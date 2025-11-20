@@ -1,0 +1,863 @@
+msgid "/api/audit/?limit=${limit}&skip=${skip}"
+msgstr ""
+
+msgid "/api/config/"
+msgstr ""
+
+msgid "/api/crm/campaigns"
+msgstr ""
+
+msgid "/api/crm/campaigns/${campaignToSend}/send"
+msgstr ""
+
+msgid "/api/crm/segments"
+msgstr ""
+
+msgid "/api/crm/subscribers"
+msgstr ""
+
+msgid "/api/crm/subscribers/import-inventree"
+msgstr ""
+
+msgid "/api/data/${formId}"
+msgstr ""
+
+msgid "/api/data/submission/${submissionId}"
+msgstr ""
+
+msgid "/api/data/submission/${submissionId}/history"
+msgstr ""
+
+msgid "/api/data/submissions/all"
+msgstr ""
+
+msgid "/api/documents/form/${formId}/templates"
+msgstr ""
+
+msgid "/api/forms/"
+msgstr ""
+
+msgid "/api/forms/${slug}"
+msgstr ""
+
+msgid "/api/system/notifications"
+msgstr ""
+
+msgid "/api/system/status"
+msgstr ""
+
+msgid "/api/templates"
+msgstr ""
+
+msgid "/api/users/"
+msgstr ""
+
+msgid "<html>\n<body>\n  <h1>{{title}}</h1>\n  <p>{{content}}</p>\n</body>\n</html>"
+msgstr ""
+
+msgid "Access Denied"
+msgstr "Acces interzis"
+
+msgid "Action"
+msgstr "Acțiune"
+
+msgid "Actions"
+msgstr "Acțiuni"
+
+msgid "Active"
+msgstr "Activ"
+
+msgid "Activity Log"
+msgstr "Jurnal activitate"
+
+msgid "Add Campaign"
+msgstr "Adaugă campanie"
+
+msgid "Add Segment"
+msgstr "Adaugă segment"
+
+msgid "Add Subscriber"
+msgstr "Adaugă abonat"
+
+msgid "Add notes..."
+msgstr "Adaugă notițe..."
+
+msgid "Admin"
+msgstr "Administrator"
+
+msgid "Administrator access required"
+msgstr "Ai nevoie de acces de administrator"
+
+msgid "Administrator access required to view submissions."
+msgstr "Ai nevoie de acces de administrator ca să vezi răspunsurile."
+
+msgid "Administrator access required to view this page."
+msgstr "Ai nevoie de acces de administrator ca să vezi această pagină."
+
+msgid "All Submissions"
+msgstr "Toate răspunsurile"
+
+msgid "All systems operational"
+msgstr "Toate sistemele funcționează"
+
+msgid "Anonymous"
+msgstr "Anonim"
+
+msgid "Are you sure you want to delete this campaign?"
+msgstr "Sigur vrei să ștergi această campanie?"
+
+msgid "Are you sure you want to delete this form? This action cannot be undone."
+msgstr "Sigur vrei să ștergi acest formular? Acțiunea nu poate fi anulată."
+
+msgid "Are you sure you want to delete this part?"
+msgstr "Sigur vrei să ștergi această parte?"
+
+msgid "Are you sure you want to delete this segment?"
+msgstr "Sigur vrei să ștergi acest segment?"
+
+msgid "Are you sure you want to delete this submission? This action cannot be undone."
+msgstr "Sigur vrei să ștergi acest răspuns? Acțiunea nu poate fi anulată."
+
+msgid "Are you sure you want to delete this subscriber?"
+msgstr "Sigur vrei să ștergi acest abonat?"
+
+msgid "Are you sure you want to send this campaign? It will be processed by the cron job."
+msgstr "Sigur vrei să trimiți campania? Va fi procesată automat de cron."
+
+msgid "Audit Log"
+msgstr "Jurnal activitate"
+
+msgid "Authentication Required"
+msgstr "E nevoie de autentificare"
+
+msgid "Authentication required for this form"
+msgstr "E nevoie de autentificare pentru acest formular"
+
+msgid "Authentication required. Please login to submit this form."
+msgstr "Trebuie să te autentifici ca să trimiți acest formular."
+
+msgid "Author"
+msgstr "Autor"
+
+msgid "Back"
+msgstr "Înapoi"
+
+msgid "Back to Dashboard"
+msgstr "Înapoi la panou"
+
+msgid "By"
+msgstr "De"
+
+msgid "Campaign created successfully"
+msgstr "Campania a fost creată cu succes"
+
+msgid "Campaign deleted successfully"
+msgstr "Campania a fost ștearsă cu succes"
+
+msgid "Campaign marked for sending. It will be processed by the cron job."
+msgstr "Campania a fost marcată pentru trimitere. Va fi procesată automat de cron."
+
+msgid "Campaign updated successfully"
+msgstr "Campania a fost actualizată cu succes"
+
+msgid "Campaigns"
+msgstr "Campanii"
+
+msgid "Cancel"
+msgstr "Anulează"
+
+msgid "Cannot connect to server. Please check if the backend is running."
+msgstr "Nu mă pot conecta la server. Verifică dacă backend-ul rulează."
+
+msgid "Cererea a fost înregistrată"
+msgstr "Cererea ta a fost înregistrată"
+
+msgid "Change State"
+msgstr "Schimbă starea"
+
+msgid "Confirm"
+msgstr "Confirmă"
+
+msgid "Confirm Submission"
+msgstr "Confirmă trimiterea"
+
+msgid "Confirmi trimiterea formularului în forma actuală?"
+msgstr "Confirmi că vrei să trimiți formularul așa cum este acum?"
+
+msgid "Consents"
+msgstr "Consimțăminte"
+
+msgid "Contact Form"
+msgstr "Formular Contact"
+
+msgid "Content"
+msgstr "Conținut"
+
+msgid "Content is required"
+msgstr "Conținutul este obligatoriu"
+
+msgid "Create"
+msgstr "Creează"
+
+msgid "Create Form"
+msgstr "Creează Formular"
+
+msgid "Create New Form"
+msgstr "Creează Formular Nou"
+
+msgid "Create New Template"
+msgstr "Creează Șablon Nou"
+
+msgid "Create Template"
+msgstr "Creează Șablon"
+
+msgid "Create your first form to get started."
+msgstr "Creează primul tău formular ca să începi."
+
+msgid "Data"
+msgstr "Date"
+
+msgid "DataFlows Docu is not configured"
+msgstr "DataFlows Docu nu este configurat"
+
+msgid "DataFlows Docu is not configured. Please configure it in config.yaml to use document templates."
+msgstr "DataFlows Docu nu este configurat. Te rog configurează-l în config.yaml ca să poți folosi șabloanele de documente."
+
+msgid "Delete"
+msgstr "Șterge"
+
+msgid "Delete Campaign"
+msgstr "Șterge Campanie"
+
+msgid "Delete Form"
+msgstr "Șterge Formular"
+
+msgid "Delete Part"
+msgstr "Șterge Parte"
+
+msgid "Delete Segment"
+msgstr "Șterge Segment"
+
+msgid "Delete Submission"
+msgstr "Șterge Răspuns"
+
+msgid "Delete Subscriber"
+msgstr "Șterge Abonat"
+
+msgid "Delete form"
+msgstr "Șterge formular"
+
+msgid "Delete submission"
+msgstr "Șterge răspuns"
+
+msgid "Description"
+msgstr "Descriere"
+
+msgid "Document Templates"
+msgstr "Șabloane Documente"
+
+msgid "Document generated successfully!"
+msgstr "Document generat cu succes!"
+
+msgid "Drag image here or click to select"
+msgstr "Trage imaginea aici sau dă click ca să alegi"
+
+msgid "Edit"
+msgstr "Editează"
+
+msgid "Edit Campaign"
+msgstr "Editează Campanie"
+
+msgid "Edit Form"
+msgstr "Editează Formular"
+
+msgid "Edit Segment"
+msgstr "Editează Segment"
+
+msgid "Edit Subscriber"
+msgstr "Editează Abonat"
+
+msgid "Edit form"
+msgstr "Editează formular"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "Email marketing consent"
+msgstr "Consimțământ pentru email marketing"
+
+msgid "English"
+msgstr "English"
+
+msgid "Enter campaign title"
+msgstr "Introdu titlul campaniei"
+
+msgid "Enter description"
+msgstr "Introdu descrierea"
+
+msgid "Enter email"
+msgstr "Introdu emailul"
+
+msgid "Enter link URL"
+msgstr "Introdu linkul URL"
+
+msgid "Enter name"
+msgstr "Introdu numele"
+
+msgid "Enter phone"
+msgstr "Introdu numărul de telefon"
+
+msgid "Enter segment name"
+msgstr "Introdu numele segmentului"
+
+msgid "Enter tax ID"
+msgstr "Introdu codul fiscal"
+
+msgid "Enter your password"
+msgstr "Introdu parola"
+
+msgid "Enter your username"
+msgstr "Introdu numele de utilizator"
+
+msgid "Error"
+msgstr "Eroare"
+
+msgid "Failed to create template"
+msgstr "Nu am putut crea șablonul"
+
+msgid "Failed to delete campaign"
+msgstr "Nu am putut șterge campania"
+
+msgid "Failed to delete form"
+msgstr "Nu am putut șterge formularul"
+
+msgid "Failed to delete part"
+msgstr "Nu am putut șterge partea"
+
+msgid "Failed to delete segment"
+msgstr "Nu am putut șterge segmentul"
+
+msgid "Failed to delete submission"
+msgstr "Nu am putut șterge răspunsul"
+
+msgid "Failed to delete subscriber"
+msgstr "Nu am putut șterge abonatul"
+
+msgid "Failed to generate document"
+msgstr "Nu am putut genera documentul"
+
+msgid "Failed to import from InvenTree"
+msgstr "Nu am putut importa din InvenTree"
+
+msgid "Failed to load campaigns"
+msgstr "Nu am putut încărca campaniile"
+
+msgid "Failed to load form"
+msgstr "Nu am putut încărca formularul"
+
+msgid "Failed to load forms"
+msgstr "Nu am putut încărca formularele"
+
+msgid "Failed to load part content"
+msgstr "Nu am putut încărca conținutul părții"
+
+msgid "Failed to load segments"
+msgstr "Nu am putut încărca segmentele"
+
+msgid "Failed to load submission"
+msgstr "Nu am putut încărca răspunsul"
+
+msgid "Failed to load submissions"
+msgstr "Nu am putut încărca răspunsurile"
+
+msgid "Failed to load subscribers"
+msgstr "Nu am putut încărca abonații"
+
+msgid "Failed to load template content"
+msgstr "Nu am putut încărca conținutul șablonului"
+
+msgid "Failed to load templates"
+msgstr "Nu am putut încărca șabloanele"
+
+msgid "Failed to save campaign"
+msgstr "Nu am putut salva campania"
+
+msgid "Failed to save part"
+msgstr "Nu am putut salva partea"
+
+msgid "Failed to save segment"
+msgstr "Nu am putut salva segmentul"
+
+msgid "Failed to save subscriber"
+msgstr "Nu am putut salva abonatul"
+
+msgid "Failed to send campaign"
+msgstr "Nu am putut trimite campania"
+
+msgid "Failed to submit form. Please try again."
+msgstr "Nu am putut trimite formularul. Încearcă din nou."
+
+msgid "Failed to update state"
+msgstr "Nu am putut actualiza starea"
+
+msgid "Failed to upload image"
+msgstr "Nu am putut încărca imaginea"
+
+msgid "Form"
+msgstr "Formular"
+
+msgid "Form Schema"
+msgstr "Schema Formular"
+
+msgid "Form Submissions"
+msgstr "Răspunsuri Formular"
+
+msgid "Form Summary"
+msgstr "Rezumat Formular"
+
+msgid "Form Title"
+msgstr "Titlu Formular"
+
+msgid "Form created successfully"
+msgstr "Formular creat cu succes"
+
+msgid "Form deleted successfully"
+msgstr "Formular șters cu succes"
+
+msgid "Form description..."
+msgstr "Descrierea formularului..."
+
+msgid "Form not found"
+msgstr "Formularul nu a fost găsit"
+
+msgid "Form submitted successfully!"
+msgstr "Formular trimis cu succes!"
+
+msgid "Form updated successfully"
+msgstr "Formular actualizat cu succes"
+
+msgid "Forms"
+msgstr "Formulare"
+
+msgid "Forms Management"
+msgstr "Management Formulare"
+
+msgid "Generate Document"
+msgstr "Generează Document"
+
+msgid "History"
+msgstr "Istoric"
+
+msgid "IP Address"
+msgstr "Adresă IP"
+
+msgid "Image"
+msgstr "Imagine"
+
+msgid "Image should not exceed 5MB"
+msgstr "Imaginea nu trebuie să depășească 5MB"
+
+msgid "Image uploaded successfully"
+msgstr "Imagine încărcată cu succes"
+
+msgid "Import from InvenTree"
+msgstr "Importă din InvenTree"
+
+msgid "Imported"
+msgstr "Importat"
+
+msgid "Inactive"
+msgstr "Inactiv"
+
+msgid "Invalid InvenTree credentials. Please check your username and password."
+msgstr "Datele de autentificare InvenTree sunt invalide. Verifică numele de utilizator și parola."
+
+msgid "Invalid file type. Please upload an image."
+msgstr "Tip de fișier invalid. Te rog încarcă o imagine."
+
+msgid "JSON Forms Documentation"
+msgstr "Documentație JSON Forms"
+
+msgid "JSON Schema"
+msgstr "Schema JSON"
+
+msgid "JavaScript code"
+msgstr "Cod JavaScript"
+
+msgid "Last Login"
+msgstr "Ultima autentificare"
+
+msgid "Last updated"
+msgstr "Ultima actualizare"
+
+msgid "Link"
+msgstr "Link"
+
+msgid "Load More"
+msgstr "Încarcă mai mult"
+
+msgid "Loading audit logs..."
+msgstr "Se încarcă jurnalul..."
+
+msgid "Loading campaigns..."
+msgstr "Se încarcă campaniile..."
+
+msgid "Loading form..."
+msgstr "Se încarcă formularul..."
+
+msgid "Loading forms..."
+msgstr "Se încarcă formularele..."
+
+msgid "Loading notifications..."
+msgstr "Se încarcă notificările..."
+
+msgid "Loading segments..."
+msgstr "Se încarcă segmentele..."
+
+msgid "Loading submission..."
+msgstr "Se încarcă răspunsul..."
+
+msgid "Loading submissions..."
+msgstr "Se încarcă răspunsurile..."
+
+msgid "Loading subscribers..."
+msgstr "Se încarcă abonații..."
+
+msgid "Loading templates..."
+msgstr "Se încarcă șabloanele..."
+
+msgid "Loading users..."
+msgstr "Se încarcă utilizatorii..."
+
+msgid "Login"
+msgstr "Autentificare"
+
+msgid "Logout"
+msgstr "Deconectare"
+
+msgid "Message"
+msgstr "Mesaj"
+
+msgid "My Template"
+msgstr "Șablonul Meu"
+
+msgid "Name"
+msgstr "Nume"
+
+msgid "Need help with JSON Schema or UI Schema?"
+msgstr "Ai nevoie de ajutor cu Schema JSON sau Schema UI?"
+
+msgid "Never"
+msgstr "Niciodată"
+
+msgid "New Template"
+msgstr "Șablon Nou"
+
+msgid "Next: Add JSON Schema"
+msgstr "Următorul: Adaugă Schema JSON"
+
+msgid "Next: Update JSON Schema"
+msgstr "Următorul: Actualizează Schema JSON"
+
+msgid "No"
+msgstr "Nu"
+
+msgid "No audit logs found"
+msgstr "Nu am găsit niciun jurnal"
+
+msgid "No campaigns"
+msgstr "Nicio campanie"
+
+msgid "No campaigns found. Create your first campaign to send to subscribers."
+msgstr "Nu am găsit nicio campanie. Creează prima ta campanie ca să le trimiți abonaților."
+
+msgid "No forms yet"
+msgstr "Niciun formular încă"
+
+msgid "No history"
+msgstr "Niciun istoric"
+
+msgid "No notifications"
+msgstr "Nicio notificare"
+
+msgid "No segments"
+msgstr "Niciun segment"
+
+msgid "No segments found. Add your first segment to organize subscribers."
+msgstr "Nu am găsit niciun segment. Adaugă primul tău segment ca să organizezi abonații."
+
+msgid "No submissions"
+msgstr "Niciun răspuns"
+
+msgid "No submissions found."
+msgstr "Nu am găsit niciun răspuns."
+
+msgid "No submissions yet"
+msgstr "Niciun răspuns încă"
+
+msgid "No subscribers"
+msgstr "Niciun abonat"
+
+msgid "No subscribers found. Add your first subscriber or import from InvenTree."
+msgstr "Nu am găsit niciun abonat. Adaugă primul abonat sau importă din InvenTree."
+
+msgid "No templates available"
+msgstr "Niciun șablon disponibil"
+
+msgid "No templates available in DataFlows Docu"
+msgstr "Niciun șablon disponibil în DataFlows Docu"
+
+msgid "No templates found"
+msgstr "Nu am găsit niciun șablon"
+
+msgid "No users found"
+msgstr "Nu am găsit niciun utilizator"
+
+msgid "Not Found"
+msgstr "Negăsit"
+
+msgid "Notes"
+msgstr "Notițe"
+
+msgid "Notifications"
+msgstr "Notificări"
+
+msgid "Notify author"
+msgstr "Anunță autorul"
+
+msgid "Part Type"
+msgstr "Tip parte"
+
+msgid "Part deleted successfully"
+msgstr "Partea a fost ștearsă cu succes"
+
+msgid "Part updated successfully"
+msgstr "Partea a fost actualizată cu succes"
+
+msgid "Password"
+msgstr "Parolă"
+
+msgid "Phone"
+msgstr "Telefon"
+
+msgid "Please login to submit this form"
+msgstr "Te rog autentifică-te ca să trimiți acest formular"
+
+msgid "Preview"
+msgstr "Previzualizare"
+
+msgid "Protected"
+msgstr "Protejat"
+
+msgid "Protected Form"
+msgstr "Formular Protejat"
+
+msgid "Public"
+msgstr "Public"
+
+msgid "Public Form"
+msgstr "Formular Public"
+
+msgid "Public forms can be filled by anyone. Protected forms require authentication."
+msgstr "Formularele publice pot fi completate de oricine. Formularele protejate cer autentificare."
+
+msgid "Recent Submissions"
+msgstr "Răspunsuri Recente"
+
+msgid "Role"
+msgstr "Rol"
+
+msgid "Română"
+msgstr "Română"
+
+msgid "SMS marketing consent"
+msgstr "Consimțământ pentru SMS marketing"
+
+msgid "Save"
+msgstr "Salvează"
+
+msgid "Segment"
+msgstr "Segment"
+
+msgid "Segment created successfully"
+msgstr "Segment creat cu succes"
+
+msgid "Segment deleted successfully"
+msgstr "Segment șters cu succes"
+
+msgid "Segment updated successfully"
+msgstr "Segment actualizat cu succes"
+
+msgid "Segments"
+msgstr "Segmente"
+
+msgid "Select segment"
+msgstr "Selectează segment"
+
+msgid "Select segments"
+msgstr "Selectează segmente"
+
+msgid "Select templates"
+msgstr "Selectează șabloane"
+
+msgid "Select templates for document generation"
+msgstr "Selectează șabloane pentru generarea documentelor"
+
+msgid "Select the type of template part to create"
+msgstr "Selectează tipul părții de șablon pe care vrei să o creezi"
+
+msgid "Send Campaign"
+msgstr "Trimite Campania"
+
+msgid "Sent Count"
+msgstr "Număr Trimise"
+
+msgid "Skipped"
+msgstr "Sărite"
+
+msgid "Slug"
+msgstr "Slug"
+
+msgid "Standard CSS syntax"
+msgstr "Sintaxă CSS standard"
+
+msgid "State"
+msgstr "Stare"
+
+msgid "State updated successfully"
+msgstr "Stare actualizată cu succes"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Submission Details"
+msgstr "Detalii Răspuns"
+
+msgid "Submission deleted successfully"
+msgstr "Răspuns șters cu succes"
+
+msgid "Submission not found"
+msgstr "Răspunsul nu a fost găsit"
+
+msgid "Submit"
+msgstr "Trimite"
+
+msgid "Submitted At"
+msgstr "Trimis La"
+
+msgid "Submitted By"
+msgstr "Trimis De"
+
+msgid "Subscriber created successfully"
+msgstr "Abonat creat cu succes"
+
+msgid "Subscriber deleted successfully"
+msgstr "Abonat șters cu succes"
+
+msgid "Subscriber updated successfully"
+msgstr "Abonat actualizat cu succes"
+
+msgid "Subscribers"
+msgstr "Abonați"
+
+msgid "Success"
+msgstr "Succes"
+
+msgid "System Notifications"
+msgstr "Notificări Sistem"
+
+msgid "T"
+msgstr "T"
+
+msgid "Tax ID"
+msgstr "Cod fiscal"
+
+msgid "Tax ID (CUI/CIF)"
+msgstr "Cod fiscal (CUI/CIF)"
+
+msgid "Template Name"
+msgstr "Nume Șablon"
+
+msgid "Template Parts"
+msgstr "Părți Șablon"
+
+msgid "Template created successfully"
+msgstr "Șablon creat cu succes"
+
+msgid "Template name is required"
+msgstr "Numele șablonului este obligatoriu"
+
+msgid "Templates"
+msgstr "Șabloane"
+
+msgid "The DataFlows Docu server may be experiencing issues with the /raw endpoint."
+msgstr "Serverul DataFlows Docu poate avea probleme cu endpoint-ul /raw."
+
+msgid "This action cannot be undone."
+msgstr "Acțiunea asta nu poate fi anulată."
+
+msgid "This is a protected form. You need to login to access it."
+msgstr "Acesta este un formular protejat. Trebuie să te autentifici ca să-l accesezi."
+
+msgid "Timestamp"
+msgstr "Data/Ora"
+
+msgid "Title"
+msgstr "Titlu"
+
+msgid "Type"
+msgstr "Tip"
+
+msgid "UI Schema (optional)"
+msgstr "Schema UI (opțional)"
+
+msgid "Unable to load template content. Please try again later or contact support."
+msgstr "Nu pot încărca conținutul șablonului. Încearcă mai târziu sau contactează suportul."
+
+msgid "Update"
+msgstr "Actualizează"
+
+msgid "Update Form Schema"
+msgstr "Actualizează Schema Formular"
+
+msgid "Update State"
+msgstr "Actualizează Starea"
+
+msgid "Use Jinja2 syntax: {{variable}}, {% for %}, {% if %}"
+msgstr "Folosește sintaxa Jinja2: {{variable}}, {% for %}, {% if %}"
+
+msgid "User"
+msgstr "Utilizator"
+
+msgid "Username"
+msgstr "Utilizator"
+
+msgid "Users"
+msgstr "Utilizatori"
+
+msgid "Users List"
+msgstr "Lista Utilizatori"
+
+msgid "View All Submissions"
+msgstr "Vezi toate răspunsurile"
+
+msgid "View Documentation"
+msgstr "Vezi Documentația"
+
+msgid "View details"
+msgstr "Vezi detalii"
+
+msgid "View submissions"
+msgstr "Vezi răspunsurile"
+
+msgid "Will be verified with ANAF if provided"
+msgstr "Va fi verificat automat la ANAF dacă îl introduci"
+
+msgid "Yes"
+msgstr "Da"
+
+msgid "a"
+msgstr "a"
+
+msgid "part"
+msgstr "parte"
