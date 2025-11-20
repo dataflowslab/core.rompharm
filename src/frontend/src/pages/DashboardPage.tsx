@@ -1,18 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Container, Title, Stack, SimpleGrid, Paper, Text, Group } from '@mantine/core';
 import { IconClipboardList } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
-
-interface RequestShortcut {}
 
 export function DashboardPage() {
   const { username } = useAuth();
   const { t } = useTranslation();
-  const [loading] = useState(false);
 
-  useEffect(() => {}, []);
+  useEffect(() => {
+    // Future: load dashboard data
+  }, []);
 
   return (
     <Container size="xl" mt={30}>

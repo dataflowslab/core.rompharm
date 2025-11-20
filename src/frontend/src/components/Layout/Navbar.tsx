@@ -11,6 +11,7 @@ import {
   IconArrowsExchange,
   IconBox,
   IconClipboardList,
+  IconFileText,
 } from '@tabler/icons-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -20,17 +21,9 @@ export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const [depoConfigured, setDepoConfigured] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
-    // Check system status
-    api.get('/api/system/status')
-      .then((response) => {
-        setDepoConfigured(response.data.dataflows_docu?.configured || false);
-      })
-      .catch(() => {});
-
     // Check notifications 
     api.get('/api/system/notifications')
       .then((response) => {
