@@ -15,6 +15,7 @@ import { SubmissionsListPage } from './pages/SubmissionsListPage';
 import { SubmissionDetailPage } from './pages/SubmissionDetailPage';
 import { RequestsPage } from './pages/RequestsPage';
 import { ProcurementPage } from './pages/ProcurementPage';
+import { ProcurementDetailPage } from './pages/ProcurementDetailPage';
 import { SalesPage } from './pages/SalesPage';
 import { BuildOrdersPage } from './pages/BuildOrdersPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
@@ -122,6 +123,7 @@ function App() {
           <Route path="/build-orders" element={<ProtectedRoute><BuildOrdersPage /></ProtectedRoute>} />
           <Route path="/build-simulation" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/procurement" element={<ProtectedRoute><ProcurementPage /></ProtectedRoute>} />
+          <Route path="/procurement/:id" element={<ProtectedRoute><ProcurementDetailPage /></ProtectedRoute>} />
           <Route path="/reception" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><SalesPage /></ProtectedRoute>} />
           <Route path="/returns" element={<ProtectedRoute><div /></ProtectedRoute>} />

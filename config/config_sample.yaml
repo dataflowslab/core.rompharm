@@ -1,0 +1,68 @@
+# DataFlows Core Configuration Sample
+# Copy this file to config.yaml and fill in your values
+
+# InvenTree Configuration
+# Used for authentication - users login with InvenTree credentials
+inventree:
+  url: "https://your-inventree-instance.com/"  # Your InvenTree instance URL
+
+# MongoDB Configuration
+# Database for storing forms, submissions, and application data
+mongo:
+  auth_string: "mongodb+srv://username:password@cluster.mongodb.net/database_name?retryWrites=true&w=majority"  # MongoDB connection string
+
+# Web Configuration
+# Base URLs and server settings
+web:
+  base_url: "http://localhost:8000"  # Base URL for the application (used in QR codes, emails, etc.)
+  media_url: "/media/img"  # URL path for media files
+  port: 8000  # Port where the application will run
+  host: "0.0.0.0"  # Host to bind to (0.0.0.0 for all interfaces, 127.0.0.1 for localhost only)
+
+# Application Security
+# Secret key for JWT tokens and session management
+app:
+  secret_key: "your-secret-key-here-generate-a-random-string"  # Generate a secure random string (min 32 characters)
+  debug: false  # Set to true only in development
+
+# DataFlows Docu Integration (Optional)
+# For document generation from templates
+dataflows_docu:
+  url: "https://docu.dataflows.ro"  # DataFlows Docu service URL
+  token: "your-dataflows-docu-token"  # API token for DataFlows Docu
+
+# Email Configuration (Newsman API)
+# Used for form notifications and email campaigns
+# API Documentation: https://cluster.newsmanapp.com/api/1.0/message.send
+email:
+  mailing_operator: "newsman"  # Email service provider
+  newsman_api_key: "your-newsman-api-key"  # Newsman API Key
+  newsman_account_id: "your-newsman-account-id"  # Newsman Account ID
+  from_email: "noreply@yourdomain.com"  # Sender email address
+  from_name: "DataFlows Core"  # Sender name
+
+# Document Generation Settings
+document_generation:
+  max_revisions: 3  # Maximum number of document revisions to keep
+
+# File Upload Configuration
+# Settings for form file uploads
+file_uploads:
+  path: "media/files"  # Directory path for uploaded files (relative to project root)
+  max_size_mb: 10  # Maximum file size in megabytes
+  allowed_extensions:  # Allowed file extensions
+    - pdf
+    - doc
+    - docx
+    - xls
+    - xlsx
+    - jpg
+    - jpeg
+    - png
+    - gif
+    - zip
+
+# API Configuration
+# Settings for API requests and responses
+api:
+  search_results_limit: 30  # Maximum number of results to return in search/autocomplete endpoints

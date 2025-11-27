@@ -10,6 +10,8 @@ import {
   Button,
   Stack,
   Alert,
+  Box,
+  Image,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useAuth } from '../context/AuthContext';
@@ -50,46 +52,69 @@ export function LoginPage() {
   };
 
   return (
-    <Container size="xs" mt={100}>
-      <Paper shadow="md" p="xl" radius="md" withBorder>
-        <Title order={2} ta="center" mb="lg">
-          {t('Login')}
-        </Title>
-
-        <form onSubmit={handleSubmit}>
-          <Stack>
-            {error && (
-              <Alert
-                icon={<IconAlertCircle size={16} />}
-                title={t('Error')}
-                color="red"
-              >
-                {error}
-              </Alert>
-            )}
-
-            <TextInput
-              label={t('Username')}
-              placeholder={t('Enter your username')}
-              value={username}
-              onChange={(e) => setUsername(e.currentTarget.value)}
-              required
+    <Box
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundImage: 'url(/media/img/login_bg.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      <Container size="xs">
+        <Paper shadow="xl" p="xl" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
+          {/* Logo */}
+          <Box mb="xl" style={{ textAlign: 'center', padding: '20px', border: '2px solid #e9ecef', borderRadius: '8px' }}>
+            <Image
+              src="/media/img/logo.svg"
+              alt="DataFlows"
+              height={60}
+              fit="contain"
             />
+          </Box>
 
-            <PasswordInput
-              label={t('Password')}
-              placeholder={t('Enter your password')}
-              value={password}
-              onChange={(e) => setPassword(e.currentTarget.value)}
-              required
-            />
+          <Title order={2} ta="center" mb="lg">
+            {t('Login')}
+          </Title>
 
-            <Button type="submit" fullWidth loading={loading}>
-              {t('Login')}
-            </Button>
-          </Stack>
-        </form>
-      </Paper>
-    </Container>
+          <form onSubmit={handleSubmit}>
+            <Stack>
+              {error && (
+                <Alert
+                  icon={<IconAlertCircle size={16} />}
+                  title={t('Error')}
+                  color="red"
+                >
+                  {error}
+                </Alert>
+              )}
+
+              <TextInput
+                label={t('Username')}
+                placeholder={t('Enter your username')}
+                value={username}
+                onChange={(e) => setUsername(e.currentTarget.value)}
+                required
+              />
+
+              <PasswordInput
+                label={t('Password')}
+                placeholder={t('Enter your password')}
+                value={password}
+                onChange={(e) => setPassword(e.currentTarget.value)}
+                required
+              />
+
+              <Button type="submit" fullWidth loading={loading}>
+                {t('Login')}
+              </Button>
+            </Stack>
+          </form>
+        </Paper>
+      </Container>
+    </Box>
   );
 }

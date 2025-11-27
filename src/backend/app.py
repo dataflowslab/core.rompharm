@@ -16,8 +16,11 @@ from .routes import users
 from .routes import audit
 from .routes import system
 from .routes import external
+from .routes import approvals
+from .routes import procurement
 from .utils.db import close_db
 from .scheduler import get_scheduler
+from .modules import register_modules
 
 # Create FastAPI app
 app = FastAPI(
@@ -35,7 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include core routers
 app.include_router(auth.router)
 app.include_router(forms.router)
 app.include_router(data.router)
@@ -45,6 +48,13 @@ app.include_router(users.router)
 app.include_router(audit.router)
 app.include_router(system.router)
 app.include_router(external.router)
+app.include_router(approvals.router)
+app.include_router(procurement.router)
+
+# Register modules dynamically
+print("\n=== Loading Modules ===")
+register_modules(app)
+print("=== Modules Loaded ===\n")
 
 # Mount media directory
 media_path = os.path.join(os.path.dirname(__file__), '..', '..', 'media')

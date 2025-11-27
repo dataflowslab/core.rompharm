@@ -1,10 +1,26 @@
 # DataFlows Core Configuration Sample
 # Copy this file to config.yaml and fill in your values
 
-# InvenTree Configuration
+# Identity Server Configuration
+# Choose between 'inventree' or 'firebase' for authentication
+identity_server: "inventree"  # Options: inventree, firebase
+
+# InvenTree Configuration (if identity_server = inventree)
 # Used for authentication - users login with InvenTree credentials
 inventree:
   url: "https://your-inventree-instance.com/"  # Your InvenTree instance URL
+  token: ""  # Optional: API token for admin operations
+
+# Firebase Configuration (if identity_server = firebase)
+# Used for authentication - users login with Firebase credentials
+firebase:
+  api_key: "your-firebase-api-key"
+  auth_domain: "your-project.firebaseapp.com"
+  project_id: "your-project-id"
+  storage_bucket: "your-project.appspot.com"
+  messaging_sender_id: "your-sender-id"
+  app_id: "your-app-id"
+  admin_sdk_json: "config/firebase-admin-sdk.json"  # Path to Firebase Admin SDK JSON file (relative to project root)
 
 # MongoDB Configuration
 # Database for storing forms, submissions, and application data

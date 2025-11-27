@@ -2,6 +2,613 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2024-12-XX
+
+### Added
+- **Global Approval System**: Complete approval/signature workflow for DataFlows Core
+  - Database tables: `approval_templates` and `approval_flows`
+  - Approval templates define who must/can sign for each object type
+  - Approval flows track signatures for specific objects
+  - SHA256 signature hashing for security
+  - Officers can be persons or roles
+  - Required vs optional approvers
+  - Admin-only signature removal
+  - Automatic status updates when signed
+  
+- **Procurement Approval Integration**
+  - Approval flow for procurement orders
+  - "Approvals" tab in procurement detail page
+  - Create approval flow button (admin only)
+  - Sign button for authorized users
+  - Visual status badges (pending, in_progress, approved)
+  - Signature table with hash display
+  - Admin can remove signatures
+  - Order automatically moves to "Placed" status when signed
+  - Template-based approval configuration
+
+### Technical
+- **Backend Routes** (`/api/approvals`):
+  - `GET /api/approvals/templates` - List approval templates
+  - `POST /api/approvals/templates` - Create template
+  - `GET /api/approvals/templates/{id}` - Get template
+  - `PUT /api/approvals/templates/{id}` - Update template
+  - `DELETE /api/approvals/templates/{id}` - Delete template
+  - `GET /api/approvals/flows` - List approval flows
+  - `POST /api/approvals/flows` - Create flow
+  - `GET /api/approvals/flows/{id}` - Get flow
+  - `GET /api/approvals/flows/object/{type}/{id}` - Get flow by object
+  - `POST /api/approvals/flows/{id}/sign` - Sign flow
+  - `DELETE /api/approvals/flows/{id}/signatures/{user_id}` - Remove signature (admin)
+
+- **Procurement Routes** (`/api/procurement`):
+  - `GET /api/procurement/purchase-orders/{id}/approval-flow` - Get order approval flow
+  - `POST /api/procurement/purchase-orders/{id}/approval-flow` - Create order approval flow
+  - `POST /api/procurement/purchase-orders/{id}/sign` - Sign purchase order
+  - `DELETE /api/procurement/purchase-orders/{id}/signatures/{user_id}` - Remove signature
+
+- **Models**:
+  - `ApprovalTemplateModel` - Template configuration
+  - `ApprovalFlowModel` - Flow instance with signatures
+  - `ApprovalOfficer` - Officer definition (person/role, must/can sign)
+  - `ApprovalSignature` - Individual signature with hash
+
+- **Frontend Component**:
+  - `ApprovalsTab.tsx` - Complete approval UI
+  - Shows required and optional approvers
+  - Displays all signatures with timestamps
+  - Sign button for authorized users
+  - Remove button for admins
+  - Status badges and visual feedback
+
+### Database Schema
+```javascript
+// approval_templates
+{
+  object_type: "procurement_order",
+  object_source: "depo_procurement",
+  name: "Procurement Order Approval",
+  description: "Approval workflow for procurement orders",
+  officers: [
+    {
+      type: "person" | "role",
+      reference: "user_id" | "role_name",
+      action: "must_sign" | "can_sign",
+      order: 1
+    }
+  ],
+  active: true,
+  created_at: DateTime,
+  updated_at: DateTime
+}
+
+// approval_flows
+{
+  object_type: "procurement_order",
+  object_source: "depo_procurement",
+  object_id: "123",
+  template_id: "template_id",
+  required_officers: [...],
+  optional_officers: [...],
+  signatures: [
+    {
+      user_id: "user_id",
+      username: "username",
+      signed_at: DateTime,
+      signature_hash: "sha256_hash",
+      ip_address: "127.0.0.1",
+      user_agent: "Mozilla/5.0..."
+    }
+  ],
+  status: "pending" | "in_progress" | "approved" | "rejected",
+  created_at: DateTime,
+  updated_at: DateTime,
+  completed_at: DateTime
+}
+```
+
+### Initialization
+- Run `python init_procurement_approval_template.py` to create default template
+- Default template requires admin role approval
+- Customize officers in database or through admin interface
+
+### Security
+- Signatures use SHA256 hashing
+- Hash includes: user_id, object_type, object_id, timestamp
+- Users cannot remove their own signatures
+- Only admins can remove signatures
+- Backend validates authorization before signing
+
+### Workflow
+1. Admin creates approval flow for purchase order
+2. System loads template and creates flow instance
+3. Authorized users see "Sign" button
+4. User clicks sign → generates hash → stores signature
+5. Order status automatically updates to "Placed"
+6. When all required officers sign → flow marked as "approved"
+7. Admin can remove signatures if needed
+
+### Notes
+- Approval system is global and reusable for any object type
+- Template-based configuration allows flexibility
+- Role-based and person-based authorization
+- Signature hashes provide audit trail
+- Integration with InvenTree status updates
+
+---
+
+## [1.7.0] - 2024-12-XX
+
+### Added
+- **Global Approval System**: Complete approval workflow system for DataFlows Core
+  - Database tables: `approval_flows` and `approval_templates`
+  - Template-based approval configuration per object type
+  - Support for person-based and role-based approvers
+  - Required approvers (must_sign) and optional approvers (can_sign)
+  - Digital signature generation with SHA256 hash
+  - Signature includes: user_id, object_type, object_id, timestamp, IP address, user agent
+  - Approval flow status tracking: pending, in_progress, approved, rejected
+  - Complete audit trail with signature history
+  - Admin-only signature removal capability
+  - Users cannot remove their own signatures
+
+- **Procurement Order Approval Integration**
+  - Approval flow creation for procurement orders
+  - Object type: "procurement_order", source: "depo_procurement"
+  - Automatic order status update to "Placed" (20) when signed
+  - ApprovalsTab component with full approval UI
+  - Display required and optional approvers
+  - Show signature list with timestamps and hashes
+  - Sign button for authorized users
+  - Admin controls for signature removal
+  - Real-time approval status badges
+  - Integration with InvenTree order status
+
+- **Backend API Endpoints**:
+  - `GET /api/approvals/templates` - List approval templates
+  - `POST /api/approvals/templates` - Create approval template
+  - `GET /api/approvals/templates/{id}` - Get template details
+  - `PUT /api/approvals/templates/{id}` - Update template
+  - `DELETE /api/approvals/templates/{id}` - Delete template
+  - `GET /api/approvals/flows` - List approval flows
+  - `POST /api/approvals/flows` - Create approval flow
+  - `GET /api/approvals/flows/{id}` - Get flow details
+  - `GET /api/approvals/flows/object/{type}/{id}` - Get flow by object
+  - `POST /api/approvals/flows/{id}/sign` - Sign approval flow
+  - `DELETE /api/approvals/flows/{id}/signatures/{user_id}` - Remove signature (admin)
+  - `GET /api/procurement/purchase-orders/{id}/approval-flow` - Get order approval flow
+  - `POST /api/procurement/purchase-orders/{id}/approval-flow` - Create order approval flow
+  - `POST /api/procurement/purchase-orders/{id}/sign` - Sign purchase order
+  - `DELETE /api/procurement/purchase-orders/{id}/signatures/{user_id}` - Remove order signature
+
+- **Frontend Components**:
+  - `ApprovalsTab.tsx` - Complete approval UI for procurement orders
+  - Display approval flow status with color-coded badges
+  - List required and optional approvers with sign status
+  - Signature table with user, timestamp, and hash
+  - Sign button for authorized users
+  - Admin-only remove signature buttons
+  - Real-time status updates
+  - Integration with order refresh
+
+### Technical
+- New models:
+  - `ApprovalFlowModel` - Tracks approval status for objects
+  - `ApprovalTemplateModel` - Defines approval workflows
+  - `ApprovalOfficer` - Officer configuration (person/role, must/can sign)
+  - `ApprovalSignature` - Individual signature with hash
+- Signature hash generation: SHA256(user_id + object_type + object_id + timestamp)
+- Role-based authorization checking
+- Person-based authorization checking
+- Automatic status progression (pending → in_progress → approved)
+- Integration with existing user and role systems
+- MongoDB collections: `approval_flows`, `approval_templates`
+
+### Database Schema
+```python
+approval_templates = {
+    "object_type": "procurement_order",
+    "object_source": "depo_procurement",
+    "name": "Procurement Order Approval",
+    "description": "Approval workflow for procurement orders",
+    "officers": [
+        {
+            "type": "person" | "role",
+            "reference": "user_id" | "role_name",
+            "action": "must_sign" | "can_sign",
+            "order": 1
+        }
+    ],
+    "active": True
+}
+
+approval_flows = {
+    "object_type": "procurement_order",
+    "object_source": "depo_procurement",
+    "object_id": "123",
+    "template_id": "template_id",
+    "required_officers": [...],
+    "optional_officers": [...],
+    "signatures": [
+        {
+            "user_id": "user_id",
+            "username": "username",
+            "signed_at": "2024-12-XX",
+            "signature_hash": "sha256_hash",
+            "ip_address": "192.168.1.1",
+            "user_agent": "Mozilla/5.0..."
+        }
+    ],
+    "status": "pending" | "in_progress" | "approved" | "rejected"
+}
+```
+
+### Setup
+1. Run initialization script to create approval template:
+   ```bash
+   python init_procurement_approval_template.py
+   ```
+2. Customize template officers in MongoDB:
+   - Add person-based approvers with user IDs
+   - Add role-based approvers with role names
+   - Set action: "must_sign" for required, "can_sign" for optional
+3. Create approval flow for procurement orders via admin UI or API
+4. Users can sign orders from ApprovalsTab
+5. Order automatically moves to "Placed" status when signed
+
+### Features
+- ��� Template-based approval configuration
+- ✅ Person and role-based approvers
+- ✅ Required and optional approvers
+- ✅ Digital signature with hash
+- ✅ Complete audit trail
+- ✅ Admin signature removal
+- ✅ User cannot remove own signature
+- ✅ Automatic status updates
+- ✅ Real-time UI updates
+- ✅ Integration with procurement orders
+- ✅ Reusable for any object type
+
+### Notes
+- Approval system is global and reusable for any object type
+- Procurement orders are the first implementation
+- Template must be created before approval flows can be used
+- Signatures are cryptographically secure with SHA256 hashing
+- IP address and user agent tracked for audit purposes
+- Admin users can remove signatures for corrections
+- Users cannot remove their own signatures (audit integrity)
+- Order status automatically updates to "Placed" when signed
+- System supports multiple approvers per order
+- Approval flow status progresses automatically based on signatures
+
+---
+
+## [1.6.0] - 2024-12-XX
+
+### Added
+- **Module System**: Dynamic module loading architecture
+  - Modules can be enabled/disabled via `config.yaml`
+  - Each module has its own API prefix: `/modules/{module_name}/api`
+  - Module configuration via `config.json` (version, display name, dependencies, menu items)
+  - Automatic router registration on application startup
+  - Module loader with error handling and logging
+  - Support for module-specific menu items
+
+- **DEPO Procurement Module** (`depo_procurement`)
+  - First modular implementation of procurement system
+  - Complete InvenTree integration
+  - API prefix: `/modules/depo_procurement/api`
+  - All procurement features moved to module
+  - Module README with installation and usage instructions
+  - Module version: 1.0.0
+
+### Changed
+- **Application Architecture**: Modular design
+  - Core application (`src/backend/app.py`) loads modules dynamically
+  - Modules stored in `src/backend/modules/` directory
+  - Each module is self-contained with routes, models, and config
+  - Frontend API calls centralized in `src/frontend/src/services/procurement.ts`
+  - Module configuration in `src/frontend/src/config/modules.ts`
+
+### Technical
+- New directory structure:
+  ```
+  src/backend/modules/
+  ├── __init__.py (module loader)
+  └── depo_procurement/
+      ├── __init__.py
+      ├── routes.py
+      ├── config.json
+      └── README.md
+  ```
+- Module loader functions:
+  - `register_modules(app)` - Register all enabled modules
+  - `get_enabled_modules()` - Get list from config
+  - `load_module_config()` - Load module configuration
+  - `get_module_menu_items()` - Get menu items from modules
+- Dynamic import using `importlib.util.spec_from_file_location`
+- Module isolation with separate API prefixes
+
+### Configuration
+```yaml
+modules:
+  active:
+    - depo_procurement
+```
+
+### Module Structure
+Each module contains:
+- `config.json` - Module metadata and configuration
+- `__init__.py` - Module initialization and router export
+- `routes.py` - FastAPI routes
+- `README.md` - Module documentation
+- Optional: `models.py`, `utils.py`, etc.
+
+### Benefits
+- ✅ Easy to add/remove features
+- ✅ Clean separation of concerns
+- ✅ Independent module versioning
+- ✅ Simplified testing and maintenance
+- ✅ Reusable across projects
+
+### Frontend Updates
+- **ProcurementPage.tsx**: Updated to use `procurementApi` service
+- **ProcurementDetailPage.tsx**: All API calls migrated to modular endpoints
+- **Centralized API Service**: `src/frontend/src/services/procurement.ts`
+- **Module Configuration**: `src/frontend/src/config/modules.ts`
+
+### Migration Complete
+- ✅ All procurement API calls use modular endpoints
+- ✅ Frontend build successful
+- ✅ Backend module loading functional
+- ✅ Documentation updated
+
+### Notes
+- Modules are loaded at application startup
+- Failed modules don't crash the application
+- Module API routes are prefixed automatically
+- Frontend uses centralized API service for module calls
+- Old `/api/procurement` routes can be safely removed
+
+---
+
+## [1.5.4] - 2024-12-XX
+
+### Added
+- **Auto-Association of Parts with Suppliers**
+  - Automatic supplier-part association when adding items to purchase orders
+  - If a part is not associated with the order's supplier, system creates the association automatically
+  - Generates SKU in format: `SUP-{supplier_id}-{part_id}`
+  - Prevents "Supplier must match purchase order" errors
+  - Seamless user experience - no manual association needed
+
+### Technical
+- Enhanced `POST /api/procurement/purchase-orders/{order_id}/items` endpoint
+- Checks supplier-part association via `/api/company/part/` before adding item
+- Creates association via `POST /api/company/part/` if needed
+- Continues with item addition even if association check fails (graceful degradation)
+
+### Notes
+- Association is created in InvenTree database
+- SKU is auto-generated to satisfy InvenTree requirements
+- User can add any purchaseable part to any purchase order
+- System handles InvenTree constraints transparently
+
+---
+
+## [1.5.3] - 2024-12-XX
+
+### Added
+- **Procurement Module Enhancements**
+  - Component-based architecture for better maintainability
+  - New procurement components:
+    - `DetailsTab` - DatePickers for dates, Select for supplier and destination
+    - `ApprovalsTab` - Select with order statuses from InvenTree
+    - `ReceivedStockTab` - Complete stock reception functionality
+  - Stock reception system with full form:
+    - Select line item from order (shows received/total)
+    - Quantity input with max validation
+    - Location selection (stock locations)
+    - Batch code input
+    - Serial numbers input (comma-separated)
+    - Packaging information
+    - Status selection (OK, Attention, Damaged, etc.)
+    - Notes field
+  - Auto-calculation of remaining quantity to receive
+  - Disabled receive button when all items fully received
+
+### Changed
+- **Tab Details**: Now uses DatePickerInput for issue_date and target_date
+- **Tab Details**: Supplier and Destination now use Select components
+- **Tab Approvals**: Replaced static status display with editable Select
+- **Tab Reception**: Renamed to "Received Stock" with full functionality
+- **Code Organization**: Split large ProcurementDetailPage into manageable components
+
+### Fixed
+- **Attachments Upload**: Fixed 404 error by correcting API endpoint path
+- **Backend API**: Changed attachments endpoint from `/api/order/po/{id}/attachments/` to `/api/order/po/attachment/` with `order` parameter
+
+### Technical
+- Created `src/frontend/src/components/Procurement/` directory
+- New components: `DetailsTab.tsx`, `ApprovalsTab.tsx`, `ReceivedStockTab.tsx`
+- Added backend endpoints:
+  - `POST /api/procurement/purchase-orders/{id}/receive-stock` - Receive stock items
+  - `GET /api/procurement/order-statuses` - Get available order statuses
+  - `PATCH /api/procurement/purchase-orders/{id}/status` - Update order status
+- InvenTree 1.0.1 compatible stock reception
+- Stock status codes: 10 (OK), 50 (Attention), 55 (Damaged), 60 (Destroyed), 65 (Rejected), 70 (Lost), 75 (Returned)
+
+### Notes
+- Components are reusable and easier to maintain
+- Stock reception integrates directly with InvenTree API
+- Received items automatically update order line item quantities
+- DatePickers provide better UX for date selection
+- Status management allows workflow control from UI
+
+---
+
+## [1.5.2] - 2024-12-XX
+
+### Added
+- **Line Items Progress Bar**
+  - New "Line Items" column in purchase orders table
+  - Shows received/total items count (e.g., "0 / 3")
+  - Visual progress bar with color coding:
+    - Gray: No items received (0%)
+    - Blue: Partially received (1-99%)
+    - Green: Fully received (100%)
+  - Progress bar width: 120px minimum for better visibility
+
+### Fixed
+- **Supplier Display Issue**
+  - Fixed missing supplier names in purchase orders list
+  - Added `supplier_detail=true` parameter to InvenTree API call
+  - Now correctly displays supplier information from InvenTree 1.0.6
+
+### Changed
+- **Search Field UI Improvement**
+  - Removed border/Paper wrapper from search fields for cleaner look
+  - Search fields now display directly without container box
+  - Applied to both main procurement list and items table
+
+### Fixed (Additional)
+- **Navigation Issue**
+  - Fixed navigation from procurement list to order details
+  - Corrected route paths from `/web/procurement/:id` to `/procurement/:id`
+  - Back button now correctly returns to procurement list
+  - Clicking on order row now properly navigates to detail page
+
+### Technical Details
+- **Frontend**: Mantine Progress component for visual feedback
+- **API**: Enhanced purchase orders endpoint with supplier details
+- **Calculation**: Percentage = (line_items / lines) * 100
+- **UI**: Removed Paper component wrapper from search inputs
+
+### Notes
+- Line items count comes from InvenTree `line_items` and `lines` fields
+- Progress bar provides quick visual overview of order completion status
+- Supplier details now properly fetched from InvenTree API
+- Cleaner UI without unnecessary borders around search fields
+
+---
+
+## [1.5.1] - 2024-12-XX
+
+### Added
+- **Real-time Search Functionality**
+  - Search bar for purchase orders table (searches reference, supplier, description, status)
+  - Search bar for items table (searches part name, IPN, reference, destination)
+  - Instant filtering as you type
+  - "No results found" message when search yields no results
+
+- **Table Sorting**
+  - Click column headers to sort
+  - Toggle between ascending/descending order
+  - Visual indicators (up/down arrows) for active sort
+  - Sortable columns in purchase orders: Reference, Supplier, Description, Status, Issue Date, Target Date
+  - Sortable columns in items: Part, Quantity, Received, Unit Price, Destination, Reference
+  - Smart sorting for numeric fields (quantity, price) vs text fields
+
+### Fixed
+- **Authentication Token Issue**
+  - Fixed 500 Internal Server Error in procurement routes
+  - Changed `get_inventree_headers` to use `current_user` token instead of `request.session`
+  - Updated all procurement endpoints to pass correct user authentication
+  - Fixed file upload authentication to use user token
+
+### Technical Details
+- **Frontend**: React useMemo for optimized filtering/sorting
+- **Icons**: IconSearch, IconArrowUp, IconArrowDown from Tabler
+- **Performance**: Memoized computed values prevent unnecessary re-renders
+- **UX**: Clickable headers with visual feedback
+
+### Notes
+- Search is case-insensitive
+- Sorting handles null/undefined values gracefully
+- Numeric fields sorted numerically, text fields alphabetically
+- Search and sort work together (search first, then sort filtered results)
+
+---
+
+## [1.5.0] - 2024-12-XX
+
+### Added
+- **Procurement Module**: Complete InvenTree procurement system integration
+  - Purchase order list page with supplier, status, and dates
+  - Create new purchase orders with supplier selection
+  - New supplier creation with custom fields (cod, reg_code)
+  - Supplier form fields: Company name, Currency, Tax ID, Is supplier, Is manufacturer, Cod, Registration No., Address, Country, City
+  - Purchase order form fields: Order reference, Description, Supplier reference, Currency, Start date, Target date, Destination (stock location), Notes
+  - Purchase order detail page with 5 tabs: Details, Approvals, Items, Attachments, Reception
+  - Full CRUD operations for purchase order items
+  - Item fields: Part (searchable), Quantity, Purchase Price, Currency, Destination, Reference, Notes
+  - Edit and delete items inline from table
+  - File attachments with drag-and-drop upload (Dropzone)
+  - Attachment list with download and delete options
+  - Reception tab showing received stock items
+  - Integration with InvenTree custom fields plugin (dataflows-depo-companies)
+  - Automatic currency selection based on supplier or order
+  - Stock location selection for order and item destinations
+  - Clickable rows to navigate to order details
+  - Status badges with color coding
+- **Backend API Routes**: New `/api/procurement` endpoints
+  - `GET /api/procurement/suppliers` - List suppliers from InvenTree
+  - `POST /api/procurement/suppliers` - Create new supplier with custom fields
+  - `GET /api/procurement/stock-locations` - List stock locations
+  - `GET /api/procurement/purchase-orders` - List purchase orders
+  - `GET /api/procurement/purchase-orders/{id}` - Get purchase order details
+  - `POST /api/procurement/purchase-orders` - Create new purchase order
+  - `GET /api/procurement/purchase-orders/{id}/items` - List order items
+  - `POST /api/procurement/purchase-orders/{id}/items` - Add item to order
+  - `PUT /api/procurement/purchase-orders/{id}/items/{item_id}` - Update item
+  - `DELETE /api/procurement/purchase-orders/{id}/items/{item_id}` - Delete item
+  - `GET /api/procurement/parts` - List purchaseable parts
+  - `GET /api/procurement/purchase-orders/{id}/attachments` - List attachments
+  - `POST /api/procurement/purchase-orders/{id}/attachments` - Upload attachment (multipart/form-data)
+  - `DELETE /api/procurement/purchase-orders/{id}/attachments/{attachment_id}` - Delete attachment
+  - `GET /api/procurement/purchase-orders/{id}/received-items` - List received stock items
+- **Frontend Components**:
+  - `ProcurementPage.tsx` - Main procurement list and order creation
+  - `ProcurementDetailPage.tsx` - Order details with 5 tabs
+  - New supplier modal with all required fields
+  - New item modal for adding parts to orders
+  - Edit item modal for updating existing items
+  - Dropzone component for file uploads (1/3 width)
+  - Attachment list with download links (2/3 width)
+  - Reception tab with received items table
+  - Date pickers for issue and target dates
+  - Searchable select dropdowns for suppliers, parts, and locations
+  - Action buttons for edit and delete on each item
+
+### Technical
+- New backend route: `src/backend/routes/procurement.py`
+- Integration with InvenTree Purchase Order API
+- Integration with InvenTree Company API
+- Integration with InvenTree Stock API for received items
+- Integration with InvenTree Attachment API
+- Integration with dataflows-depo-companies plugin for custom fields
+- Custom fields support: cod, reg_code, tax_id
+- Address creation for new suppliers (primary address)
+- Multipart form data handling for file uploads
+- Mantine DatePickerInput for date selection
+- Mantine Dropzone for file uploads
+- React Router navigation to order details
+- Status color coding (Pending, Placed, Complete, Received, Cancelled)
+- Item destination per line item (overrides order destination)
+- Currency per line item (defaults to order currency)
+
+### Notes
+- Purchase orders are stored in InvenTree database
+- Custom fields managed via dataflows-depo-companies plugin
+- Supplier selection includes "New supplier" option
+- Currency defaults to EUR or supplier's currency
+- Item currency defaults to order currency
+- Attachments stored in InvenTree with authentication
+- Files can be opened in new tab or downloaded
+- Received items shown from InvenTree stock with batch/serial info
+- Approval system placeholder (to be implemented in next phase)
+- All data synced with InvenTree in real-time
+- No local storage - all operations via InvenTree API
+
 ## [1.4.4] - 2024-11-20
 
 ### Added

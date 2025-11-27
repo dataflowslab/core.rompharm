@@ -1,0 +1,26 @@
+{
+  "name": "depo_procurement",
+  "version": "1.0.0",
+  "display_name": "DEPO Procurement",
+  "description": "InvenTree procurement module with purchase orders, suppliers, and stock reception",
+  "author": "DataFlows",
+  "requires": {
+    "inventree": ">=1.0.1",
+    "dataflows_core": ">=1.5.0"
+  },
+  "api_prefix": "/modules/depo_procurement/api",
+  "dependencies": [
+    "dataflows-depo-companies"
+  ],
+  "permissions": [
+    "admin"
+  ],
+  "menu_items": [
+    {
+      "label": "Procurement",
+      "icon": "IconShoppingCart",
+      "path": "/procurement",
+      "order": 50
+    }
+  ]
+}

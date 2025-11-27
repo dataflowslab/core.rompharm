@@ -861,3 +861,267 @@ msgstr "a"
 
 msgid "part"
 msgstr "parte"
+
+msgid "Procurement"
+msgstr "Achiziții"
+
+msgid "New item"
+msgstr "Element nou"
+
+msgid "New Purchase Order"
+msgstr "Comandă de achiziție nouă"
+
+msgid "New Supplier"
+msgstr "Furnizor nou"
+
+msgid "Supplier"
+msgstr "Furnizor"
+
+msgid "Select supplier"
+msgstr "Selectează furnizor"
+
+msgid "Order Reference"
+msgstr "Referință comandă"
+
+msgid "Supplier Reference"
+msgstr "Referință furnizor"
+
+msgid "Supplier order number"
+msgstr "Număr comandă furnizor"
+
+msgid "Order description"
+msgstr "Descriere comandă"
+
+msgid "Currency"
+msgstr "Monedă"
+
+msgid "Destination"
+msgstr "Destinație"
+
+msgid "Select stock location"
+msgstr "Selectează locație stoc"
+
+msgid "Start Date"
+msgstr "Data început"
+
+msgid "Target Date"
+msgstr "Data țintă"
+
+msgid "Select date"
+msgstr "Selectează data"
+
+msgid "Additional notes"
+msgstr "Notițe adiționale"
+
+msgid "Company Name"
+msgstr "Nume companie"
+
+msgid "Enter company name"
+msgstr "Introdu numele companiei"
+
+msgid "Company name is required"
+msgstr "Numele companiei este obligatoriu"
+
+msgid "Tax identification number"
+msgstr "Cod de identificare fiscală"
+
+msgid "Cod"
+msgstr "Cod"
+
+msgid "F001"
+msgstr "F001"
+
+msgid "Registration No."
+msgstr "Nr. înregistrare"
+
+msgid "J40/12345/2020"
+msgstr "J40/12345/2020"
+
+msgid "Address"
+msgstr "Adresă"
+
+msgid "Street address"
+msgstr "Adresa străzii"
+
+msgid "Country"
+msgstr "Țară"
+
+msgid "City"
+msgstr "Oraș"
+
+msgid "Is Supplier"
+msgstr "Este furnizor"
+
+msgid "Is Manufacturer"
+msgstr "Este producător"
+
+msgid "Supplier created successfully"
+msgstr "Furnizor creat cu succes"
+
+msgid "Failed to create supplier"
+msgstr "Nu am putut crea furnizorul"
+
+msgid "Please select a supplier"
+msgstr "Te rog selectează un furnizor"
+
+msgid "Purchase order created successfully"
+msgstr "Comandă de achiziție creată cu succes"
+
+msgid "Failed to create purchase order"
+msgstr "Nu am putut crea comanda de achiziție"
+
+msgid "Failed to load purchase orders"
+msgstr "Nu am putut încărca comenzile de achiziție"
+
+msgid "Loading..."
+msgstr "Se încarcă..."
+
+msgid "No data"
+msgstr "Nicio dată"
+
+msgid "Reference"
+msgstr "Referință"
+
+msgid "Issue Date"
+msgstr "Data emiterii"
+
+msgid "Purchase order not found"
+msgstr "Comanda de achiziție nu a fost găsită"
+
+msgid "Details"
+msgstr "Detalii"
+
+msgid "Approvals"
+msgstr "Aprobări"
+
+msgid "Items"
+msgstr "Articole"
+
+msgid "Attachments"
+msgstr "Atașamente"
+
+msgid "Approval system will be implemented in the next phase"
+msgstr "Sistemul de aprobări va fi implementat în faza următoare"
+
+msgid "Order Items"
+msgstr "Articole comandă"
+
+msgid "Add Item"
+msgstr "Adaugă articol"
+
+msgid "Part"
+msgstr "Piesă"
+
+msgid "Select part"
+msgstr "Selectează piesa"
+
+msgid "Quantity"
+msgstr "Cantitate"
+
+msgid "Received"
+msgstr "Recepționat"
+
+msgid "Unit Price"
+msgstr "Preț unitar"
+
+msgid "Purchase Price"
+msgstr "Preț achiziție"
+
+msgid "Item reference"
+msgstr "Referință articol"
+
+msgid "Please select a part"
+msgstr "Te rog selectează o piesă"
+
+msgid "Item added successfully"
+msgstr "Articol adăugat cu succes"
+
+msgid "Failed to add item"
+msgstr "Nu am putut adăuga articolul"
+
+msgid "No items"
+msgstr "Niciun articol"
+
+msgid "Attachments functionality will be implemented in the next phase"
+msgstr "Funcționalitatea de atașamente va fi implementată în faza următoare"
+
+msgid "PO-001"
+msgstr "PO-001"
+
+msgid "Add"
+msgstr "Adaugă"
+
+msgid "Edit Item"
+msgstr "Editează articol"
+
+msgid "Item updated successfully"
+msgstr "Articol actualizat cu succes"
+
+msgid "Failed to update item"
+msgstr "Nu am putut actualiza articolul"
+
+msgid "Are you sure you want to delete this item?"
+msgstr "Sigur vrei să ștergi acest articol?"
+
+msgid "Item deleted successfully"
+msgstr "Articol șters cu succes"
+
+msgid "Failed to delete item"
+msgstr "Nu am putut șterge articolul"
+
+msgid "Upload File"
+msgstr "Încarcă fișier"
+
+msgid "Drag files here or click to select"
+msgstr "Trage fișierele aici sau dă click ca să alegi"
+
+msgid "Max file size: 10MB"
+msgstr "Dimensiune maximă: 10MB"
+
+msgid "File uploaded successfully"
+msgstr "Fișier încărcat cu succes"
+
+msgid "Failed to upload file"
+msgstr "Nu am putut încărca fișierul"
+
+msgid "Are you sure you want to delete this attachment?"
+msgstr "Sigur vrei să ștergi acest atașament?"
+
+msgid "Attachment deleted successfully"
+msgstr "Atașament șters cu succes"
+
+msgid "Failed to delete attachment"
+msgstr "Nu am putut șterge atașamentul"
+
+msgid "No attachments"
+msgstr "Niciun atașament"
+
+msgid "Reception"
+msgstr "Recepție"
+
+msgid "Received Items"
+msgstr "Articole recepționate"
+
+msgid "No received items"
+msgstr "Niciun articol recepționat"
+
+msgid "Location"
+msgstr "Locație"
+
+msgid "Batch"
+msgstr "Lot"
+
+msgid "Serial"
+msgstr "Serie"
+
+msgid "Edit"
+msgstr "Editează"
+m s g i d   " S e a r c h   b y   r e f e r e n c e ,   s u p p l i e r ,   d e s c r i p t i o n ,   o r   s t a t u s . . . "  
+ m s g s t r   " C a u t   d u p   r e f e r i n ,   f u r n i z o r ,   d e s c r i e r e   s a u   s t a t u s . . . "  
+  
+ m s g i d   " N o   r e s u l t s   f o u n d "  
+ m s g s t r   " N i c i u n   r e z u l t a t   g s i t "  
+  
+ m s g i d   " S e a r c h   i t e m s . . . "  
+ m s g s t r   " C a u t   a r t i c o l e . . . "  
+ 
