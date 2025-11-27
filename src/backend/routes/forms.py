@@ -263,7 +263,7 @@ async def get_form_qr_code(slug: str):
         raise HTTPException(status_code=404, detail="Form not found")
     
     # Load config to get base URL
-    config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config.yaml')
+    config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.yaml')
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     

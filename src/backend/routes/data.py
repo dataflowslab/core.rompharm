@@ -109,7 +109,7 @@ async def submit_data(submission: DataSubmit, request: Request, authorization: O
             import yaml
             
             # Load config for base_url
-            config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config.yaml')
+            config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.yaml')
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)
             

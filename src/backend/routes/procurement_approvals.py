@@ -118,7 +118,7 @@ async def sign_purchase_order(
     db = get_db()
     
     # Load config for InvenTree URL
-    config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config.yaml')
+    config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.yaml')
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     inventree_url = config['inventree']['url'].rstrip('/')
