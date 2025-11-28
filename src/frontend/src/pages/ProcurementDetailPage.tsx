@@ -21,7 +21,23 @@ import {
   Anchor
 } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
-import { IconArrowLeft, IconPlus, IconTrash, IconEdit, IconUpload, IconFile, IconExternalLink, IconSearch, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
+import { 
+  IconArrowLeft, 
+  IconPlus, 
+  IconTrash, 
+  IconEdit, 
+  IconUpload, 
+  IconFile, 
+  IconExternalLink, 
+  IconSearch, 
+  IconArrowUp, 
+  IconArrowDown,
+  IconInfoCircle,
+  IconChecklist,
+  IconPackage,
+  IconTruckDelivery,
+  IconPaperclip
+} from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { procurementApi } from '../services/procurement';
@@ -532,11 +548,21 @@ export function ProcurementDetailPage() {
 
       <Tabs value={activeTab} onChange={setActiveTab}>
         <Tabs.List>
-          <Tabs.Tab value="details">{t('Details')}</Tabs.Tab>
-          <Tabs.Tab value="approvals">{t('Approvals')}</Tabs.Tab>
-          <Tabs.Tab value="items">{t('Items')}</Tabs.Tab>
-          <Tabs.Tab value="receive-stock">{t('Receive Stock')}</Tabs.Tab>
-          <Tabs.Tab value="attachments">{t('Attachments')}</Tabs.Tab>
+          <Tabs.Tab value="details" leftSection={<IconInfoCircle size={16} />}>
+            {t('Details')}
+          </Tabs.Tab>
+          <Tabs.Tab value="approvals" leftSection={<IconChecklist size={16} />}>
+            {t('Approvals')}
+          </Tabs.Tab>
+          <Tabs.Tab value="items" leftSection={<IconPackage size={16} />}>
+            {t('Items')}
+          </Tabs.Tab>
+          <Tabs.Tab value="receive-stock" leftSection={<IconTruckDelivery size={16} />}>
+            {t('Receive Stock')}
+          </Tabs.Tab>
+          <Tabs.Tab value="attachments" leftSection={<IconPaperclip size={16} />}>
+            {t('Attachments')}
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">
