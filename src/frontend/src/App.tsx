@@ -17,6 +17,7 @@ import { RequestsPage } from './pages/RequestsPage';
 import { ProcurementPage } from './pages/ProcurementPage';
 import { ProcurementDetailPage } from './pages/ProcurementDetailPage';
 import { SalesPage } from './pages/SalesPage';
+import { SalesDetailPage } from './pages/SalesDetailPage';
 import { BuildOrdersPage } from './pages/BuildOrdersPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Navbar } from './components/Layout/Navbar';
@@ -125,6 +126,7 @@ function App() {
           <Route path="/procurement" element={<ProtectedRoute><ProcurementPage /></ProtectedRoute>} />
           <Route path="/procurement/:id" element={<ProtectedRoute><ProcurementDetailPage /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><SalesPage /></ProtectedRoute>} />
+          <Route path="/sales/:id" element={<ProtectedRoute><SalesDetailPage /></ProtectedRoute>} />
           <Route path="/returns" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/withdrawals" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/deliveries" element={<ProtectedRoute><div /></ProtectedRoute>} />
