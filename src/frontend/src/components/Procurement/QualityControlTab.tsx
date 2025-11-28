@@ -15,7 +15,7 @@ interface QualityControlTabProps {
   canEdit: boolean;
 }
 
-export function QualityControlTab({ orderId, canEdit }: QualityControlTabProps) {
+export function QualityControlTab({ canEdit }: QualityControlTabProps) {
   const { t } = useTranslation();
   const [qcRecords] = useState<any[]>([]);
 

@@ -42,7 +42,7 @@ interface DetailsTabProps {
   onUpdate?: (data: any) => void;
 }
 
-export function DetailsTab({ order, suppliers, stockLocations, canEdit, onUpdate }: DetailsTabProps) {
+export function DetailsTab({ order, stockLocations, canEdit }: DetailsTabProps) {
   const { t } = useTranslation();
 
   // Parse dates

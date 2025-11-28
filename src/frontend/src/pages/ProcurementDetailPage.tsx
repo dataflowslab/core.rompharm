@@ -239,7 +239,7 @@ export function ProcurementDetailPage() {
     );
   }
 
-  const isEditable = canEdit();
+  const isEditable = canEdit() || false;
 
   return (
     <Container size="xl">

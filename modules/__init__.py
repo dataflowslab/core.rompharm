@@ -56,12 +56,12 @@ def register_modules(app: FastAPI):
             if hasattr(module, 'get_router'):
                 router = module.get_router()
                 app.include_router(router)
-                print(f"  ✓ Registered API routes: {module_config.get('api_prefix', '/api')}")
+                print(f"  [OK] Registered API routes: {module_config.get('api_prefix', '/api')}")
             else:
-                print(f"  ⚠ No router found in module {module_name}")
+                print(f"  [WARNING] No router found in module {module_name}")
                 
         except Exception as e:
-            print(f"  ✗ Failed to load module {module_name}: {str(e)}")
+            print(f"  [ERROR] Failed to load module {module_name}: {str(e)}")
             import traceback
             traceback.print_exc()
 

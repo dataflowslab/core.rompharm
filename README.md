@@ -397,6 +397,50 @@ dataflows-forms/
 
 ### Available Commands
 
+#### Windows (PowerShell/CMD)
+
+```powershell
+# Setup and Installation
+python -m invoke install              # Install all dependencies
+python -m invoke setup                # Complete setup (install + build)
+
+# Development
+python -m invoke dev                  # Run backend with auto-reload
+python -m invoke dev-frontend         # Run frontend dev server
+
+# Building
+python -m invoke build                # Build frontend for production
+python -m invoke build-frontend       # Build only frontend
+
+# Running
+python -m invoke run                  # Run complete application
+python -m invoke run-backend          # Run only backend
+
+# Jobs Management
+python -m invoke job-run --name=update_roles  # Run a job manually
+python -m invoke job-list                     # List all configured jobs
+python -m invoke scheduler-start              # Start scheduler service
+
+# Maintenance
+python -m invoke clean                # Clean build artifacts
+python -m invoke check                # Run linter and tests
+python -m invoke lint-frontend        # Lint frontend code
+python -m invoke test-backend         # Run backend tests
+
+# Database
+python -m invoke db-init              # Initialize database
+
+# Help
+python -m invoke --list               # List all tasks
+python -m invoke help                 # Show help
+
+# Frontend specific (from src/frontend directory)
+cd src\frontend ; npm run build ; cd ..\..
+cd src\frontend ; npm run dev ; cd ..\..
+```
+
+#### Linux/macOS (Bash)
+
 ```bash
 # Setup and Installation
 invoke install              # Install all dependencies
@@ -431,6 +475,10 @@ invoke db-init              # Initialize database
 # Help
 invoke --list               # List all tasks
 invoke help                 # Show help
+
+# Frontend specific (from src/frontend directory)
+cd src/frontend ; npm run build ; cd ../..
+cd src/frontend ; npm run dev ; cd ../..
 ```
 
 ### API Documentation
