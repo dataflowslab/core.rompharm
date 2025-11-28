@@ -208,16 +208,33 @@ export function ProcurementDetailPage() {
 
   // Check if user can edit
   const canEdit = () => {
-    if (!order) return false;
-
-    // Admin can always edit
-    if (isAdmin) return true;
-
-    // Creator can edit if no signatures yet
-    if (approvalFlow && approvalFlow.signatures.length === 0) {
-      return order.responsible && currentUserId && String(order.responsible) === String(currentUserId);
+    if (!order) {
+      console.log('[canEdit] No order');
+      return false;
     }
 
+    console.log('[canEdit] Checking permissions:', {
+      isAdmin,
+      currentUserId,
+      orderResponsible: order.responsible,
+      approvalFlow,
+      signatures: approvalFlow?.signatures?.length || 0,
+    });
+
+    // Admin can always edit
+    if (isAdmin) {
+      console.log('[canEdit] User is admin - CAN EDIT');
+      return true;
+    }
+
+    // If no approval flow exists yet, or no signatures, creator can edit
+    if (!approvalFlow || approvalFlow.signatures.length === 0) {
+      const isCreator = order.responsible && currentUserId && String(order.responsible) === String(currentUserId);
+      console.log('[canEdit] No signatures, checking creator:', isCreator);
+      return isCreator;
+    }
+
+    console.log('[canEdit] Has signatures - CANNOT EDIT');
     return false;
   };
 

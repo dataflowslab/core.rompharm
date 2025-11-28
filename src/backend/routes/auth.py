@@ -201,6 +201,22 @@ async def verify(user = Depends(verify_token)):
     }
 
 
+@router.get("/me")
+async def get_current_user(user = Depends(verify_token)):
+    """
+    Get current user information
+    """
+    return {
+        '_id': str(user['_id']),
+        'pk': str(user['_id']),
+        'username': user['username'],
+        'name': user.get('name'),
+        'is_staff': user.get('is_staff', False),
+        'staff': user.get('is_staff', False),
+        'local_role': user.get('local_role')
+    }
+
+
 @router.post("/refresh-status")
 async def refresh_status(user = Depends(verify_token)):
     """
