@@ -30,8 +30,6 @@ import {
   QualityControlTab,
   AttachmentsTab,
 } from '../components/Procurement';
-import { useAuth } from '../context/AuthContext';
-
 interface PurchaseOrder {
   pk: number;
   reference: string;
@@ -103,7 +101,8 @@ export function ProcurementDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   const [order, setOrder] = useState<PurchaseOrder | null>(null);
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
@@ -112,6 +111,18 @@ export function ProcurementDetailPage() {
   const [approvalFlow, setApprovalFlow] = useState<ApprovalFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string | null>('details');
+
+  useEffect(() => {
+    // Load current user info
+    api.get('/api/auth/me')
+      .then(response => {
+        setCurrentUserId(response.data._id || response.data.pk);
+        setIsAdmin(response.data.is_staff || response.data.staff || false);
+      })
+      .catch(error => {
+        console.error('Failed to load user info:', error);
+      });
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -188,14 +199,14 @@ export function ProcurementDetailPage() {
 
   // Check if user can edit
   const canEdit = () => {
-    if (!order || !user) return false;
+    if (!order) return false;
 
     // Admin can always edit
-    if (user.is_staff || user.staff) return true;
+    if (isAdmin) return true;
 
     // Creator can edit if no signatures yet
     if (approvalFlow && approvalFlow.signatures.length === 0) {
-      return order.responsible === user._id || order.responsible === user.pk;
+      return order.responsible && currentUserId && String(order.responsible) === String(currentUserId);
     }
 
     return false;
