@@ -20,7 +20,11 @@ from .routes import approvals
 from .routes import procurement
 from .utils.db import close_db
 from .scheduler import get_scheduler
-from .modules import register_modules
+
+# Import modules from root
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from modules import register_modules
 
 # Create FastAPI app
 app = FastAPI(
