@@ -18,6 +18,7 @@ from .routes import system
 from .routes import external
 from .routes import approvals
 from .routes import procurement
+from .routes import sales
 from .utils.db import close_db
 from .scheduler import get_scheduler
 
@@ -54,6 +55,7 @@ app.include_router(system.router)
 app.include_router(external.router)
 app.include_router(approvals.router)
 app.include_router(procurement.router)
+app.include_router(sales.router)
 
 # Register modules dynamically
 print("\n=== Loading Modules ===")

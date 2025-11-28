@@ -1,77 +1,147 @@
-import { useState } from 'react';
-import { Button, Container, Group, Modal, Table, Title } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { useState, useEffect } from 'react';
+import {
+  Container,
+  Title,
+  Table,
+  Badge,
+  Text,
+  Loader,
+  Center,
+  Alert,
+  Group,
+  ActionIcon,
+} from '@mantine/core';
+import { IconAlertCircle, IconEye } from '@tabler/icons-react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-
-interface SalesItem {
-  id: string;
-  clientCode: string;
-  clientName: string;
-  requestedDate: string;
-  promisedDate: string;
-  operator: string;
-  final: string;
-  state: string;
-  approvedOn: string;
-  campaignNo: string;
-}
+import { salesService, SalesOrder } from '../services/sales';
 
 export function SalesPage() {
   const { t } = useTranslation();
-  const [opened, setOpened] = useState(false);
-  const [items] = useState<SalesItem[]>([]);
+  const navigate = useNavigate();
+  const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await salesService.getSalesOrders();
+      const results = data.results || data || [];
+      setOrders(results);
+    } catch (err: any) {
+      console.error('Failed to load sales orders:', err);
+      setError(err.response?.data?.detail || 'Failed to load sales orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: number) => {
+    switch (status) {
+      case 10: return 'yellow'; // Pending
+      case 20: return 'blue';   // In Progress
+      case 30: return 'green';  // Shipped
+      case 40: return 'red';    // Cancelled
+      case 50: return 'gray';   // Lost
+      case 60: return 'orange'; // Returned
+      default: return 'gray';
+    }
+  };
+
+  if (loading) {
+    return (
+      <Center h={400}>
+        <Loader size="lg" />
+      </Center>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container size="xl">
+        <Alert icon={<IconAlertCircle size={16} />} title="Error" color="red">
+          {error}
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
-        <Title order={2}>{t('Sales')}</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={() => setOpened(true)}>
-          {t('New item')}
-        </Button>
+        <Title order={2}>{t('Sales Orders')}</Title>
       </Group>
 
       <Table striped withTableBorder withColumnBorders highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>#</Table.Th>
-            <Table.Th>{t('Client code')}</Table.Th>
-            <Table.Th>{t('Client name')}</Table.Th>
-            <Table.Th>{t('Reested date')}</Table.Th>
-            <Table.Th>{t('Promised date')}</Table.Th>
-            <Table.Th>{t('Operator')}</Table.Th>
-            <Table.Th>{t('Final')}</Table.Th>
-            <Table.Th>{t('State')}</Table.Th>
-            <Table.Th>{t('Approved on')}</Table.Th>
-            <Table.Th>{t('Campaign No')}</Table.Th>
+            <Table.Th>{t('Reference')}</Table.Th>
+            <Table.Th>{t('Customer')}</Table.Th>
+            <Table.Th>{t('Status')}</Table.Th>
+            <Table.Th>{t('Description')}</Table.Th>
+            <Table.Th>{t('Target Date')}</Table.Th>
+            <Table.Th>{t('Total')}</Table.Th>
+            <Table.Th>{t('Actions')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {items.length === 0 ? (
+          {orders.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={10}>{t('No data')}</Table.Td>
+              <Table.Td colSpan={7} style={{ textAlign: 'center' }}>
+                <Text c="dimmed">{t('No sales orders found')}</Text>
+              </Table.Td>
             </Table.Tr>
           ) : (
-            items.map((it) => (
-              <Table.Tr key={it.id}>
-                <Table.Td>{it.id}</Table.Td>
-                <Table.Td>{it.clientCode}</Table.Td>
-                <Table.Td>{it.clientName}</Table.Td>
-                <Table.Td>{it.requestedDate}</Table.Td>
-                <Table.Td>{it.promisedDate}</Table.Td>
-                <Table.Td>{it.operator}</Table.Td>
-                <Table.Td>{it.final}</Table.Td>
-                <Table.Td>{it.state}</Table.Td>
-                <Table.Td>{it.approvedOn}</Table.Td>
-                <Table.Td>{it.campaignNo}</Table.Td>
+            orders.map((order) => (
+              <Table.Tr
+                key={order.pk}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/sales/${order.pk}`)}
+              >
+                <Table.Td>
+                  <Text fw={500}>{order.reference}</Text>
+                </Table.Td>
+                <Table.Td>
+                  {order.customer_detail?.name || order.customer}
+                </Table.Td>
+                <Table.Td>
+                  <Badge color={getStatusColor(order.status)}>
+                    {order.status_text || `Status ${order.status}`}
+                  </Badge>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="sm" lineClamp={1}>
+                    {order.description || '-'}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  {order.target_date || '-'}
+                </Table.Td>
+                <Table.Td>
+                  {order.total_price || '-'}
+                </Table.Td>
+                <Table.Td>
+                  <ActionIcon
+                    variant="subtle"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/sales/${order.pk}`);
+                    }}
+                  >
+                    <IconEye size={18} />
+                  </ActionIcon>
+                </Table.Td>
               </Table.Tr>
             ))
           )}
         </Table.Tbody>
       </Table>
-
-      <Modal opened={opened} onClose={() => setOpened(false)} title={t('New item')} centered>
-        {/* Placeholder for Sales form; will be provided later */}
-      </Modal>
     </Container>
   );
 }
