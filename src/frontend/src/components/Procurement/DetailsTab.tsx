@@ -119,7 +119,6 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
             value={formData.reference}
             onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
             readOnly={!canEdit}
-            disabled={!canEdit}
           />
         </Grid.Col>
 
@@ -129,7 +128,6 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
             value={formData.supplier_reference}
             onChange={(e) => setFormData({ ...formData, supplier_reference: e.target.value })}
             readOnly={!canEdit}
-            disabled={!canEdit}
           />
         </Grid.Col>
 
@@ -139,7 +137,6 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             readOnly={!canEdit}
-            disabled={!canEdit}
           />
         </Grid.Col>
 
@@ -179,7 +176,6 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
                 setFormData({ ...formData, target_date: date.toISOString().split('T')[0] });
               }
             }}
-            readOnly={!canEdit}
             disabled={!canEdit}
           />
         </Grid.Col>
@@ -190,7 +186,6 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
             value={formData.destination}
             onChange={(value) => setFormData({ ...formData, destination: value || '' })}
             data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
-            readOnly={!canEdit}
             disabled={!canEdit}
             searchable
             clearable
@@ -203,7 +198,6 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             readOnly={!canEdit}
-            disabled={!canEdit}
             minRows={4}
           />
         </Grid.Col>
