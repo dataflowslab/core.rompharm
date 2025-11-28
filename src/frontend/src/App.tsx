@@ -124,7 +124,6 @@ function App() {
           <Route path="/build-simulation" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/procurement" element={<ProtectedRoute><ProcurementPage /></ProtectedRoute>} />
           <Route path="/procurement/:id" element={<ProtectedRoute><ProcurementDetailPage /></ProtectedRoute>} />
-          <Route path="/reception" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><SalesPage /></ProtectedRoute>} />
           <Route path="/returns" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/withdrawals" element={<ProtectedRoute><div /></ProtectedRoute>} />

@@ -7,7 +7,6 @@ import {
   IconChevronRight,
   IconTruckDelivery,
   IconShoppingCart,
-  IconPackageImport,
   IconArrowsExchange,
   IconBox,
   IconClipboardList,
@@ -74,14 +73,6 @@ export function Navbar() {
         rightSection={<IconChevronRight size={14} />}
         active={isActive('/procurement')}
         onClick={() => navigate('/procurement')}
-      />
-
-      <NavLink
-        label={t('Reception')}
-        leftSection={<IconPackageImport size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/reception')}
-        onClick={() => navigate('/reception')}
       />
 
       <NavLink
