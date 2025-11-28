@@ -38,9 +38,11 @@ interface DetailsTabProps {
   order: PurchaseOrder;
   suppliers: Supplier[];
   stockLocations: StockLocation[];
+  canEdit: boolean;
+  onUpdate?: (data: any) => void;
 }
 
-export function DetailsTab({ order, suppliers, stockLocations }: DetailsTabProps) {
+export function DetailsTab({ order, suppliers, stockLocations, canEdit, onUpdate }: DetailsTabProps) {
   const { t } = useTranslation();
 
   // Parse dates
@@ -54,7 +56,7 @@ export function DetailsTab({ order, suppliers, stockLocations }: DetailsTabProps
           <TextInput
             label={t('Order Reference')}
             value={order.reference}
-            readOnly
+            readOnly={!canEdit}
           />
         </Grid.Col>
 
@@ -62,7 +64,7 @@ export function DetailsTab({ order, suppliers, stockLocations }: DetailsTabProps
           <TextInput
             label={t('Supplier Reference')}
             value={order.supplier_reference || ''}
-            readOnly
+            readOnly={!canEdit}
           />
         </Grid.Col>
 
@@ -70,15 +72,14 @@ export function DetailsTab({ order, suppliers, stockLocations }: DetailsTabProps
           <TextInput
             label={t('Description')}
             value={order.description || ''}
-            readOnly
+            readOnly={!canEdit}
           />
         </Grid.Col>
 
         <Grid.Col span={6}>
-          <Select
+          <TextInput
             label={t('Supplier')}
-            value={String(order.supplier)}
-            data={suppliers.map(s => ({ value: String(s.pk), label: s.name }))}
+            value={order.supplier_detail?.name || `Supplier ${order.supplier}`}
             readOnly
             disabled
           />
