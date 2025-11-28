@@ -161,6 +161,15 @@ export function ProcurementDetailPage() {
     }
   };
 
+  const handleUpdateOrder = async (data: any) => {
+    try {
+      await api.patch(`/api/procurement/purchase-orders/${id}`, data);
+      await loadPurchaseOrder();
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const loadItems = async () => {
     try {
       const response = await api.get(procurementApi.getOrderItems(id!));
@@ -291,6 +300,7 @@ export function ProcurementDetailPage() {
             suppliers={[]} 
             stockLocations={stockLocations}
             canEdit={isEditable}
+            onUpdate={handleUpdateOrder}
           />
         </Tabs.Panel>
 
