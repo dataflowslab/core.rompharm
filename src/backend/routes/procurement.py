@@ -306,6 +306,58 @@ async def create_purchase_order(
         raise HTTPException(status_code=500, detail=f"Failed to create purchase order: {error_detail}")
 
 
+class PurchaseOrderUpdateRequest(BaseModel):
+    reference: Optional[str] = None
+    description: Optional[str] = None
+    supplier_reference: Optional[str] = None
+    target_date: Optional[str] = None
+    destination: Optional[int] = None
+    notes: Optional[str] = None
+
+
+@router.patch("/purchase-orders/{order_id}")
+async def update_purchase_order(
+    request: Request,
+    order_id: int,
+    order_data: PurchaseOrderUpdateRequest,
+    current_user: dict = Depends(verify_admin)
+):
+    """Update a purchase order in InvenTree"""
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    headers = get_inventree_headers(current_user)
+    
+    payload = {}
+    
+    if order_data.reference is not None:
+        payload['reference'] = order_data.reference
+    if order_data.description is not None:
+        payload['description'] = order_data.description
+    if order_data.supplier_reference is not None:
+        payload['supplier_reference'] = order_data.supplier_reference
+    if order_data.target_date is not None:
+        payload['target_date'] = order_data.target_date
+    if order_data.destination is not None:
+        payload['destination'] = order_data.destination
+    if order_data.notes is not None:
+        payload['notes'] = order_data.notes
+    
+    try:
+        response = requests.patch(
+            f"{inventree_url}/api/order/po/{order_id}/",
+            headers=headers,
+            json=payload,
+            timeout=10
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        error_detail = str(e)
+        if hasattr(e.response, 'text'):
+            error_detail = f"{error_detail}: {e.response.text}"
+        raise HTTPException(status_code=500, detail=f"Failed to update purchase order: {error_detail}")
+
+
 @router.get("/purchase-orders/{order_id}/items")
 async def get_purchase_order_items(
     request: Request,
