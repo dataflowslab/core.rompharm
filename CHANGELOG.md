@@ -2,6 +2,115 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2024-12-XX
+
+### Added
+- **Document Generation for Procurement Orders**
+  - Integration with DataFlows Docu (OfficeClerk) for document generation
+  - Template configuration via MongoDB config collection (slug: "procurement_order")
+  - Document sidebar in procurement order Details tab (1/4 width)
+  - Order details form occupies 3/4 width
+  - Generate documents from available templates
+  - Track document generation jobs with status
+  - Download completed documents
+  - Document versioning system
+  - Real-time status updates (queued, processing, completed, failed)
+
+- **Backend API Endpoints**:
+  - `GET /api/documents/procurement-order/templates` - Get available templates for procurement orders
+  - `POST /api/documents/procurement-order/generate` - Generate document for procurement order
+  - `GET /api/documents/procurement-order/{order_id}` - Get all documents for order
+  - `GET /api/documents/procurement-order/{order_id}/job/{job_id}/status` - Check job status
+  - `GET /api/documents/procurement-order/{order_id}/job/{job_id}/download` - Download document
+
+- **Frontend Components**:
+  - Enhanced `DetailsTab.tsx` with document sidebar
+  - Template list with generate buttons
+  - Generated documents list with status badges
+  - Download button for completed documents
+  - Refresh button for document list
+  - Visual status indicators (gray: queued, blue: processing, green: completed, red: failed)
+
+### Technical
+- Document templates configured in MongoDB config collection
+- Template codes stored in `items` array of config entry with slug "procurement_order"
+- Documents stored in `generated_documents` collection
+- Integration with existing DataFlows Docu client
+- Async job creation with status tracking
+- Local file caching after download
+- Document data includes order details and line items
+- Filename format: `PO-{order_id}-{template_code}-v{version}.pdf`
+
+### Database Schema
+```javascript
+// MongoDB config collection
+{
+  "slug": "procurement_order",
+  "items": ["template_code_1", "template_code_2", ...]
+}
+
+// generated_documents collection
+{
+  "object_type": "procurement_order",
+  "object_id": "123",
+  "job_id": "job_id_from_officeclerk",
+  "template_code": "ABC123DEF456",
+  "template_name": "Purchase Order",
+  "status": "completed",
+  "filename": "PO-123-ABC123-v1.pdf",
+  "version": 1,
+  "created_at": "2024-12-XX",
+  "created_by": "username",
+  "local_file": "hash_of_file",
+  "error": null
+}
+```
+
+### Configuration
+- DataFlows Docu settings already in `config_sample.yaml`:
+  ```yaml
+  dataflows_docu:
+    url: "https://docu.dataflows.ro"
+    token: "your-dataflows-docu-token"
+  ```
+
+### Setup
+1. Configure DataFlows Docu credentials in `config.yaml`
+2. Create MongoDB config entry:
+   ```javascript
+   db.config.insertOne({
+     slug: "procurement_order",
+     items: ["template_code_1", "template_code_2"]
+   })
+   ```
+3. Add template codes to the `items` array
+4. Templates will appear in procurement order Details tab
+5. Users can generate and download documents
+
+### Features
+- ✅ Template-based document generation
+- ✅ Async job processing
+- ✅ Status tracking and updates
+- ✅ Document versioning
+- ✅ Local file caching
+- ✅ Download completed documents
+- ✅ Visual status indicators
+- ✅ Sidebar layout (1/4 documents, 3/4 form)
+- ✅ Real-time document list refresh
+- ✅ Integration with InvenTree order data
+
+### Notes
+- Documents are generated asynchronously via OfficeClerk
+- Template codes must be valid OfficeClerk template codes
+- Document data includes full order and line items details
+- Generated documents are cached locally after first download
+- Version number increments for each generation of same template
+- Status updates automatically when checking job status
+- Sidebar provides quick access to document generation
+- Form remains fully functional alongside document sidebar
+
+---
+
 ## [1.7.0] - 2024-12-XX
 
 ### Added

@@ -269,8 +269,44 @@ async def create_purchase_order(
         'supplier': order_data.supplier,
     }
     
-    if order_data.reference:
+    # Auto-generate reference if not provided
+    if not order_data.reference:
+        try:
+            # Get all purchase orders to find the next number
+            po_list_response = requests.get(
+                f"{inventree_url}/api/order/po/",
+                headers=headers,
+                timeout=10
+            )
+            po_list_response.raise_for_status()
+            po_list = po_list_response.json()
+            
+            # Extract numbers from existing PO references
+            max_num = 0
+            if isinstance(po_list, list):
+                orders = po_list
+            else:
+                orders = po_list.get('results', [])
+            
+            for po in orders:
+                ref = po.get('reference', '')
+                if ref.startswith('PO-'):
+                    try:
+                        num = int(ref.replace('PO-', ''))
+                        max_num = max(max_num, num)
+                    except ValueError:
+                        continue
+            
+            # Generate next reference
+            next_num = max_num + 1
+            payload['reference'] = f"PO-{next_num:04d}"
+            print(f"[PROCUREMENT] Auto-generated reference: {payload['reference']}")
+        except Exception as e:
+            print(f"[PROCUREMENT] Warning: Could not auto-generate reference: {e}")
+            # If auto-generation fails, let InvenTree handle it
+    else:
         payload['reference'] = order_data.reference
+    
     if order_data.description:
         payload['description'] = order_data.description
     if order_data.supplier_reference:
@@ -365,10 +401,12 @@ async def add_purchase_order_item(
         po_response.raise_for_status()
         purchase_order = po_response.json()
         supplier_id = purchase_order.get('supplier')
+        print(f"[PROCUREMENT] Order {order_id} supplier: {supplier_id}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get purchase order: {str(e)}")
     
-    # Check if part is associated with supplier
+    # Get or create supplier part association
+    supplier_part_id = None
     try:
         supplier_parts_response = requests.get(
             f"{inventree_url}/api/company/part/",
@@ -377,17 +415,26 @@ async def add_purchase_order_item(
             timeout=10
         )
         supplier_parts_response.raise_for_status()
-        supplier_parts = supplier_parts_response.json()
+        supplier_parts_data = supplier_parts_response.json()
         
-        # If no association exists, create one
-        if not supplier_parts.get('results') or len(supplier_parts.get('results', [])) == 0:
-            print(f"Part {item_data.part} not associated with supplier {supplier_id}, creating association...")
-            
+        # Handle both list and dict responses
+        if isinstance(supplier_parts_data, list):
+            supplier_parts = supplier_parts_data
+        else:
+            supplier_parts = supplier_parts_data.get('results', [])
+        
+        # If association exists, use it
+        if supplier_parts and len(supplier_parts) > 0:
+            supplier_part_id = supplier_parts[0].get('pk') or supplier_parts[0].get('id')
+            print(f"[PROCUREMENT] Found existing supplier_part: {supplier_part_id}")
+        else:
             # Create supplier part association
+            print(f"[PROCUREMENT] Creating supplier_part association for part {item_data.part} and supplier {supplier_id}")
+            
             supplier_part_payload = {
                 'part': item_data.part,
                 'supplier': supplier_id,
-                'SKU': f"SUP-{supplier_id}-{item_data.part}"  # Generate a SKU
+                'SKU': f"SUP-{supplier_id}-{item_data.part}"
             }
             
             create_response = requests.post(
@@ -397,15 +444,21 @@ async def add_purchase_order_item(
                 timeout=10
             )
             create_response.raise_for_status()
-            print(f"Successfully associated part {item_data.part} with supplier {supplier_id}")
+            created_supplier_part = create_response.json()
+            supplier_part_id = created_supplier_part.get('pk') or created_supplier_part.get('id')
+            print(f"[PROCUREMENT] Created supplier_part: {supplier_part_id}")
+            
     except Exception as e:
-        print(f"Warning: Could not check/create supplier part association: {str(e)}")
-        # Continue anyway, let InvenTree handle the error if needed
+        print(f"[PROCUREMENT] Error with supplier_part: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get/create supplier part association: {str(e)}")
     
-    # Now add the item to purchase order
+    if not supplier_part_id:
+        raise HTTPException(status_code=500, detail="Could not determine supplier_part ID")
+    
+    # Now add the item to purchase order using supplier_part
     payload = {
         'order': order_id,
-        'part': item_data.part,
+        'part': supplier_part_id,  # InvenTree 1.0.1 expects supplier_part ID here
         'quantity': item_data.quantity
     }
     
@@ -420,6 +473,8 @@ async def add_purchase_order_item(
     if item_data.notes:
         payload['notes'] = item_data.notes
     
+    print(f"[PROCUREMENT] Adding line item with payload: {payload}")
+    
     try:
         response = requests.post(
             f"{inventree_url}/api/order/po-line/",
@@ -433,6 +488,7 @@ async def add_purchase_order_item(
         error_detail = str(e)
         if hasattr(e.response, 'text'):
             error_detail = f"{error_detail}: {e.response.text}"
+        print(f"[PROCUREMENT] Error adding line item: {error_detail}")
         raise HTTPException(status_code=500, detail=f"Failed to add item to purchase order: {error_detail}")
 
 
@@ -543,21 +599,31 @@ async def get_attachments(
     order_id: int,
     current_user: dict = Depends(verify_token)
 ):
-    """Get attachments for a purchase order"""
+    """Get attachments for a purchase order using generic attachment API"""
     config = load_config()
     inventree_url = config['inventree']['url'].rstrip('/')
     headers = get_inventree_headers(current_user)
     
     try:
+        # InvenTree 1.0.1: Use generic attachment endpoint with model_type and model_id
         response = requests.get(
-            f"{inventree_url}/api/order/po/attachment/",
+            f"{inventree_url}/api/attachment/",
             headers=headers,
-            params={'order': order_id},
+            params={
+                'model_type': 'purchaseorder',
+                'model_id': order_id
+            },
             timeout=10
         )
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        
+        print(f"[PROCUREMENT] Got {len(data.get('results', data)) if isinstance(data, dict) else len(data)} attachments for order {order_id}")
+        return data
     except requests.exceptions.RequestException as e:
+        print(f"[PROCUREMENT] Error fetching attachments: {str(e)}")
+        if hasattr(e, 'response') and hasattr(e.response, 'text'):
+            print(f"[PROCUREMENT] Response: {e.response.text}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch attachments: {str(e)}")
 
 
@@ -569,7 +635,7 @@ async def upload_attachment(
     comment: Optional[str] = Form(None),
     current_user: dict = Depends(verify_token)
 ):
-    """Upload an attachment to a purchase order"""
+    """Upload an attachment to a purchase order using generic attachment API"""
     config = load_config()
     inventree_url = config['inventree']['url'].rstrip('/')
     token = current_user.get('token')
@@ -585,27 +651,31 @@ async def upload_attachment(
             'attachment': (file.filename, file_content, file.content_type)
         }
         
+        # InvenTree 1.0.1: Use model_type and model_id
         data = {
-            'order': order_id
+            'model_type': 'purchaseorder',
+            'model_id': order_id
         }
         
         if comment:
             data['comment'] = comment
         
-        # Upload to InvenTree
+        # Upload to InvenTree generic attachment endpoint
         response = requests.post(
-            f"{inventree_url}/api/order/po/attachment/",
+            f"{inventree_url}/api/attachment/",
             headers={'Authorization': f'Token {token}'},
             files=files,
             data=data,
             timeout=30
         )
         response.raise_for_status()
+        print(f"[PROCUREMENT] Uploaded attachment for order {order_id}")
         return response.json()
     except requests.exceptions.RequestException as e:
         error_detail = str(e)
         if hasattr(e, 'response') and hasattr(e.response, 'text'):
             error_detail = f"{error_detail}: {e.response.text}"
+        print(f"[PROCUREMENT] Error uploading attachment: {error_detail}")
         raise HTTPException(status_code=500, detail=f"Failed to upload attachment: {error_detail}")
 
 
@@ -622,17 +692,20 @@ async def delete_attachment(
     headers = get_inventree_headers(current_user)
     
     try:
+        # Use generic attachment endpoint
         response = requests.delete(
-            f"{inventree_url}/api/order/po/attachment/{attachment_id}/",
+            f"{inventree_url}/api/attachment/{attachment_id}/",
             headers=headers,
             timeout=10
         )
         response.raise_for_status()
+        print(f"[PROCUREMENT] Deleted attachment {attachment_id} for order {order_id}")
         return {"success": True}
     except requests.exceptions.RequestException as e:
         error_detail = str(e)
         if hasattr(e.response, 'text'):
             error_detail = f"{error_detail}: {e.response.text}"
+        print(f"[PROCUREMENT] Error deleting attachment: {error_detail}")
         raise HTTPException(status_code=500, detail=f"Failed to delete attachment: {error_detail}")
 
 
@@ -714,6 +787,17 @@ async def receive_stock(
         if hasattr(e, 'response') and hasattr(e.response, 'text'):
             error_detail = f"{error_detail}: {e.response.text}"
         raise HTTPException(status_code=500, detail=f"Failed to receive stock: {error_detail}")
+
+
+@router.get("/purchase-orders/{order_id}/qc-records")
+async def get_qc_records(
+    request: Request,
+    order_id: int,
+    current_user: dict = Depends(verify_token)
+):
+    """Get QC records for a purchase order (placeholder)"""
+    # This is a placeholder - QC records functionality to be implemented
+    return {"results": []}
 
 
 @router.get("/order-statuses")

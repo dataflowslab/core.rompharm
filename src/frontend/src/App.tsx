@@ -19,6 +19,7 @@ import { ProcurementDetailPage } from './pages/ProcurementDetailPage';
 import { SalesPage } from './pages/SalesPage';
 import { SalesDetailPage } from './pages/SalesDetailPage';
 import { BuildOrdersPage } from './pages/BuildOrdersPage';
+import { TemplatesPage } from './pages/TemplatesPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Navbar } from './components/Layout/Navbar';
 import { useAuth } from './context/AuthContext';
@@ -132,6 +133,7 @@ function App() {
           <Route path="/deliveries" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/submissions" element={<ProtectedRoute><SubmissionsListPage /></ProtectedRoute>} />
           <Route path="/submission/:submissionId" element={<ProtectedRoute><SubmissionDetailPage /></ProtectedRoute>} />
+          <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
           <Route path="/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />

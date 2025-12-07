@@ -421,10 +421,12 @@ async def add_purchase_order_item(
         po_response.raise_for_status()
         purchase_order = po_response.json()
         supplier_id = purchase_order.get('supplier')
+        print(f"[PROCUREMENT] Order {order_id} supplier: {supplier_id}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get purchase order: {str(e)}")
     
-    # Check if part is associated with supplier
+    # Check if part is associated with supplier and get the SupplierPart ID
+    supplier_part_id = None
     try:
         supplier_parts_response = requests.get(
             f"{inventree_url}/api/company/part/",
@@ -433,11 +435,21 @@ async def add_purchase_order_item(
             timeout=10
         )
         supplier_parts_response.raise_for_status()
-        supplier_parts = supplier_parts_response.json()
+        supplier_parts_data = supplier_parts_response.json()
         
-        # If no association exists, create one
-        if not supplier_parts.get('results') or len(supplier_parts.get('results', [])) == 0:
-            print(f"Part {item_data.part} not associated with supplier {supplier_id}, creating association...")
+        # Handle both list and dict responses
+        if isinstance(supplier_parts_data, list):
+            supplier_parts = supplier_parts_data
+        else:
+            supplier_parts = supplier_parts_data.get('results', [])
+        
+        # If association exists, use it
+        if supplier_parts and len(supplier_parts) > 0:
+            supplier_part_id = supplier_parts[0].get('pk') or supplier_parts[0].get('id')
+            print(f"[PROCUREMENT] Found existing SupplierPart: {supplier_part_id}")
+        else:
+            # No association exists, create one
+            print(f"[PROCUREMENT] Part {item_data.part} not associated with supplier {supplier_id}, creating association...")
             
             # Create supplier part association
             supplier_part_payload = {
@@ -453,15 +465,27 @@ async def add_purchase_order_item(
                 timeout=10
             )
             create_response.raise_for_status()
-            print(f"Successfully associated part {item_data.part} with supplier {supplier_id}")
+            created_supplier_part = create_response.json()
+            supplier_part_id = created_supplier_part.get('pk') or created_supplier_part.get('id')
+            print(f"[PROCUREMENT] Successfully created SupplierPart: {supplier_part_id}")
     except Exception as e:
-        print(f"Warning: Could not check/create supplier part association: {str(e)}")
-        # Continue anyway, let InvenTree handle the error if needed
+        print(f"[PROCUREMENT] Error checking/creating supplier part association: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to associate part with supplier: {str(e)}"
+        )
     
-    # Now add the item to purchase order
+    # Verify we have a supplier_part_id
+    if not supplier_part_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to get or create supplier part association"
+        )
+    
+    # Now add the item to purchase order using the SupplierPart ID
     payload = {
         'order': order_id,
-        'part': item_data.part,
+        'part': supplier_part_id,  # Use SupplierPart ID, not internal part ID
         'quantity': item_data.quantity
     }
     
@@ -476,6 +500,8 @@ async def add_purchase_order_item(
     if item_data.notes:
         payload['notes'] = item_data.notes
     
+    print(f"[PROCUREMENT] Adding line item with SupplierPart ID: {supplier_part_id}")
+    
     try:
         response = requests.post(
             f"{inventree_url}/api/order/po-line/",
@@ -484,11 +510,13 @@ async def add_purchase_order_item(
             timeout=10
         )
         response.raise_for_status()
+        print(f"[PROCUREMENT] Successfully added line item")
         return response.json()
     except requests.exceptions.RequestException as e:
         error_detail = str(e)
         if hasattr(e.response, 'text'):
             error_detail = f"{error_detail}: {e.response.text}"
+        print(f"[PROCUREMENT] Error adding line item: {error_detail}")
         raise HTTPException(status_code=500, detail=f"Failed to add item to purchase order: {error_detail}")
 
 
@@ -627,28 +655,27 @@ async def get_attachments(
     order_id: int,
     current_user: dict = Depends(verify_admin)
 ):
-    """Get attachments for a purchase order"""
+    """Get attachments for a purchase order using generic attachment API"""
     config = load_config()
     inventree_url = config['inventree']['url'].rstrip('/')
     headers = get_inventree_headers(current_user)
     
     try:
+        # InvenTree 1.0.1: Use generic attachment endpoint with model_type and model_id
         response = requests.get(
-            f"{inventree_url}/api/order/po/attachment/",
+            f"{inventree_url}/api/attachment/",
             headers=headers,
-            params={'order': order_id},
+            params={
+                'model_type': 'purchaseorder',
+                'model_id': order_id
+            },
             timeout=10
         )
         response.raise_for_status()
         data = response.json()
         
-        # InvenTree might return results in different formats
-        if isinstance(data, dict) and 'results' in data:
-            return data
-        elif isinstance(data, list):
-            return {"results": data}
-        else:
-            return data
+        print(f"[PROCUREMENT] Got {len(data.get('results', data)) if isinstance(data, dict) else len(data)} attachments for order {order_id}")
+        return data
     except requests.exceptions.HTTPError as e:
         # If it's a 404, return empty results instead of error
         if e.response.status_code == 404:
@@ -668,7 +695,7 @@ async def upload_attachment(
     comment: Optional[str] = Form(None),
     current_user: dict = Depends(verify_admin)
 ):
-    """Upload an attachment to a purchase order"""
+    """Upload an attachment to a purchase order using generic attachment API"""
     config = load_config()
     inventree_url = config['inventree']['url'].rstrip('/')
     token = current_user.get('token')
@@ -684,27 +711,31 @@ async def upload_attachment(
             'attachment': (file.filename, file_content, file.content_type)
         }
         
+        # InvenTree 1.0.1: Use model_type and model_id
         data = {
-            'order': order_id
+            'model_type': 'purchaseorder',
+            'model_id': order_id
         }
         
         if comment:
             data['comment'] = comment
         
-        # Upload to InvenTree
+        # Upload to InvenTree generic attachment endpoint
         response = requests.post(
-            f"{inventree_url}/api/order/po/attachment/",
+            f"{inventree_url}/api/attachment/",
             headers={'Authorization': f'Token {token}'},
             files=files,
             data=data,
             timeout=30
         )
         response.raise_for_status()
+        print(f"[PROCUREMENT] Uploaded attachment for order {order_id}")
         return response.json()
     except requests.exceptions.RequestException as e:
         error_detail = str(e)
         if hasattr(e, 'response') and hasattr(e.response, 'text'):
             error_detail = f"{error_detail}: {e.response.text}"
+        print(f"[PROCUREMENT] Error uploading attachment: {error_detail}")
         raise HTTPException(status_code=500, detail=f"Failed to upload attachment: {error_detail}")
 
 
@@ -721,18 +752,32 @@ async def delete_attachment(
     headers = get_inventree_headers(current_user)
     
     try:
+        # Use generic attachment endpoint
         response = requests.delete(
-            f"{inventree_url}/api/order/po/attachment/{attachment_id}/",
+            f"{inventree_url}/api/attachment/{attachment_id}/",
             headers=headers,
             timeout=10
         )
         response.raise_for_status()
+        print(f"[PROCUREMENT] Deleted attachment {attachment_id} for order {order_id}")
         return {"success": True}
     except requests.exceptions.RequestException as e:
         error_detail = str(e)
         if hasattr(e.response, 'text'):
             error_detail = f"{error_detail}: {e.response.text}"
+        print(f"[PROCUREMENT] Error deleting attachment: {error_detail}")
         raise HTTPException(status_code=500, detail=f"Failed to delete attachment: {error_detail}")
+
+
+@router.get("/purchase-orders/{order_id}/qc-records")
+async def get_qc_records(
+    request: Request,
+    order_id: int,
+    current_user: dict = Depends(verify_admin)
+):
+    """Get QC records for a purchase order (placeholder)"""
+    # This is a placeholder - QC records functionality to be implemented
+    return {"results": []}
 
 
 @router.get("/purchase-orders/{order_id}/received-items")
@@ -1318,3 +1363,6 @@ async def remove_order_signature(
         )
     
     return {"message": "Signature removed successfully"}
+
+
+#

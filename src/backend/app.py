@@ -12,6 +12,7 @@ from .routes import forms
 from .routes import data
 from .routes import config
 from .routes import documents
+from .routes import templates
 from .routes import users
 from .routes import audit
 from .routes import system
@@ -49,6 +50,7 @@ app.include_router(forms.router)
 app.include_router(data.router)
 app.include_router(config.router)
 app.include_router(documents.router)
+app.include_router(templates.router)
 app.include_router(users.router)
 app.include_router(audit.router)
 app.include_router(system.router)

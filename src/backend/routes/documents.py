@@ -8,6 +8,7 @@ from typing import Optional, List
 from bson import ObjectId
 from datetime import datetime
 import io
+import requests
 
 from ..utils.db import get_db
 from ..utils.dataflows_docu import DataFlowsDocuClient
@@ -470,3 +471,375 @@ async def get_form_templates(form_id: str):
             })
     
     return templates
+
+
+@router.get("/procurement-order/templates")
+async def get_procurement_order_templates(user = Depends(verify_token)):
+    """
+    Get templates available for procurement orders from MongoDB config
+    Templates are stored in config collection with slug = 'procurement_order'
+    """
+    try:
+        db = get_db()
+        
+        # Check if service is available
+        client = DataFlowsDocuClient()
+        if not client.health_check():
+            raise HTTPException(
+                status_code=503,
+                detail="DataFlows Docu service is not available"
+            )
+        
+        # Get template codes from MongoDB config collection
+        config_collection = db['config']
+        procurement_config = config_collection.find_one({'slug': 'procurement_order'})
+        
+        if not procurement_config or 'items' not in procurement_config:
+            return []
+        
+        template_codes = procurement_config.get('items', [])
+        
+        if not template_codes:
+            return []
+        
+        # Fetch details for each template
+        templates = []
+        for code in template_codes:
+            template = client.get_template(code)
+            if template:
+                # Extract name from parts if available
+                name = code
+                if template.get('parts') and len(template['parts']) > 0:
+                    name = template['parts'][0].get('name', code)
+                
+                templates.append({
+                    'code': code,
+                    'name': name,
+                    'parts': template.get('parts', [])
+                })
+            else:
+                # If template not found, still return the code
+                templates.append({
+                    'code': code,
+                    'name': code,
+                    'parts': []
+                })
+        
+        return templates
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get procurement templates: {str(e)}"
+        )
+
+
+class GenerateProcurementDocumentRequest(BaseModel):
+    order_id: int
+    template_code: str
+    template_name: str
+
+
+@router.post("/procurement-order/generate")
+async def generate_procurement_document(
+    request: GenerateProcurementDocumentRequest,
+    user = Depends(verify_token)
+):
+    """
+    Generate a document for a procurement order (async job)
+    Creates a job in OfficeClerk and saves it to MongoDB
+    """
+    print(f"[DOCUMENT] Generate procurement doc: order_id={request.order_id}, template_code={request.template_code}")
+    print(f"[DOCUMENT] User: {user.get('username')}")
+    
+    db = get_db()
+    
+    # Get procurement order data from InvenTree
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    token = user.get('token')
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated with InvenTree")
+    
+    headers = {
+        'Authorization': f'Token {token}',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        # Get purchase order details
+        po_response = requests.get(
+            f"{inventree_url}/api/order/po/{request.order_id}/",
+            headers=headers,
+            timeout=10
+        )
+        po_response.raise_for_status()
+        purchase_order = po_response.json()
+        
+        # Get line items
+        items_response = requests.get(
+            f"{inventree_url}/api/order/po-line/",
+            headers=headers,
+            params={'order': request.order_id, 'part_detail': 'true'},
+            timeout=10
+        )
+        items_response.raise_for_status()
+        items_data = items_response.json()
+        
+        if isinstance(items_data, list):
+            line_items = items_data
+        else:
+            line_items = items_data.get('results', [])
+        
+        print(f"[DOCUMENT] Initializing DataFlows Docu client...")
+        client = DataFlowsDocuClient()
+        
+        # Get next version for this order and template
+        generated_docs_collection = db['generated_documents']
+        existing_docs = list(generated_docs_collection.find({
+            'object_type': 'procurement_order',
+            'object_id': str(request.order_id),
+            'template_code': request.template_code
+        }))
+        version = len(existing_docs) + 1
+        
+        print(f"[DOCUMENT] Version: {version}")
+        
+        # Generate filename
+        filename = f"PO-{request.order_id}-{request.template_code[:6]}-v{version}"
+        print(f"[DOCUMENT] Filename: {filename}")
+        
+        print(f"[DOCUMENT] Preparing document data...")
+        # Prepare data for template
+        document_data = {
+            'order': purchase_order,
+            'items': line_items,
+            'generated_at': datetime.utcnow().isoformat(),
+            'generated_by': user.get('username')
+        }
+        
+        print(f"[DOCUMENT] Creating async job in OfficeClerk...")
+        # Create async job
+        job_response = client.create_job(
+            template_code=request.template_code,
+            data=document_data,
+            format='pdf',
+            filename=filename
+        )
+        
+        if not job_response or 'id' not in job_response:
+            print(f"[DOCUMENT] ERROR: Failed to create job")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create document generation job"
+            )
+        
+        job_id = job_response['id']
+        print(f"[DOCUMENT] Job created: {job_id}, status: {job_response.get('status')}")
+        
+        # Save job to MongoDB
+        job_entry = {
+            'object_type': 'procurement_order',
+            'object_id': str(request.order_id),
+            'job_id': job_id,
+            'template_code': request.template_code,
+            'template_name': request.template_name,
+            'status': job_response.get('status', 'queued'),
+            'filename': f"{filename}.pdf",
+            'version': version,
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow(),
+            'created_by': user.get('username'),
+            'local_file': None,
+            'error': None
+        }
+        
+        generated_docs_collection.insert_one(job_entry)
+        
+        print(f"[DOCUMENT] Job saved to database")
+        
+        return {
+            'job_id': job_id,
+            'status': job_response.get('status'),
+            'message': 'Document generation job created',
+            'filename': f"{filename}.pdf"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[DOCUMENT] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating document: {str(e)}"
+        )
+
+
+@router.get("/procurement-order/{order_id}")
+async def get_procurement_order_documents(
+    order_id: int,
+    user = Depends(verify_token)
+):
+    """
+    Get all document generation jobs for a procurement order
+    """
+    db = get_db()
+    generated_docs_collection = db['generated_documents']
+    
+    docs = list(generated_docs_collection.find({
+        'object_type': 'procurement_order',
+        'object_id': str(order_id)
+    }))
+    
+    # Convert ObjectId and datetime to strings
+    for doc in docs:
+        doc['_id'] = str(doc['_id'])
+        if 'created_at' in doc and isinstance(doc['created_at'], datetime):
+            doc['created_at'] = doc['created_at'].isoformat()
+        if 'updated_at' in doc and isinstance(doc['updated_at'], datetime):
+            doc['updated_at'] = doc['updated_at'].isoformat()
+    
+    return docs
+
+
+@router.get("/procurement-order/{order_id}/job/{job_id}/status")
+async def get_procurement_job_status(
+    order_id: int,
+    job_id: str,
+    user = Depends(verify_token)
+):
+    """
+    Check status of a procurement document generation job
+    """
+    print(f"[DOCUMENT] Checking procurement job status: {job_id}")
+    
+    db = get_db()
+    generated_docs_collection = db['generated_documents']
+    
+    job_entry = generated_docs_collection.find_one({
+        'object_type': 'procurement_order',
+        'object_id': str(order_id),
+        'job_id': job_id
+    })
+    
+    if not job_entry:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check status from OfficeClerk
+    client = DataFlowsDocuClient()
+    job_status = client.get_job_status(job_id)
+    
+    if not job_status:
+        return {
+            'job_id': job_id,
+            'status': job_entry.get('status', 'unknown'),
+            'error': 'Failed to get status from OfficeClerk'
+        }
+    
+    current_status = job_status.get('status')
+    print(f"[DOCUMENT] Job {job_id} status: {current_status}")
+    
+    # Update job status if changed
+    if current_status != job_entry.get('status'):
+        generated_docs_collection.update_one(
+            {'job_id': job_id},
+            {
+                '$set': {
+                    'status': current_status,
+                    'updated_at': datetime.utcnow(),
+                    'error': job_status.get('error')
+                }
+            }
+        )
+    
+    return {
+        'job_id': job_id,
+        'status': current_status,
+        'filename': job_entry.get('filename'),
+        'template_name': job_entry.get('template_name'),
+        'created_at': job_entry.get('created_at').isoformat() if isinstance(job_entry.get('created_at'), datetime) else str(job_entry.get('created_at')),
+        'error': job_status.get('error'),
+        'has_local_file': job_entry.get('local_file') is not None
+    }
+
+
+@router.get("/procurement-order/{order_id}/job/{job_id}/download")
+async def download_procurement_job_document(
+    order_id: int,
+    job_id: str,
+    user = Depends(verify_token)
+):
+    """
+    Download document from completed procurement job and save locally
+    """
+    print(f"[DOCUMENT] Download request for procurement job: {job_id}")
+    
+    db = get_db()
+    generated_docs_collection = db['generated_documents']
+    
+    job_entry = generated_docs_collection.find_one({
+        'object_type': 'procurement_order',
+        'object_id': str(order_id),
+        'job_id': job_id
+    })
+    
+    if not job_entry:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if already downloaded
+    if job_entry.get('local_file'):
+        print(f"[DOCUMENT] File already downloaded: {job_entry['local_file']}")
+        from ..utils.file_handler import get_file_path
+        file_path = get_file_path(job_entry['local_file'])
+        
+        if file_path and os.path.exists(file_path):
+            from fastapi.responses import FileResponse
+            return FileResponse(
+                file_path,
+                media_type='application/pdf',
+                filename=job_entry.get('filename', 'document.pdf')
+            )
+    
+    # Download from OfficeClerk
+    client = DataFlowsDocuClient()
+    document_bytes = client.download_document(job_id)
+    
+    if not document_bytes:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to download document from OfficeClerk"
+        )
+    
+    print(f"[DOCUMENT] Downloaded {len(document_bytes)} bytes")
+    
+    # Save to local filesystem
+    from ..utils.file_handler import save_document_file
+    file_hash = save_document_file(
+        document_bytes,
+        job_entry.get('filename', 'document.pdf')
+    )
+    
+    print(f"[DOCUMENT] Saved to local file: {file_hash}")
+    
+    # Update job with local file path
+    generated_docs_collection.update_one(
+        {'job_id': job_id},
+        {
+            '$set': {
+                'local_file': file_hash,
+                'updated_at': datetime.utcnow()
+            }
+        }
+    )
+    
+    # Return document
+    return StreamingResponse(
+        io.BytesIO(document_bytes),
+        media_type='application/pdf',
+        headers={
+            'Content-Disposition': f'attachment; filename="{job_entry.get("filename", "document.pdf")}"'
+        }
+    )

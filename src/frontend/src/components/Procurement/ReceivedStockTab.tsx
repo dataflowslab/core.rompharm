@@ -52,7 +52,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [receiveModalOpened, setReceiveModalOpened] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [stockStatuses, setStockStatuses] = useState<Array<{value: string, label: string}>>([]);
+  const [stockStatuses, setStockStatuses] = useState<{ value: number; label: string }[]>([]);
 
   // Form state for receiving stock
   const [receiveData, setReceiveData] = useState({
@@ -62,7 +62,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
     batch_code: '',
     serial_numbers: '',
     packaging: '',
-    status: '10', // OK status
+    status: '65', // Quarantine status (implicit)
     notes: ''
   });
 
@@ -71,36 +71,26 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
     loadStockStatuses();
   }, [orderId]);
 
+  const loadStockStatuses = async () => {
+    try {
+      const response = await api.get('/api/procurement/stock-statuses');
+      setStockStatuses(response.data.statuses || []);
+    } catch (error) {
+      console.error('Failed to load stock statuses:', error);
+    }
+  };
+
+  const getStatusLabel = (statusValue: number): string => {
+    const status = stockStatuses.find(s => s.value === statusValue);
+    return status ? status.label : String(statusValue);
+  };
+
   const loadReceivedItems = async () => {
     try {
       const response = await api.get(`/api/procurement/purchase-orders/${orderId}/received-items`);
       setReceivedItems(response.data.results || response.data || []);
     } catch (error) {
       console.error('Failed to load received items:', error);
-    }
-  };
-
-  const loadStockStatuses = async () => {
-    try {
-      const response = await api.get('/api/procurement/stock-statuses');
-      const statuses = response.data.statuses || [];
-      setStockStatuses(statuses.map((s: any) => ({
-        value: String(s.value),
-        label: s.label
-      })));
-    } catch (error) {
-      console.error('Failed to load stock statuses:', error);
-      // Fallback to default statuses
-      setStockStatuses([
-        { value: '10', label: 'OK' },
-        { value: '50', label: 'Attention needed' },
-        { value: '55', label: 'Damaged' },
-        { value: '60', label: 'Destroyed' },
-        { value: '65', label: 'Rejected' },
-        { value: '70', label: 'Lost' },
-        { value: '75', label: 'Returned' },
-        { value: '80', label: 'În carantină (tranzacționabil)' }
-      ]);
     }
   };
 
@@ -221,7 +211,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
                 <Table.Td>{item.batch || '-'}</Table.Td>
                 <Table.Td>{item.serial || '-'}</Table.Td>
                 <Table.Td>{item.packaging || '-'}</Table.Td>
-                <Table.Td>{item.status}</Table.Td>
+                <Table.Td>{getStatusLabel(item.status)}</Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
@@ -309,15 +299,6 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
               value={receiveData.serial_numbers}
               onChange={(e) => setReceiveData({ ...receiveData, serial_numbers: e.target.value })}
               description={t('For multiple serials, separate with commas')}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <Select
-              label={t('Status')}
-              data={stockStatuses}
-              value={receiveData.status}
-              onChange={(value) => setReceiveData({ ...receiveData, status: value || '10' })}
             />
           </Grid.Col>
 

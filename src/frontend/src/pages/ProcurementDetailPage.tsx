@@ -300,9 +300,12 @@ export function ProcurementDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconPackage size={16} />}>
             {t('Items')}
           </Tabs.Tab>
-          <Tabs.Tab value="receive-stock" leftSection={<IconTruckDelivery size={16} />}>
-            {t('Receive Stock')}
-          </Tabs.Tab>
+          {/* Show Receive Stock tab only if order status is PLACED (20) or higher */}
+          {order.status >= 20 && (
+            <Tabs.Tab value="receive-stock" leftSection={<IconTruckDelivery size={16} />}>
+              {t('Receive Stock')}
+            </Tabs.Tab>
+          )}
           <Tabs.Tab value="quality-control" leftSection={<IconClipboardCheck size={16} />}>
             {t('Quality Control')}
           </Tabs.Tab>
@@ -350,8 +353,7 @@ export function ProcurementDetailPage() {
 
         <Tabs.Panel value="quality-control" pt="md">
           <QualityControlTab
-            orderId={id!}
-            canEdit={isEditable}
+            orderId={parseInt(id!)}
           />
         </Tabs.Panel>
 

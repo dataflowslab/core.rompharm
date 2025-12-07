@@ -441,16 +441,7 @@ export function ProcurementPage() {
             />
           </Grid.Col>
 
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('Order Reference')}
-              placeholder={t('PO-001')}
-              value={formData.reference}
-              onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
+          <Grid.Col span={12}>
             <TextInput
               label={t('Supplier Reference')}
               placeholder={t('Supplier order number')}

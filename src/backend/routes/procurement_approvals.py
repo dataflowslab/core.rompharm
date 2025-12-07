@@ -213,23 +213,42 @@ async def sign_purchase_order(
     
     # Count how many required officers have signed
     required_signed = 0
+    print(f"[PROCUREMENT] Checking signatures for order {order_id}")
+    print(f"[PROCUREMENT] Required officers: {updated_flow.get('required_officers', [])}")
+    print(f"[PROCUREMENT] Signatures: {len(updated_flow.get('signatures', []))}")
+    
     for officer in updated_flow.get("required_officers", []):
         if officer["type"] == "person":
             if any(s["user_id"] == officer["reference"] for s in updated_flow.get("signatures", [])):
                 required_signed += 1
+                print(f"[PROCUREMENT] Person {officer['reference']} has signed")
         elif officer["type"] == "role":
             # Check if any user with this role has signed
-            role = db.roles.find_one({"name": officer["reference"]})
+            role_name = officer["reference"]
+            print(f"[PROCUREMENT] Checking role: {role_name}")
+            
+            # Find role by name
+            role = db.roles.find_one({"name": role_name})
             if role:
+                print(f"[PROCUREMENT] Found role {role_name} with ID {role['_id']}")
                 for sig in updated_flow.get("signatures", []):
                     signer = db.users.find_one({"_id": ObjectId(sig["user_id"])})
                     if signer:
-                        signer_role = signer.get("role") or signer.get("local_role")
-                        if signer_role and str(signer_role) == str(role["_id"]):
-                            required_signed += 1
-                            break
+                        signer_role_id = signer.get("role") or signer.get("local_role")
+                        print(f"[PROCUREMENT] Signer {signer.get('username')} has role: {signer_role_id}")
+                        
+                        # Compare role IDs (handle both string and ObjectId)
+                        if signer_role_id:
+                            if str(signer_role_id) == str(role["_id"]):
+                                required_signed += 1
+                                print(f"[PROCUREMENT] Role {role_name} requirement satisfied by {signer.get('username')}")
+                                break
+            else:
+                print(f"[PROCUREMENT] WARNING: Role {role_name} not found in database")
     
-    # If all required officers have signed, mark as approved
+    print(f"[PROCUREMENT] Required signatures: {required_count}, Collected: {required_signed}")
+    
+    # If all required officers have signed, mark as approved AND issue order (place it)
     if required_signed == required_count:
         db.approval_flows.update_one(
             {"_id": ObjectId(flow["_id"])},
@@ -241,24 +260,29 @@ async def sign_purchase_order(
                 }
             }
         )
-    
-    # Update order status to "Placed" (20) when someone signs
-    try:
-        token = current_user.get('token')
-        if token:
-            headers = {
-                'Authorization': f'Token {token}',
-                'Content-Type': 'application/json'
-            }
-            response = requests.patch(
-                f"{inventree_url}/api/order/po/{order_id}/",
-                headers=headers,
-                json={"status": 20},
-                timeout=10
-            )
-            response.raise_for_status()
-    except Exception as e:
-        print(f"Warning: Failed to update order status: {e}")
+        
+        # Issue order (place it) - InvenTree 1.0.1 requires using /issue/ endpoint
+        try:
+            token = current_user.get('token')
+            if token:
+                headers = {
+                    'Authorization': f'Token {token}',
+                    'Content-Type': 'application/json'
+                }
+                print(f"[PROCUREMENT] Issuing (placing) order {order_id}")
+                response = requests.post(
+                    f"{inventree_url}/api/order/po/{order_id}/issue/",
+                    headers=headers,
+                    json={},  # Empty payload for issue
+                    timeout=10
+                )
+                response.raise_for_status()
+                print(f"[PROCUREMENT] Order {order_id} issued successfully - status is now PLACED")
+        except Exception as e:
+            print(f"[PROCUREMENT] ERROR: Failed to issue order: {e}")
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                print(f"[PROCUREMENT] Response: {e.response.text}")
+            # Don't raise exception, just log it
     
     # Get updated flow
     flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
