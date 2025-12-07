@@ -595,14 +595,52 @@ async def generate_procurement_document(
         print(f"[DOCUMENT] Initializing DataFlows Docu client...")
         client = DataFlowsDocuClient()
         
-        # Get next version for this order and template
+        # Check if there's already a document for this template
         generated_docs_collection = db['generated_documents']
-        existing_docs = list(generated_docs_collection.find({
+        existing_doc = generated_docs_collection.find_one({
             'object_type': 'procurement_order',
             'object_id': str(request.order_id),
             'template_code': request.template_code
-        }))
-        version = len(existing_docs) + 1
+        }, sort=[('created_at', -1)])  # Get most recent
+        
+        # If exists and is not completed/failed, check its status first
+        if existing_doc and existing_doc.get('status') not in ['completed', 'failed']:
+            job_id = existing_doc.get('job_id')
+            print(f"[DOCUMENT] Found existing job {job_id}, checking status...")
+            
+            job_status = client.get_job_status(job_id)
+            if job_status:
+                current_status = job_status.get('status')
+                print(f"[DOCUMENT] Existing job status: {current_status}")
+                
+                # Update status in DB
+                generated_docs_collection.update_one(
+                    {'_id': existing_doc['_id']},
+                    {
+                        '$set': {
+                            'status': current_status,
+                            'updated_at': datetime.utcnow(),
+                            'error': job_status.get('error')
+                        }
+                    }
+                )
+                
+                # If completed, return existing job
+                if current_status == 'completed':
+                    print(f"[DOCUMENT] Existing job is completed, returning it")
+                    return {
+                        'job_id': job_id,
+                        'status': current_status,
+                        'message': 'Document already generated',
+                        'filename': existing_doc.get('filename')
+                    }
+        
+        # If we have an existing doc (completed or failed), delete it to replace
+        if existing_doc:
+            print(f"[DOCUMENT] Deleting existing document to replace it")
+            generated_docs_collection.delete_one({'_id': existing_doc['_id']})
+        
+        version = 1  # Always version 1 since we replace old ones
         
         print(f"[DOCUMENT] Version: {version}")
         
@@ -685,6 +723,7 @@ async def get_procurement_order_documents(
 ):
     """
     Get all document generation jobs for a procurement order
+    Also checks and updates status from DataFlows Docu
     """
     db = get_db()
     generated_docs_collection = db['generated_documents']
@@ -693,6 +732,30 @@ async def get_procurement_order_documents(
         'object_type': 'procurement_order',
         'object_id': str(order_id)
     }))
+    
+    # Check status for non-completed docs
+    client = DataFlowsDocuClient()
+    for doc in docs:
+        if doc.get('status') not in ['completed', 'failed']:
+            job_id = doc.get('job_id')
+            if job_id:
+                job_status = client.get_job_status(job_id)
+                if job_status:
+                    current_status = job_status.get('status')
+                    if current_status != doc.get('status'):
+                        # Update status in DB
+                        generated_docs_collection.update_one(
+                            {'_id': doc['_id']},
+                            {
+                                '$set': {
+                                    'status': current_status,
+                                    'updated_at': datetime.utcnow(),
+                                    'error': job_status.get('error')
+                                }
+                            }
+                        )
+                        doc['status'] = current_status
+                        doc['error'] = job_status.get('error')
     
     # Convert ObjectId and datetime to strings
     for doc in docs:
