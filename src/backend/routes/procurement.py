@@ -769,15 +769,98 @@ async def delete_attachment(
         raise HTTPException(status_code=500, detail=f"Failed to delete attachment: {error_detail}")
 
 
+class QCRecordRequest(BaseModel):
+    batch_code: str
+    part: str
+    prelevation_date: str
+    prelevated_quantity: float
+    ba_rompharm_no: str
+    ba_rompharm_date: str
+    test_result: str
+    transactionable: bool
+    comment: Optional[str] = None
+    confirmed: bool = False
+
+
 @router.get("/purchase-orders/{order_id}/qc-records")
 async def get_qc_records(
     request: Request,
     order_id: int,
     current_user: dict = Depends(verify_admin)
 ):
-    """Get QC records for a purchase order (placeholder)"""
-    # This is a placeholder - QC records functionality to be implemented
-    return {"results": []}
+    """Get QC records for a purchase order from MongoDB"""
+    db = get_db()
+    qc_collection = db['qc_records']
+    
+    records = list(qc_collection.find({
+        'order_id': str(order_id)
+    }))
+    
+    # Convert ObjectId to string
+    for record in records:
+        record['_id'] = str(record['_id'])
+        if 'created_at' in record and isinstance(record['created_at'], datetime):
+            record['created_at'] = record['created_at'].isoformat()
+        if 'updated_at' in record and isinstance(record['updated_at'], datetime):
+            record['updated_at'] = record['updated_at'].isoformat()
+    
+    return {"results": records}
+
+
+@router.post("/purchase-orders/{order_id}/qc-records")
+async def create_qc_record(
+    request: Request,
+    order_id: int,
+    qc_data: QCRecordRequest,
+    current_user: dict = Depends(verify_admin)
+):
+    """Create a QC record for a purchase order"""
+    db = get_db()
+    qc_collection = db['qc_records']
+    
+    # Get part name from InvenTree
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    headers = get_inventree_headers(current_user)
+    
+    part_name = f"Part {qc_data.part}"
+    try:
+        part_response = requests.get(
+            f"{inventree_url}/api/part/{qc_data.part}/",
+            headers=headers,
+            timeout=10
+        )
+        if part_response.status_code == 200:
+            part_data = part_response.json()
+            part_name = part_data.get('name', part_name)
+    except Exception as e:
+        print(f"Warning: Failed to get part name: {e}")
+    
+    # Create QC record
+    record = {
+        'order_id': str(order_id),
+        'batch_code': qc_data.batch_code,
+        'part': qc_data.part,
+        'part_name': part_name,
+        'prelevation_date': qc_data.prelevation_date,
+        'prelevated_quantity': qc_data.prelevated_quantity,
+        'ba_rompharm_no': qc_data.ba_rompharm_no,
+        'ba_rompharm_date': qc_data.ba_rompharm_date,
+        'test_result': qc_data.test_result,
+        'transactionable': qc_data.transactionable,
+        'comment': qc_data.comment or '',
+        'confirmed': qc_data.confirmed,
+        'created_at': datetime.utcnow(),
+        'updated_at': datetime.utcnow(),
+        'created_by': current_user.get('username')
+    }
+    
+    result = qc_collection.insert_one(record)
+    record['_id'] = str(result.inserted_id)
+    record['created_at'] = record['created_at'].isoformat()
+    record['updated_at'] = record['updated_at'].isoformat()
+    
+    return record
 
 
 @router.get("/purchase-orders/{order_id}/received-items")
