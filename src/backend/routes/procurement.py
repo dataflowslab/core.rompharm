@@ -788,9 +788,9 @@ async def get_qc_records(
     order_id: int,
     current_user: dict = Depends(verify_admin)
 ):
-    """Get QC records for a purchase order from MongoDB"""
+    """Get QC records for a purchase order from MongoDB (depo_procurement_qc collection)"""
     db = get_db()
-    qc_collection = db['qc_records']
+    qc_collection = db['depo_procurement_qc']
     
     records = list(qc_collection.find({
         'order_id': str(order_id)
@@ -814,9 +814,9 @@ async def create_qc_record(
     qc_data: QCRecordRequest,
     current_user: dict = Depends(verify_admin)
 ):
-    """Create a QC record for a purchase order"""
+    """Create a QC record for a purchase order in MongoDB (depo_procurement_qc collection)"""
     db = get_db()
-    qc_collection = db['qc_records']
+    qc_collection = db['depo_procurement_qc']
     
     # Get part name from InvenTree
     config = load_config()
