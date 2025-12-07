@@ -814,15 +814,18 @@ async def create_qc_record(
     qc_data: QCRecordRequest,
     current_user: dict = Depends(verify_admin)
 ):
-    """Create a QC record for a purchase order in MongoDB (depo_procurement_qc collection)"""
+    """
+    Create a QC record for a purchase order in MongoDB (depo_procurement_qc collection)
+    Also transfers stock to QC location (ID 27) and creates stock adjustment
+    """
     db = get_db()
     qc_collection = db['depo_procurement_qc']
     
-    # Get part name from InvenTree
     config = load_config()
     inventree_url = config['inventree']['url'].rstrip('/')
     headers = get_inventree_headers(current_user)
     
+    # Get part name from InvenTree
     part_name = f"Part {qc_data.part}"
     try:
         part_response = requests.get(
@@ -835,6 +838,75 @@ async def create_qc_record(
             part_name = part_data.get('name', part_name)
     except Exception as e:
         print(f"Warning: Failed to get part name: {e}")
+    
+    # Find stock item with this batch code
+    stock_item_id = None
+    try:
+        stock_response = requests.get(
+            f"{inventree_url}/api/stock/",
+            headers=headers,
+            params={
+                'part': qc_data.part,
+                'batch': qc_data.batch_code,
+                'purchase_order': order_id
+            },
+            timeout=10
+        )
+        if stock_response.status_code == 200:
+            stock_data = stock_response.json()
+            stock_items = stock_data if isinstance(stock_data, list) else stock_data.get('results', [])
+            if stock_items:
+                stock_item_id = stock_items[0].get('pk') or stock_items[0].get('id')
+                print(f"[QC] Found stock item: {stock_item_id}")
+    except Exception as e:
+        print(f"Warning: Failed to find stock item: {e}")
+    
+    # Transfer stock to QC location (ID 27)
+    qc_stock_item_id = None
+    if stock_item_id and qc_data.prelevated_quantity > 0:
+        try:
+            # Transfer stock to QC location
+            transfer_payload = {
+                'items': [{
+                    'item': stock_item_id,
+                    'quantity': qc_data.prelevated_quantity,
+                    'location': 27  # QC location
+                }],
+                'notes': f'Transfer pentru testare QC - BA Rompharm {qc_data.ba_rompharm_no}'
+            }
+            
+            transfer_response = requests.post(
+                f"{inventree_url}/api/stock/transfer/",
+                headers=headers,
+                json=transfer_payload,
+                timeout=10
+            )
+            
+            if transfer_response.status_code in [200, 201]:
+                print(f"[QC] Stock transferred to QC location")
+                
+                # Find the new stock item in QC location
+                qc_stock_response = requests.get(
+                    f"{inventree_url}/api/stock/",
+                    headers=headers,
+                    params={
+                        'part': qc_data.part,
+                        'batch': qc_data.batch_code,
+                        'location': 27
+                    },
+                    timeout=10
+                )
+                
+                if qc_stock_response.status_code == 200:
+                    qc_stock_data = qc_stock_response.json()
+                    qc_stock_items = qc_stock_data if isinstance(qc_stock_data, list) else qc_stock_data.get('results', [])
+                    if qc_stock_items:
+                        qc_stock_item_id = qc_stock_items[0].get('pk') or qc_stock_items[0].get('id')
+                        print(f"[QC] QC stock item: {qc_stock_item_id}")
+            else:
+                print(f"[QC] Warning: Failed to transfer stock: {transfer_response.text}")
+        except Exception as e:
+            print(f"Warning: Failed to transfer stock to QC: {e}")
     
     # Create QC record
     record = {
@@ -850,6 +922,8 @@ async def create_qc_record(
         'transactionable': qc_data.transactionable,
         'comment': qc_data.comment or '',
         'confirmed': qc_data.confirmed,
+        'stock_item_id': stock_item_id,
+        'qc_stock_item_id': qc_stock_item_id,
         'created_at': datetime.utcnow(),
         'updated_at': datetime.utcnow(),
         'created_by': current_user.get('username')
@@ -861,6 +935,114 @@ async def create_qc_record(
     record['updated_at'] = record['updated_at'].isoformat()
     
     return record
+
+
+class QCRecordUpdateRequest(BaseModel):
+    test_result: Optional[str] = None
+    transactionable: Optional[bool] = None
+    comment: Optional[str] = None
+    confirmed: Optional[bool] = None
+
+
+@router.patch("/purchase-orders/{order_id}/qc-records/{record_id}")
+async def update_qc_record(
+    request: Request,
+    order_id: int,
+    record_id: str,
+    qc_data: QCRecordUpdateRequest,
+    current_user: dict = Depends(verify_admin)
+):
+    """
+    Update a QC record (approve/reject)
+    When confirmed, creates stock adjustment to remove tested quantity
+    """
+    from bson import ObjectId
+    
+    db = get_db()
+    qc_collection = db['depo_procurement_qc']
+    
+    try:
+        record_obj_id = ObjectId(record_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid record ID")
+    
+    # Get existing record
+    record = qc_collection.find_one({'_id': record_obj_id})
+    if not record:
+        raise HTTPException(status_code=404, detail="QC record not found")
+    
+    # Prepare update
+    update_data = {
+        'updated_at': datetime.utcnow(),
+        'updated_by': current_user.get('username')
+    }
+    
+    if qc_data.test_result is not None:
+        update_data['test_result'] = qc_data.test_result
+    if qc_data.transactionable is not None:
+        update_data['transactionable'] = qc_data.transactionable
+    if qc_data.comment is not None:
+        update_data['comment'] = qc_data.comment
+    if qc_data.confirmed is not None:
+        update_data['confirmed'] = qc_data.confirmed
+    
+    # If confirming, create stock adjustment to remove tested quantity
+    if qc_data.confirmed and not record.get('confirmed'):
+        qc_stock_item_id = record.get('qc_stock_item_id')
+        prelevated_quantity = record.get('prelevated_quantity', 0)
+        
+        if qc_stock_item_id and prelevated_quantity > 0:
+            config = load_config()
+            inventree_url = config['inventree']['url'].rstrip('/')
+            headers = get_inventree_headers(current_user)
+            
+            try:
+                # Remove stock (stock adjustment)
+                adjustment_payload = {
+                    'items': [{
+                        'item': qc_stock_item_id,
+                        'quantity': prelevated_quantity
+                    }],
+                    'notes': f'Testare calitate - BA Rompharm {record.get("ba_rompharm_no")} - Rezultat: {qc_data.test_result or record.get("test_result")}'
+                }
+                
+                adjustment_response = requests.post(
+                    f"{inventree_url}/api/stock/remove/",
+                    headers=headers,
+                    json=adjustment_payload,
+                    timeout=10
+                )
+                
+                if adjustment_response.status_code in [200, 201]:
+                    print(f"[QC] Stock adjusted (removed {prelevated_quantity} units)")
+                    update_data['stock_adjusted'] = True
+                    update_data['stock_adjusted_at'] = datetime.utcnow()
+                else:
+                    print(f"[QC] Warning: Failed to adjust stock: {adjustment_response.text}")
+                    update_data['stock_adjusted'] = False
+                    update_data['stock_adjustment_error'] = adjustment_response.text
+            except Exception as e:
+                print(f"Warning: Failed to adjust stock: {e}")
+                update_data['stock_adjusted'] = False
+                update_data['stock_adjustment_error'] = str(e)
+    
+    # Update record
+    qc_collection.update_one(
+        {'_id': record_obj_id},
+        {'$set': update_data}
+    )
+    
+    # Get updated record
+    updated_record = qc_collection.find_one({'_id': record_obj_id})
+    updated_record['_id'] = str(updated_record['_id'])
+    if 'created_at' in updated_record and isinstance(updated_record['created_at'], datetime):
+        updated_record['created_at'] = updated_record['created_at'].isoformat()
+    if 'updated_at' in updated_record and isinstance(updated_record['updated_at'], datetime):
+        updated_record['updated_at'] = updated_record['updated_at'].isoformat()
+    if 'stock_adjusted_at' in updated_record and isinstance(updated_record['stock_adjusted_at'], datetime):
+        updated_record['stock_adjusted_at'] = updated_record['stock_adjusted_at'].isoformat()
+    
+    return updated_record
 
 
 @router.get("/purchase-orders/{order_id}/received-items")
