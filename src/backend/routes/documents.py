@@ -695,20 +695,18 @@ async def get_procurement_order_documents(
 ):
     """
     Get all document generation jobs for a procurement order
-    Checks status and auto-downloads completed documents
+    Only checks status, does NOT auto-download
     """
-    import base64
-    
     db = get_db()
     docs_collection = db['depo_procurement_documents']
     
     docs = list(docs_collection.find({'order_id': order_id}))
     
-    # Check status for non-completed docs and auto-download completed ones
+    # Check status for incomplete documents (but don't download)
     client = DataFlowsDocuClient()
     for doc in docs:
-        # Skip if already has document data
-        if doc.get('document_data'):
+        # Skip if already has document data or failed
+        if doc.get('document_data') or doc.get('status') == 'failed':
             continue
             
         # Check status for incomplete documents
@@ -722,24 +720,12 @@ async def get_procurement_order_documents(
                     print(f"[DOCUMENT] Job {job_id} status: {current_status}")
                     
                     if current_status != doc.get('status'):
-                        # Update status in DB
+                        # Update status in DB (but don't download yet)
                         update_data = {
                             'status': current_status,
                             'updated_at': datetime.utcnow(),
                             'error': job_status.get('error')
                         }
-                        
-                        # If completed, download document automatically
-                        if current_status == 'completed':
-                            print(f"[DOCUMENT] Job completed, downloading document...")
-                            document_bytes = client.download_document(job_id)
-                            if document_bytes:
-                                # Store as base64 in MongoDB
-                                update_data['document_data'] = base64.b64encode(document_bytes).decode('utf-8')
-                                print(f"[DOCUMENT] Document downloaded and saved ({len(document_bytes)} bytes)")
-                            else:
-                                print(f"[DOCUMENT] Failed to download document")
-                                update_data['error'] = 'Failed to download completed document'
                         
                         docs_collection.update_one(
                             {'_id': doc['_id']},
@@ -749,8 +735,6 @@ async def get_procurement_order_documents(
                         # Update doc in memory for response
                         doc['status'] = current_status
                         doc['error'] = update_data.get('error')
-                        if 'document_data' in update_data:
-                            doc['document_data'] = update_data['document_data']
     
     # Convert ObjectId and datetime to strings, remove document_data from response
     for doc in docs:
@@ -768,67 +752,6 @@ async def get_procurement_order_documents(
     return docs
 
 
-@router.get("/procurement-order/{order_id}/job/{job_id}/status")
-async def get_procurement_job_status(
-    order_id: int,
-    job_id: str,
-    user = Depends(verify_token)
-):
-    """
-    Check status of a procurement document generation job
-    """
-    print(f"[DOCUMENT] Checking procurement job status: {job_id}")
-    
-    db = get_db()
-    generated_docs_collection = db['generated_documents']
-    
-    job_entry = generated_docs_collection.find_one({
-        'object_type': 'procurement_order',
-        'object_id': str(order_id),
-        'job_id': job_id
-    })
-    
-    if not job_entry:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    # Check status from OfficeClerk
-    client = DataFlowsDocuClient()
-    job_status = client.get_job_status(job_id)
-    
-    if not job_status:
-        return {
-            'job_id': job_id,
-            'status': job_entry.get('status', 'unknown'),
-            'error': 'Failed to get status from OfficeClerk'
-        }
-    
-    current_status = job_status.get('status')
-    print(f"[DOCUMENT] Job {job_id} status: {current_status}")
-    
-    # Update job status if changed
-    if current_status != job_entry.get('status'):
-        generated_docs_collection.update_one(
-            {'job_id': job_id},
-            {
-                '$set': {
-                    'status': current_status,
-                    'updated_at': datetime.utcnow(),
-                    'error': job_status.get('error')
-                }
-            }
-        )
-    
-    return {
-        'job_id': job_id,
-        'status': current_status,
-        'filename': job_entry.get('filename'),
-        'template_name': job_entry.get('template_name'),
-        'created_at': job_entry.get('created_at').isoformat() if isinstance(job_entry.get('created_at'), datetime) else str(job_entry.get('created_at')),
-        'error': job_status.get('error'),
-        'has_local_file': job_entry.get('local_file') is not None
-    }
-
-
 @router.get("/procurement-order/{order_id}/job/{job_id}/download")
 async def download_procurement_job_document(
     order_id: int,
@@ -836,7 +759,7 @@ async def download_procurement_job_document(
     user = Depends(verify_token)
 ):
     """
-    Download document from MongoDB (already stored as base64)
+    Download document - fetches from DataFlows Docu if not cached, stores in MongoDB
     """
     import base64
     
@@ -853,22 +776,46 @@ async def download_procurement_job_document(
     if not job_entry:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    # Check if document data exists
-    if not job_entry.get('document_data'):
-        raise HTTPException(
-            status_code=404,
-            detail="Document not yet available. Please wait for generation to complete."
-        )
-    
-    # Decode base64 document
-    try:
-        document_bytes = base64.b64decode(job_entry['document_data'])
-        print(f"[DOCUMENT] Serving document from MongoDB ({len(document_bytes)} bytes)")
-    except Exception as e:
-        print(f"[DOCUMENT] ERROR decoding document: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to decode document data"
+    # Check if document is already cached in MongoDB
+    if job_entry.get('document_data'):
+        print(f"[DOCUMENT] Serving cached document from MongoDB")
+        try:
+            document_bytes = base64.b64decode(job_entry['document_data'])
+        except Exception as e:
+            print(f"[DOCUMENT] ERROR decoding cached document: {e}")
+            raise HTTPException(status_code=500, detail="Failed to decode cached document")
+    else:
+        # Document not cached - download from DataFlows Docu
+        print(f"[DOCUMENT] Document not cached, downloading from DataFlows Docu...")
+        
+        # Check if job is completed
+        if job_entry.get('status') != 'completed':
+            raise HTTPException(
+                status_code=400,
+                detail=f"Document not ready. Current status: {job_entry.get('status', 'unknown')}"
+            )
+        
+        # Download from DataFlows Docu
+        client = DataFlowsDocuClient()
+        document_bytes = client.download_document(job_id)
+        
+        if not document_bytes:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to download document from DataFlows Docu"
+            )
+        
+        print(f"[DOCUMENT] Downloaded {len(document_bytes)} bytes, caching in MongoDB...")
+        
+        # Cache in MongoDB for future requests
+        docs_collection.update_one(
+            {'_id': job_entry['_id']},
+            {
+                '$set': {
+                    'document_data': base64.b64encode(document_bytes).decode('utf-8'),
+                    'updated_at': datetime.utcnow()
+                }
+            }
         )
     
     # Return document
@@ -879,3 +826,34 @@ async def download_procurement_job_document(
             'Content-Disposition': f'attachment; filename="{job_entry.get("filename", "document.pdf")}"'
         }
     )
+
+
+@router.delete("/procurement-order/{order_id}/job/{job_id}")
+async def delete_procurement_document(
+    order_id: int,
+    job_id: str,
+    user = Depends(verify_token)
+):
+    """
+    Delete a procurement document from MongoDB
+    """
+    print(f"[DOCUMENT] Delete request for procurement job: {job_id}")
+    
+    db = get_db()
+    docs_collection = db['depo_procurement_documents']
+    
+    # Find and delete the document
+    result = docs_collection.delete_one({
+        'order_id': order_id,
+        'job_id': job_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    print(f"[DOCUMENT] Document deleted successfully")
+    
+    return {
+        'message': 'Document deleted successfully',
+        'job_id': job_id
+    }
