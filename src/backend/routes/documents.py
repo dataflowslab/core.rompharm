@@ -587,11 +587,16 @@ async def generate_procurement_document(
         items_response.raise_for_status()
         items_data = items_response.json()
         
+        # Extract line items - handle both list and paginated response
         if isinstance(items_data, list):
             line_items = items_data
+        elif isinstance(items_data, dict) and 'results' in items_data:
+            line_items = items_data['results']
         else:
-            line_items = items_data.get('results', [])
+            print(f"[DOCUMENT] WARNING: Unexpected items_data type: {type(items_data)}")
+            line_items = []
         
+        print(f"[DOCUMENT] Found {len(line_items)} line items")
         print(f"[DOCUMENT] Initializing DataFlows Docu client...")
         client = DataFlowsDocuClient()
         
