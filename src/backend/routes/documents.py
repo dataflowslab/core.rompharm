@@ -548,7 +548,7 @@ async def generate_procurement_document(
 ):
     """
     Generate a document for a procurement order (async job)
-    Creates a job in OfficeClerk and saves it to MongoDB
+    Creates a job in OfficeClerk and saves it to depo_procurement_documents
     """
     print(f"[DOCUMENT] Generate procurement doc: order_id={request.order_id}, template_code={request.template_code}")
     print(f"[DOCUMENT] User: {user.get('username')}")
@@ -595,13 +595,12 @@ async def generate_procurement_document(
         print(f"[DOCUMENT] Initializing DataFlows Docu client...")
         client = DataFlowsDocuClient()
         
-        # For procurement, we replace the existing document with the same template_code
-        generated_docs_collection = db['generated_documents']
+        # Use depo_procurement_documents collection
+        docs_collection = db['depo_procurement_documents']
         
         # Check if document already exists for this template
-        existing_doc = generated_docs_collection.find_one({
-            'object_type': 'procurement_order',
-            'object_id': str(request.order_id),
+        existing_doc = docs_collection.find_one({
+            'order_id': request.order_id,
             'template_code': request.template_code
         })
         
@@ -642,10 +641,9 @@ async def generate_procurement_document(
         job_id = job_response['id']
         print(f"[DOCUMENT] Job created: {job_id}, status: {job_response.get('status')}")
         
-        # Save/Replace job in MongoDB using upsert
+        # Save/Replace job in depo_procurement_documents using upsert
         job_entry = {
-            'object_type': 'procurement_order',
-            'object_id': str(request.order_id),
+            'order_id': request.order_id,
             'job_id': job_id,
             'template_code': request.template_code,
             'template_name': request.template_name,
@@ -655,22 +653,21 @@ async def generate_procurement_document(
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow(),
             'created_by': user.get('username'),
-            'local_file': None,
+            'document_data': None,  # Will store base64 encoded PDF
             'error': None
         }
         
         # Use update_one with upsert to replace existing document with same template_code
-        generated_docs_collection.update_one(
+        docs_collection.update_one(
             {
-                'object_type': 'procurement_order',
-                'object_id': str(request.order_id),
+                'order_id': request.order_id,
                 'template_code': request.template_code
             },
             {'$set': job_entry},
             upsert=True
         )
         
-        print(f"[DOCUMENT] Job saved/replaced in database")
+        print(f"[DOCUMENT] Job saved/replaced in depo_procurement_documents")
         
         return {
             'job_id': job_id,
@@ -698,47 +695,75 @@ async def get_procurement_order_documents(
 ):
     """
     Get all document generation jobs for a procurement order
-    Also checks and updates status from DataFlows Docu
+    Checks status and auto-downloads completed documents
     """
+    import base64
+    
     db = get_db()
-    generated_docs_collection = db['generated_documents']
+    docs_collection = db['depo_procurement_documents']
     
-    docs = list(generated_docs_collection.find({
-        'object_type': 'procurement_order',
-        'object_id': str(order_id)
-    }))
+    docs = list(docs_collection.find({'order_id': order_id}))
     
-    # Check status for non-completed docs
+    # Check status for non-completed docs and auto-download completed ones
     client = DataFlowsDocuClient()
     for doc in docs:
+        # Skip if already has document data
+        if doc.get('document_data'):
+            continue
+            
+        # Check status for incomplete documents
         if doc.get('status') not in ['completed', 'failed']:
             job_id = doc.get('job_id')
             if job_id:
+                print(f"[DOCUMENT] Checking status for job: {job_id}")
                 job_status = client.get_job_status(job_id)
                 if job_status:
                     current_status = job_status.get('status')
+                    print(f"[DOCUMENT] Job {job_id} status: {current_status}")
+                    
                     if current_status != doc.get('status'):
                         # Update status in DB
-                        generated_docs_collection.update_one(
+                        update_data = {
+                            'status': current_status,
+                            'updated_at': datetime.utcnow(),
+                            'error': job_status.get('error')
+                        }
+                        
+                        # If completed, download document automatically
+                        if current_status == 'completed':
+                            print(f"[DOCUMENT] Job completed, downloading document...")
+                            document_bytes = client.download_document(job_id)
+                            if document_bytes:
+                                # Store as base64 in MongoDB
+                                update_data['document_data'] = base64.b64encode(document_bytes).decode('utf-8')
+                                print(f"[DOCUMENT] Document downloaded and saved ({len(document_bytes)} bytes)")
+                            else:
+                                print(f"[DOCUMENT] Failed to download document")
+                                update_data['error'] = 'Failed to download completed document'
+                        
+                        docs_collection.update_one(
                             {'_id': doc['_id']},
-                            {
-                                '$set': {
-                                    'status': current_status,
-                                    'updated_at': datetime.utcnow(),
-                                    'error': job_status.get('error')
-                                }
-                            }
+                            {'$set': update_data}
                         )
+                        
+                        # Update doc in memory for response
                         doc['status'] = current_status
-                        doc['error'] = job_status.get('error')
+                        doc['error'] = update_data.get('error')
+                        if 'document_data' in update_data:
+                            doc['document_data'] = update_data['document_data']
     
-    # Convert ObjectId and datetime to strings
+    # Convert ObjectId and datetime to strings, remove document_data from response
     for doc in docs:
         doc['_id'] = str(doc['_id'])
         if 'created_at' in doc and isinstance(doc['created_at'], datetime):
             doc['created_at'] = doc['created_at'].isoformat()
         if 'updated_at' in doc and isinstance(doc['updated_at'], datetime):
             doc['updated_at'] = doc['updated_at'].isoformat()
+        # Add flag to indicate if document is available
+        doc['has_document'] = doc.get('document_data') is not None
+        # Remove actual document data from list response (too large)
+        if 'document_data' in doc:
+            del doc['document_data']
     
     return docs
 
@@ -811,67 +836,40 @@ async def download_procurement_job_document(
     user = Depends(verify_token)
 ):
     """
-    Download document from completed procurement job and save locally
+    Download document from MongoDB (already stored as base64)
     """
+    import base64
+    
     print(f"[DOCUMENT] Download request for procurement job: {job_id}")
     
     db = get_db()
-    generated_docs_collection = db['generated_documents']
+    docs_collection = db['depo_procurement_documents']
     
-    job_entry = generated_docs_collection.find_one({
-        'object_type': 'procurement_order',
-        'object_id': str(order_id),
+    job_entry = docs_collection.find_one({
+        'order_id': order_id,
         'job_id': job_id
     })
     
     if not job_entry:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    # Check if already downloaded
-    if job_entry.get('local_file'):
-        print(f"[DOCUMENT] File already downloaded: {job_entry['local_file']}")
-        from ..utils.file_handler import get_file_path
-        file_path = get_file_path(job_entry['local_file'])
-        
-        if file_path and os.path.exists(file_path):
-            from fastapi.responses import FileResponse
-            return FileResponse(
-                file_path,
-                media_type='application/pdf',
-                filename=job_entry.get('filename', 'document.pdf')
-            )
-    
-    # Download from OfficeClerk
-    client = DataFlowsDocuClient()
-    document_bytes = client.download_document(job_id)
-    
-    if not document_bytes:
+    # Check if document data exists
+    if not job_entry.get('document_data'):
         raise HTTPException(
-            status_code=500,
-            detail="Failed to download document from OfficeClerk"
+            status_code=404,
+            detail="Document not yet available. Please wait for generation to complete."
         )
     
-    print(f"[DOCUMENT] Downloaded {len(document_bytes)} bytes")
-    
-    # Save to local filesystem
-    from ..utils.file_handler import save_document_file
-    file_hash = save_document_file(
-        document_bytes,
-        job_entry.get('filename', 'document.pdf')
-    )
-    
-    print(f"[DOCUMENT] Saved to local file: {file_hash}")
-    
-    # Update job with local file path
-    generated_docs_collection.update_one(
-        {'job_id': job_id},
-        {
-            '$set': {
-                'local_file': file_hash,
-                'updated_at': datetime.utcnow()
-            }
-        }
-    )
+    # Decode base64 document
+    try:
+        document_bytes = base64.b64decode(job_entry['document_data'])
+        print(f"[DOCUMENT] Serving document from MongoDB ({len(document_bytes)} bytes)")
+    except Exception as e:
+        print(f"[DOCUMENT] ERROR decoding document: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to decode document data"
+        )
     
     # Return document
     return StreamingResponse(
