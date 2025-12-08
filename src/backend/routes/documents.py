@@ -577,6 +577,45 @@ async def generate_procurement_document(
         po_response.raise_for_status()
         purchase_order = po_response.json()
         
+        # Get supplier details
+        supplier_id = purchase_order.get('supplier')
+        supplier_detail = None
+        if supplier_id:
+            try:
+                supplier_response = requests.get(
+                    f"{inventree_url}/api/company/{supplier_id}/",
+                    headers=headers,
+                    timeout=10
+                )
+                supplier_response.raise_for_status()
+                supplier_detail = supplier_response.json()
+                print(f"[DOCUMENT] Supplier details: {supplier_detail.get('name')}")
+            except Exception as e:
+                print(f"[DOCUMENT] WARNING: Failed to get supplier details: {e}")
+        
+        # Get company settings (buyer info)
+        company_info = None
+        try:
+            settings_response = requests.get(
+                f"{inventree_url}/api/settings/global/",
+                headers=headers,
+                timeout=10
+            )
+            settings_response.raise_for_status()
+            settings = settings_response.json()
+            
+            # Extract company info from settings
+            company_info = {
+                'name': next((s['value'] for s in settings if s['key'] == 'INVENTREE_COMPANY_NAME'), 'Company Name'),
+                'address': next((s['value'] for s in settings if s['key'] == 'INVENTREE_COMPANY_ADDRESS'), ''),
+                'phone': next((s['value'] for s in settings if s['key'] == 'INVENTREE_COMPANY_PHONE'), ''),
+                'email': next((s['value'] for s in settings if s['key'] == 'INVENTREE_COMPANY_EMAIL'), ''),
+            }
+            print(f"[DOCUMENT] Company info: {company_info.get('name')}")
+        except Exception as e:
+            print(f"[DOCUMENT] WARNING: Failed to get company settings: {e}")
+            company_info = {'name': 'Company Name', 'address': '', 'phone': '', 'email': ''}
+        
         # Get line items
         items_response = requests.get(
             f"{inventree_url}/api/order/po-line/",
@@ -625,6 +664,8 @@ async def generate_procurement_document(
             'data': {
                 'order': purchase_order,
                 'line_items': line_items,  # Changed from 'items' to 'line_items'
+                'supplier': supplier_detail,  # Full supplier details
+                'company': company_info,  # Buyer/company info
                 'generated_at': datetime.utcnow().isoformat(),
                 'generated_by': user.get('username')
             }
