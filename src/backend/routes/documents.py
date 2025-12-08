@@ -595,16 +595,20 @@ async def generate_procurement_document(
         print(f"[DOCUMENT] Initializing DataFlows Docu client...")
         client = DataFlowsDocuClient()
         
-        # Get next version for this order and template (same as submissions)
+        # For procurement, we replace the existing document with the same template_code
         generated_docs_collection = db['generated_documents']
-        existing_docs = list(generated_docs_collection.find({
+        
+        # Check if document already exists for this template
+        existing_doc = generated_docs_collection.find_one({
             'object_type': 'procurement_order',
             'object_id': str(request.order_id),
             'template_code': request.template_code
-        }))
-        version = len(existing_docs) + 1
+        })
         
-        print(f"[DOCUMENT] Version: {version}")
+        # Always use version 1 since we replace
+        version = 1
+        
+        print(f"[DOCUMENT] Version: {version} (replacing existing: {existing_doc is not None})")
         
         # Generate filename
         filename = f"PO-{request.order_id}-{request.template_code[:6]}-v{version}"
@@ -638,7 +642,7 @@ async def generate_procurement_document(
         job_id = job_response['id']
         print(f"[DOCUMENT] Job created: {job_id}, status: {job_response.get('status')}")
         
-        # Save job to MongoDB
+        # Save/Replace job in MongoDB using upsert
         job_entry = {
             'object_type': 'procurement_order',
             'object_id': str(request.order_id),
@@ -655,9 +659,18 @@ async def generate_procurement_document(
             'error': None
         }
         
-        generated_docs_collection.insert_one(job_entry)
+        # Use update_one with upsert to replace existing document with same template_code
+        generated_docs_collection.update_one(
+            {
+                'object_type': 'procurement_order',
+                'object_id': str(request.order_id),
+                'template_code': request.template_code
+            },
+            {'$set': job_entry},
+            upsert=True
+        )
         
-        print(f"[DOCUMENT] Job saved to database")
+        print(f"[DOCUMENT] Job saved/replaced in database")
         
         return {
             'job_id': job_id,
