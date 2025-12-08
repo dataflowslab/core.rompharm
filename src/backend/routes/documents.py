@@ -620,10 +620,11 @@ async def generate_procurement_document(
         
         print(f"[DOCUMENT] Preparing document data...")
         # Prepare data for template - wrap in 'data' key like submissions
+        # NOTE: Don't use 'items' as key name - conflicts with dict.items() method in Jinja2
         document_data = {
             'data': {
                 'order': purchase_order,
-                'items': line_items,
+                'line_items': line_items,  # Changed from 'items' to 'line_items'
                 'generated_at': datetime.utcnow().isoformat(),
                 'generated_by': user.get('username')
             }
