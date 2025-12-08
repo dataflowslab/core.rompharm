@@ -703,14 +703,16 @@ async def get_procurement_order_documents(
 ):
     """
     Get all document generation jobs for a procurement order
-    Only checks status, does NOT auto-download
+    Auto-downloads documents when status is 'done' or 'completed'
     """
+    import base64
+    
     db = get_db()
     docs_collection = db['depo_procurement_documents']
     
     docs = list(docs_collection.find({'order_id': order_id}))
     
-    # Check status for incomplete documents (but don't download)
+    # Check status and auto-download completed documents
     client = DataFlowsDocuClient()
     for doc in docs:
         # Skip if already has document data or failed
@@ -718,7 +720,8 @@ async def get_procurement_order_documents(
             continue
             
         # Check status for incomplete documents
-        if doc.get('status') not in ['completed', 'failed']:
+        # Note: DataFlows Docu uses 'done' as completed status
+        if doc.get('status') not in ['done', 'completed', 'failed']:
             job_id = doc.get('job_id')
             if job_id:
                 print(f"[DOCUMENT] Checking status for job: {job_id}")
@@ -728,12 +731,24 @@ async def get_procurement_order_documents(
                     print(f"[DOCUMENT] Job {job_id} status: {current_status}")
                     
                     if current_status != doc.get('status'):
-                        # Update status in DB (but don't download yet)
+                        # Update status in DB
                         update_data = {
                             'status': current_status,
                             'updated_at': datetime.utcnow(),
                             'error': job_status.get('error')
                         }
+                        
+                        # If status is 'done' or 'completed', auto-download document
+                        if current_status in ['done', 'completed']:
+                            print(f"[DOCUMENT] Job completed, auto-downloading document...")
+                            document_bytes = client.download_document(job_id)
+                            if document_bytes:
+                                # Store as base64 in MongoDB
+                                update_data['document_data'] = base64.b64encode(document_bytes).decode('utf-8')
+                                print(f"[DOCUMENT] Document downloaded and cached ({len(document_bytes)} bytes)")
+                            else:
+                                print(f"[DOCUMENT] Failed to download document")
+                                update_data['error'] = 'Failed to download completed document'
                         
                         docs_collection.update_one(
                             {'_id': doc['_id']},
@@ -743,6 +758,8 @@ async def get_procurement_order_documents(
                         # Update doc in memory for response
                         doc['status'] = current_status
                         doc['error'] = update_data.get('error')
+                        if 'document_data' in update_data:
+                            doc['document_data'] = update_data['document_data']
     
     # Convert ObjectId and datetime to strings, remove document_data from response
     for doc in docs:
@@ -796,8 +813,8 @@ async def download_procurement_job_document(
         # Document not cached - download from DataFlows Docu
         print(f"[DOCUMENT] Document not cached, downloading from DataFlows Docu...")
         
-        # Check if job is completed
-        if job_entry.get('status') != 'completed':
+        # Check if job is completed (DataFlows Docu uses 'done' status)
+        if job_entry.get('status') not in ['done', 'completed']:
             raise HTTPException(
                 status_code=400,
                 detail=f"Document not ready. Current status: {job_entry.get('status', 'unknown')}"
