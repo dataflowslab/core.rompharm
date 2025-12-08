@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Table, Button, Group, Modal, Grid, Select, Textarea, Badge, TextInput, NumberInput, Checkbox } from '@mantine/core';
+import { Paper, Title, Text, Table, Button, Group, Modal, Grid, Select, Textarea, Badge, TextInput, NumberInput, Checkbox, ActionIcon } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { IconPlus, IconCheck } from '@tabler/icons-react';
+import { IconPlus, IconCheck, IconEdit } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { notifications } from '@mantine/notifications';
 
 interface QCRecord {
-  pk: number;
+  _id: string;
+  pk?: number;
   batch_code: string;
   part: string;
   part_name: string;
@@ -45,6 +46,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [qcModalOpened, setQcModalOpened] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<QCRecord | null>(null);
 
   // Form state for QC record
   const [qcData, setQcData] = useState({
@@ -173,6 +175,100 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
     }
   };
 
+  const handleEditRecord = (record: QCRecord) => {
+    setEditingRecord(record);
+    setQcData({
+      batch_code: record.batch_code,
+      part: record.part,
+      prelevation_date: new Date(record.prelevation_date),
+      prelevated_quantity: record.prelevated_quantity,
+      ba_rompharm_no: record.ba_rompharm_no,
+      ba_rompharm_date: new Date(record.ba_rompharm_date),
+      test_result: record.test_result,
+      transactionable: record.transactionable,
+      comment: record.comment
+    });
+    setQcModalOpened(true);
+  };
+
+  const handleUpdateQCRecord = async () => {
+    if (!editingRecord) return;
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        ba_rompharm_no: qcData.ba_rompharm_no,
+        ba_rompharm_date: qcData.ba_rompharm_date?.toISOString().split('T')[0],
+        test_result: qcData.test_result,
+        transactionable: qcData.transactionable,
+        comment: qcData.comment,
+        confirmed: false
+      };
+
+      await api.patch(`/api/procurement/purchase-orders/${orderId}/qc-records/${editingRecord._id}`, payload);
+
+      notifications.show({
+        title: t('Success'),
+        message: t('QC record updated successfully'),
+        color: 'green'
+      });
+
+      resetForm();
+      setEditingRecord(null);
+      setQcModalOpened(false);
+      loadQCRecords();
+    } catch (error: any) {
+      console.error('Failed to update QC record:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to update QC record'),
+        color: 'red'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmEditedRecord = async () => {
+    if (!editingRecord) return;
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        ba_rompharm_no: qcData.ba_rompharm_no,
+        ba_rompharm_date: qcData.ba_rompharm_date?.toISOString().split('T')[0],
+        test_result: qcData.test_result,
+        transactionable: qcData.test_result === 'conform',
+        comment: qcData.comment,
+        confirmed: true
+      };
+
+      await api.patch(`/api/procurement/purchase-orders/${orderId}/qc-records/${editingRecord._id}`, payload);
+
+      notifications.show({
+        title: t('Success'),
+        message: qcData.test_result === 'conform' 
+          ? t('QC record confirmed - Batch is transactionable') 
+          : t('QC record confirmed - Non-conforming batch'),
+        color: qcData.test_result === 'conform' ? 'green' : 'orange'
+      });
+
+      resetForm();
+      setEditingRecord(null);
+      setQcModalOpened(false);
+      loadQCRecords();
+    } catch (error: any) {
+      console.error('Failed to confirm QC record:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to confirm QC record'),
+        color: 'red'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const resetForm = () => {
     setQcData({
       batch_code: '',
@@ -185,6 +281,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
       transactionable: false,
       comment: ''
     });
+    setEditingRecord(null);
   };
 
   const isFormComplete = () => {
@@ -260,11 +357,12 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
               <Table.Th>{t('BA Rompharm')}</Table.Th>
               <Table.Th>{t('Transactionable')}</Table.Th>
               <Table.Th>{t('Comment')}</Table.Th>
+              <Table.Th>{t('Actions')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {qcRecords.map((record) => (
-              <Table.Tr key={record.pk}>
+              <Table.Tr key={record._id}>
                 <Table.Td>{record.part_name}</Table.Td>
                 <Table.Td>{record.batch_code}</Table.Td>
                 <Table.Td>{new Date(record.prelevation_date).toLocaleDateString()}</Table.Td>
@@ -275,6 +373,18 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
                 </Table.Td>
                 <Table.Td>{getTransactionableBadge(record.transactionable)}</Table.Td>
                 <Table.Td>{record.comment || '-'}</Table.Td>
+                <Table.Td>
+                  {!record.confirmed && (
+                    <ActionIcon
+                      variant="subtle"
+                      color="blue"
+                      onClick={() => handleEditRecord(record)}
+                      title={t('Edit')}
+                    >
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                  )}
+                </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
@@ -285,38 +395,56 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
       <Modal
         opened={qcModalOpened}
         onClose={() => { setQcModalOpened(false); resetForm(); }}
-        title={t('New QC Record')}
+        title={editingRecord ? t('Edit QC Record') : t('New QC Record')}
         size="lg"
       >
         <Grid>
-          {/* Batch Code */}
+          {/* Batch Code - READ ONLY when editing */}
           <Grid.Col span={12}>
-            <Select
-              label={t('Batch Code')}
-              placeholder={t('Select batch code')}
-              data={batchCodes}
-              value={qcData.batch_code}
-              onChange={(value) => setQcData({ ...qcData, batch_code: value || '', part: '' })}
-              searchable
-              required
-            />
+            {editingRecord ? (
+              <TextInput
+                label={t('Batch Code')}
+                value={qcData.batch_code}
+                readOnly
+                disabled
+              />
+            ) : (
+              <Select
+                label={t('Batch Code')}
+                placeholder={t('Select batch code')}
+                data={batchCodes}
+                value={qcData.batch_code}
+                onChange={(value) => setQcData({ ...qcData, batch_code: value || '', part: '' })}
+                searchable
+                required
+              />
+            )}
           </Grid.Col>
 
-          {/* Part (Article) */}
+          {/* Part (Article) - READ ONLY when editing */}
           <Grid.Col span={12}>
-            <Select
-              label={t('Part (Article)')}
-              placeholder={t('Select part')}
-              data={partsForBatch}
-              value={qcData.part}
-              onChange={(value) => setQcData({ ...qcData, part: value || '' })}
-              searchable
-              required
-              disabled={!qcData.batch_code}
-            />
+            {editingRecord ? (
+              <TextInput
+                label={t('Part (Article)')}
+                value={editingRecord.part_name}
+                readOnly
+                disabled
+              />
+            ) : (
+              <Select
+                label={t('Part (Article)')}
+                placeholder={t('Select part')}
+                data={partsForBatch}
+                value={qcData.part}
+                onChange={(value) => setQcData({ ...qcData, part: value || '' })}
+                searchable
+                required
+                disabled={!qcData.batch_code}
+              />
+            )}
           </Grid.Col>
 
-          {/* Prelevation Date & Quantity */}
+          {/* Prelevation Date & Quantity - READ ONLY when editing */}
           <Grid.Col span={6}>
             <DatePickerInput
               label={t('Prelevation Date')}
@@ -324,6 +452,8 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
               value={qcData.prelevation_date}
               onChange={(date) => setQcData({ ...qcData, prelevation_date: date })}
               required
+              readOnly={!!editingRecord}
+              disabled={!!editingRecord}
             />
           </Grid.Col>
 
@@ -336,6 +466,8 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
               min={0}
               step={1}
               required
+              readOnly={!!editingRecord}
+              disabled={!!editingRecord}
             />
           </Grid.Col>
 
@@ -400,22 +532,45 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
           <Button variant="default" onClick={() => { setQcModalOpened(false); resetForm(); }}>
             {t('Cancel')}
           </Button>
-          <Button 
-            onClick={handleSaveQCRecord} 
-            loading={submitting}
-            disabled={!qcData.batch_code || !qcData.part}
-          >
-            {t('Save')}
-          </Button>
-          {isFormComplete() && (
-            <Button 
-              onClick={handleConfirmQCRecord} 
-              loading={submitting}
-              color="green"
-              leftSection={<IconCheck size={16} />}
-            >
-              {t('Confirm')}
-            </Button>
+          {editingRecord ? (
+            <>
+              <Button 
+                onClick={handleUpdateQCRecord} 
+                loading={submitting}
+              >
+                {t('Save')}
+              </Button>
+              {qcData.ba_rompharm_no && qcData.ba_rompharm_date && qcData.test_result && (
+                <Button 
+                  onClick={handleConfirmEditedRecord} 
+                  loading={submitting}
+                  color="green"
+                  leftSection={<IconCheck size={16} />}
+                >
+                  {t('Confirm')}
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <Button 
+                onClick={handleSaveQCRecord} 
+                loading={submitting}
+                disabled={!qcData.batch_code || !qcData.part}
+              >
+                {t('Save')}
+              </Button>
+              {isFormComplete() && (
+                <Button 
+                  onClick={handleConfirmQCRecord} 
+                  loading={submitting}
+                  color="green"
+                  leftSection={<IconCheck size={16} />}
+                >
+                  {t('Confirm')}
+                </Button>
+              )}
+            </>
           )}
         </Group>
       </Modal>
