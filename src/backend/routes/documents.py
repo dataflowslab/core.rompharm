@@ -593,28 +593,21 @@ async def generate_procurement_document(
             except Exception as e:
                 print(f"[DOCUMENT] WARNING: Failed to get supplier details: {e}")
         
-        # Get company settings (buyer info)
+        # Get company info from MongoDB config (buyer info)
         company_info = None
         try:
-            settings_response = requests.get(
-                f"{inventree_url}/api/settings/global/",
-                headers=headers,
-                timeout=10
-            )
-            settings_response.raise_for_status()
-            settings = settings_response.json()
+            config_collection = db['config']
+            org_config = config_collection.find_one({'slug': 'organizatie'})
             
-            # Extract company info from settings
-            company_info = {
-                'name': next((s['value'] for s in settings if s['key'] == 'INVENTREE_COMPANY_NAME'), 'Company Name'),
-                'address': next((s['value'] for s in settings if s['key'] == 'INVENTREE_COMPANY_ADDRESS'), ''),
-                'phone': next((s['value'] for s in settings if s['key'] == 'INVENTREE_COMPANY_PHONE'), ''),
-                'email': next((s['value'] for s in settings if s['key'] == 'INVENTREE_COMPANY_EMAIL'), ''),
-            }
-            print(f"[DOCUMENT] Company info: {company_info.get('name')}")
+            if org_config and 'content' in org_config:
+                company_info = org_config['content']
+                print(f"[DOCUMENT] Company info from MongoDB: {company_info.get('name', company_info.get('nume', 'N/A'))}")
+            else:
+                print(f"[DOCUMENT] WARNING: No organization config found in MongoDB")
+                company_info = {'name': 'Company Name', 'cif': '', 'address': '', 'adresa': ''}
         except Exception as e:
-            print(f"[DOCUMENT] WARNING: Failed to get company settings: {e}")
-            company_info = {'name': 'Company Name', 'address': '', 'phone': '', 'email': ''}
+            print(f"[DOCUMENT] WARNING: Failed to get company info from MongoDB: {e}")
+            company_info = {'name': 'Company Name', 'cif': '', 'address': '', 'adresa': ''}
         
         # Get line items
         items_response = requests.get(
