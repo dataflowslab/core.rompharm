@@ -57,7 +57,7 @@ interface GeneratedDocument {
   created_at: string;
   created_by: string;
   error?: string;
-  has_local_file?: boolean;
+  has_document?: boolean;
 }
 
 export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: DetailsTabProps) {
@@ -236,6 +236,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'done':
       case 'completed':
         return 'green';
       case 'processing':
@@ -302,7 +303,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
                         <Text size="sm" fw={500}>
                           {doc.template_name} {order.reference}
                         </Text>
-                        {doc.status === 'completed' ? (
+                        {doc.has_document ? (
                           <Group gap="xs">
                             <Button
                               size="xs"
@@ -322,6 +323,10 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
                               <IconTrash size={16} />
                             </ActionIcon>
                           </Group>
+                        ) : doc.status === 'failed' ? (
+                          <Badge size="sm" color="red" fullWidth>
+                            {t('Failed')}
+                          </Badge>
                         ) : (
                           <Badge size="sm" color={getStatusColor(doc.status)} fullWidth>
                             {doc.status === 'processing' ? t('Processing...') : t('Queued')}
