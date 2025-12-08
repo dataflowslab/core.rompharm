@@ -614,12 +614,14 @@ async def generate_procurement_document(
         print(f"[DOCUMENT] Filename: {filename}")
         
         print(f"[DOCUMENT] Preparing document data...")
-        # Prepare data for template
+        # Prepare data for template - wrap in 'data' key like submissions
         document_data = {
-            'order': purchase_order,
-            'items': line_items,
-            'generated_at': datetime.utcnow().isoformat(),
-            'generated_by': user.get('username')
+            'data': {
+                'order': purchase_order,
+                'items': line_items,
+                'generated_at': datetime.utcnow().isoformat(),
+                'generated_by': user.get('username')
+            }
         }
         
         print(f"[DOCUMENT] Creating async job in OfficeClerk...")
