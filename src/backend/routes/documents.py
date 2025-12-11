@@ -946,3 +946,319 @@ async def delete_procurement_document(
         'message': 'Document deleted successfully',
         'job_id': job_id
     }
+
+
+# ==================== STOCK REQUEST DOCUMENTS ====================
+
+class GenerateStockRequestDocumentRequest(BaseModel):
+    request_id: str
+    template_code: str
+    template_name: str
+
+
+@router.post("/stock-request/generate")
+async def generate_stock_request_document(
+    request: GenerateStockRequestDocumentRequest,
+    user = Depends(verify_token)
+):
+    """Generate document for stock request (Nota de transfer)"""
+    import base64
+    print(f"[DOCUMENT] Generate stock request doc: request_id={request.request_id}, template_code={request.template_code}")
+    
+    db = get_db()
+    requests_collection = db['depo_requests_items']
+    
+    # Get request data
+    from bson import ObjectId
+    try:
+        req_obj_id = ObjectId(request.request_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid request ID")
+    
+    req = requests_collection.find_one({'_id': req_obj_id})
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Get location and part details
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    token = user.get('token')
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated with InvenTree")
+    
+    headers = {
+        'Authorization': f'Token {token}',
+        'Content-Type': 'application/json'
+    }
+    
+    # Get source location
+    source_detail = None
+    if req.get('source'):
+        try:
+            source_response = requests.get(
+                f"{inventree_url}/api/stock/location/{req['source']}/",
+                headers=headers,
+                timeout=10
+            )
+            if source_response.status_code == 200:
+                source_detail = source_response.json()
+        except Exception as e:
+            print(f"Warning: Failed to get source location: {e}")
+    
+    # Get destination location
+    destination_detail = None
+    if req.get('destination'):
+        try:
+            dest_response = requests.get(
+                f"{inventree_url}/api/stock/location/{req['destination']}/",
+                headers=headers,
+                timeout=10
+            )
+            if dest_response.status_code == 200:
+                destination_detail = dest_response.json()
+        except Exception as e:
+            print(f"Warning: Failed to get destination location: {e}")
+    
+    # Get part details for items
+    items_with_details = []
+    for item in req.get('items', []):
+        item_data = item.copy()
+        if item.get('part'):
+            try:
+                part_response = requests.get(
+                    f"{inventree_url}/api/part/{item['part']}/",
+                    headers=headers,
+                    timeout=10
+                )
+                if part_response.status_code == 200:
+                    item_data['part_detail'] = part_response.json()
+            except Exception as e:
+                print(f"Warning: Failed to get part details: {e}")
+        items_with_details.append(item_data)
+    
+    # Initialize DataFlows Docu client
+    client = DataFlowsDocuClient()
+    
+    # Use depo_stock_request_documents collection
+    docs_collection = db['depo_stock_request_documents']
+    
+    # Check if document already exists for this template
+    existing_doc = docs_collection.find_one({
+        'request_id': request.request_id,
+        'template_code': request.template_code
+    })
+    
+    version = 1
+    print(f"[DOCUMENT] Version: {version} (replacing existing: {existing_doc is not None})")
+    
+    # Generate filename
+    filename = f"REQ-{req['reference']}-{request.template_code[:6]}-v{version}"
+    print(f"[DOCUMENT] Filename: {filename}")
+    
+    # Prepare document data
+    document_data = {
+        'data': {
+            'request': {
+                'reference': req.get('reference'),
+                'source': req.get('source'),
+                'destination': req.get('destination'),
+                'status': req.get('status'),
+                'notes': req.get('notes', ''),
+                'issue_date': req.get('issue_date').isoformat() if isinstance(req.get('issue_date'), datetime) else str(req.get('issue_date', '')),
+                'created_by': req.get('created_by'),
+                'created_at': req.get('created_at').isoformat() if isinstance(req.get('created_at'), datetime) else str(req.get('created_at', ''))
+            },
+            'source_location': source_detail,
+            'destination_location': destination_detail,
+            'items': items_with_details,
+            'generated_at': datetime.utcnow().isoformat(),
+            'generated_by': user.get('username')
+        }
+    }
+    
+    print(f"[DOCUMENT] Creating async job in OfficeClerk...")
+    job_response = client.create_job(
+        template_code=request.template_code,
+        data=document_data,
+        format='pdf',
+        filename=filename
+    )
+    
+    if not job_response or 'id' not in job_response:
+        print(f"[DOCUMENT] ERROR: Failed to create job")
+        raise HTTPException(status_code=500, detail="Failed to create document generation job")
+    
+    job_id = job_response['id']
+    print(f"[DOCUMENT] Job created: {job_id}, status: {job_response.get('status')}")
+    
+    # Save/Replace job in depo_stock_request_documents
+    job_entry = {
+        'request_id': request.request_id,
+        'job_id': job_id,
+        'template_code': request.template_code,
+        'template_name': request.template_name,
+        'status': job_response.get('status', 'queued'),
+        'filename': f"{filename}.pdf",
+        'version': version,
+        'created_at': datetime.utcnow(),
+        'updated_at': datetime.utcnow(),
+        'created_by': user.get('username'),
+        'document_data': None,
+        'error': None
+    }
+    
+    docs_collection.update_one(
+        {
+            'request_id': request.request_id,
+            'template_code': request.template_code
+        },
+        {'$set': job_entry},
+        upsert=True
+    )
+    
+    print(f"[DOCUMENT] Job saved in depo_stock_request_documents")
+    
+    return {
+        'job_id': job_id,
+        'status': job_response.get('status'),
+        'message': 'Document generation job created',
+        'filename': f"{filename}.pdf"
+    }
+
+
+@router.get("/stock-request/{request_id}")
+async def get_stock_request_documents(
+    request_id: str,
+    user = Depends(verify_token)
+):
+    """Get all documents for a stock request with auto-download"""
+    import base64
+    
+    db = get_db()
+    docs_collection = db['depo_stock_request_documents']
+    
+    docs = list(docs_collection.find({'request_id': request_id}))
+    
+    # Check status and auto-download completed documents
+    client = DataFlowsDocuClient()
+    for doc in docs:
+        if doc.get('document_data') or doc.get('status') == 'failed':
+            continue
+            
+        if doc.get('status') not in ['done', 'completed', 'failed']:
+            job_id = doc.get('job_id')
+            if job_id:
+                print(f"[DOCUMENT] Checking status for job: {job_id}")
+                job_status = client.get_job_status(job_id)
+                if job_status:
+                    current_status = job_status.get('status')
+                    print(f"[DOCUMENT] Job {job_id} status: {current_status}")
+                    
+                    if current_status != doc.get('status'):
+                        update_data = {
+                            'status': current_status,
+                            'updated_at': datetime.utcnow(),
+                            'error': job_status.get('error')
+                        }
+                        
+                        if current_status in ['done', 'completed']:
+                            print(f"[DOCUMENT] Job completed, auto-downloading document...")
+                            document_bytes = client.download_document(job_id)
+                            if document_bytes:
+                                update_data['document_data'] = base64.b64encode(document_bytes).decode('utf-8')
+                                print(f"[DOCUMENT] Document downloaded and cached ({len(document_bytes)} bytes)")
+                            else:
+                                print(f"[DOCUMENT] Failed to download document")
+                                update_data['error'] = 'Failed to download completed document'
+                        
+                        docs_collection.update_one(
+                            {'_id': doc['_id']},
+                            {'$set': update_data}
+                        )
+                        
+                        doc['status'] = current_status
+                        doc['error'] = update_data.get('error')
+                        if 'document_data' in update_data:
+                            doc['document_data'] = update_data['document_data']
+    
+    # Convert ObjectId and datetime to strings
+    for doc in docs:
+        doc['_id'] = str(doc['_id'])
+        if 'created_at' in doc and isinstance(doc['created_at'], datetime):
+            doc['created_at'] = doc['created_at'].isoformat()
+        if 'updated_at' in doc and isinstance(doc['updated_at'], datetime):
+            doc['updated_at'] = doc['updated_at'].isoformat()
+        doc['has_document'] = doc.get('document_data') is not None
+        if 'document_data' in doc:
+            del doc['document_data']
+    
+    return {'documents': docs}
+
+
+@router.get("/stock-request/{request_id}/job/{job_id}/download")
+async def download_stock_request_document(
+    request_id: str,
+    job_id: str,
+    user = Depends(verify_token)
+):
+    """Download stock request document"""
+    import base64
+    
+    print(f"[DOCUMENT] Download request for stock request job: {job_id}")
+    
+    db = get_db()
+    docs_collection = db['depo_stock_request_documents']
+    
+    job_entry = docs_collection.find_one({
+        'request_id': request_id,
+        'job_id': job_id
+    })
+    
+    if not job_entry:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if document is cached
+    if job_entry.get('document_data'):
+        print(f"[DOCUMENT] Serving cached document from MongoDB")
+        try:
+            document_bytes = base64.b64decode(job_entry['document_data'])
+        except Exception as e:
+            print(f"[DOCUMENT] ERROR decoding cached document: {e}")
+            raise HTTPException(status_code=500, detail="Failed to decode cached document")
+    else:
+        print(f"[DOCUMENT] Document not cached, downloading from DataFlows Docu...")
+        
+        if job_entry.get('status') not in ['done', 'completed']:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Document not ready. Current status: {job_entry.get('status', 'unknown')}"
+            )
+        
+        client = DataFlowsDocuClient()
+        document_bytes = client.download_document(job_id)
+        
+        if not document_bytes:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to download document from DataFlows Docu"
+            )
+        
+        print(f"[DOCUMENT] Downloaded {len(document_bytes)} bytes, caching in MongoDB...")
+        
+        docs_collection.update_one(
+            {'_id': job_entry['_id']},
+            {
+                '$set': {
+                    'document_data': base64.b64encode(document_bytes).decode('utf-8'),
+                    'updated_at': datetime.utcnow()
+                }
+            }
+        )
+    
+    return StreamingResponse(
+        io.BytesIO(document_bytes),
+        media_type='application/pdf',
+        headers={
+            'Content-Disposition': f'attachment; filename="{job_entry.get("filename", "document.pdf")}"'
+        }
+    )

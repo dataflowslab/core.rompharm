@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Modal, Textarea, Select } from '@mantine/core';
-import { IconSignature, IconTrash, IconCheck, IconX } from '@tabler/icons-react';
+import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Modal, Textarea, Stack } from '@mantine/core';
+import { IconSignature, IconTrash, IconCheck, IconX, IconFileText, IconDownload } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
@@ -32,6 +32,17 @@ interface OperationsFlow {
   min_signatures: number;
 }
 
+interface Document {
+  _id: string;
+  job_id: string;
+  template_code: string;
+  template_name: string;
+  status: string;
+  filename: string;
+  has_document: boolean;
+  created_at: string;
+}
+
 interface OperationsTabProps {
   requestId: string;
   currentStatus: string;
@@ -48,6 +59,8 @@ export function OperationsTab({ requestId, currentStatus, onReload }: Operations
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [refusalReason, setRefusalReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     loadOperationsFlow();
