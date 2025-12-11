@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Paper, Title, Tabs, Button, Group, Badge, Text, Grid, TextInput, Textarea, Table } from '@mantine/core';
+import { Paper, Title, Tabs, Button, Group, Badge, Text } from '@mantine/core';
 import { IconArrowLeft, IconFileText, IconSignature, IconTruck, IconPackage } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { notifications } from '@mantine/notifications';
+import { DetailsTab } from '../components/Requests/DetailsTab';
 import { ApprovalsTab } from '../components/Requests/ApprovalsTab';
 import { OperationsTab } from '../components/Requests/OperationsTab';
 import { ReceptieTab } from '../components/Requests/ReceptieTab';
@@ -83,12 +84,6 @@ export function RequestDetailPage() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-  };
-
   if (loading) {
     return <Paper p="md"><Text>{t('Loading...')}</Text></Paper>;
   }
@@ -136,92 +131,7 @@ export function RequestDetailPage() {
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">
-          <Grid>
-            <Grid.Col span={6}>
-              <TextInput
-                label={t('Reference')}
-                value={request.reference}
-                readOnly
-              />
-            </Grid.Col>
-
-            <Grid.Col span={6}>
-              <TextInput
-                label={t('Status')}
-                value={request.status}
-                readOnly
-              />
-            </Grid.Col>
-
-            <Grid.Col span={6}>
-              <TextInput
-                label={t('Source Location')}
-                value={request.source_detail?.name || String(request.source)}
-                readOnly
-              />
-            </Grid.Col>
-
-            <Grid.Col span={6}>
-              <TextInput
-                label={t('Destination Location')}
-                value={request.destination_detail?.name || String(request.destination)}
-                readOnly
-              />
-            </Grid.Col>
-
-            <Grid.Col span={6}>
-              <TextInput
-                label={t('Issue Date')}
-                value={formatDate(request.issue_date)}
-                readOnly
-              />
-            </Grid.Col>
-
-            <Grid.Col span={6}>
-              <TextInput
-                label={t('Created By')}
-                value={request.created_by}
-                readOnly
-              />
-            </Grid.Col>
-
-            <Grid.Col span={12}>
-              <Textarea
-                label={t('Notes')}
-                value={request.notes || ''}
-                readOnly
-                minRows={3}
-              />
-            </Grid.Col>
-
-            <Grid.Col span={12}>
-              <Title order={4} mb="md">{t('Items')}</Title>
-              {request.items && request.items.length > 0 ? (
-                <Table striped withTableBorder withColumnBorders>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>{t('Part')}</Table.Th>
-                      <Table.Th>{t('IPN')}</Table.Th>
-                      <Table.Th>{t('Quantity')}</Table.Th>
-                      <Table.Th>{t('Notes')}</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {request.items.map((item, index) => (
-                      <Table.Tr key={index}>
-                        <Table.Td>{item.part_detail?.name || item.part}</Table.Td>
-                        <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
-                        <Table.Td>{item.quantity}</Table.Td>
-                        <Table.Td>{item.notes || '-'}</Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              ) : (
-                <Text size="sm" c="dimmed">{t('No items')}</Text>
-              )}
-            </Grid.Col>
-          </Grid>
+          <DetailsTab request={request} onUpdate={loadRequest} />
         </Tabs.Panel>
 
         <Tabs.Panel value="approval" pt="md">

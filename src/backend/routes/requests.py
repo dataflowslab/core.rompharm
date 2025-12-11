@@ -527,17 +527,17 @@ async def create_request_approval_flow(
     if existing:
         raise HTTPException(status_code=400, detail="Approval flow already exists for this request")
     
-    # Get request approval config from MongoDB
+    # Get request approval config from MongoDB (use operations flow config)
     config_collection = db['config']
-    approval_config = config_collection.find_one({'slug': 'request_approval_flows'})
+    approval_config = config_collection.find_one({'slug': 'requests_operations_flow'})
     
     if not approval_config or 'items' not in approval_config:
-        raise HTTPException(status_code=404, detail="No request approval configuration found")
+        raise HTTPException(status_code=404, detail="No request operations flow configuration found")
     
-    # Get the first enabled flow
+    # Get the operations flow config (first item with slug='operations')
     flow_config = None
     for item in approval_config.get('items', []):
-        if item.get('enabled', True):
+        if item.get('slug') == 'operations' and item.get('enabled', True):
             flow_config = item
             break
     
