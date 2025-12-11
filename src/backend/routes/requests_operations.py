@@ -299,6 +299,68 @@ async def update_operations_status(
     
     print(f"[REQUESTS] Request {request_id} operations status updated to {status_data.status}")
     
+    # Auto-create reception flow when status becomes Finished
+    if status_data.status == 'Finished':
+        try:
+            # Check if reception flow already exists
+            existing_reception_flow = db.approval_flows.find_one({
+                "object_type": "stock_request_reception",
+                "object_id": request_id
+            })
+            
+            if not existing_reception_flow:
+                # Get reception config
+                config_collection = db['config']
+                reception_config = config_collection.find_one({'slug': 'requests_operations_flow'})
+                
+                if reception_config and 'items' in reception_config:
+                    # Find reception flow config
+                    reception_flow_config = None
+                    for item in reception_config.get('items', []):
+                        if item.get('slug') == 'receiving' and item.get('enabled', True):
+                            reception_flow_config = item
+                            break
+                    
+                    if reception_flow_config:
+                        # Build officers lists
+                        can_sign_officers = []
+                        for user in reception_flow_config.get('can_sign', []):
+                            can_sign_officers.append({
+                                "type": "person",
+                                "reference": user.get('user_id'),
+                                "username": user.get('username'),
+                                "action": "can_sign"
+                            })
+                        
+                        must_sign_officers = []
+                        for user in reception_flow_config.get('must_sign', []):
+                            must_sign_officers.append({
+                                "type": "person",
+                                "reference": user.get('user_id'),
+                                "username": user.get('username'),
+                                "action": "must_sign"
+                            })
+                        
+                        reception_flow_data = {
+                            "object_type": "stock_request_reception",
+                            "object_source": "depo_request",
+                            "object_id": request_id,
+                            "flow_type": "reception",
+                            "config_slug": reception_flow_config.get('slug'),
+                            "min_signatures": reception_flow_config.get('min_signatures', 1),
+                            "can_sign_officers": can_sign_officers,
+                            "must_sign_officers": must_sign_officers,
+                            "signatures": [],
+                            "status": "pending",
+                            "created_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow()
+                        }
+                        
+                        db.approval_flows.insert_one(reception_flow_data)
+                        print(f"[REQUESTS] Auto-created reception flow for request {request_id}")
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to auto-create reception flow: {e}")
+    
     return {"success": True, "status": status_data.status}
 
 
