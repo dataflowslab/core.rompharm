@@ -14,6 +14,7 @@ import { NotificationsPage } from './pages/NotificationsPage';
 import { SubmissionsListPage } from './pages/SubmissionsListPage';
 import { SubmissionDetailPage } from './pages/SubmissionDetailPage';
 import { RequestsPage } from './pages/RequestsPage';
+import { RequestDetailPage } from './pages/RequestDetailPage';
 import { ProcurementPage } from './pages/ProcurementPage';
 import { ProcurementDetailPage } from './pages/ProcurementDetailPage';
 import { SalesPage } from './pages/SalesPage';
@@ -122,6 +123,7 @@ function App() {
         <Routes>
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/requests" element={<ProtectedRoute><RequestsPage /></ProtectedRoute>} />
+          <Route path="/requests/:id" element={<ProtectedRoute><RequestDetailPage /></ProtectedRoute>} />
           <Route path="/build-orders" element={<ProtectedRoute><BuildOrdersPage /></ProtectedRoute>} />
           <Route path="/build-simulation" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/procurement" element={<ProtectedRoute><ProcurementPage /></ProtectedRoute>} />
