@@ -230,7 +230,7 @@ export function RequestDetailPage() {
 
         {request.status === 'Approved' && (
           <Tabs.Panel value="operations" pt="md">
-            {id && <OperationsTab requestId={id} currentStatus={request.status} onReload={loadRequest} />}
+            {id && <OperationsTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
         )}
 

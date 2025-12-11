@@ -39,7 +39,7 @@ interface ReceptieTabProps {
 
 export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { username, isStaff } = useAuth();
   const [flow, setFlow] = useState<ReceptionFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
@@ -203,15 +203,13 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   };
 
   const canUserSign = () => {
-    if (!flow || !user) return false;
+    if (!flow || !username) return false;
     
-    const userId = user._id || user.id;
-    
-    const alreadySigned = flow.signatures.some(s => s.user_id === userId);
+    const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
     
-    const canSign = flow.can_sign_officers.some(o => o.reference === userId);
-    const mustSign = flow.must_sign_officers.some(o => o.reference === userId);
+    const canSign = flow.can_sign_officers.some(o => o.username === username);
+    const mustSign = flow.must_sign_officers.some(o => o.username === username);
     
     return canSign || mustSign;
   };
@@ -330,7 +328,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    {user?.is_admin && (
+                    {isStaff && (
                       <ActionIcon
                         color="red"
                         variant="subtle"

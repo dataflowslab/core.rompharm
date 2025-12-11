@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Modal, Textarea, Stack } from '@mantine/core';
-import { IconSignature, IconTrash, IconCheck, IconX, IconFileText, IconDownload } from '@tabler/icons-react';
+import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Modal, Textarea } from '@mantine/core';
+import { IconSignature, IconTrash, IconCheck, IconX } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
@@ -32,26 +32,16 @@ interface OperationsFlow {
   min_signatures: number;
 }
 
-interface Document {
-  _id: string;
-  job_id: string;
-  template_code: string;
-  template_name: string;
-  status: string;
-  filename: string;
-  has_document: boolean;
-  created_at: string;
-}
+
 
 interface OperationsTabProps {
   requestId: string;
-  currentStatus: string;
-  onReload: () => void;
+    onReload: () => void;
 }
 
-export function OperationsTab({ requestId, currentStatus, onReload }: OperationsTabProps) {
+export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { username, isStaff } = useAuth();
   const [flow, setFlow] = useState<OperationsFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
@@ -59,8 +49,6 @@ export function OperationsTab({ requestId, currentStatus, onReload }: Operations
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [refusalReason, setRefusalReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     loadOperationsFlow();
@@ -217,15 +205,11 @@ export function OperationsTab({ requestId, currentStatus, onReload }: Operations
   };
 
   const canUserSign = () => {
-    if (!flow || !user) return false;
-    
-    const userId = user._id || user.id;
-    
-    const alreadySigned = flow.signatures.some(s => s.user_id === userId);
+    if (!flow || !username) return false;
+    const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
-    
-    const canSign = flow.can_sign_officers.some(o => o.reference === userId);
-    const mustSign = flow.must_sign_officers.some(o => o.reference === userId);
+    const canSign = flow.can_sign_officers.some(o => o.username === username);
+    const mustSign = flow.must_sign_officers.some(o => o.username === username);
     
     return canSign || mustSign;
   };
@@ -344,7 +328,7 @@ export function OperationsTab({ requestId, currentStatus, onReload }: Operations
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    {user?.is_admin && (
+                    {isStaff && (
                       <ActionIcon
                         color="red"
                         variant="subtle"

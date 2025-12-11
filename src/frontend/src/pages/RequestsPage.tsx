@@ -18,11 +18,7 @@ interface Part {
   IPN: string;
 }
 
-interface RequestItem {
-  part: number;
-  quantity: number;
-  notes?: string;
-}
+
 
 interface Request {
   _id: string;
