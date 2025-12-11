@@ -1497,7 +1497,13 @@ async def sign_purchase_order(
     request: Request,
     current_user: dict = Depends(get_current_user)
 ):
-    """Sign a purchase order approval flow"""
+    """
+    Sign a purchase order approval flow
+    Logic:
+    - can_sign: any user from this list can sign, minimum min_signatures required
+    - must_sign: all users from this list must sign
+    - After conditions met, order becomes "Placed" (status 20)
+    """
     from bson import ObjectId
     from ..models.approval_flow_model import ApprovalFlowModel
     
@@ -1528,47 +1534,18 @@ async def sign_purchase_order(
     username = current_user["username"]
     can_sign = False
     
-    # Admin/staff can always sign
-    is_admin = current_user.get("is_staff", False) or current_user.get("staff", False)
+    # Check can_sign officers (optional - any can sign)
+    for officer in flow.get("can_sign_officers", []):
+        if officer["reference"] == user_id:
+            can_sign = True
+            break
     
-    if is_admin:
-        can_sign = True
-    else:
-        # Check required officers
-        for officer in flow.get("required_officers", []):
-            if officer["type"] == "person" and officer["reference"] == user_id:
+    # Check must_sign officers (required - all must sign)
+    if not can_sign:
+        for officer in flow.get("must_sign_officers", []):
+            if officer["reference"] == user_id:
                 can_sign = True
                 break
-            elif officer["type"] == "role":
-                # Check if user has this role
-                user_role = current_user.get("role") or current_user.get("local_role")
-                if user_role:
-                    role = db.roles.find_one({"_id": ObjectId(user_role)})
-                    if role and role.get("name") == officer["reference"]:
-                        can_sign = True
-                        break
-                # Also check if role name matches directly (for "admin" role)
-                if officer["reference"] == "admin" and is_admin:
-                    can_sign = True
-                    break
-        
-        # Check optional officers
-        if not can_sign:
-            for officer in flow.get("optional_officers", []):
-                if officer["type"] == "person" and officer["reference"] == user_id:
-                    can_sign = True
-                    break
-                elif officer["type"] == "role":
-                    user_role = current_user.get("role") or current_user.get("local_role")
-                    if user_role:
-                        role = db.roles.find_one({"_id": ObjectId(user_role)})
-                        if role and role.get("name") == officer["reference"]:
-                            can_sign = True
-                            break
-                    # Also check if role name matches directly (for "admin" role)
-                    if officer["reference"] == "admin" and is_admin:
-                        can_sign = True
-                        break
     
     if not can_sign:
         raise HTTPException(status_code=403, detail="You are not authorized to sign this order")
@@ -1603,30 +1580,31 @@ async def sign_purchase_order(
         }
     )
     
-    # Check if all required signatures are collected
+    # Check if approval conditions are met
     updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
-    required_count = len(updated_flow.get("required_officers", []))
+    signatures = updated_flow.get("signatures", [])
+    signature_user_ids = [s["user_id"] for s in signatures]
     
-    # Count how many required officers have signed
-    required_signed = 0
-    for officer in updated_flow.get("required_officers", []):
-        if officer["type"] == "person":
-            if any(s["user_id"] == officer["reference"] for s in updated_flow.get("signatures", [])):
-                required_signed += 1
-        elif officer["type"] == "role":
-            # Check if any user with this role has signed
-            role = db.roles.find_one({"name": officer["reference"]})
-            if role:
-                for sig in updated_flow.get("signatures", []):
-                    signer = db.users.find_one({"_id": ObjectId(sig["user_id"])})
-                    if signer:
-                        signer_role = signer.get("role") or signer.get("local_role")
-                        if signer_role and str(signer_role) == str(role["_id"]):
-                            required_signed += 1
-                            break
+    # Check must_sign: all must have signed
+    must_sign_officers = updated_flow.get("must_sign_officers", [])
+    all_must_signed = True
+    for officer in must_sign_officers:
+        if officer["reference"] not in signature_user_ids:
+            all_must_signed = False
+            break
     
-    # If all required officers have signed, mark as approved
-    if required_signed == required_count:
+    # Check can_sign: at least min_signatures have signed
+    can_sign_officers = updated_flow.get("can_sign_officers", [])
+    min_signatures = updated_flow.get("min_signatures", 1)
+    can_sign_count = 0
+    for officer in can_sign_officers:
+        if officer["reference"] in signature_user_ids:
+            can_sign_count += 1
+    
+    has_min_signatures = can_sign_count >= min_signatures
+    
+    # If all conditions met, mark as approved and update order status
+    if all_must_signed and has_min_signatures:
         db.approval_flows.update_one(
             {"_id": ObjectId(flow["_id"])},
             {
@@ -1637,19 +1615,20 @@ async def sign_purchase_order(
                 }
             }
         )
-    
-    # Update order status to "Placed" (20) when someone signs
-    try:
-        headers = get_inventree_headers(current_user)
-        response = requests.patch(
-            f"{inventree_url}/api/order/po/{order_id}/",
-            headers=headers,
-            json={"status": 20},
-            timeout=10
-        )
-        response.raise_for_status()
-    except Exception as e:
-        print(f"Warning: Failed to update order status: {e}")
+        
+        # Update order status to "Placed" (20)
+        try:
+            headers = get_inventree_headers(current_user)
+            response = requests.patch(
+                f"{inventree_url}/api/order/po/{order_id}/",
+                headers=headers,
+                json={"status": 20},
+                timeout=10
+            )
+            response.raise_for_status()
+            print(f"[PROCUREMENT] Order {order_id} status updated to Placed")
+        except Exception as e:
+            print(f"[PROCUREMENT] Warning: Failed to update order status: {e}")
     
     # Get updated flow
     flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
