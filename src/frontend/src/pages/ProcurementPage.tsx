@@ -379,8 +379,10 @@ export function ProcurementPage() {
             </Table.Tr>
           ) : (
             filteredAndSortedOrders.map((order) => {
-              const received = order.line_items || 0;
+              // InvenTree 1.0.1: lines = total line items, line_items = received count
+              // But line_items might be 0 if not calculated, so we show lines as total
               const total = order.lines || 0;
+              const received = order.line_items || 0;
               const percentage = total > 0 ? (received / total) * 100 : 0;
               
               return (
