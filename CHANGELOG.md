@@ -2,6 +2,146 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.11.0] - 2024-12-XX
+
+### Added
+- **Operations and Reception Flows for Requests Module**
+  - Operations tab appears when request status is "Approved"
+  - Reception tab appears when request status is "Finished"
+  - Complete approval workflow for both Operations and Reception phases
+  - Config-based flows from MongoDB (`requests_operations_flow`)
+  - Two flow types: "operations" and "receiving"
+  - Status management with reason tracking for refusals
+
+- **Operations Flow**:
+  - Signature workflow with config-based approvers
+  - Status change to "Finished" or "Refused" after approval
+  - Refusal requires reason (stored in `operations_refusal_reason`)
+  - Tracks completion timestamp and user
+  - Document generation trigger for "Nota de transfer" (RC45WVTRBDGT)
+
+- **Reception Flow**:
+  - Signature workflow with config-based approvers
+  - Status change to "Approved" (Completed) or "Refused" after approval
+  - Refusal requires reason (stored in `reception_refusal_reason`)
+  - Tracks approval timestamp and user
+  - Final step in request lifecycle
+
+- **Backend API Endpoints** (`/api/requests`):
+  - `GET /api/requests/{id}/operations-flow` - Get operations flow
+  - `POST /api/requests/{id}/operations-flow` - Create operations flow
+  - `POST /api/requests/{id}/operations-sign` - Sign operations
+  - `DELETE /api/requests/{id}/operations-signatures/{user_id}` - Remove operations signature
+  - `PATCH /api/requests/{id}/operations-status` - Update status (Finished/Refused)
+  - `GET /api/requests/{id}/reception-flow` - Get reception flow
+  - `POST /api/requests/{id}/reception-flow` - Create reception flow
+  - `POST /api/requests/{id}/reception-sign` - Sign reception
+  - `DELETE /api/requests/{id}/reception-signatures/{user_id}` - Remove reception signature
+  - `PATCH /api/requests/{id}/reception-status` - Update status (Approved/Refused)
+
+- **Frontend Components**:
+  - `OperationsTab.tsx` - Operations approval and status management
+  - `ReceptieTab.tsx` - Reception approval and status management
+  - Conditional tab rendering based on request status
+  - Modal dialogs for status changes with reason input
+  - Signature tables with hash display
+  - Status badges with color coding
+
+### Technical
+- New backend route: `src/backend/routes/requests_operations.py`
+- Integrated with main app router
+- MongoDB collections:
+  - `approval_flows` (object_type: "stock_request_operations" and "stock_request_reception")
+  - `depo_requests_items` (extended with operations and reception fields)
+- Request status workflow:
+  - Pending → Approved → Finished → Completed
+  - Refused states at Operations or Reception level
+- SHA256 signature hashing for audit trail
+- IP address and user agent tracking
+
+### Database Schema Extensions
+```javascript
+// depo_requests_items (additional fields)
+{
+  // ... existing fields ...
+  operations_refusal_reason: "Reason text",
+  operations_completed_at: DateTime,
+  operations_completed_by: "username",
+  reception_status: "Approved" | "Refused",
+  reception_refusal_reason: "Reason text",
+  reception_approved_at: DateTime,
+  reception_approved_by: "username",
+  reception_completed_at: DateTime,
+  reception_completed_by: "username"
+}
+
+// approval_flows (operations and reception)
+{
+  object_type: "stock_request_operations" | "stock_request_reception",
+  object_source: "depo_request",
+  object_id: "request_id",
+  flow_type: "operations" | "reception",
+  config_slug: "operations" | "receiving",
+  // ... standard approval flow fields ...
+}
+```
+
+### Configuration
+- Operations and Reception flows config in MongoDB:
+  ```javascript
+  db.config.insertOne({
+    slug: "requests_operations_flow",
+    items: [
+      {
+        slug: "operations",
+        enabled: true,
+        min_signatures: 1,
+        can_sign: [{ user_id: "...", username: "..." }],
+        must_sign: []
+      },
+      {
+        slug: "receiving",
+        enabled: true,
+        min_signatures: 1,
+        can_sign: [{ user_id: "...", username: "..." }],
+        must_sign: []
+      }
+    ]
+  })
+  ```
+
+### Workflow
+1. Request created → Status: "Pending"
+2. Approval flow signed → Status: "Approved"
+3. **Operations tab appears**
+4. Operations flow signed → Can mark as "Finished" or "Refused"
+5. If "Finished" → **Reception tab appears**
+6. Reception flow signed → Can mark as "Approved" (Completed) or "Refused"
+7. Final status: "Completed" or "Refused"
+
+### Features
+- ✅ Conditional tab rendering based on status
+- ✅ Config-based approval flows
+- ✅ Signature workflows for Operations and Reception
+- ✅ Status management with reason tracking
+- ✅ Modal dialogs for status changes
+- ✅ Refusal reason required for "Refused" status
+- ✅ Admin can remove signatures
+- ✅ Automatic status updates after approval
+- ✅ Complete audit trail
+- ✅ Document generation ready (RC45WVTRBDGT)
+
+### Notes
+- Operations tab only visible when status = "Approved"
+- Reception tab only visible when status = "Finished"
+- Refusal at any stage requires reason
+- Each flow has independent signature workflow
+- Status automatically updates when all signatures collected
+- Document "Nota de transfer" (RC45WVTRBDGT) generated after Operations finalized
+- Complete lifecycle tracking from creation to completion
+
+---
+
 ## [1.10.0] - 2024-12-XX
 
 ### Added
