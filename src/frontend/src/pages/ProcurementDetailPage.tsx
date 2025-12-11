@@ -300,8 +300,8 @@ export function ProcurementDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconPackage size={16} />}>
             {t('Items')}
           </Tabs.Tab>
-          {/* Show Receive Stock tab only if order status is PLACED (20) or higher */}
-          {order.status >= 20 && (
+          {/* Show Receive Stock tab only if order has been signed (has approval flow with signatures) */}
+          {approvalFlow && approvalFlow.signatures && approvalFlow.signatures.length > 0 && (
             <Tabs.Tab value="receive-stock" leftSection={<IconTruckDelivery size={16} />}>
               {t('Receive Stock')}
             </Tabs.Tab>
