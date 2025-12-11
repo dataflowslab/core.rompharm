@@ -29,6 +29,9 @@ interface ReceivedItem {
   part_detail?: {
     name: string;
     IPN: string;
+    custom_fields?: {
+      [key: string]: any;
+    };
   };
   quantity: number;
   location_detail?: {
