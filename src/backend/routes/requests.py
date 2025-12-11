@@ -52,6 +52,8 @@ class RequestUpdate(BaseModel):
     destination: Optional[int] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    issue_date: Optional[str] = None
+    items: Optional[List[RequestItemCreate]] = None
 
 
 def generate_request_reference(db) -> str:
@@ -427,6 +429,15 @@ async def update_request(
         update_data['notes'] = request_data.notes
     if request_data.status is not None:
         update_data['status'] = request_data.status
+    if request_data.issue_date is not None:
+        # Parse date string to datetime
+        try:
+            update_data['issue_date'] = datetime.fromisoformat(request_data.issue_date.replace('Z', '+00:00'))
+        except:
+            update_data['issue_date'] = datetime.utcnow()
+    if request_data.items is not None:
+        update_data['items'] = [item.dict() for item in request_data.items]
+        update_data['line_items'] = len(request_data.items)
     
     # Validate source != destination if both are being updated
     source = update_data.get('source', existing.get('source'))

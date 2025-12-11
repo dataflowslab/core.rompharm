@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text } from '@mantine/core';
+import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
-import { IconDeviceFloppy } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconTrash, IconPlus } from '@tabler/icons-react';
+import { modals } from '@mantine/modals';
 import api from '../../services/api';
 
 interface StockLocation {
@@ -50,16 +51,29 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
+  const [parts, setParts] = useState<Part[]>([]);
+  const [partSearch, setPartSearch] = useState('');
+  const [addItemModalOpened, setAddItemModalOpened] = useState(false);
+  const [hasSignatures, setHasSignatures] = useState(false);
+  const [checkingSignatures, setCheckingSignatures] = useState(true);
   
   const [formData, setFormData] = useState({
     source: String(request.source),
     destination: String(request.destination),
     issue_date: request.issue_date ? new Date(request.issue_date) : new Date(),
-    notes: request.notes || ''
+    notes: request.notes || '',
+    items: [...request.items]
+  });
+
+  const [newItem, setNewItem] = useState({
+    part: '',
+    quantity: 1,
+    notes: ''
   });
 
   useEffect(() => {
     loadStockLocations();
+    checkApprovalSignatures();
   }, []);
 
   useEffect(() => {
@@ -67,9 +81,23 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
       source: String(request.source),
       destination: String(request.destination),
       issue_date: request.issue_date ? new Date(request.issue_date) : new Date(),
-      notes: request.notes || ''
+      notes: request.notes || '',
+      items: [...request.items]
     });
   }, [request]);
+
+  const checkApprovalSignatures = async () => {
+    try {
+      const response = await api.get(`/api/requests/${request._id}/approval-flow`);
+      const flow = response.data.flow;
+      setHasSignatures(flow && flow.signatures && flow.signatures.length > 0);
+    } catch (error) {
+      console.error('Failed to check signatures:', error);
+      setHasSignatures(false);
+    } finally {
+      setCheckingSignatures(false);
+    }
+  };
 
   const loadStockLocations = async () => {
     try {
@@ -79,6 +107,69 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
     } catch (error) {
       console.error('Failed to load stock locations:', error);
     }
+  };
+
+  const searchParts = async (query: string) => {
+    if (!query || query.length < 2) {
+      setParts([]);
+      return;
+    }
+    
+    try {
+      const response = await api.get('/api/requests/parts', {
+        params: { search: query }
+      });
+      const results = response.data.results || response.data || [];
+      setParts(results);
+    } catch (error) {
+      console.error('Failed to search parts:', error);
+    }
+  };
+
+  const handleAddItem = () => {
+    if (!newItem.part || !newItem.quantity) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please select a part and enter quantity'),
+        color: 'red'
+      });
+      return;
+    }
+
+    const partDetail = parts.find(p => String(p.pk) === newItem.part);
+    const item: RequestItem = {
+      part: parseInt(newItem.part),
+      quantity: newItem.quantity,
+      notes: newItem.notes || undefined,
+      part_detail: partDetail
+    };
+
+    setFormData({
+      ...formData,
+      items: [...formData.items, item]
+    });
+
+    setNewItem({ part: '', quantity: 1, notes: '' });
+    setPartSearch('');
+    setParts([]);
+    setAddItemModalOpened(false);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    modals.openConfirmModal({
+      title: t('Remove Item'),
+      children: (
+        <Text size="sm">
+          {t('Are you sure you want to remove this item?')}
+        </Text>
+      ),
+      labels: { confirm: t('Remove'), cancel: t('Cancel') },
+      confirmProps: { color: 'red' },
+      onConfirm: () => {
+        const newItems = formData.items.filter((_, i) => i !== index);
+        setFormData({ ...formData, items: newItems });
+      }
+    });
   };
 
   const handleSave = async () => {
@@ -91,13 +182,27 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
       return;
     }
 
+    if (formData.items.length === 0) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Request must have at least one item'),
+        color: 'red'
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       await api.patch(`/api/requests/${request._id}`, {
         source: parseInt(formData.source),
         destination: parseInt(formData.destination),
         issue_date: formData.issue_date.toISOString().split('T')[0],
-        notes: formData.notes || undefined
+        notes: formData.notes || undefined,
+        items: formData.items.map(item => ({
+          part: item.part,
+          quantity: item.quantity,
+          notes: item.notes
+        }))
       });
 
       notifications.show({
@@ -125,7 +230,8 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
       source: String(request.source),
       destination: String(request.destination),
       issue_date: request.issue_date ? new Date(request.issue_date) : new Date(),
-      notes: request.notes || ''
+      notes: request.notes || '',
+      items: [...request.items]
     });
     setEditing(false);
   };
@@ -136,11 +242,13 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
     return date.toLocaleDateString();
   };
 
+  const canEdit = !hasSignatures && !checkingSignatures;
+
   return (
     <div>
       <Group justify="flex-end" mb="md">
         {!editing ? (
-          <Button onClick={() => setEditing(true)}>
+          <Button onClick={() => setEditing(true)} disabled={!canEdit}>
             {t('Edit')}
           </Button>
         ) : (
@@ -159,12 +267,19 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
         )}
       </Group>
 
+      {!canEdit && !checkingSignatures && (
+        <Text size="sm" c="orange" mb="md">
+          {t('This request has signatures and cannot be edited. Remove all signatures to enable editing.')}
+        </Text>
+      )}
+
       <Grid>
         <Grid.Col span={6}>
           <TextInput
             label={t('Reference')}
             value={request.reference}
             readOnly
+            styles={editing ? { input: { backgroundColor: '#f1f3f5', color: '#868e96' } } : undefined}
           />
         </Grid.Col>
 
@@ -173,6 +288,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             label={t('Status')}
             value={request.status}
             readOnly
+            styles={editing ? { input: { backgroundColor: '#f1f3f5', color: '#868e96' } } : undefined}
           />
         </Grid.Col>
 
@@ -261,8 +377,20 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
         </Grid.Col>
 
         <Grid.Col span={12}>
-          <Title order={4} mb="md">{t('Items')}</Title>
-          {request.items && request.items.length > 0 ? (
+          <Group justify="space-between" mb="md">
+            <Title order={4}>{t('Items')}</Title>
+            {editing && (
+              <Button
+                leftSection={<IconPlus size={16} />}
+                size="sm"
+                onClick={() => setAddItemModalOpened(true)}
+              >
+                {t('Add Item')}
+              </Button>
+            )}
+          </Group>
+
+          {formData.items && formData.items.length > 0 ? (
             <Table striped withTableBorder withColumnBorders>
               <Table.Thead>
                 <Table.Tr>
@@ -270,15 +398,28 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
                   <Table.Th>{t('IPN')}</Table.Th>
                   <Table.Th>{t('Quantity')}</Table.Th>
                   <Table.Th>{t('Notes')}</Table.Th>
+                  {editing && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {request.items.map((item, index) => (
+                {formData.items.map((item, index) => (
                   <Table.Tr key={index}>
                     <Table.Td>{item.part_detail?.name || item.part}</Table.Td>
                     <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
                     <Table.Td>{item.quantity}</Table.Td>
                     <Table.Td>{item.notes || '-'}</Table.Td>
+                    {editing && (
+                      <Table.Td>
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          onClick={() => handleRemoveItem(index)}
+                          title={t('Remove')}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Table.Td>
+                    )}
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -288,6 +429,77 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           )}
         </Grid.Col>
       </Grid>
+
+      {/* Add Item Modal */}
+      <Modal
+        opened={addItemModalOpened}
+        onClose={() => {
+          setAddItemModalOpened(false);
+          setNewItem({ part: '', quantity: 1, notes: '' });
+          setPartSearch('');
+          setParts([]);
+        }}
+        title={t('Add Item')}
+        size="md"
+      >
+        <Grid>
+          <Grid.Col span={12}>
+            <Select
+              label={t('Part')}
+              placeholder={t('Search for part...')}
+              data={parts.map(part => ({
+                value: String(part.pk),
+                label: `${part.name} (${part.IPN})`
+              }))}
+              value={newItem.part}
+              onChange={(value) => setNewItem({ ...newItem, part: value || '' })}
+              onSearchChange={(query) => {
+                setPartSearch(query);
+                searchParts(query);
+              }}
+              searchValue={partSearch}
+              searchable
+              required
+            />
+          </Grid.Col>
+
+          <Grid.Col span={12}>
+            <NumberInput
+              label={t('Quantity')}
+              placeholder="1"
+              value={newItem.quantity}
+              onChange={(value) => setNewItem({ ...newItem, quantity: Number(value) || 1 })}
+              min={1}
+              step={1}
+              required
+            />
+          </Grid.Col>
+
+          <Grid.Col span={12}>
+            <Textarea
+              label={t('Notes')}
+              placeholder={t('Additional notes')}
+              value={newItem.notes}
+              onChange={(e) => setNewItem({ ...newItem, notes: e.target.value })}
+              minRows={2}
+            />
+          </Grid.Col>
+        </Grid>
+
+        <Group justify="flex-end" mt="md">
+          <Button variant="default" onClick={() => {
+            setAddItemModalOpened(false);
+            setNewItem({ part: '', quantity: 1, notes: '' });
+            setPartSearch('');
+            setParts([]);
+          }}>
+            {t('Cancel')}
+          </Button>
+          <Button onClick={handleAddItem}>
+            {t('Add')}
+          </Button>
+        </Group>
+      </Modal>
     </div>
   );
 }
