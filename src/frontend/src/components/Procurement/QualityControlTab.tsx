@@ -210,7 +210,8 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
       ba_rompharm_date: new Date(record.ba_rompharm_date),
       test_result: record.test_result,
       transactionable: record.transactionable,
-      comment: record.comment
+      comment: record.comment,
+      quarantine_delivery: false
     });
     setQcModalOpened(true);
   };
@@ -303,7 +304,8 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
       ba_rompharm_date: null,
       test_result: '',
       transactionable: false,
-      comment: ''
+      comment: '',
+      quarantine_delivery: false
     });
     setEditingRecord(null);
   };
