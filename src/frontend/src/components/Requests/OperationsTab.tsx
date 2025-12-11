@@ -355,7 +355,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
             />
           )}
 
-          {finalStatus && (!isFormReadonly || finalStatus === '') && (
+          {finalStatus && !isFormReadonly && (
             <Group justify="flex-end">
               <Button
                 onClick={handleSubmitStatus}
@@ -369,9 +369,9 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         </Paper>
       )}
 
-      {isFormReadonly && (
+      {isFormReadonly && !finalStatus && (
         <Text size="sm" c="orange" mt="md">
-          {t('This form is read-only because it has been signed.')}
+          {t('This form is read-only because it has been signed. Please select a status to proceed.')}
         </Text>
       )}
     </Paper>
