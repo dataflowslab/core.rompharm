@@ -5,6 +5,7 @@ import { IconArrowLeft, IconFileText, IconSignature } from '@tabler/icons-react'
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { notifications } from '@mantine/notifications';
+import { ApprovalsTab } from '../components/Requests/ApprovalsTab';
 
 interface StockLocation {
   pk: number;
@@ -212,7 +213,7 @@ export function RequestDetailPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="approval" pt="md">
-          <Text size="sm" c="dimmed">{t('Approval flow will be implemented here')}</Text>
+          {id && <ApprovalsTab requestId={id} onReload={loadRequest} />}
         </Tabs.Panel>
       </Tabs>
     </Paper>
