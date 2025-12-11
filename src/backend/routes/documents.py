@@ -9,6 +9,8 @@ from bson import ObjectId
 from datetime import datetime
 import io
 import requests
+import qrcode
+import qrcode.image.svg
 
 from ..utils.db import get_db
 from ..utils.dataflows_docu import DataFlowsDocuClient
@@ -629,6 +631,32 @@ async def generate_procurement_document(
             line_items = []
         
         print(f"[DOCUMENT] Found {len(line_items)} line items")
+        
+        # Generate QR code for the order
+        # Format: ORDERID#SUPPLIERID#ISSUEDATE
+        qr_string = f"{request.order_id}#{supplier_id}#{purchase_order.get('issue_date', '')}"
+        print(f"[DOCUMENT] Generating QR code: {qr_string}")
+        
+        # Create QR code as SVG
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=1,
+        )
+        qr.add_data(qr_string)
+        qr.make(fit=True)
+        
+        # Generate SVG
+        factory = qrcode.image.svg.SvgPathImage
+        img = qr.make_image(fill_color="black", back_color="white", image_factory=factory)
+        
+        # Convert to string
+        svg_io = io.BytesIO()
+        img.save(svg_io)
+        qr_svg = svg_io.getvalue().decode('utf-8')
+        print(f"[DOCUMENT] QR code generated ({len(qr_svg)} bytes)")
+        
         print(f"[DOCUMENT] Initializing DataFlows Docu client...")
         client = DataFlowsDocuClient()
         
@@ -659,6 +687,8 @@ async def generate_procurement_document(
                 'line_items': line_items,  # Changed from 'items' to 'line_items'
                 'supplier': supplier_detail,  # Full supplier details
                 'company': company_info,  # Buyer/company info
+                'qr_code_svg': qr_svg,  # QR code as SVG string
+                'qr_code_data': qr_string,  # Raw QR code data
                 'generated_at': datetime.utcnow().isoformat(),
                 'generated_by': user.get('username')
             }
