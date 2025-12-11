@@ -243,11 +243,14 @@ async def get_request(
     request_id: str,
     current_user: dict = Depends(verify_admin)
 ):
-    """Get a specific request by ID"""
+    """Get a specific request by ID with location and part details"""
     from bson import ObjectId
     
     db = get_db()
     requests_collection = db['depo_requests_items']
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    headers = get_inventree_headers(current_user)
     
     try:
         req_obj_id = ObjectId(request_id)
@@ -258,6 +261,47 @@ async def get_request(
     
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Get source location details
+    if req.get('source'):
+        try:
+            source_response = requests.get(
+                f"{inventree_url}/api/stock/location/{req['source']}/",
+                headers=headers,
+                timeout=10
+            )
+            if source_response.status_code == 200:
+                req['source_detail'] = source_response.json()
+        except Exception as e:
+            print(f"Warning: Failed to get source location: {e}")
+    
+    # Get destination location details
+    if req.get('destination'):
+        try:
+            dest_response = requests.get(
+                f"{inventree_url}/api/stock/location/{req['destination']}/",
+                headers=headers,
+                timeout=10
+            )
+            if dest_response.status_code == 200:
+                req['destination_detail'] = dest_response.json()
+        except Exception as e:
+            print(f"Warning: Failed to get destination location: {e}")
+    
+    # Get part details for each item
+    if req.get('items'):
+        for item in req['items']:
+            if item.get('part'):
+                try:
+                    part_response = requests.get(
+                        f"{inventree_url}/api/part/{item['part']}/",
+                        headers=headers,
+                        timeout=10
+                    )
+                    if part_response.status_code == 200:
+                        item['part_detail'] = part_response.json()
+                except Exception as e:
+                    print(f"Warning: Failed to get part details: {e}")
     
     req['_id'] = str(req['_id'])
     if 'created_at' in req and isinstance(req['created_at'], datetime):

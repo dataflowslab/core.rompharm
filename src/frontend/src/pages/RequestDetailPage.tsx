@@ -1,23 +1,43 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Paper, Title, Tabs, Button, Group, Badge, Text, Grid, TextInput, Select, Textarea } from '@mantine/core';
+import { Paper, Title, Tabs, Button, Group, Badge, Text, Grid, TextInput, Textarea, Table } from '@mantine/core';
 import { IconArrowLeft, IconFileText, IconSignature } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { notifications } from '@mantine/notifications';
+
+interface StockLocation {
+  pk: number;
+  name: string;
+}
+
+interface Part {
+  pk: number;
+  name: string;
+  IPN: string;
+}
+
+interface RequestItem {
+  part: number;
+  quantity: number;
+  notes?: string;
+  part_detail?: Part;
+}
 
 interface Request {
   _id: string;
   reference: string;
   source: number;
   destination: number;
-  items: any[];
+  items: RequestItem[];
   line_items: number;
   status: string;
   notes: string;
   issue_date: string;
   created_at: string;
   created_by: string;
+  source_detail?: StockLocation;
+  destination_detail?: StockLocation;
 }
 
 export function RequestDetailPage() {
@@ -123,7 +143,7 @@ export function RequestDetailPage() {
             <Grid.Col span={6}>
               <TextInput
                 label={t('Source Location')}
-                value={String(request.source)}
+                value={request.source_detail?.name || String(request.source)}
                 readOnly
               />
             </Grid.Col>
@@ -131,7 +151,7 @@ export function RequestDetailPage() {
             <Grid.Col span={6}>
               <TextInput
                 label={t('Destination Location')}
-                value={String(request.destination)}
+                value={request.destination_detail?.name || String(request.destination)}
                 readOnly
               />
             </Grid.Col>
@@ -164,15 +184,26 @@ export function RequestDetailPage() {
             <Grid.Col span={12}>
               <Title order={4} mb="md">{t('Items')}</Title>
               {request.items && request.items.length > 0 ? (
-                <Paper withBorder p="md">
-                  {request.items.map((item, index) => (
-                    <Group key={index} mb="sm">
-                      <Text><strong>{t('Part')}:</strong> {item.part}</Text>
-                      <Text><strong>{t('Quantity')}:</strong> {item.quantity}</Text>
-                      {item.notes && <Text><strong>{t('Notes')}:</strong> {item.notes}</Text>}
-                    </Group>
-                  ))}
-                </Paper>
+                <Table striped withTableBorder withColumnBorders>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>{t('Part')}</Table.Th>
+                      <Table.Th>{t('IPN')}</Table.Th>
+                      <Table.Th>{t('Quantity')}</Table.Th>
+                      <Table.Th>{t('Notes')}</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {request.items.map((item, index) => (
+                      <Table.Tr key={index}>
+                        <Table.Td>{item.part_detail?.name || item.part}</Table.Td>
+                        <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
+                        <Table.Td>{item.quantity}</Table.Td>
+                        <Table.Td>{item.notes || '-'}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
               ) : (
                 <Text size="sm" c="dimmed">{t('No items')}</Text>
               )}
