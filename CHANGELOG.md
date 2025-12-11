@@ -2,6 +2,144 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.0] - 2024-12-XX
+
+### Added
+- **Requests Module (depo_request)** - Internal stock transfer request system
+  - Complete CRUD operations for stock transfer requests
+  - MongoDB storage in `depo_requests_items` collection
+  - Auto-generated reference numbers (REQ-NNNN format)
+  - Request fields:
+    - Reference (REQ-NNNN)
+    - Source location (stock location)
+    - Destination location (stock location)
+    - Line items (parts with quantities)
+    - Status (Pending, Approved, Refused, Canceled)
+    - Issue date
+  - Request creation form:
+    - Dynamic source location select (AJAX)
+    - Dynamic destination location select (AJAX, excludes source)
+    - Part search with autocomplete
+    - Stock information display for selected part:
+      - Total stock (only transferable: status 10 or 80)
+      - Allocated to sales orders
+      - Allocated to build orders
+      - In procurement
+      - Available quantity
+    - Quantity input
+    - Notes field
+  - Validation: Source and destination cannot be the same
+  - BOM support: Parts with components show sub-components in list
+  - Approval flow integration (config-based like procurement)
+  - Document generation support (template: 6LL5WVTR8BTY - "Fisa de solicitare")
+  - Status workflow:
+    - Pending: New request
+    - Approved: All signatures collected
+    - Refused: Request rejected
+    - Canceled: Request canceled
+
+- **Backend API Endpoints** (`/api/requests`):
+  - `GET /api/requests/` - List all requests
+  - `GET /api/requests/{id}` - Get request details
+  - `POST /api/requests/` - Create new request
+  - `PATCH /api/requests/{id}` - Update request
+  - `DELETE /api/requests/{id}` - Delete request
+  - `GET /api/requests/stock-locations` - Get stock locations from InvenTree
+  - `GET /api/requests/parts` - Search parts (autocomplete)
+  - `GET /api/requests/parts/{id}/stock-info` - Get stock information for part
+  - `GET /api/requests/parts/{id}/bom` - Get BOM (sub-components) for part
+  - `GET /api/requests/{id}/approval-flow` - Get approval flow
+  - `POST /api/requests/{id}/approval-flow` - Create approval flow
+  - `POST /api/requests/{id}/sign` - Sign request
+  - `DELETE /api/requests/{id}/signatures/{user_id}` - Remove signature (admin)
+
+- **Frontend Pages**:
+  - `RequestsPage.tsx` - List all requests with table
+    - Reference, Source, Destination, Line Items, Status, Issue Date columns
+    - Create new request button
+    - View and delete actions
+    - Status badges with color coding
+    - Click row to navigate to details
+  - `RequestDetailPage.tsx` - Request details with tabs
+    - Details tab: View request information and items
+    - Approval tab: Signature workflow (to be fully implemented)
+
+### Technical
+- New backend route: `src/backend/routes/requests.py`
+- MongoDB collection: `depo_requests_items`
+- Integration with InvenTree Stock Location API
+- Integration with InvenTree Part API
+- Integration with InvenTree BOM API
+- Stock information calculation (transferable items only: status 10 or 80)
+- Approval flow configuration via MongoDB (`request_approval_flows`)
+- Document generation template: 6LL5WVTR8BTY
+
+### Database Schema
+```javascript
+// depo_requests_items
+{
+  reference: "REQ-0001",
+  source: 123,  // Stock location ID
+  destination: 456,  // Stock location ID
+  items: [
+    {
+      part: 789,  // Part ID
+      quantity: 10,
+      notes: "Optional notes"
+    }
+  ],
+  line_items: 1,  // Count of items
+  status: "Pending" | "Approved" | "Refused" | "Canceled",
+  notes: "Request notes",
+  issue_date: DateTime,
+  created_at: DateTime,
+  updated_at: DateTime,
+  created_by: "username"
+}
+```
+
+### Configuration
+- Approval flow config in MongoDB:
+  ```javascript
+  db.config.insertOne({
+    slug: "request_approval_flows",
+    items: [{
+      slug: "stock_requests",
+      enabled: true,
+      min_signatures: 1,
+      can_sign: [
+        { user_id: "...", username: "..." }
+      ],
+      must_sign: [
+        { user_id: "...", username: "..." }
+      ]
+    }]
+  })
+  ```
+
+### Features
+- ✅ Auto-generated reference numbers
+- ✅ Dynamic location selection
+- ✅ Part search with autocomplete
+- ✅ Real-time stock information
+- ✅ BOM support for assemblies
+- ✅ Approval workflow integration
+- ✅ Document generation ready
+- ✅ Status management
+- ✅ MongoDB storage
+- ✅ InvenTree integration
+
+### Notes
+- Requests are stored in MongoDB (not InvenTree)
+- Stock information shows only transferable items (status 10 or 80)
+- Approval flow uses same config-based system as procurement
+- Document template 6LL5WVTR8BTY generates "Fisa de solicitare"
+- Source and destination validation prevents same location selection
+- BOM components automatically included in part selection
+- Status automatically updates to "Approved" when all signatures collected
+
+---
+
 ## [1.9.0] - 2024-12-XX
 
 ### Added
