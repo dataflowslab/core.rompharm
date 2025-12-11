@@ -104,7 +104,7 @@ export function RequestDetailPage() {
           <Button
             variant="subtle"
             leftSection={<IconArrowLeft size={16} />}
-            onClick={() => navigate('/web/requests')}
+            onClick={() => navigate('/requests')}
           >
             {t('Back')}
           </Button>

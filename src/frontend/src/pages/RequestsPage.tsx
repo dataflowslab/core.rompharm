@@ -274,22 +274,22 @@ export function RequestsPage() {
           <Table.Tbody>
             {requests.map((request) => (
               <Table.Tr key={request._id} style={{ cursor: 'pointer' }}>
-                <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
+                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                   {request.reference}
                 </Table.Td>
-                <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
+                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                   {request.source_name || request.source}
                 </Table.Td>
-                <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
+                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                   {request.destination_name || request.destination}
                 </Table.Td>
-                <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
+                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                   {request.line_items}
                 </Table.Td>
-                <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
+                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                   <Badge color={getStatusColor(request.status)}>{request.status}</Badge>
                 </Table.Td>
-                <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
+                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                   {formatDate(request.issue_date)}
                 </Table.Td>
                 <Table.Td>
@@ -297,7 +297,7 @@ export function RequestsPage() {
                     <ActionIcon
                       variant="subtle"
                       color="blue"
-                      onClick={() => navigate(`/web/requests/${request._id}`)}
+                      onClick={() => navigate(`/requests/${request._id}`)}
                       title={t('View')}
                     >
                       <IconEye size={16} />
