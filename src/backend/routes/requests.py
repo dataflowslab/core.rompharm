@@ -385,10 +385,66 @@ async def create_request(
     }
     
     result = requests_collection.insert_one(request_doc)
-    request_doc['_id'] = str(result.inserted_id)
+    request_id = str(result.inserted_id)
+    request_doc['_id'] = request_id
     request_doc['created_at'] = request_doc['created_at'].isoformat()
     request_doc['updated_at'] = request_doc['updated_at'].isoformat()
     request_doc['issue_date'] = request_doc['issue_date'].isoformat()
+    
+    # Auto-create approval flow
+    try:
+        # Get request approval config from MongoDB (use operations flow config)
+        config_collection = db['config']
+        approval_config = config_collection.find_one({'slug': 'requests_operations_flow'})
+        
+        if approval_config and 'items' in approval_config:
+            # Get the operations flow config (first item with slug='operations')
+            flow_config = None
+            for item in approval_config.get('items', []):
+                if item.get('slug') == 'operations' and item.get('enabled', True):
+                    flow_config = item
+                    break
+            
+            if flow_config:
+                # Build can_sign list
+                can_sign_officers = []
+                for user in flow_config.get('can_sign', []):
+                    can_sign_officers.append({
+                        "type": "person",
+                        "reference": user.get('user_id'),
+                        "username": user.get('username'),
+                        "action": "can_sign"
+                    })
+                
+                # Build must_sign list
+                must_sign_officers = []
+                for user in flow_config.get('must_sign', []):
+                    must_sign_officers.append({
+                        "type": "person",
+                        "reference": user.get('user_id'),
+                        "username": user.get('username'),
+                        "action": "must_sign"
+                    })
+                
+                flow_data = {
+                    "object_type": "stock_request",
+                    "object_source": "depo_request",
+                    "object_id": request_id,
+                    "config_slug": flow_config.get('slug'),
+                    "min_signatures": flow_config.get('min_signatures', 1),
+                    "can_sign_officers": can_sign_officers,
+                    "must_sign_officers": must_sign_officers,
+                    "signatures": [],
+                    "status": "pending",
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+                
+                db.approval_flows.insert_one(flow_data)
+                print(f"[REQUESTS] Auto-created approval flow for request {request_id}")
+    except Exception as e:
+        print(f"[REQUESTS] Warning: Failed to auto-create approval flow: {e}")
+        # Don't fail the request creation if approval flow creation fails
     
     return request_doc
 
