@@ -29,6 +29,8 @@ interface Request {
   reference: string;
   source: number;
   destination: number;
+  source_name?: string;
+  destination_name?: string;
   line_items: number;
   status: string;
   issue_date: string;
@@ -265,10 +267,10 @@ export function RequestsPage() {
                   {request.reference}
                 </Table.Td>
                 <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
-                  {request.source}
+                  {request.source_name || request.source}
                 </Table.Td>
                 <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
-                  {request.destination}
+                  {request.destination_name || request.destination}
                 </Table.Td>
                 <Table.Td onClick={() => navigate(`/web/requests/${request._id}`)}>
                   {request.line_items}

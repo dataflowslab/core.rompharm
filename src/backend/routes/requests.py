@@ -219,15 +219,52 @@ async def get_part_bom(
 async def list_requests(
     current_user: dict = Depends(verify_admin)
 ):
-    """List all requests"""
+    """List all requests with location names"""
     db = get_db()
     requests_collection = db['depo_requests_items']
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    headers = get_inventree_headers(current_user)
     
     requests_list = list(requests_collection.find().sort('created_at', -1))
     
-    # Convert ObjectId to string
+    # Get all unique location IDs
+    location_ids = set()
+    for req in requests_list:
+        if req.get('source'):
+            location_ids.add(req['source'])
+        if req.get('destination'):
+            location_ids.add(req['destination'])
+    
+    # Fetch all locations in one call
+    location_map = {}
+    if location_ids:
+        try:
+            locations_response = requests.get(
+                f"{inventree_url}/api/stock/location/",
+                headers=headers,
+                timeout=10
+            )
+            if locations_response.status_code == 200:
+                locations_data = locations_response.json()
+                locations = locations_data if isinstance(locations_data, list) else locations_data.get('results', [])
+                for loc in locations:
+                    loc_id = loc.get('pk') or loc.get('id')
+                    if loc_id in location_ids:
+                        location_map[loc_id] = loc.get('name', str(loc_id))
+        except Exception as e:
+            print(f"Warning: Failed to fetch locations: {e}")
+    
+    # Convert ObjectId to string and add location names
     for req in requests_list:
         req['_id'] = str(req['_id'])
+        
+        # Add location names
+        if req.get('source') and req['source'] in location_map:
+            req['source_name'] = location_map[req['source']]
+        if req.get('destination') and req['destination'] in location_map:
+            req['destination_name'] = location_map[req['destination']]
+        
         if 'created_at' in req and isinstance(req['created_at'], datetime):
             req['created_at'] = req['created_at'].isoformat()
         if 'updated_at' in req and isinstance(req['updated_at'], datetime):
