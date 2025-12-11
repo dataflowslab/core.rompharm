@@ -46,7 +46,7 @@ interface ApprovalsTabProps {
 
 export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { username, isStaff } = useAuth();
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
@@ -162,17 +162,15 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
   };
 
   const canUserSign = () => {
-    if (!flow || !user) return false;
-    
-    const userId = user._id || user.id;
+    if (!flow || !username) return false;
     
     // Check if already signed
-    const alreadySigned = flow.signatures.some(s => s.user_id === userId);
+    const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
     
-    // Check if user is in can_sign or must_sign
-    const canSign = flow.can_sign_officers.some(o => o.reference === userId);
-    const mustSign = flow.must_sign_officers.some(o => o.reference === userId);
+    // Check if user is in can_sign or must_sign by username
+    const canSign = flow.can_sign_officers.some(o => o.username === username);
+    const mustSign = flow.must_sign_officers.some(o => o.username === username);
     
     return canSign || mustSign;
   };
@@ -296,7 +294,7 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
                     </Text>
                   </Table.Td>
                   <Table.Td>
-                    {user?.is_admin && (
+                    {isStaff && (
                       <ActionIcon
                         color="red"
                         variant="subtle"
