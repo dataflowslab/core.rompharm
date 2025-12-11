@@ -29,6 +29,42 @@ def get_inventree_headers(user: dict) -> Dict[str, str]:
     }
 
 
+def is_manager(user: dict) -> bool:
+    """Check if user is in Managers group"""
+    groups = user.get('groups', [])
+    # Check if user has 'Managers' group
+    for group in groups:
+        if isinstance(group, dict):
+            if group.get('name', '').lower() == 'managers':
+                return True
+        elif isinstance(group, str):
+            if group.lower() == 'managers':
+                return True
+    return False
+
+
+def can_access_order(user: dict, order_data: dict) -> bool:
+    """
+    Check if user can access a purchase order
+    - Managers can access all orders
+    - Regular users can only access orders they created (responsible user)
+    """
+    # Managers have full access
+    if is_manager(user):
+        return True
+    
+    # Check if user is the responsible user for this order
+    user_pk = user.get('pk')
+    responsible_user = order_data.get('responsible')
+    
+    # If no responsible user set, allow access (backward compatibility)
+    if not responsible_user:
+        return True
+    
+    # Check if current user is the responsible user
+    return user_pk == responsible_user
+
+
 # Pydantic models
 class NewSupplierRequest(BaseModel):
     name: str
@@ -719,6 +755,27 @@ async def get_received_items(
     config = load_config()
     inventree_url = config['inventree']['url'].rstrip('/')
     headers = get_inventree_headers(current_user)
+    
+    # Check permissions - get order first
+    try:
+        po_response = requests.get(
+            f"{inventree_url}/api/order/po/{order_id}/",
+            headers=headers,
+            timeout=10
+        )
+        po_response.raise_for_status()
+        purchase_order = po_response.json()
+        
+        # Check if user can access this order
+        if not can_access_order(current_user, purchase_order):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to access this purchase order"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to verify order access: {str(e)}")
     
     try:
         response = requests.get(
