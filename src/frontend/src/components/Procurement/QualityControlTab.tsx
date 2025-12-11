@@ -61,8 +61,12 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
     ba_rompharm_date: null as Date | null,
     test_result: '',
     transactionable: false,
-    comment: ''
+    comment: '',
+    quarantine_delivery: false, // Livrare în carantină (for Reglementat products)
   });
+
+  // Separate state for LOTALLEXP items
+  const [lotallexpItems, setLotallexpItems] = useState<ReceivedItem[]>([]);
 
   useEffect(() => {
     loadQCRecords();
@@ -82,9 +86,26 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
     try {
       const response = await api.get(`/api/procurement/purchase-orders/${orderId}/received-items`);
       const items = response.data.results || response.data || [];
-      // Filter items that have batch codes
-      const itemsWithBatch = items.filter((item: ReceivedItem) => item.batch && item.batch.trim() !== '');
-      setReceivedItems(itemsWithBatch);
+      
+      // Separate LOTALLEXP items (custom field id 3)
+      const lotallexpFiltered: ReceivedItem[] = [];
+      const regularItems: ReceivedItem[] = [];
+      
+      items.forEach((item: ReceivedItem) => {
+        // Check if item has LOTALLEXP custom field (id 3) set to true
+        const hasLotallexp = item.part_detail?.custom_fields?.['3'] === true || 
+                            item.part_detail?.custom_fields?.['LOTALLEXP'] === true;
+        
+        if (hasLotallexp) {
+          lotallexpFiltered.push(item);
+        } else if (item.batch && item.batch.trim() !== '') {
+          // Only add to regular items if it has a batch code
+          regularItems.push(item);
+        }
+      });
+      
+      setLotallexpItems(lotallexpFiltered);
+      setReceivedItems(regularItems);
     } catch (error) {
       console.error('Failed to load received items:', error);
     }
@@ -392,6 +413,40 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
             ))}
           </Table.Tbody>
         </Table>
+      )}
+
+      {/* LOTALLEXP Items Table - Separate section */}
+      {lotallexpItems.length > 0 && (
+        <>
+          <Title order={5} mt="xl" mb="md">{t('LOTALLEXP - Auto-received Items')}</Title>
+          <Text size="sm" c="dimmed" mb="md">
+            {t('These items were automatically received as transactionable (OK) without quarantine.')}
+          </Text>
+          <Table striped withTableBorder withColumnBorders>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('Article')}</Table.Th>
+                <Table.Th>{t('IPN')}</Table.Th>
+                <Table.Th>{t('Quantity')}</Table.Th>
+                <Table.Th>{t('Location')}</Table.Th>
+                <Table.Th>{t('Status')}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {lotallexpItems.map((item) => (
+                <Table.Tr key={item.pk}>
+                  <Table.Td>{item.part_detail?.name || `Part ${item.part}`}</Table.Td>
+                  <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
+                  <Table.Td>{item.quantity}</Table.Td>
+                  <Table.Td>{item.location_detail?.name || '-'}</Table.Td>
+                  <Table.Td>
+                    <Badge color="green">{t('OK - Transactionable')}</Badge>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </>
       )}
 
       {/* QC Record Modal */}
