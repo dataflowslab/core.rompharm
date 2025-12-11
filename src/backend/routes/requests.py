@@ -782,6 +782,67 @@ async def sign_request(
                 {"$set": {"status": "Approved", "updated_at": timestamp}}
             )
             print(f"[REQUESTS] Request {request_id} status updated to Approved")
+            
+            # Auto-create operations flow when request is approved
+            try:
+                # Check if operations flow already exists
+                existing_ops_flow = db.approval_flows.find_one({
+                    "object_type": "stock_request_operations",
+                    "object_id": request_id
+                })
+                
+                if not existing_ops_flow:
+                    # Get operations config
+                    config_collection = db['config']
+                    ops_config = config_collection.find_one({'slug': 'requests_operations_flow'})
+                    
+                    if ops_config and 'items' in ops_config:
+                        # Find operations flow config
+                        ops_flow_config = None
+                        for item in ops_config.get('items', []):
+                            if item.get('slug') == 'operations' and item.get('enabled', True):
+                                ops_flow_config = item
+                                break
+                        
+                        if ops_flow_config:
+                            # Build officers lists
+                            can_sign_officers = []
+                            for user in ops_flow_config.get('can_sign', []):
+                                can_sign_officers.append({
+                                    "type": "person",
+                                    "reference": user.get('user_id'),
+                                    "username": user.get('username'),
+                                    "action": "can_sign"
+                                })
+                            
+                            must_sign_officers = []
+                            for user in ops_flow_config.get('must_sign', []):
+                                must_sign_officers.append({
+                                    "type": "person",
+                                    "reference": user.get('user_id'),
+                                    "username": user.get('username'),
+                                    "action": "must_sign"
+                                })
+                            
+                            ops_flow_data = {
+                                "object_type": "stock_request_operations",
+                                "object_source": "depo_request",
+                                "object_id": request_id,
+                                "flow_type": "operations",
+                                "config_slug": ops_flow_config.get('slug'),
+                                "min_signatures": ops_flow_config.get('min_signatures', 1),
+                                "can_sign_officers": can_sign_officers,
+                                "must_sign_officers": must_sign_officers,
+                                "signatures": [],
+                                "status": "pending",
+                                "created_at": timestamp,
+                                "updated_at": timestamp
+                            }
+                            
+                            db.approval_flows.insert_one(ops_flow_data)
+                            print(f"[REQUESTS] Auto-created operations flow for request {request_id}")
+            except Exception as e:
+                print(f"[REQUESTS] Warning: Failed to auto-create operations flow: {e}")
     
     # Get updated flow
     flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
