@@ -1137,7 +1137,59 @@ async def receive_stock(
             timeout=10
         )
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        
+        # Try to get the stock item ID from the response
+        stock_item_id = None
+        
+        # InvenTree 1.0.1 may return different structures
+        if isinstance(result, dict):
+            # Check for direct stock_item field
+            if 'stock_item' in result:
+                stock_item_id = result['stock_item']
+            # Check for items array
+            elif 'items' in result and len(result['items']) > 0:
+                stock_item_id = result['items'][0].get('pk') or result['items'][0].get('id')
+        
+        # If we couldn't get it from response, query for it
+        if not stock_item_id and stock_data.batch_code:
+            try:
+                # Get the line item to know the part
+                line_response = requests.get(
+                    f"{inventree_url}/api/order/po-line/{stock_data.line_item}/",
+                    headers=headers,
+                    timeout=10
+                )
+                if line_response.status_code == 200:
+                    line_data = line_response.json()
+                    part_id = line_data.get('part_detail', {}).get('pk') or line_data.get('part_detail', {}).get('id')
+                    
+                    if part_id:
+                        # Find the stock item
+                        stock_response = requests.get(
+                            f"{inventree_url}/api/stock/",
+                            headers=headers,
+                            params={
+                                'part': part_id,
+                                'batch': stock_data.batch_code,
+                                'purchase_order': order_id,
+                                'location': stock_data.location
+                            },
+                            timeout=10
+                        )
+                        if stock_response.status_code == 200:
+                            stock_data_list = stock_response.json()
+                            stock_items = stock_data_list if isinstance(stock_data_list, list) else stock_data_list.get('results', [])
+                            if stock_items:
+                                stock_item_id = stock_items[0].get('pk') or stock_items[0].get('id')
+            except Exception as e:
+                print(f"[PROCUREMENT] Warning: Failed to find stock item ID: {e}")
+        
+        # Add stock_item_id to result
+        if stock_item_id:
+            result['stock_item_id'] = stock_item_id
+        
+        return result
     except requests.exceptions.RequestException as e:
         error_detail = str(e)
         if hasattr(e, 'response') and hasattr(e.response, 'text'):
