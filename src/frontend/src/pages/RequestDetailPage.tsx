@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Paper, Title, Tabs, Button, Group, Badge, Text, Grid, TextInput, Textarea, Table } from '@mantine/core';
-import { IconArrowLeft, IconFileText, IconSignature } from '@tabler/icons-react';
+import { IconArrowLeft, IconFileText, IconSignature, IconTruck, IconPackage } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { notifications } from '@mantine/notifications';
 import { ApprovalsTab } from '../components/Requests/ApprovalsTab';
+import { OperationsTab } from '../components/Requests/OperationsTab';
+import { ReceptieTab } from '../components/Requests/ReceptieTab';
 
 interface StockLocation {
   pk: number;
@@ -121,6 +123,16 @@ export function RequestDetailPage() {
           <Tabs.Tab value="approval" leftSection={<IconSignature size={16} />}>
             {t('Approval')}
           </Tabs.Tab>
+          {request.status === 'Approved' && (
+            <Tabs.Tab value="operations" leftSection={<IconTruck size={16} />}>
+              {t('Operations')}
+            </Tabs.Tab>
+          )}
+          {request.status === 'Finished' && (
+            <Tabs.Tab value="reception" leftSection={<IconPackage size={16} />}>
+              {t('Reception')}
+            </Tabs.Tab>
+          )}
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">
@@ -215,6 +227,18 @@ export function RequestDetailPage() {
         <Tabs.Panel value="approval" pt="md">
           {id && <ApprovalsTab requestId={id} onReload={loadRequest} />}
         </Tabs.Panel>
+
+        {request.status === 'Approved' && (
+          <Tabs.Panel value="operations" pt="md">
+            {id && <OperationsTab requestId={id} currentStatus={request.status} onReload={loadRequest} />}
+          </Tabs.Panel>
+        )}
+
+        {request.status === 'Finished' && (
+          <Tabs.Panel value="reception" pt="md">
+            {id && <ReceptieTab requestId={id} onReload={loadRequest} />}
+          </Tabs.Panel>
+        )}
       </Tabs>
     </Paper>
   );
