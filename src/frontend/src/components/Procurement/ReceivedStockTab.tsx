@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Table, Button, Group, Modal, Grid, Select, NumberInput, TextInput, Textarea, Checkbox, Divider } from '@mantine/core';
+import { Paper, Title, Text, Table, Button, Group, Modal, Grid, Select, NumberInput, TextInput, Textarea, Checkbox, Divider, ActionIcon } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { DateInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
+import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { notifications } from '@mantine/notifications';
 
@@ -121,6 +122,44 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
     } catch (error) {
       console.error('Failed to load received items:', error);
     }
+  };
+
+  const handleDeleteStock = (item: ReceivedItem) => {
+    modals.openConfirmModal({
+      title: t('Delete Received Stock'),
+      children: (
+        <Text size="sm">
+          {t('Are you sure you want to delete this stock item?')}
+          <br />
+          <strong>{item.part_detail?.name || item.part}</strong>
+          <br />
+          {t('Quantity')}: {item.quantity}
+          <br />
+          {t('Batch')}: {item.batch || '-'}
+        </Text>
+      ),
+      labels: { confirm: t('Delete'), cancel: t('Cancel') },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/procurement/stock-items/${item.pk}`);
+          notifications.show({
+            title: t('Success'),
+            message: t('Stock item deleted successfully'),
+            color: 'green'
+          });
+          loadReceivedItems();
+          onReload();
+        } catch (error: any) {
+          console.error('Failed to delete stock:', error);
+          notifications.show({
+            title: t('Error'),
+            message: error.response?.data?.detail || t('Failed to delete stock item'),
+            color: 'red'
+          });
+        }
+      }
+    });
   };
 
   const handleReceiveStock = async () => {
@@ -292,9 +331,8 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
               <Table.Th>{t('Quantity')}</Table.Th>
               <Table.Th>{t('Location')}</Table.Th>
               <Table.Th>{t('Batch')}</Table.Th>
-              <Table.Th>{t('Serial')}</Table.Th>
-              <Table.Th>{t('Packaging')}</Table.Th>
               <Table.Th>{t('Status')}</Table.Th>
+              <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -307,9 +345,17 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
                 <Table.Td>{item.quantity}</Table.Td>
                 <Table.Td>{item.location_detail?.name || item.location}</Table.Td>
                 <Table.Td>{item.batch || '-'}</Table.Td>
-                <Table.Td>{item.serial || '-'}</Table.Td>
-                <Table.Td>{item.packaging || '-'}</Table.Td>
                 <Table.Td>{getStatusLabel(item.status)}</Table.Td>
+                <Table.Td>
+                  <ActionIcon
+                    color="red"
+                    variant="subtle"
+                    onClick={() => handleDeleteStock(item)}
+                    title={t('Delete')}
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
@@ -632,28 +678,9 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
             </Grid.Col>
           )}
 
-          {/* Other Fields */}
+          {/* Notes */}
           <Grid.Col span={12}>
             <Divider my="md" />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <TextInput
-              label={t('Packaging')}
-              placeholder={t('Enter packaging info')}
-              value={receiveData.packaging}
-              onChange={(e) => setReceiveData({ ...receiveData, packaging: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <TextInput
-              label={t('Serial Numbers')}
-              placeholder={t('Enter serial numbers (comma separated)')}
-              value={receiveData.serial_numbers}
-              onChange={(e) => setReceiveData({ ...receiveData, serial_numbers: e.target.value })}
-              description={t('For multiple serials, separate with commas')}
-            />
           </Grid.Col>
 
           <Grid.Col span={12}>

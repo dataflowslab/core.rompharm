@@ -1789,3 +1789,69 @@ async def save_stock_extra_data(
         "containers_saved": len(containers) if containers else 0,
         "plugin_fields_updated": len(plugin_fields)
     }
+
+
+@router.delete("/stock-items/{stock_item_id}")
+async def delete_stock_item(
+    stock_item_id: int,
+    current_user: dict = Depends(verify_admin)
+):
+    """
+    Delete a received stock item (admin only)
+    Logs the action to audit log
+    """
+    from ..utils.audit import log_audit
+    
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    headers = get_inventree_headers(current_user)
+    
+    try:
+        # Get stock item details before deletion for audit log
+        stock_response = requests.get(
+            f"{inventree_url}/api/stock/{stock_item_id}/",
+            headers=headers,
+            timeout=10
+        )
+        stock_response.raise_for_status()
+        stock_data = stock_response.json()
+        
+        # Delete stock item from InvenTree
+        delete_response = requests.delete(
+            f"{inventree_url}/api/stock/{stock_item_id}/",
+            headers=headers,
+            timeout=10
+        )
+        delete_response.raise_for_status()
+        
+        # Log to audit
+        log_audit(
+            action="delete_stock_item",
+            user_id=current_user.get('pk') or current_user.get('id'),
+            username=current_user.get('username'),
+            details={
+                "stock_item_id": stock_item_id,
+                "part": stock_data.get('part'),
+                "part_name": stock_data.get('part_detail', {}).get('name') if stock_data.get('part_detail') else None,
+                "quantity": stock_data.get('quantity'),
+                "batch": stock_data.get('batch'),
+                "location": stock_data.get('location'),
+                "purchase_order": stock_data.get('purchase_order'),
+                "status": stock_data.get('status')
+            }
+        )
+        
+        print(f"[PROCUREMENT] Stock item {stock_item_id} deleted by {current_user.get('username')}")
+        
+        return {"success": True, "message": "Stock item deleted successfully"}
+        
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Stock item not found")
+        error_detail = str(e)
+        if hasattr(e.response, 'text'):
+            error_detail = f"{error_detail}: {e.response.text}"
+        raise HTTPException(status_code=e.response.status_code, detail=f"Failed to delete stock item: {error_detail}")
+    except requests.exceptions.RequestException as e:
+        error_detail = str(e)
+        raise HTTPException(status_code=500, detail=f"Failed to delete stock item: {error_detail}")
