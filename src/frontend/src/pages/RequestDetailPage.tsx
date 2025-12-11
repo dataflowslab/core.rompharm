@@ -125,7 +125,7 @@ export function RequestDetailPage() {
           )}
           {request.status === 'Finished' && (
             <Tabs.Tab value="reception" leftSection={<IconPackage size={16} />}>
-              {t('Reception')}
+              {t('Receive Stock')}
             </Tabs.Tab>
           )}
         </Tabs.List>

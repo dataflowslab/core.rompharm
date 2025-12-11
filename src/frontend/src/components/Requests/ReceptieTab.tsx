@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Modal, Textarea } from '@mantine/core';
-import { IconSignature, IconTrash, IconCheck, IconX } from '@tabler/icons-react';
+import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, NumberInput, Select, Textarea } from '@mantine/core';
+import { IconSignature, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
@@ -32,6 +32,18 @@ interface ReceptionFlow {
   min_signatures: number;
 }
 
+interface RequestItem {
+  part: number;
+  quantity: number;
+  notes?: string;
+  part_detail?: {
+    pk: number;
+    name: string;
+    IPN: string;
+  };
+  received_quantity?: number;
+}
+
 interface ReceptieTabProps {
   requestId: string;
   onReload: () => void;
@@ -43,13 +55,14 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   const [flow, setFlow] = useState<ReceptionFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
-  const [statusModalOpened, setStatusModalOpened] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [items, setItems] = useState<RequestItem[]>([]);
+  const [finalStatus, setFinalStatus] = useState<string>('');
   const [refusalReason, setRefusalReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadReceptionFlow();
+    loadRequestItems();
   }, [requestId]);
 
   const loadReceptionFlow = async () => {
@@ -63,30 +76,43 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     }
   };
 
-  const handleCreateFlow = async () => {
+  const loadRequestItems = async () => {
     try {
-      await api.post(`/api/requests/${requestId}/reception-flow`);
-      notifications.show({
-        title: t('Success'),
-        message: t('Reception flow created successfully'),
-        color: 'green'
-      });
-      loadReceptionFlow();
-      onReload();
-    } catch (error: any) {
-      console.error('Failed to create reception flow:', error);
-      notifications.show({
-        title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to create reception flow'),
-        color: 'red'
-      });
+      const response = await api.get(`/api/requests/${requestId}`);
+      const requestItems = response.data.items || [];
+      // Initialize received_quantity with requested quantity
+      const itemsWithReceived = requestItems.map((item: RequestItem) => ({
+        ...item,
+        received_quantity: item.received_quantity || item.quantity
+      }));
+      setItems(itemsWithReceived);
+    } catch (error) {
+      console.error('Failed to load request items:', error);
     }
+  };
+
+  const handleReceivedQuantityChange = (index: number, value: number) => {
+    const newItems = [...items];
+    newItems[index].received_quantity = value;
+    setItems(newItems);
   };
 
   const handleSign = async () => {
     setSigning(true);
     try {
+      // Save received quantities first
+      await api.patch(`/api/requests/${requestId}`, {
+        items: items.map(item => ({
+          part: item.part,
+          quantity: item.quantity,
+          notes: item.notes,
+          received_quantity: item.received_quantity
+        }))
+      });
+
+      // Then sign
       await api.post(`/api/requests/${requestId}/reception-sign`);
+      
       notifications.show({
         title: t('Success'),
         message: t('Reception signed successfully'),
@@ -96,7 +122,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
       setTimeout(() => {
         loadReceptionFlow();
         onReload();
-      }, 1000);
+      }, 500);
     } catch (error: any) {
       console.error('Failed to sign reception:', error);
       notifications.show({
@@ -141,14 +167,17 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     });
   };
 
-  const handleStatusChange = (newStatus: string) => {
-    setSelectedStatus(newStatus);
-    setRefusalReason('');
-    setStatusModalOpened(true);
-  };
+  const handleSubmitStatus = async () => {
+    if (!finalStatus) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please select a status'),
+        color: 'red'
+      });
+      return;
+    }
 
-  const handleConfirmStatusChange = async () => {
-    if (selectedStatus === 'Refused' && !refusalReason.trim()) {
+    if (finalStatus === 'Refused' && !refusalReason.trim()) {
       notifications.show({
         title: t('Error'),
         message: t('Please provide a reason for refusal'),
@@ -160,8 +189,8 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     setSubmitting(true);
     try {
       await api.patch(`/api/requests/${requestId}/reception-status`, {
-        status: selectedStatus,
-        reason: selectedStatus === 'Refused' ? refusalReason : undefined
+        status: finalStatus,
+        reason: finalStatus === 'Refused' ? refusalReason : undefined
       });
 
       notifications.show({
@@ -170,8 +199,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
         color: 'green'
       });
 
-      setStatusModalOpened(false);
-      setSelectedStatus('');
+      setFinalStatus('');
       setRefusalReason('');
       onReload();
     } catch (error: any) {
@@ -204,10 +232,8 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
 
   const canUserSign = () => {
     if (!flow || !username) return false;
-    
     const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
-    
     const canSign = flow.can_sign_officers.some(o => o.username === username);
     const mustSign = flow.must_sign_officers.some(o => o.username === username);
     
@@ -216,8 +242,27 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
 
   const isFlowCompleted = () => {
     if (!flow) return false;
-    return flow.status === 'approved';
+    
+    // Check if all must_sign have signed
+    const allMustSigned = flow.must_sign_officers.every(officer =>
+      flow.signatures.some(s => s.user_id === officer.reference)
+    );
+    
+    // Check if minimum signatures reached
+    const signatureCount = flow.signatures.filter(s =>
+      flow.can_sign_officers.some(o => o.reference === s.user_id)
+    ).length;
+    
+    const hasMinSignatures = signatureCount >= flow.min_signatures;
+    
+    return allMustSigned && hasMinSignatures;
   };
+
+  const hasAnySignature = () => {
+    return !!(flow && flow.signatures.length > 0);
+  };
+
+  const isFormReadonly = hasAnySignature();
 
   if (loading) {
     return <Paper p="md"><Text>{t('Loading...')}</Text></Paper>;
@@ -226,8 +271,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   if (!flow) {
     return (
       <Paper p="md">
-        <Text mb="md">{t('No reception flow created yet')}</Text>
-        <Button onClick={handleCreateFlow}>{t('Create Reception Flow')}</Button>
+        <Text c="dimmed">{t('Reception flow will be created automatically when operations are finished')}</Text>
       </Paper>
     );
   }
@@ -236,47 +280,59 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     <Paper p="md">
       <Group justify="space-between" mb="md">
         <Group>
-          <Title order={4}>{t('Reception')}</Title>
+          <Title order={4}>{t('Reception Flow')}</Title>
           <Badge color={getStatusColor(flow.status)} size="lg">
-            {flow.status}
+            {flow.status.toUpperCase()}
           </Badge>
         </Group>
-        <Group>
-          {canUserSign() && (
-            <Button
-              leftSection={<IconSignature size={16} />}
-              onClick={handleSign}
-              loading={signing}
-            >
-              {t('Sign')}
-            </Button>
-          )}
-          {isFlowCompleted() && (
-            <>
-              <Button
-                leftSection={<IconCheck size={16} />}
-                color="green"
-                onClick={() => handleStatusChange('Approved')}
-              >
-                {t('Approve')}
-              </Button>
-              <Button
-                leftSection={<IconX size={16} />}
-                color="red"
-                onClick={() => handleStatusChange('Refused')}
-              >
-                {t('Refuse')}
-              </Button>
-            </>
-          )}
-        </Group>
+        {canUserSign() && !isFlowCompleted() && (
+          <Button
+            leftSection={<IconSignature size={16} />}
+            onClick={handleSign}
+            loading={signing}
+          >
+            {t('Sign')}
+          </Button>
+        )}
       </Group>
 
-      {/* Approvers */}
+      {/* Received Quantities Table */}
+      <Title order={5} mt="md" mb="sm">{t('Received Quantities')}</Title>
+      <Table striped withTableBorder withColumnBorders mb="md">
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>{t('Part')}</Table.Th>
+            <Table.Th>{t('IPN')}</Table.Th>
+            <Table.Th>{t('Requested')}</Table.Th>
+            <Table.Th>{t('Received')}</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {items.map((item, index) => (
+            <Table.Tr key={index}>
+              <Table.Td>{item.part_detail?.name || item.part}</Table.Td>
+              <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
+              <Table.Td>{item.quantity}</Table.Td>
+              <Table.Td>
+                <NumberInput
+                  value={item.received_quantity || item.quantity}
+                  onChange={(value) => handleReceivedQuantityChange(index, Number(value) || 0)}
+                  min={0}
+                  max={item.quantity}
+                  disabled={isFormReadonly}
+                  style={{ width: '120px' }}
+                />
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+
+      {/* Optional Approvers */}
       {flow.can_sign_officers.length > 0 && (
         <>
           <Title order={5} mt="md" mb="sm">
-            {t('Approvers')} ({t('Minimum')}: {flow.min_signatures})
+            {t('Optional Approvers')} ({t('Minimum')}: {flow.min_signatures})
           </Title>
           <Table striped withTableBorder withColumnBorders mb="md">
             <Table.Thead>
@@ -308,13 +364,13 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
       {flow.signatures.length > 0 && (
         <>
           <Title order={5} mt="md" mb="sm">{t('Signatures')}</Title>
-          <Table striped withTableBorder withColumnBorders>
+          <Table striped withTableBorder withColumnBorders mb="md">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>{t('User')}</Table.Th>
                 <Table.Th>{t('Date')}</Table.Th>
                 <Table.Th>{t('Signature Hash')}</Table.Th>
-                <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>
+                {isStaff && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -327,8 +383,8 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
                       {signature.signature_hash.substring(0, 16)}...
                     </Text>
                   </Table.Td>
-                  <Table.Td>
-                    {isStaff && (
+                  {isStaff && (
+                    <Table.Td>
                       <ActionIcon
                         color="red"
                         variant="subtle"
@@ -337,8 +393,8 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
                       >
                         <IconTrash size={16} />
                       </ActionIcon>
-                    )}
-                  </Table.Td>
+                    </Table.Td>
+                  )}
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -346,43 +402,57 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
         </>
       )}
 
-      {/* Status Change Modal */}
-      <Modal
-        opened={statusModalOpened}
-        onClose={() => setStatusModalOpened(false)}
-        title={selectedStatus === 'Approved' ? t('Approve Reception') : t('Refuse Reception')}
-      >
-        <Text size="sm" mb="md">
-          {selectedStatus === 'Approved' 
-            ? t('Are you sure you want to approve this reception?')
-            : t('Please provide a reason for refusing this reception:')}
-        </Text>
-
-        {selectedStatus === 'Refused' && (
-          <Textarea
-            label={t('Reason')}
-            placeholder={t('Enter reason for refusal')}
-            value={refusalReason}
-            onChange={(e) => setRefusalReason(e.target.value)}
+      {/* Final Status Selection - appears after all signatures */}
+      {isFlowCompleted() && (
+        <Paper withBorder p="md" mt="md">
+          <Title order={5} mb="md">{t('Final Decision')}</Title>
+          
+          <Select
+            label={t('Status')}
+            placeholder={t('Select status')}
+            data={[
+              { value: 'Approved', label: t('Approved') },
+              { value: 'Refused', label: t('Refused') }
+            ]}
+            value={finalStatus}
+            onChange={(value) => setFinalStatus(value || '')}
+            disabled={isFormReadonly}
             required
-            minRows={3}
             mb="md"
           />
-        )}
 
-        <Group justify="flex-end">
-          <Button variant="default" onClick={() => setStatusModalOpened(false)}>
-            {t('Cancel')}
-          </Button>
-          <Button
-            color={selectedStatus === 'Approved' ? 'green' : 'red'}
-            onClick={handleConfirmStatusChange}
-            loading={submitting}
-          >
-            {t('Confirm')}
-          </Button>
-        </Group>
-      </Modal>
+          {finalStatus === 'Refused' && (
+            <Textarea
+              label={t('Reason for Refusal')}
+              placeholder={t('Enter reason for refusal')}
+              value={refusalReason}
+              onChange={(e) => setRefusalReason(e.target.value)}
+              disabled={isFormReadonly}
+              required
+              minRows={3}
+              mb="md"
+            />
+          )}
+
+          {finalStatus && (!isFormReadonly || finalStatus === '') && (
+            <Group justify="flex-end">
+              <Button
+                onClick={handleSubmitStatus}
+                loading={submitting}
+                color={finalStatus === 'Approved' ? 'green' : 'red'}
+              >
+                {t('Submit')}
+              </Button>
+            </Group>
+          )}
+        </Paper>
+      )}
+
+      {isFormReadonly && (
+        <Text size="sm" c="orange" mt="md">
+          {t('This form is read-only because it has been signed.')}
+        </Text>
+      )}
     </Paper>
   );
 }
