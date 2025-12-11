@@ -2,6 +2,135 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2024-12-XX
+
+### Added
+- **Enhanced Procurement Reception System**
+  - Extended receive stock form with comprehensive fields:
+    - Supplier Batch Code (on same row with Batch Code)
+    - Manufacturing Date (datepicker)
+    - Expected Quantity from delivery documents (on same row with received quantity)
+    - Expiry Date / Reset Date with toggle checkbox
+    - Containers section with incremental table:
+      - Number of containers
+      - Products per container
+      - Unit of measurement
+      - Value (weight, volume, etc.)
+      - Damaged checkbox
+      - Unsealed checkbox
+      - Mislabeled checkbox
+    - Containers Cleaned checkbox
+    - Supplier BA Number and Date
+    - In Accordance with Supplier BA checkbox
+    - Supplier in List checkbox
+    - Transport section:
+      - Clean Transport checkbox
+      - Temperature Control Transport checkbox
+      - Temperature Conditions Met (conditional on temperature control)
+  
+- **Stock Extra Data Management**
+  - New MongoDB collections:
+    - `depo_procurement_containers` - Container information per stock item
+    - `depo_procurement_stock_metadata` - Transport and delivery metadata
+  - Backend endpoint `/api/procurement/stock-extra-data` for saving:
+    - Container data to MongoDB
+    - Transport information to MongoDB
+    - Custom fields to InvenTree via DataFlowsDepoStocks plugin
+  - Integration with DataFlowsDepoStocks plugin for custom fields:
+    - supplier_batch_code
+    - manufacturing_date
+    - expiry_date / reset_date
+    - containers_cleaned
+    - supplier_ba_no
+    - supplier_ba_date
+    - accord_ba
+    - is_list_supplier
+
+- **Enhanced Quality Control System**
+  - Automatic separation of LOTALLEXP products (custom field id 3):
+    - Separate table for LOTALLEXP items
+    - Auto-received as transactionable (OK status)
+    - No quarantine required
+    - Direct stock entry
+  - Support for Reglementat products (custom field id 2):
+    - Quarantine delivery checkbox for regulated products
+    - Ability to complete certificate number and conformity date later
+  - Custom fields integration from InvenTree parts
+  - Improved product categorization and handling
+
+- **Receive Stock Tab Visibility**
+  - Tab now appears only after purchase order has been signed
+  - Conditional rendering based on approval flow signatures
+  - Prevents premature stock reception
+
+### Changed
+- **Receive Stock Modal**: Expanded to XL size with scrollable content
+- **Stock Reception Workflow**: Enhanced with plugin integration
+- **Quality Control Tab**: Separated LOTALLEXP items from regular QC flow
+
+### Technical
+- Enhanced `ReceivedStockTab.tsx` with comprehensive form fields
+- Added container management functions (add, remove, update rows)
+- Modified `receive_stock` endpoint to return `stock_item_id`
+- Created `save_stock_extra_data` endpoint for MongoDB and plugin updates
+- Updated `QualityControlTab.tsx` with LOTALLEXP filtering logic
+- Added custom_fields support in ReceivedItem interface
+- Integrated with DataFlowsDepoStocks plugin API
+
+### Database Schema
+```javascript
+// depo_procurement_containers
+{
+  stock_item_id: number,
+  order_id: string,
+  num_containers: number,
+  products_per_container: number,
+  unit: string,
+  value: number,
+  is_damaged: boolean,
+  is_unsealed: boolean,
+  is_mislabeled: boolean,
+  created_at: DateTime,
+  created_by: string
+}
+
+// depo_procurement_stock_metadata
+{
+  stock_item_id: number,
+  order_id: string,
+  expected_quantity: number,
+  clean_transport: boolean,
+  temperature_control: boolean,
+  temperature_conditions_met: boolean,
+  created_at: DateTime,
+  created_by: string
+}
+```
+
+### Plugin Integration
+- DataFlowsDepoStocks plugin endpoint: `/plugin/dataflows-depo-stocks/api/extra/stock/{stock_id}/update/`
+- Fields updated via plugin:
+  - supplier_batch_code (text)
+  - manufacturing_date (date)
+  - expiry_date (date)
+  - reset_date (date)
+  - containers_cleaned (boolean)
+  - supplier_ba_no (text)
+  - supplier_ba_date (date)
+  - accord_ba (boolean)
+  - is_list_supplier (boolean)
+
+### Notes
+- All container data stored in MongoDB for detailed tracking
+- Transport conditions tracked separately from InvenTree
+- Plugin handles InvenTree custom fields synchronization
+- LOTALLEXP products bypass normal QC workflow
+- Reglementat products support deferred certificate completion
+- Stock reception now captures comprehensive delivery information
+- System supports both InvenTree standard fields and custom plugin fields
+
+---
+
 ## [1.8.0] - 2024-12-XX
 
 ### Added
