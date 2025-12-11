@@ -1630,4 +1630,112 @@ async def remove_order_signature(
     return {"message": "Signature removed successfully"}
 
 
-#
+@router.post("/stock-extra-data")
+async def save_stock_extra_data(
+    request: Request,
+    data: dict,
+    current_user: dict = Depends(verify_admin)
+):
+    """
+    Save extra data for received stock item
+    - Saves to MongoDB (containers, transport info)
+    - Updates InvenTree via DataFlowsDepoStocks plugin (dates, supplier info)
+    """
+    db = get_db()
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    headers = get_inventree_headers(current_user)
+    
+    stock_item_id = data.get('stock_item_id')
+    order_id = data.get('order_id')
+    
+    if not stock_item_id:
+        raise HTTPException(status_code=400, detail="stock_item_id is required")
+    
+    # Prepare data for MongoDB (containers and metadata)
+    mongo_data = {
+        'stock_item_id': stock_item_id,
+        'order_id': order_id,
+        'expected_quantity': data.get('expected_quantity'),
+        'clean_transport': data.get('clean_transport', False),
+        'temperature_control': data.get('temperature_control', False),
+        'temperature_conditions_met': data.get('temperature_conditions_met'),
+        'created_at': datetime.utcnow(),
+        'created_by': current_user.get('username')
+    }
+    
+    # Save containers to MongoDB
+    containers = data.get('containers')
+    if containers:
+        containers_collection = db['depo_procurement_containers']
+        for container in containers:
+            container_doc = {
+                'stock_item_id': stock_item_id,
+                'order_id': order_id,
+                'num_containers': container.get('num_containers', 1),
+                'products_per_container': container.get('products_per_container', 1),
+                'unit': container.get('unit', 'pcs'),
+                'value': container.get('value', 0),
+                'is_damaged': container.get('is_damaged', False),
+                'is_unsealed': container.get('is_unsealed', False),
+                'is_mislabeled': container.get('is_mislabeled', False),
+                'created_at': datetime.utcnow(),
+                'created_by': current_user.get('username')
+            }
+            containers_collection.insert_one(container_doc)
+    
+    # Save metadata to MongoDB
+    stock_metadata_collection = db['depo_procurement_stock_metadata']
+    stock_metadata_collection.insert_one(mongo_data)
+    
+    # Prepare data for InvenTree plugin (DataFlowsDepoStocks)
+    plugin_fields = {}
+    
+    if data.get('supplier_batch_code'):
+        plugin_fields['supplier_batch_code'] = data['supplier_batch_code']
+    
+    if data.get('manufacturing_date'):
+        plugin_fields['manufacturing_date'] = data['manufacturing_date']
+    
+    if data.get('expiry_date'):
+        plugin_fields['expiry_date'] = data['expiry_date']
+    
+    if data.get('reset_date'):
+        plugin_fields['reset_date'] = data['reset_date']
+    
+    if data.get('containers_cleaned') is not None:
+        plugin_fields['containers_cleaned'] = str(data['containers_cleaned']).lower()
+    
+    if data.get('supplier_ba_no'):
+        plugin_fields['supplier_ba_no'] = data['supplier_ba_no']
+    
+    if data.get('supplier_ba_date'):
+        plugin_fields['supplier_ba_date'] = data['supplier_ba_date']
+    
+    if data.get('accord_ba') is not None:
+        plugin_fields['accord_ba'] = str(data['accord_ba']).lower()
+    
+    if data.get('is_list_supplier') is not None:
+        plugin_fields['is_list_supplier'] = str(data['is_list_supplier']).lower()
+    
+    # Update stock item via plugin if we have fields to update
+    if plugin_fields:
+        try:
+            plugin_response = requests.post(
+                f"{inventree_url}/plugin/dataflows-depo-stocks/api/extra/stock/{stock_item_id}/update/",
+                headers=headers,
+                json={'fields': plugin_fields},
+                timeout=10
+            )
+            plugin_response.raise_for_status()
+            print(f"[PROCUREMENT] Updated stock {stock_item_id} via plugin with fields: {list(plugin_fields.keys())}")
+        except Exception as e:
+            print(f"[PROCUREMENT] Warning: Failed to update stock via plugin: {e}")
+            # Don't fail the whole operation if plugin update fails
+    
+    return {
+        "success": True,
+        "stock_item_id": stock_item_id,
+        "containers_saved": len(containers) if containers else 0,
+        "plugin_fields_updated": len(plugin_fields)
+    }
