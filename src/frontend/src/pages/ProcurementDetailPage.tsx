@@ -306,9 +306,12 @@ export function ProcurementDetailPage() {
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
-          <Tabs.Tab value="quality-control" leftSection={<IconClipboardCheck size={16} />}>
-            {t('Quality Control')}
-          </Tabs.Tab>
+          {/* Show Quality Control tab only if order has been signed (has approval flow with signatures) */}
+          {approvalFlow && approvalFlow.signatures && approvalFlow.signatures.length > 0 && (
+            <Tabs.Tab value="quality-control" leftSection={<IconClipboardCheck size={16} />}>
+              {t('Quality Control')}
+            </Tabs.Tab>
+          )}
           <Tabs.Tab value="attachments" leftSection={<IconPaperclip size={16} />}>
             {t('Attachments')}
           </Tabs.Tab>

@@ -126,6 +126,11 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
 
       // Refresh order to get updated status
       onOrderUpdate();
+      
+      // Reload page after a short delay to show new tabs
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
       console.error('Failed to sign order:', error);
       notifications.show({
