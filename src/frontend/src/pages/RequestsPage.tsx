@@ -49,6 +49,7 @@ export function RequestsPage() {
   const [parts, setParts] = useState<Part[]>([]);
   const [partSearch, setPartSearch] = useState('');
   const [stockInfo, setStockInfo] = useState<any>(null);
+  const [bomComponents, setBomComponents] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     source: '',
@@ -116,12 +117,26 @@ export function RequestsPage() {
     }
   };
 
+  const loadBOM = async (partId: number) => {
+    try {
+      const response = await api.get(`/api/requests/parts/${partId}/bom`);
+      const bomItems = response.data.results || [];
+      setBomComponents(bomItems);
+    } catch (error) {
+      console.error('Failed to load BOM:', error);
+      setBomComponents([]);
+    }
+  };
+
   const handlePartChange = (value: string | null) => {
     setFormData({ ...formData, part: value || '' });
     if (value) {
-      loadStockInfo(parseInt(value));
+      const partId = parseInt(value);
+      loadStockInfo(partId);
+      loadBOM(partId);
     } else {
       setStockInfo(null);
+      setBomComponents([]);
     }
   };
 
@@ -372,6 +387,21 @@ export function RequestsPage() {
                   <strong> {t('In builds')}:</strong> {stockInfo.in_builds} | 
                   <strong> {t('In procurement')}:</strong> {stockInfo.in_procurement} | 
                   <strong> {t('Available')}:</strong> {stockInfo.available}
+                </Text>
+              </Paper>
+            </Grid.Col>
+          )}
+
+          {bomComponents.length > 0 && (
+            <Grid.Col span={12}>
+              <Paper p="xs" withBorder>
+                <Text size="sm" fw={500} mb="xs" c="blue">
+                  {t('This part has')} {bomComponents.length} {t('component(s)')}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {t('Components')}: {bomComponents.map((bom: any) => 
+                    bom.sub_part_detail?.name || bom.sub_part
+                  ).join(', ')}
                 </Text>
               </Paper>
             </Grid.Col>
