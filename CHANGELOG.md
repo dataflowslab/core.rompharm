@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 ## [1.9.0] - 2024-12-XX
 
 ### Added
+- **Procurement Approval System - Config-Based**
+  - Approval flows now use MongoDB config (`procurement_approval_flows`) instead of templates
+  - Configuration structure:
+    - `can_sign`: List of users who can sign (any user, minimum `min_signatures` required)
+    - `must_sign`: List of users who must sign (all required)
+    - `min_signatures`: Minimum number of signatures from `can_sign` list
+  - Logic implementation:
+    - Any user from `can_sign` can sign
+    - At least `min_signatures` from `can_sign` must sign
+    - All users from `must_sign` must sign
+    - Order becomes "Placed" (status 20) when all conditions met
+  - Backend endpoints updated:
+    - `POST /api/procurement/purchase-orders/{id}/approval-flow` - Creates flow from config
+    - `POST /api/procurement/purchase-orders/{id}/sign` - Signs with new logic
+  - Approval flow structure:
+    - `can_sign_officers`: Array of optional signers
+    - `must_sign_officers`: Array of required signers
+    - `min_signatures`: Minimum required from can_sign
+    - `signatures`: Array of collected signatures
+    - `status`: pending, in_progress, approved
+
+- **QR Code Generation for Procurement Orders**
+  - QR code generated as SVG for each purchase order
+  - Format: `ORDERID#SUPPLIERID#ISSUEDATE`
+  - Example: `8#5#2024-12-20`
+  - Included in document generation data:
+    - `data.qr_code_svg` - Full SVG string (use with `|safe` filter)
+    - `data.qr_code_data` - Raw QR string for debugging
+  - Display in template: `{{ data.qr_code_svg|safe }}`
+  - Library: `qrcode[pil]` with SVG support
+
+- **Procurement Permissions System**
+  - Manager-based access control for procurement orders
+  - Logic:
+    - Users in "Managers" group (InvenTree): Full access to all orders
+    - Regular users: Access only to orders they created (responsible user)
+    - Backward compatibility: Orders without responsible user accessible to all
+  - Helper functions:
+    - `is_manager(user)` - Checks if user is in Managers group
+    - `can_access_order(user, order_data)` - Validates order access
+  - Applied to sensitive endpoints:
+    - `GET /api/procurement/purchase-orders/{id}/received-items`
+  - Returns 403 Forbidden for unauthorized access
+
+- **Auto-Reload After Signing**
+  - Page automatically reloads 1 second after signing order
+  - Ensures new tabs (Receive Stock, Quality Control) appear immediately
+  - Implemented in `ApprovalsTab.tsx`
+
+- **Quality Control Tab Visibility**
+  - QC tab now hidden until order is signed
+  - Same logic as Receive Stock tab
+  - Conditional rendering based on approval flow signatures
+  - Prevents premature QC operations
+
+### Added (Previous Features)
 - **Enhanced Procurement Reception System**
   - Extended receive stock form with comprehensive fields:
     - Supplier Batch Code (on same row with Batch Code)
