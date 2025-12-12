@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Paper, Title, Tabs, Button, Group, Badge, Text } from '@mantine/core';
-import { IconArrowLeft, IconFileText, IconSignature, IconTruck, IconPackage } from '@tabler/icons-react';
+import { IconArrowLeft, IconFileText, IconSignature, IconTruck, IconPackage, IconList } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { notifications } from '@mantine/notifications';
 import { DetailsTab } from '../components/Requests/DetailsTab';
 import { ApprovalsTab } from '../components/Requests/ApprovalsTab';
+import { ItemsTab } from '../components/Requests/ItemsTab';
 import { OperationsTab } from '../components/Requests/OperationsTab';
 import { ReceptieTab } from '../components/Requests/ReceptieTab';
 
@@ -118,6 +119,9 @@ export function RequestDetailPage() {
           <Tabs.Tab value="approval" leftSection={<IconSignature size={16} />}>
             {t('Approval')}
           </Tabs.Tab>
+          <Tabs.Tab value="items" leftSection={<IconList size={16} />}>
+            {t('Items')}
+          </Tabs.Tab>
           {request.status === 'Approved' && (
             <Tabs.Tab value="operations" leftSection={<IconTruck size={16} />}>
               {t('Operations')}
@@ -136,6 +140,10 @@ export function RequestDetailPage() {
 
         <Tabs.Panel value="approval" pt="md">
           {id && <ApprovalsTab requestId={id} onReload={loadRequest} />}
+        </Tabs.Panel>
+
+        <Tabs.Panel value="items" pt="md">
+          {id && request && <ItemsTab requestId={id} request={request} onReload={loadRequest} />}
         </Tabs.Panel>
 
         {request.status === 'Approved' && (
