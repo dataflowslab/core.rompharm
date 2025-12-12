@@ -238,7 +238,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
             {flow.status.toUpperCase()}
           </Badge>
         </Group>
-        {canUserSign() && !isFlowCompleted() && (
+        {canUserSign() && isFlowCompleted() && finalStatus && (
           <Button
             leftSection={<IconSignature size={16} />}
             onClick={handleSign}
