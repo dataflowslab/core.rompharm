@@ -217,6 +217,60 @@ async def get_part_bom(
         raise HTTPException(status_code=500, detail=f"Failed to fetch BOM: {str(e)}")
 
 
+@router.get("/parts/{part_id}/batch-codes")
+async def get_part_batch_codes(
+    part_id: int,
+    location_id: Optional[int] = None,
+    current_user: dict = Depends(verify_admin)
+):
+    """Get available batch codes for a part from InvenTree stock items"""
+    config = load_config()
+    inventree_url = config['inventree']['url'].rstrip('/')
+    headers = get_inventree_headers(current_user)
+    
+    try:
+        # Get stock items for this part
+        params = {
+            'part': part_id,
+            'in_stock': 'true',
+            'status': 10  # OK status (transferable)
+        }
+        
+        if location_id:
+            params['location'] = location_id
+        
+        response = requests.get(
+            f"{inventree_url}/api/stock/",
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+        response.raise_for_status()
+        stock_data = response.json()
+        stock_items = stock_data if isinstance(stock_data, list) else stock_data.get('results', [])
+        
+        # Extract unique batch codes with details
+        batch_map = {}
+        for item in stock_items:
+            batch = item.get('batch', '')
+            if batch and batch.strip():
+                if batch not in batch_map:
+                    batch_map[batch] = {
+                        'batch_code': batch,
+                        'expiry_date': item.get('expiry_date', ''),
+                        'quantity': 0,
+                        'location': item.get('location_detail', {}).get('name', ''),
+                        'location_id': item.get('location', 0)
+                    }
+                batch_map[batch]['quantity'] += item.get('quantity', 0)
+        
+        batch_codes = list(batch_map.values())
+        
+        return {"batch_codes": batch_codes}
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch batch codes: {str(e)}")
+
+
 @router.get("/")
 async def list_requests(
     current_user: dict = Depends(verify_admin)
