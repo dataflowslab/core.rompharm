@@ -31,6 +31,14 @@ All notable changes to this project will be documented in this file.
     - Format: `BATCH_CODE - EXPIRY_DATE - QUANTITY buc`
     - No more series field (removed as per requirements)
     - Validation before signing (all items must have batch code)
+  
+  - **Document Generation in Operations**: P-Distrib-102_F2 (Nota de transfer)
+    - Template code: RC45WVTRBDGT
+    - Generate button in Operations tab
+    - Available before signing (while form is editable)
+    - PDF download with filename: `Nota_Transfer_{REFERENCE}.pdf`
+    - Integration with existing document generation system
+    - Uses `/api/documents/stock-request/generate` endpoint
 
 - **Operations and Reception Flows for Requests Module**
   - Operations tab appears when request status is "Approved"
