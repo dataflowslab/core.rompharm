@@ -38,6 +38,8 @@ class RequestItemCreate(BaseModel):
     part: int
     quantity: float
     notes: Optional[str] = None
+    series: Optional[str] = None
+    batch_code: Optional[str] = None
 
 
 class RequestCreate(BaseModel):
