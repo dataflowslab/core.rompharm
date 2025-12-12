@@ -1,174 +1,89 @@
 <div class="page">
-
 <div class="rand">
-
 <div class="col1 left">
-
 <h5>Comanda de achizitie</h5>
-
 <strong>{{ company.name }}</strong><br>
-
 CUI: {{ company.tax_id }} Adresa: {{ company.address }}<br>
-
 Tel: {{ company.phone }} Fax: {{ company.fax }} E-mail: {{ company.email }}
-
 </div>
-
 </div>
-
 <div class="rand rand_cu_border_bottom">
-
 <table class="table_noborder">
-
 <tr>
-
 <td>Comanda</td>
-
 <td><strong>Comanda Nr {{ purchase_order.reference }} / {{ purchase_order.issue_date }}</strong></td>
-
 </tr>
-
 <tr>
-
 <td>Catre</td>
-
 <td>{{ supplier.name }}</td>
-
 </tr>
-
 <tr>
-
 <td>In atentia</td>
-
 <td>{{ supplier.contact }}</td>
-
 </tr>
-
 </table>
-
 </div>
-
 <div class="col1">
-
 <div class="col1 left" style="margin-bottom: 15px; margin-top: 15px;">Dorim sa comandam urmatoarele</div>
-
 <table class="table">
-
 <thead>
-
 <tr>
-
 <th>Nr. Crt.</th>
-
 <th>Denumire articol</th>
-
 <th>Cod / calitate</th>
-
 <th>Producator</th>
-
 <th>Cantitate</th>
-
 <th>U.M.</th>
-
 <th>Pret</th>
-
 <th>Valuta</th>
-
 </tr>
-
 </thead>
-
 <tbody>
-
 {% for item in line_items %}
-
 <tr>
-
 <td>{{ loop.index }}</td>
-
 <td>{{ item.part_name }}</td>
-
 <td>{{ item.part_IPN }}</td>
-
 <td>{{ item.manufacturer }}</td>
-
 <td>{{ item.quantity }}</td>
-
 <td>{{ item.unit }}</td>
-
 <td>{{ item.price }}</td>
-
 <td>{{ purchase_order.currency }}</td>
-
 </tr>
-
 {% endfor %}
-
 </tbody>
-
 </table>
-
 </div>
-
 <div class="col1 left" style="margin-top: 10px; clear: both;">
-
 <div class="left" style="width:50%;padding-top:10px">
-
 <table class="table_noborder">
-
 <tr>
-
 <td style="width:150px">Conditii de livrare</td>
-
 <td>{{ purchase_order.delivery_terms }}</td>
-
 </tr>
-
 <tr>
-
 <td>Termen de livrare</td>
-
 <td>{{ purchase_order.target_date }}</td>
-
 </tr>
-
 <tr>
-
 <td>Conditii plata</td>
-
 <td>{{ purchase_order.payment_terms }}</td>
-
 </tr>
-
 <tr>
-
 <td>Adresa de livrare</td>
-
 <td>{{ delivery_address }}</td>
-
 </tr>
-
 </table>
-
 </div>
-
 </div>
-
 <div class="col1 left" style="margin-top: 30px; clear: both;">
-
 Va rog sa confirmati comanda noastra.<br><br>
-
 Cu stima,<br>
-
 {{ user.name }}
-
 </div>
-
 </div>
-
 <!-- 
 PLACEHOLDERS EXPLICATIE:
-
 COMPANY (Buyer/Organization):
 - company.name: Numele companiei (ex: "SC ROMPHARM COMPANY SRL")
 - company.tax_id: CUI-ul companiei
@@ -176,7 +91,6 @@ COMPANY (Buyer/Organization):
 - company.phone: Telefon
 - company.fax: Fax
 - company.email: Email
-
 PURCHASE ORDER:
 - purchase_order.reference: Numărul comenzii (ex: "PO-0001")
 - purchase_order.issue_date: Data emiterii comenzii
@@ -184,11 +98,9 @@ PURCHASE ORDER:
 - purchase_order.delivery_terms: Condiții de livrare (ex: "Franco depozit")
 - purchase_order.target_date: Termen de livrare
 - purchase_order.payment_terms: Condiții de plată (ex: "30 zile")
-
 SUPPLIER:
 - supplier.name: Numele furnizorului
 - supplier.contact: Persoana de contact
-
 LINE ITEMS (Lista produse):
 - loop.index: Număr curent (1, 2, 3...)
 - item.part_name: Denumirea articolului
@@ -197,7 +109,6 @@ LINE ITEMS (Lista produse):
 - item.quantity: Cantitate
 - item.unit: Unitate de măsură (ex: "buc", "kg")
 - item.price: Preț unitar
-
 OTHER:
 - delivery_address: Adresa de livrare
 - user.name: Numele utilizatorului care a creat comanda

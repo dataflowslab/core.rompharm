@@ -354,23 +354,24 @@ export function RequestsPage() {
           </Grid.Col>
 
           <Grid.Col span={12}>
-            <Select
-              label={t('Part')}
-              placeholder={t('Search for part...')}
-              data={parts.map(part => ({
-                value: String(part.pk),
-                label: `${part.name} (${part.IPN})`
-              }))}
-              value={formData.part}
-              onChange={handlePartChange}
-              onSearchChange={(query) => {
-                setPartSearch(query);
-                searchParts(query);
-              }}
-              searchValue={partSearch}
-              searchable
-              required
-            />
+          <Select
+          label={t('Part')}
+          placeholder={t('Search for part...')}
+          data={parts.map(part => ({
+          value: String(part.pk),
+          label: `${part.name} (${part.IPN})`
+          }))}
+          value={formData.part}
+          onChange={handlePartChange}
+          onSearchChange={(query) => {
+          setPartSearch(query);
+          searchParts(query);
+          }}
+          searchValue={partSearch}
+          searchable
+          clearable
+          required
+          />
           </Grid.Col>
 
           {stockInfo && (
