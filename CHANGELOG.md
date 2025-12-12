@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 ## [1.11.0] - 2024-12-XX
 
 ### Added
+- **Requests Module - Complete Implementation**
+  - **Tab Items**: Editable items table with batch code management
+    - Description, Quantity, Batch Code columns
+    - Add/Delete/Save items functionality
+    - Batch code selection from available stock (datalist)
+    - Manual batch code entry supported
+    - Editable only until first signature (approval flow)
+    - Real-time batch code loading from InvenTree
+    - Inline quantity editing with NumberInput
+    - Modal for adding new items with part search
+  
+  - **Document Generation**: P-Distrib-102_F1 (Fisa de solicitare)
+    - Template code: 6LL5WVTR8BTY
+    - Generate button in Details tab
+    - Enabled only after request approval
+    - PDF download with filename: `Fisa_Solicitare_{REFERENCE}.pdf`
+    - Integration with existing document generation system
+    - Uses `/api/documents/stock-request/generate` endpoint
+  
+  - **Batch Code Manual Entry**: Operations tab enhancements
+    - TextInput with HTML5 datalist for batch codes
+    - Can select from available batch codes OR type manually
+    - Batch codes loaded from source location stock
+    - Format: `BATCH_CODE - EXPIRY_DATE - QUANTITY buc`
+    - No more series field (removed as per requirements)
+    - Validation before signing (all items must have batch code)
+
 - **Operations and Reception Flows for Requests Module**
   - Operations tab appears when request status is "Approved"
   - Reception tab appears when request status is "Finished"
