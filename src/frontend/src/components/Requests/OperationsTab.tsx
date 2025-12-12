@@ -420,77 +420,8 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         </Badge>
       </Group>
 
-      <Grid>
-        {/* Left side - Series and Batch Form */}
-        <Grid.Col span={6}>
-          <Paper withBorder p="md">
-            <Group justify="space-between" mb="md">
-              <Title order={5}>{t('Series and Batch Information')}</Title>
-              {!isFormReadonly && (
-                <Button
-                  leftSection={<IconDeviceFloppy size={16} />}
-                  onClick={handleSaveBatchData}
-                  loading={savingBatch}
-                  size="sm"
-                  variant="light"
-                >
-                  {t('Save')}
-                </Button>
-              )}
-            </Group>
-
-            <Table striped withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('Part')}</Table.Th>
-                  <Table.Th>{t('Qty')}</Table.Th>
-                  <Table.Th>{t('Series')}</Table.Th>
-                  <Table.Th>{t('Batch Code')}</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {itemsWithBatch.map((item, index) => (
-                  <Table.Tr key={index}>
-                    <Table.Td>{item.part_name}</Table.Td>
-                    <Table.Td>{item.quantity}</Table.Td>
-                    <Table.Td>
-                      <TextInput
-                        value={item.series}
-                        onChange={(e) => handleSeriesChange(index, e.target.value)}
-                        disabled={isFormReadonly}
-                        placeholder={t('Enter series')}
-                        size="xs"
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      <TextInput
-                        value={item.batch_code}
-                        onChange={(e) => handleBatchChange(index, e.target.value)}
-                        disabled={isFormReadonly}
-                        placeholder={t('Enter or select batch')}
-                        list={`batch-options-${index}`}
-                        size="xs"
-                      />
-                      <datalist id={`batch-options-${index}`}>
-                        {item.batch_options.map((option, i) => (
-                          <option key={i} value={option.value} label={option.label} />
-                        ))}
-                      </datalist>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-
-            {isFormReadonly && (
-              <Text size="sm" c="orange" mt="md">
-                {t('This form is read-only because it has been signed.')}
-              </Text>
-            )}
-          </Paper>
-        </Grid.Col>
-
-        {/* Right side - Signatures */}
+      <Grid gutter="md">
+        {/* Top Left - Signatures */}
         <Grid.Col span={6}>
           <Paper withBorder p="md">
             <Group justify="space-between" mb="md">
@@ -582,6 +513,121 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
             )}
           </Paper>
         </Grid.Col>
+
+        {/* Top Right - Decision */}
+        <Grid.Col span={6}>
+          {isFlowCompleted() && (
+            <Paper withBorder p="md">
+              <Title order={5} mb="md">{t('Decision')}</Title>
+              
+              <Select
+                label={t('Status')}
+                placeholder={t('Select status')}
+                data={[
+                  { value: 'Finished', label: t('Finished') },
+                  { value: 'Refused', label: t('Refused') }
+                ]}
+                value={finalStatus}
+                onChange={(value) => setFinalStatus(value || '')}
+                required
+                mb="md"
+              />
+
+              {finalStatus === 'Refused' && (
+                <Textarea
+                  label={t('Reason for Refusal')}
+                  placeholder={t('Enter reason for refusal')}
+                  value={refusalReason}
+                  onChange={(e) => setRefusalReason(e.target.value)}
+                  required
+                  minRows={3}
+                  mb="md"
+                />
+              )}
+
+              {finalStatus && (
+                <Group justify="flex-end">
+                  <Button
+                    onClick={handleSubmitStatus}
+                    loading={submitting}
+                    color={finalStatus === 'Finished' ? 'green' : 'red'}
+                  >
+                    {t('Submit')}
+                  </Button>
+                </Group>
+              )}
+            </Paper>
+          )}
+        </Grid.Col>
+
+        {/* Bottom - Series and Batch Information Table (Full Width) */}
+        <Grid.Col span={12}>
+          <Paper withBorder p="md">
+            <Group justify="space-between" mb="md">
+              <Title order={5}>{t('Series and Batch Information')}</Title>
+              {!isFormReadonly && (
+                <Button
+                  leftSection={<IconDeviceFloppy size={16} />}
+                  onClick={handleSaveBatchData}
+                  loading={savingBatch}
+                  size="sm"
+                  variant="light"
+                >
+                  {t('Save')}
+                </Button>
+              )}
+            </Group>
+
+            <Table striped withTableBorder withColumnBorders>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('Part')}</Table.Th>
+                  <Table.Th>{t('Qty')}</Table.Th>
+                  <Table.Th>{t('Series')}</Table.Th>
+                  <Table.Th>{t('Batch Code')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {itemsWithBatch.map((item, index) => (
+                  <Table.Tr key={index}>
+                    <Table.Td>{item.part_name}</Table.Td>
+                    <Table.Td>{item.quantity}</Table.Td>
+                    <Table.Td>
+                      <TextInput
+                        value={item.series}
+                        onChange={(e) => handleSeriesChange(index, e.target.value)}
+                        disabled={isFormReadonly}
+                        placeholder={t('Enter series')}
+                        size="xs"
+                      />
+                    </Table.Td>
+                    <Table.Td>
+                      <TextInput
+                        value={item.batch_code}
+                        onChange={(e) => handleBatchChange(index, e.target.value)}
+                        disabled={isFormReadonly}
+                        placeholder={t('Enter or select batch')}
+                        list={`batch-options-${index}`}
+                        size="xs"
+                      />
+                      <datalist id={`batch-options-${index}`}>
+                        {item.batch_options.map((option, i) => (
+                          <option key={i} value={option.value} label={option.label} />
+                        ))}
+                      </datalist>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+
+            {isFormReadonly && (
+              <Text size="sm" c="orange" mt="md">
+                {t('This form is read-only because it has been signed.')}
+              </Text>
+            )}
+          </Paper>
+        </Grid.Col>
       </Grid>
 
       {/* Document Generation Section */}
@@ -592,50 +638,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
           </Group>
           
           <GenerateDocumentButton requestId={requestId} reference={request?.reference || requestId} />
-        </Paper>
-      )}
-
-      {/* Decision - appears after all signatures */}
-      {isFlowCompleted() && (
-        <Paper withBorder p="md" mt="md">
-          <Title order={5} mb="md">{t('Decision')}</Title>
-          
-          <Select
-            label={t('Status')}
-            placeholder={t('Select status')}
-            data={[
-              { value: 'Finished', label: t('Finished') },
-              { value: 'Refused', label: t('Refused') }
-            ]}
-            value={finalStatus}
-            onChange={(value) => setFinalStatus(value || '')}
-            required
-            mb="md"
-          />
-
-          {finalStatus === 'Refused' && (
-            <Textarea
-              label={t('Reason for Refusal')}
-              placeholder={t('Enter reason for refusal')}
-              value={refusalReason}
-              onChange={(e) => setRefusalReason(e.target.value)}
-              required
-              minRows={3}
-              mb="md"
-            />
-          )}
-
-          {finalStatus && (
-            <Group justify="flex-end">
-              <Button
-                onClick={handleSubmitStatus}
-                loading={submitting}
-                color={finalStatus === 'Approved' ? 'green' : 'red'}
-              >
-                {t('Submit')}
-              </Button>
-            </Group>
-          )}
         </Paper>
       )}
     </Paper>
