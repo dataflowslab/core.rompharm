@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea } from '@mantine/core';
-import { IconSignature, IconTrash } from '@tabler/icons-react';
+import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea, TextInput, Grid } from '@mantine/core';
+import { IconSignature, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
@@ -32,6 +32,23 @@ interface OperationsFlow {
   min_signatures: number;
 }
 
+interface BatchOption {
+  value: string;
+  label: string;
+  expiry_date?: string;
+  quantity?: number;
+  location?: string;
+}
+
+interface ItemWithBatch {
+  part: number;
+  part_name?: string;
+  quantity: number;
+  series: string;
+  batch_code: string;
+  batch_options: BatchOption[];
+}
+
 interface OperationsTabProps {
   requestId: string;
   onReload: () => void;
@@ -43,12 +60,15 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const [flow, setFlow] = useState<OperationsFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
+  const [itemsWithBatch, setItemsWithBatch] = useState<ItemWithBatch[]>([]);
+  const [savingBatch, setSavingBatch] = useState(false);
   const [finalStatus, setFinalStatus] = useState<string>('');
   const [refusalReason, setRefusalReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadOperationsFlow();
+    loadRequestItems();
   }, [requestId]);
 
   const loadOperationsFlow = async () => {
@@ -62,9 +82,111 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     }
   };
 
+  const loadRequestItems = async () => {
+    try {
+      const response = await api.get(`/api/requests/${requestId}`);
+      const items = response.data.items || [];
+      const sourceLocation = response.data.source;
+      
+      // Initialize items with batch data
+      const itemsData: ItemWithBatch[] = await Promise.all(
+        items.map(async (item: any) => {
+          const batchOptions = await loadBatchCodes(item.part, sourceLocation);
+          return {
+            part: item.part,
+            part_name: item.part_detail?.name || String(item.part),
+            quantity: item.quantity,
+            series: item.series || '',
+            batch_code: item.batch_code || '',
+            batch_options: batchOptions
+          };
+        })
+      );
+      
+      setItemsWithBatch(itemsData);
+    } catch (error) {
+      console.error('Failed to load request items:', error);
+    }
+  };
+
+  const loadBatchCodes = async (partId: number, locationId?: number): Promise<BatchOption[]> => {
+    try {
+      const params = locationId ? `?location_id=${locationId}` : '';
+      const response = await api.get(`/api/requests/parts/${partId}/batch-codes${params}`);
+      const batchCodes = response.data.batch_codes || [];
+      
+      return batchCodes.map((batch: any) => ({
+        value: batch.batch_code,
+        label: `${batch.batch_code} - ${batch.expiry_date || 'N/A'} - ${batch.quantity} buc`,
+        expiry_date: batch.expiry_date,
+        quantity: batch.quantity,
+        location: batch.location
+      }));
+    } catch (error) {
+      console.error(`Failed to load batch codes for part ${partId}:`, error);
+      return [];
+    }
+  };
+
+  const handleSeriesChange = (index: number, value: string) => {
+    const newItems = [...itemsWithBatch];
+    newItems[index].series = value;
+    setItemsWithBatch(newItems);
+  };
+
+  const handleBatchChange = (index: number, value: string | null) => {
+    const newItems = [...itemsWithBatch];
+    newItems[index].batch_code = value || '';
+    setItemsWithBatch(newItems);
+  };
+
+  const handleSaveBatchData = async () => {
+    setSavingBatch(true);
+    try {
+      await api.patch(`/api/requests/${requestId}`, {
+        items: itemsWithBatch.map(item => ({
+          part: item.part,
+          quantity: item.quantity,
+          series: item.series,
+          batch_code: item.batch_code
+        }))
+      });
+      
+      notifications.show({
+        title: t('Success'),
+        message: t('Series and batch data saved successfully'),
+        color: 'green'
+      });
+    } catch (error: any) {
+      console.error('Failed to save batch data:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to save batch data'),
+        color: 'red'
+      });
+    } finally {
+      setSavingBatch(false);
+    }
+  };
+
   const handleSign = async () => {
+    // Validate that all items have series and batch
+    const allItemsComplete = itemsWithBatch.every(item => item.series && item.batch_code);
+    if (!allItemsComplete) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please fill in series and batch code for all items before signing'),
+        color: 'red'
+      });
+      return;
+    }
+
     setSigning(true);
     try {
+      // Save batch data first
+      await handleSaveBatchData();
+      
+      // Then sign
       await api.post(`/api/requests/${requestId}/operations-sign`);
       notifications.show({
         title: t('Success'),
@@ -232,96 +354,172 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   return (
     <Paper p="md">
       <Group justify="space-between" mb="md">
-        <Group>
-          <Title order={4}>{t('Operations Flow')}</Title>
-          <Badge color={getStatusColor(flow.status)} size="lg">
-            {flow.status.toUpperCase()}
-          </Badge>
-        </Group>
-        {canUserSign() && isFlowCompleted() && finalStatus && (
-          <Button
-            leftSection={<IconSignature size={16} />}
-            onClick={handleSign}
-            loading={signing}
-          >
-            {t('Sign')}
-          </Button>
-        )}
+        <Title order={4}>{t('Operations Flow')}</Title>
+        <Badge color={getStatusColor(flow.status)} size="lg">
+          {flow.status.toUpperCase()}
+        </Badge>
       </Group>
 
-      {/* Optional Approvers */}
-      {flow.can_sign_officers.length > 0 && (
-        <>
-          <Title order={5} mt="md" mb="sm">
-            {t('Optional Approvers')} ({t('Minimum')}: {flow.min_signatures})
-          </Title>
-          <Table striped withTableBorder withColumnBorders mb="md">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('User')}</Table.Th>
-                <Table.Th>{t('Status')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {flow.can_sign_officers.map((officer, index) => {
-                const hasSigned = flow.signatures.some(s => s.user_id === officer.reference);
-                return (
+      <Grid>
+        {/* Left side - Series and Batch Form */}
+        <Grid.Col span={6}>
+          <Paper withBorder p="md">
+            <Group justify="space-between" mb="md">
+              <Title order={5}>{t('Series and Batch Information')}</Title>
+              {!isFormReadonly && (
+                <Button
+                  leftSection={<IconDeviceFloppy size={16} />}
+                  onClick={handleSaveBatchData}
+                  loading={savingBatch}
+                  size="sm"
+                  variant="light"
+                >
+                  {t('Save')}
+                </Button>
+              )}
+            </Group>
+
+            <Table striped withTableBorder withColumnBorders>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('Part')}</Table.Th>
+                  <Table.Th>{t('Qty')}</Table.Th>
+                  <Table.Th>{t('Series')}</Table.Th>
+                  <Table.Th>{t('Batch Code')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {itemsWithBatch.map((item, index) => (
                   <Table.Tr key={index}>
-                    <Table.Td>{officer.username}</Table.Td>
+                    <Table.Td>{item.part_name}</Table.Td>
+                    <Table.Td>{item.quantity}</Table.Td>
                     <Table.Td>
-                      <Badge color={hasSigned ? 'green' : 'gray'}>
-                        {hasSigned ? t('Signed') : t('Pending')}
-                      </Badge>
+                      <TextInput
+                        value={item.series}
+                        onChange={(e) => handleSeriesChange(index, e.target.value)}
+                        disabled={isFormReadonly}
+                        placeholder={t('Enter series')}
+                        size="xs"
+                      />
+                    </Table.Td>
+                    <Table.Td>
+                      <Select
+                        data={item.batch_options}
+                        value={item.batch_code}
+                        onChange={(value) => handleBatchChange(index, value)}
+                        disabled={isFormReadonly}
+                        placeholder={t('Select batch')}
+                        searchable
+                        clearable
+                        size="xs"
+                      />
                     </Table.Td>
                   </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
-        </>
-      )}
+                ))}
+              </Table.Tbody>
+            </Table>
 
-      {/* Signatures */}
-      {flow.signatures.length > 0 && (
-        <>
-          <Title order={5} mt="md" mb="sm">{t('Signatures')}</Title>
-          <Table striped withTableBorder withColumnBorders mb="md">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('User')}</Table.Th>
-                <Table.Th>{t('Date')}</Table.Th>
-                <Table.Th>{t('Signature Hash')}</Table.Th>
-                {isStaff && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {flow.signatures.map((signature, index) => (
-                <Table.Tr key={index}>
-                  <Table.Td>{signature.user_name || signature.username}</Table.Td>
-                  <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
-                  <Table.Td>
-                    <Text size="xs" style={{ fontFamily: 'monospace' }}>
-                      {signature.signature_hash.substring(0, 16)}...
-                    </Text>
-                  </Table.Td>
-                  {isStaff && (
-                    <Table.Td>
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        onClick={() => handleRemoveSignature(signature.user_id, signature.username)}
-                        title={t('Remove')}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Table.Td>
-                  )}
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </>
-      )}
+            {isFormReadonly && (
+              <Text size="sm" c="orange" mt="md">
+                {t('This form is read-only because it has been signed.')}
+              </Text>
+            )}
+          </Paper>
+        </Grid.Col>
+
+        {/* Right side - Signatures */}
+        <Grid.Col span={6}>
+          <Paper withBorder p="md">
+            <Group justify="space-between" mb="md">
+              <Title order={5}>{t('Signatures')}</Title>
+              {canUserSign() && !isFlowCompleted() && (
+                <Button
+                  leftSection={<IconSignature size={16} />}
+                  onClick={handleSign}
+                  loading={signing}
+                >
+                  {t('Sign')}
+                </Button>
+              )}
+            </Group>
+
+            {/* Optional Approvers */}
+            {flow.can_sign_officers.length > 0 && (
+              <>
+                <Text size="sm" fw={500} mb="xs">
+                  {t('Optional Approvers')} ({t('Minimum')}: {flow.min_signatures})
+                </Text>
+                <Table striped withTableBorder withColumnBorders mb="md">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>{t('User')}</Table.Th>
+                      <Table.Th>{t('Status')}</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {flow.can_sign_officers.map((officer, index) => {
+                      const hasSigned = flow.signatures.some(s => s.user_id === officer.reference);
+                      return (
+                        <Table.Tr key={index}>
+                          <Table.Td>{officer.username}</Table.Td>
+                          <Table.Td>
+                            <Badge color={hasSigned ? 'green' : 'gray'} size="sm">
+                              {hasSigned ? t('Signed') : t('Pending')}
+                            </Badge>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              </>
+            )}
+
+            {/* Signatures List */}
+            {flow.signatures.length > 0 && (
+              <>
+                <Text size="sm" fw={500} mb="xs">{t('Signed by')}</Text>
+                <Table striped withTableBorder withColumnBorders>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>{t('User')}</Table.Th>
+                      <Table.Th>{t('Date')}</Table.Th>
+                      {isStaff && <Table.Th style={{ width: '40px' }}></Table.Th>}
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {flow.signatures.map((signature, index) => (
+                      <Table.Tr key={index}>
+                        <Table.Td>{signature.user_name || signature.username}</Table.Td>
+                        <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
+                        {isStaff && (
+                          <Table.Td>
+                            <ActionIcon
+                              color="red"
+                              variant="subtle"
+                              size="sm"
+                              onClick={() => handleRemoveSignature(signature.user_id, signature.username)}
+                              title={t('Remove')}
+                            >
+                              <IconTrash size={14} />
+                            </ActionIcon>
+                          </Table.Td>
+                        )}
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </>
+            )}
+
+            {flow.signatures.length === 0 && (
+              <Text size="sm" c="dimmed" ta="center" py="xl">
+                {t('No signatures yet')}
+              </Text>
+            )}
+          </Paper>
+        </Grid.Col>
+      </Grid>
 
       {/* Final Status Selection - appears after all signatures */}
       {isFlowCompleted() && (
@@ -337,7 +535,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
             ]}
             value={finalStatus}
             onChange={(value) => setFinalStatus(value || '')}
-            disabled={isFormReadonly}
             required
             mb="md"
           />
@@ -348,14 +545,13 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
               placeholder={t('Enter reason for refusal')}
               value={refusalReason}
               onChange={(e) => setRefusalReason(e.target.value)}
-              disabled={isFormReadonly}
               required
               minRows={3}
               mb="md"
             />
           )}
 
-          {finalStatus && !isFormReadonly && (
+          {finalStatus && (
             <Group justify="flex-end">
               <Button
                 onClick={handleSubmitStatus}
@@ -367,12 +563,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
             </Group>
           )}
         </Paper>
-      )}
-
-      {isFormReadonly && !finalStatus && (
-        <Text size="sm" c="orange" mt="md">
-          {t('This form is read-only because it has been signed. Please select a status to proceed.')}
-        </Text>
       )}
     </Paper>
   );
