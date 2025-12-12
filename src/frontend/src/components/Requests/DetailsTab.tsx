@@ -244,6 +244,69 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
 
   const canEdit = !hasSignatures && !checkingSignatures;
 
+  // Generate Document Component
+  const GenerateDocumentButton = ({ requestId, reference, status }: { requestId: string; reference: string; status: string }) => {
+    const [generating, setGenerating] = useState(false);
+
+    const handleGenerate = async () => {
+      setGenerating(true);
+      try {
+        const response = await api.post(
+          '/api/documents/stock-request/generate',
+          {
+            request_id: requestId,
+            template_code: '6LL5WVTR8BTY',
+            template_name: 'P-Distrib-102_F1'
+          },
+          { responseType: 'blob' }
+        );
+
+        // Download PDF
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Fisa_Solicitare_${reference}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        notifications.show({
+          title: t('Success'),
+          message: t('Document generated successfully'),
+          color: 'green'
+        });
+      } catch (error: any) {
+        console.error('Failed to generate document:', error);
+        notifications.show({
+          title: t('Error'),
+          message: error.response?.data?.detail || t('Failed to generate document'),
+          color: 'red'
+        });
+      } finally {
+        setGenerating(false);
+      }
+    };
+
+    return (
+      <>
+        <Button
+          leftSection={<IconFileText size={16} />}
+          onClick={handleGenerate}
+          loading={generating}
+          disabled={status !== 'Approved'}
+        >
+          {t('Generate P-Distrib-102_F1')}
+        </Button>
+        {status !== 'Approved' && (
+          <Text size="sm" c="dimmed" mt="xs">
+            {t('Document can only be generated after approval')}
+          </Text>
+        )}
+      </>
+    );
+  };
+
   return (
     <div>
       <Group justify="flex-end" mb="md">
@@ -429,6 +492,17 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           )}
         </Grid.Col>
       </Grid>
+
+      {/* Document Generation Section */}
+      {!editing && (
+        <Paper withBorder p="md" mt="md">
+          <Group justify="space-between" mb="md">
+            <Title order={5}>{t('Documents')}</Title>
+          </Group>
+          
+          <GenerateDocumentButton requestId={request._id} reference={request.reference} status={request.status} />
+        </Paper>
+      )}
 
       {/* Add Item Modal */}
       <Modal
