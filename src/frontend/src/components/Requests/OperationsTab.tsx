@@ -403,16 +403,19 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
                       />
                     </Table.Td>
                     <Table.Td>
-                      <Select
-                        data={item.batch_options}
+                      <TextInput
                         value={item.batch_code}
-                        onChange={(value) => handleBatchChange(index, value)}
+                        onChange={(e) => handleBatchChange(index, e.target.value)}
                         disabled={isFormReadonly}
-                        placeholder={t('Select batch')}
-                        searchable
-                        clearable
+                        placeholder={t('Enter or select batch')}
+                        list={`batch-options-${index}`}
                         size="xs"
                       />
+                      <datalist id={`batch-options-${index}`}>
+                        {item.batch_options.map((option, i) => (
+                          <option key={i} value={option.value} label={option.label} />
+                        ))}
+                      </datalist>
                     </Table.Td>
                   </Table.Tr>
                 ))}
