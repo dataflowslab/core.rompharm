@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal } from '@mantine/core';
+import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal, Paper } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
-import { IconDeviceFloppy, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconTrash, IconPlus, IconFileText } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 
