@@ -1,11 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea } from '@mantine/core';
+import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea, TextInput } from '@mantine/core';
 import { IconSignature, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
+
+interface BatchOption {
+  value: string;
+  label: string;
+  expiry_date?: string;
+  quantity?: number;
+  location?: string;
+}
+
+interface ItemWithBatch {
+  part: number;
+  part_name?: string;
+  quantity: number;
+  series: string;
+  batch_code: string;
+  batch_options: BatchOption[];
+}
 
 interface ApprovalOfficer {
   type: string;
