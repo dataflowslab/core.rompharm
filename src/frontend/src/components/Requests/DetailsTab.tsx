@@ -308,35 +308,47 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
   };
 
   return (
-    <div>
-      <Group justify="flex-end" mb="md">
-        {!editing ? (
-          <Button onClick={() => setEditing(true)} disabled={!canEdit}>
-            {t('Edit')}
-          </Button>
-        ) : (
-          <>
-            <Button variant="default" onClick={handleCancel}>
-              {t('Cancel')}
+    <>
+      <Grid gutter="md">
+        {/* Left side - Documents (1/4 width) */}
+        <Grid.Col span={3}>
+        <Paper withBorder p="md" style={{ position: 'sticky', top: 20 }}>
+          <Title order={5} mb="md">{t('Documents')}</Title>
+          
+          <GenerateDocumentButton requestId={request._id} reference={request.reference} status={request.status} />
+        </Paper>
+      </Grid.Col>
+
+      {/* Right side - Form (3/4 width) */}
+      <Grid.Col span={9}>
+        <Group justify="flex-end" mb="md">
+          {!editing ? (
+            <Button onClick={() => setEditing(true)} disabled={!canEdit}>
+              {t('Edit')}
             </Button>
-            <Button
-              leftSection={<IconDeviceFloppy size={16} />}
-              onClick={handleSave}
-              loading={saving}
-            >
-              {t('Save')}
-            </Button>
-          </>
+          ) : (
+            <>
+              <Button variant="default" onClick={handleCancel}>
+                {t('Cancel')}
+              </Button>
+              <Button
+                leftSection={<IconDeviceFloppy size={16} />}
+                onClick={handleSave}
+                loading={saving}
+              >
+                {t('Save')}
+              </Button>
+            </>
+          )}
+        </Group>
+
+        {!canEdit && !checkingSignatures && (
+          <Text size="sm" c="orange" mb="md">
+            {t('This request has signatures and cannot be edited. Remove all signatures to enable editing.')}
+          </Text>
         )}
-      </Group>
 
-      {!canEdit && !checkingSignatures && (
-        <Text size="sm" c="orange" mb="md">
-          {t('This request has signatures and cannot be edited. Remove all signatures to enable editing.')}
-        </Text>
-      )}
-
-      <Grid>
+        <Grid>
         <Grid.Col span={6}>
           <TextInput
             label={t('Reference')}
@@ -491,18 +503,9 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             <Text size="sm" c="dimmed">{t('No items')}</Text>
           )}
         </Grid.Col>
+        </Grid>
+      </Grid.Col>
       </Grid>
-
-      {/* Document Generation Section */}
-      {!editing && (
-        <Paper withBorder p="md" mt="md">
-          <Group justify="space-between" mb="md">
-            <Title order={5}>{t('Documents')}</Title>
-          </Group>
-          
-          <GenerateDocumentButton requestId={request._id} reference={request.reference} status={request.status} />
-        </Paper>
-      )}
 
       {/* Add Item Modal */}
       <Modal
@@ -574,6 +577,6 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           </Button>
         </Group>
       </Modal>
-    </div>
+    </>
   );
 }

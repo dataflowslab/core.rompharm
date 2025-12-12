@@ -285,8 +285,11 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
             message: t('Signature removed successfully'),
             color: 'green'
           });
-          loadOperationsFlow();
-          onReload();
+          
+          // Auto-refresh page to show/hide tabs
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
         } catch (error: any) {
           console.error('Failed to remove signature:', error);
           notifications.show({
@@ -592,16 +595,16 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         </Paper>
       )}
 
-      {/* Final Status Selection - appears after all signatures */}
+      {/* Decision - appears after all signatures */}
       {isFlowCompleted() && (
         <Paper withBorder p="md" mt="md">
-          <Title order={5} mb="md">{t('Final Decision')}</Title>
+          <Title order={5} mb="md">{t('Decision')}</Title>
           
           <Select
             label={t('Status')}
             placeholder={t('Select status')}
             data={[
-              { value: 'Approved', label: t('Approved') },
+              { value: 'Finished', label: t('Finished') },
               { value: 'Refused', label: t('Refused') }
             ]}
             value={finalStatus}
