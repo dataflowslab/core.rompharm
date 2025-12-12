@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea, TextInput, Grid } from '@mantine/core';
-import { IconSignature, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
+import { IconSignature, IconTrash, IconDeviceFloppy, IconFileText } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
@@ -65,11 +65,67 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const [finalStatus, setFinalStatus] = useState<string>('');
   const [refusalReason, setRefusalReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [request, setRequest] = useState<any>(null);
 
   useEffect(() => {
     loadOperationsFlow();
     loadRequestItems();
   }, [requestId]);
+
+  // Generate Document Component
+  const GenerateDocumentButton = ({ requestId, reference }: { requestId: string; reference: string }) => {
+    const [generating, setGenerating] = useState(false);
+
+    const handleGenerate = async () => {
+      setGenerating(true);
+      try {
+        const response = await api.post(
+          '/api/documents/stock-request/generate',
+          {
+            request_id: requestId,
+            template_code: 'RC45WVTRBDGT',
+            template_name: 'P-Distrib-102_F2'
+          },
+          { responseType: 'blob' }
+        );
+
+        // Download PDF
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Nota_Transfer_${reference}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        notifications.show({
+          title: t('Success'),
+          message: t('Document generated successfully'),
+          color: 'green'
+        });
+      } catch (error: any) {
+        console.error('Failed to generate document:', error);
+        notifications.show({
+          title: t('Error'),
+          message: error.response?.data?.detail || t('Failed to generate document'),
+          color: 'red'
+        });
+      } finally {
+        setGenerating(false);
+      }
+    };
+
+    return (
+      <Button
+        leftSection={<IconFileText size={16} />}
+        onClick={handleGenerate}
+        loading={generating}
+      >
+        {t('Generate P-Distrib-102_F2')}
+      </Button>
+    );
+  };
 
   const loadOperationsFlow = async () => {
     try {
@@ -85,6 +141,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const loadRequestItems = async () => {
     try {
       const response = await api.get(`/api/requests/${requestId}`);
+      setRequest(response.data); // Save request data
       const items = response.data.items || [];
       const sourceLocation = response.data.source;
       
@@ -523,6 +580,17 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
           </Paper>
         </Grid.Col>
       </Grid>
+
+      {/* Document Generation Section */}
+      {!isFormReadonly && (
+        <Paper withBorder p="md" mt="md">
+          <Group justify="space-between" mb="md">
+            <Title order={5}>{t('Documents')}</Title>
+          </Group>
+          
+          <GenerateDocumentButton requestId={requestId} reference={request?.reference || requestId} />
+        </Paper>
+      )}
 
       {/* Final Status Selection - appears after all signatures */}
       {isFlowCompleted() && (
