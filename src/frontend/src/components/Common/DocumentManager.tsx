@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Paper, Stack, Group, Title, Text, Button, Badge, Loader, ActionIcon } from '@mantine/core';
-import { IconFileTypePdf, IconDownload, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { Paper, Stack, Group, Title, Text, Button, Badge, ActionIcon } from '@mantine/core';
+import { IconFileTypePdf, IconDownload, IconRefresh } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import api from '../../services/api';
@@ -36,35 +36,79 @@ interface DocumentManagerProps {
 
 export function DocumentManager({ entityId, entityType, templates, onDocumentGenerated }: DocumentManagerProps) {
   const { t } = useTranslation();
-  const [documents, setDocuments] = useState<GeneratedDocument[]>([]);
-  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [documents, setDocuments] = useState<Record<string, GeneratedDocument>>({});
+  const [loadingDocs, setLoadingDocs] = useState<Record<string, boolean>>({});
   const [generatingDoc, setGeneratingDoc] = useState<string | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadDocuments();
   }, [entityId]);
 
   const loadDocuments = async () => {
-    setLoadingDocuments(true);
     try {
       const response = await api.get(`/api/documents/${entityType}/${entityId}`);
       const docs = response.data || [];
-      setDocuments(docs);
+      
+      // Convert array to object keyed by template_code (only keep latest per template)
+      const docsMap: Record<string, GeneratedDocument> = {};
+      docs.forEach((doc: GeneratedDocument) => {
+        if (!docsMap[doc.template_code] || doc.version > docsMap[doc.template_code].version) {
+          docsMap[doc.template_code] = doc;
+        }
+      });
+      
+      setDocuments(docsMap);
     } catch (error) {
       console.error('Failed to load documents:', error);
+    }
+  };
+
+  const checkDocumentStatus = async (templateCode: string, jobId: string) => {
+    setCheckingStatus(prev => ({ ...prev, [templateCode]: true }));
+    try {
+      const response = await api.get(`/api/documents/${entityType}/${entityId}/job/${jobId}/status`);
+      const status = response.data;
+      
+      // Update document in state
+      setDocuments(prev => ({
+        ...prev,
+        [templateCode]: { ...prev[templateCode], ...status }
+      }));
+      
+      // If done, try to download automatically
+      if (status.status === 'done' || status.has_document) {
+        await handleDownloadDocument(templateCode);
+      }
+    } catch (error) {
+      console.error('Failed to check status:', error);
     } finally {
-      setLoadingDocuments(false);
+      setCheckingStatus(prev => ({ ...prev, [templateCode]: false }));
     }
   };
 
   const handleGenerateDocument = async (template: DocumentTemplate) => {
     setGeneratingDoc(template.code);
+    
     try {
-      await api.post(`/api/documents/${entityType}/generate`, {
+      // Delete old document if exists
+      const existingDoc = documents[template.code];
+      if (existingDoc) {
+        try {
+          await api.delete(`/api/documents/${entityType}/${entityId}/job/${existingDoc.job_id}`);
+        } catch (error) {
+          console.error('Failed to delete old document:', error);
+        }
+      }
+      
+      // Generate new document
+      const response = await api.post(`/api/documents/${entityType}/generate`, {
         [entityType === 'procurement-order' ? 'order_id' : 'request_id']: entityId,
         template_code: template.code,
         template_name: template.name,
       });
+      
+      const jobData = response.data;
       
       notifications.show({
         title: t('Success'),
@@ -72,13 +116,31 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
         color: 'green',
       });
       
-      // Reload documents after a short delay
-      setTimeout(() => {
-        loadDocuments();
-        if (onDocumentGenerated) {
-          onDocumentGenerated();
+      // Update state with new job
+      setDocuments(prev => ({
+        ...prev,
+        [template.code]: {
+          _id: jobData.job_id,
+          job_id: jobData.job_id,
+          template_code: template.code,
+          template_name: template.name,
+          status: jobData.status || 'queued',
+          filename: jobData.filename || `${template.name}.pdf`,
+          version: 1,
+          created_at: new Date().toISOString(),
+          created_by: '',
+          has_document: false
         }
-      }, 1500);
+      }));
+      
+      // Check status immediately after 1 second
+      setTimeout(() => {
+        checkDocumentStatus(template.code, jobData.job_id);
+      }, 1000);
+      
+      if (onDocumentGenerated) {
+        onDocumentGenerated();
+      }
     } catch (error: any) {
       console.error('Failed to generate document:', error);
       notifications.show({
@@ -91,32 +153,11 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
     }
   };
 
-  const handleDeleteDocument = async (doc: GeneratedDocument) => {
-    if (!confirm(t('Are you sure you want to delete this document?'))) {
-      return;
-    }
-
-    try {
-      await api.delete(`/api/documents/${entityType}/${entityId}/job/${doc.job_id}`);
-      
-      notifications.show({
-        title: t('Success'),
-        message: t('Document deleted'),
-        color: 'green',
-      });
-      
-      loadDocuments();
-    } catch (error: any) {
-      console.error('Failed to delete document:', error);
-      notifications.show({
-        title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to delete document'),
-        color: 'red',
-      });
-    }
-  };
-
-  const handleDownloadDocument = async (doc: GeneratedDocument) => {
+  const handleDownloadDocument = async (templateCode: string) => {
+    const doc = documents[templateCode];
+    if (!doc) return;
+    
+    setLoadingDocs(prev => ({ ...prev, [templateCode]: true }));
     try {
       const response = await api.get(
         `/api/documents/${entityType}/${entityId}/job/${doc.job_id}/download`,
@@ -132,6 +173,12 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      
+      notifications.show({
+        title: t('Success'),
+        message: t('Document downloaded'),
+        color: 'green',
+      });
     } catch (error: any) {
       console.error('Failed to download document:', error);
       notifications.show({
@@ -139,6 +186,8 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
         message: error.response?.data?.detail || t('Failed to download document'),
         color: 'red',
       });
+    } finally {
+      setLoadingDocs(prev => ({ ...prev, [templateCode]: false }));
     }
   };
 
@@ -161,93 +210,109 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
   return (
     <Paper p="md" withBorder style={{ height: '100%' }}>
       <Stack gap="md">
-        <Group justify="space-between">
-          <Title order={5}>{t('Documents')}</Title>
-          <ActionIcon
-            variant="subtle"
-            onClick={loadDocuments}
-            loading={loadingDocuments}
-          >
-            <IconRefresh size={16} />
-          </ActionIcon>
-        </Group>
+        <Title order={5}>{t('Documents')}</Title>
 
-        {/* Generate Document Buttons */}
-        <div>
-          <Text size="sm" fw={500} mb="xs">{t('Generate Document')}</Text>
-          <Stack gap="xs">
-            {templates.map((template) => (
-              <Button
-                key={template.code}
-                variant="light"
-                size="sm"
-                fullWidth
-                onClick={() => handleGenerateDocument(template)}
-                loading={generatingDoc === template.code}
-                leftSection={<IconFileTypePdf size={16} />}
-                disabled={template.disabled}
-              >
-                {template.label}
-              </Button>
-            ))}
-            {templates.some(t => t.disabled && t.disabledMessage) && (
-              <Text size="xs" c="dimmed">
-                {templates.find(t => t.disabled)?.disabledMessage}
-              </Text>
-            )}
-          </Stack>
-        </div>
-
-        {/* Generated Documents */}
-        <div>
-          <Text size="sm" fw={500} mb="xs">{t('Generated')}</Text>
-          {loadingDocuments ? (
-            <Loader size="sm" />
-          ) : documents.length === 0 ? (
-            <Text size="xs" c="dimmed">{t('No documents generated')}</Text>
-          ) : (
-            <Stack gap="sm">
-              {documents.map((doc) => (
-                <Paper key={doc._id} p="sm" withBorder>
-                  <Stack gap="xs">
-                    <Text size="sm" fw={500}>
-                      {doc.template_name}
-                    </Text>
-                    {doc.has_document ? (
-                      <Group gap="xs">
-                        <Button
-                          size="xs"
-                          variant="light"
-                          fullWidth
-                          leftSection={<IconDownload size={14} />}
-                          onClick={() => handleDownloadDocument(doc)}
-                        >
-                          {t('Download')}
-                        </Button>
-                        <ActionIcon
-                          size="lg"
-                          variant="light"
-                          color="red"
-                          onClick={() => handleDeleteDocument(doc)}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
-                    ) : doc.status === 'failed' ? (
+        {/* Document Templates */}
+        <Stack gap="sm">
+          {templates.map((template) => {
+            const doc = documents[template.code];
+            const isGenerating = generatingDoc === template.code;
+            const isChecking = checkingStatus[template.code];
+            const isDownloading = loadingDocs[template.code];
+            
+            return (
+              <Paper key={template.code} p="sm" withBorder>
+                <Stack gap="xs">
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>{template.label}</Text>
+                    {doc && !doc.has_document && doc.status !== 'failed' && (
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        onClick={() => checkDocumentStatus(template.code, doc.job_id)}
+                        loading={isChecking}
+                        title={t('Check status')}
+                      >
+                        <IconRefresh size={14} />
+                      </ActionIcon>
+                    )}
+                  </Group>
+                  
+                  {!doc ? (
+                    // No document generated yet
+                    <>
+                      <Button
+                        variant="light"
+                        size="sm"
+                        fullWidth
+                        onClick={() => handleGenerateDocument(template)}
+                        loading={isGenerating}
+                        leftSection={<IconFileTypePdf size={16} />}
+                        disabled={template.disabled}
+                      >
+                        {t('Generate')}
+                      </Button>
+                      {template.disabled && template.disabledMessage && (
+                        <Text size="xs" c="dimmed">{template.disabledMessage}</Text>
+                      )}
+                    </>
+                  ) : doc.has_document ? (
+                    // Document ready for download
+                    <Group gap="xs">
+                      <Button
+                        size="sm"
+                        variant="light"
+                        fullWidth
+                        leftSection={<IconDownload size={14} />}
+                        onClick={() => handleDownloadDocument(template.code)}
+                        loading={isDownloading}
+                      >
+                        {t('Download')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="light"
+                        color="blue"
+                        onClick={() => handleGenerateDocument(template)}
+                        loading={isGenerating}
+                        leftSection={<IconFileTypePdf size={14} />}
+                      >
+                        {t('Regenerate')}
+                      </Button>
+                    </Group>
+                  ) : doc.status === 'failed' ? (
+                    // Generation failed
+                    <>
                       <Badge size="sm" color="red" fullWidth>
                         {t('Failed')}
                       </Badge>
-                    ) : (
+                      <Button
+                        size="sm"
+                        variant="light"
+                        fullWidth
+                        onClick={() => handleGenerateDocument(template)}
+                        loading={isGenerating}
+                        leftSection={<IconFileTypePdf size={14} />}
+                      >
+                        {t('Retry')}
+                      </Button>
+                    </>
+                  ) : (
+                    // Processing or queued
+                    <>
                       <Badge size="sm" color={getStatusColor(doc.status)} fullWidth>
                         {doc.status === 'processing' ? t('Processing...') : t('Queued')}
                       </Badge>
-                    )}
-                  </Stack>
-                </Paper>
-              ))}
-            </Stack>
-          )}
-        </div>
+                      <Text size="xs" c="dimmed" ta="center">
+                        {t('Click refresh icon to check status')}
+                      </Text>
+                    </>
+                  )}
+                </Stack>
+              </Paper>
+            );
+          })}
+        </Stack>
       </Stack>
     </Paper>
   );
