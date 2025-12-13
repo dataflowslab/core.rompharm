@@ -1,6 +1,6 @@
-# Documentation & Resources
+# Utils & Resources
 
-This folder contains technical documentation, setup scripts, API collections, and other development resources.
+This folder contains utility scripts, technical documentation, API collections, templates, and other development resources.
 
 ## Contents
 
@@ -9,7 +9,7 @@ This folder contains technical documentation, setup scripts, API collections, an
 - **`init_jobs.py`** - Initialize default jobs in MongoDB (run once during setup)
 - **`init_procurement_approval_template.py`** - Create default approval template for procurement orders
 
-### API Documentation
+### Technical Documentation
 
 - **`DOCUMENT_GENERATION.md`** - Complete guide for the reusable DocumentManager component
 - **`IMPLEMENTARE_REQUESTS_UPDATES.md`** - Implementation notes for Requests module updates
@@ -30,10 +30,10 @@ This folder contains technical documentation, setup scripts, API collections, an
 
 ```bash
 # Initialize jobs
-python docs/init_jobs.py
+python utils/init_jobs.py
 
 # Initialize procurement approval template
-python docs/init_procurement_approval_template.py
+python utils/init_procurement_approval_template.py
 ```
 
 ### Importing Postman Collections
@@ -48,4 +48,4 @@ python docs/init_procurement_approval_template.py
 - Setup scripts should be run only once during initial setup
 - Postman collections are useful for testing API endpoints
 - Document templates are HTML files with Jinja2 syntax for OfficeClerk
-- This folder serves as a "scrap bin" for any useful information and resources
+- This folder serves as a utility bin for scripts, documentation, and development resources
