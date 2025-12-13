@@ -1,0 +1,101 @@
+<div class="rand">
+    <div class="col13 left">
+        <h5>Nota de transfer intern</h5>
+    </div>
+    <div class="col23 right">
+        <table class="table_noborder">
+            <tr>
+                <td>Gestiune predare <strong>{{ request.source_location_name }}</strong></td>
+                <td>Nr. Fisa {{ request.reference }}</td>
+            </tr>
+            <tr>
+                <td>Gestiune primire <strong>{{ request.destination_location_name }}</strong></td>
+                <td>Data {{ request.issue_date }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div class="rand rand_cu_border_bottom">
+    <table class="table_noborder" style="width:60%">
+        <tr>
+            <td>Nr. solicitare</td>
+            <td>{{ request.reference }}</td>
+            <td></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Denumire produs</td>
+            <td>{{ request.product_name }}</td>
+            <td>Seria de fabricatie</td>
+            <td>{{ request.series }}</td>
+        </tr>
+    </table>
+</div>
+
+<div class="col1">
+    <table class="table">
+        <tr>
+            <th>Nr. Crt.</th>
+            <th>Descriere</th>
+            <th>Cod/Lot intern</th>
+            <th>U.M.</th>
+            <th>Cantitate</th>
+            <th>Pret</th>
+            <th>Valoare</th>
+        </tr>
+        {% for item in request.items %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ item.part_name }}</td>
+            <td>{{ item.batch_code }}</td>
+            <td>{{ item.unit }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.price }}</td>
+            <td>{{ item.total }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="col1 left" style="margin-top: 10px; clear: both;">
+    <div class="left" style="width:50%;padding-top:10px">
+        <img src="data:image/png;base64,{{ request.qr_code }}" alt="QR Code" style="width:150px;height:150px;">
+    </div>
+    <div class="right" style="width:50%;">
+        <table class="table">
+            <tr>
+                <td style="width:33%">Predat<br>Data<br>Semnatura</td>
+                <td>{{ request.operations_user }}<br>{{ request.operations_date }}<br>{{ request.operations_signature }}</td>
+            </tr>
+            <tr>
+                <td style="width:33%">Primit<br>Data<br>Semnatura</td>
+                <td>{{ request.reception_user }}<br>{{ request.reception_date }}<br>{{ request.reception_signature }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<!-- 
+PLACEHOLDERS EXPLICATIE:
+- request.source_location_name: Numele locației sursă
+- request.destination_location_name: Numele locației destinație
+- request.reference: Referința request-ului (REQ-NNNN)
+- request.issue_date: Data emiterii
+- request.product_name: Denumirea produsului (doar pentru produse compuse)
+- request.series: Seria de fabricație
+- request.items: Lista de items
+  - item.part_name: Numele piesei
+  - item.batch_code: Codul batch-ului
+  - item.unit: Unitatea de măsură
+  - item.quantity: Cantitatea
+  - item.price: Prețul
+  - item.total: Valoarea totală
+- request.qr_code: Codul QR (base64)
+- request.operations_user: Utilizatorul care a predat (Operations)
+- request.operations_date: Data predării
+- request.operations_signature: Semnătura predării
+- request.reception_user: Utilizatorul care a primit (Reception)
+- request.reception_date: Data recepției
+- request.reception_signature: Semnătura recepției
+-->

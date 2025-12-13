@@ -1,0 +1,1017 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "DataFlowsDepoStocks API - InvenTree 1.0.1",
+		"description": "API documentation for DataFlowsDepoStocks plugin for InvenTree 1.0.1.\n\nThis plugin extends InvenTree stock items with dynamic custom fields.\n\n**Base URL**: `{{base_url}}/plugin/dataflows-depo-stocks/api`\n\n**Authentication**: API Token or Session Authentication\n\n**Version**: 1.0.1",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Custom Fields",
+			"item": [
+				{
+					"name": "List All Custom Fields",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"fields",
+								""
+							]
+						},
+						"description": "Retrieve all custom field definitions ordered by order and name.\n\n**Response Fields:**\n- `id` (integer): Field ID\n- `name` (string): Unique field identifier\n- `label` (string): Display label\n- `field_type` (string): Field type (text, textarea, number, date, boolean)\n- `help_text` (string): Help text for the field\n- `required` (boolean): Whether field is required\n- `order` (integer): Display order\n- `active` (boolean): Whether field is active"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"fields",
+										""
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": 1,\n        \"name\": \"batch_number\",\n        \"label\": \"Batch Number\",\n        \"field_type\": \"text\",\n        \"help_text\": \"Manufacturing batch or lot number\",\n        \"required\": false,\n        \"order\": 10,\n        \"active\": true\n    },\n    {\n        \"id\": 2,\n        \"name\": \"expiry_date\",\n        \"label\": \"Expiry Date\",\n        \"field_type\": \"date\",\n        \"help_text\": \"Product expiration date\",\n        \"required\": true,\n        \"order\": 20,\n        \"active\": true\n    },\n    {\n        \"id\": 3,\n        \"name\": \"storage_location\",\n        \"label\": \"Storage Location\",\n        \"field_type\": \"text\",\n        \"help_text\": \"Specific storage location\",\n        \"required\": false,\n        \"order\": 30,\n        \"active\": true\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Get Custom Field by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/:id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"fields",
+								":id",
+								""
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Custom field ID"
+								}
+							]
+						},
+						"description": "Retrieve a specific custom field definition by ID."
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/1/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"fields",
+										"1",
+										""
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": 1,\n    \"name\": \"batch_number\",\n    \"label\": \"Batch Number\",\n    \"field_type\": \"text\",\n    \"help_text\": \"Manufacturing batch or lot number\",\n    \"required\": false,\n    \"order\": 10,\n    \"active\": true\n}"
+						}
+					]
+				},
+				{
+					"name": "Create Custom Field",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"quality_notes\",\n    \"label\": \"Quality Notes\",\n    \"field_type\": \"textarea\",\n    \"help_text\": \"Quality control observations\",\n    \"required\": false,\n    \"order\": 40,\n    \"active\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"fields",
+								""
+							]
+						},
+						"description": "Create a new custom field definition.\n\n**Request Body:**\n- `name` (string, required): Unique field identifier\n- `label` (string, required): Display label\n- `field_type` (string, required): Field type (text, textarea, number, date, boolean)\n- `help_text` (string, optional): Help text\n- `required` (boolean, optional): Whether field is required (default: false)\n- `order` (integer, optional): Display order (default: 0)\n- `active` (boolean, optional): Whether field is active (default: true)"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"quality_notes\",\n    \"label\": \"Quality Notes\",\n    \"field_type\": \"textarea\",\n    \"help_text\": \"Quality control observations\",\n    \"required\": false,\n    \"order\": 40,\n    \"active\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"fields",
+										""
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": 4,\n    \"name\": \"quality_notes\",\n    \"label\": \"Quality Notes\",\n    \"field_type\": \"textarea\",\n    \"help_text\": \"Quality control observations\",\n    \"required\": false,\n    \"order\": 40,\n    \"active\": true\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Custom Field",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"batch_number\",\n    \"label\": \"Batch/Lot Number\",\n    \"field_type\": \"text\",\n    \"help_text\": \"Manufacturing batch or lot number (updated)\",\n    \"required\": true,\n    \"order\": 10,\n    \"active\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/:id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"fields",
+								":id",
+								""
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Custom field ID"
+								}
+							]
+						},
+						"description": "Update an existing custom field definition (full update)."
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"batch_number\",\n    \"label\": \"Batch/Lot Number\",\n    \"field_type\": \"text\",\n    \"help_text\": \"Manufacturing batch or lot number (updated)\",\n    \"required\": true,\n    \"order\": 10,\n    \"active\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/1/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"fields",
+										"1",
+										""
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": 1,\n    \"name\": \"batch_number\",\n    \"label\": \"Batch/Lot Number\",\n    \"field_type\": \"text\",\n    \"help_text\": \"Manufacturing batch or lot number (updated)\",\n    \"required\": true,\n    \"order\": 10,\n    \"active\": true\n}"
+						}
+					]
+				},
+				{
+					"name": "Partial Update Custom Field",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"active\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/:id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"fields",
+								":id",
+								""
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Custom field ID"
+								}
+							]
+						},
+						"description": "Partially update a custom field definition (only specified fields)."
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"active\": false\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/1/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"fields",
+										"1",
+										""
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": 1,\n    \"name\": \"batch_number\",\n    \"label\": \"Batch Number\",\n    \"field_type\": \"text\",\n    \"help_text\": \"Manufacturing batch or lot number\",\n    \"required\": false,\n    \"order\": 10,\n    \"active\": false\n}"
+						}
+					]
+				},
+				{
+					"name": "Delete Custom Field",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/:id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"fields",
+								":id",
+								""
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Custom field ID"
+								}
+							]
+						},
+						"description": "Delete a custom field definition. **Warning**: This will also delete all associated field values."
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/fields/1/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"fields",
+										"1",
+										""
+									]
+								}
+							},
+							"status": "No Content",
+							"code": 204,
+							"_postman_previewlanguage": "plain",
+							"header": [],
+							"cookie": [],
+							"body": ""
+						}
+					]
+				}
+			],
+			"description": "Endpoints for managing custom field definitions."
+		},
+		{
+			"name": "Stock Extra Data",
+			"item": [
+				{
+					"name": "List All Stock Extra Data",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"extra",
+								""
+							]
+						},
+						"description": "Retrieve all stock extra data records with field values.\n\n**Response Fields:**\n- `id` (integer): Extra data record ID\n- `stock_item` (integer): Stock item ID\n- `field_values` (array): Array of field value objects\n- `fields_data` (object): Dictionary of field values for easier access"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"extra",
+										""
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": 1,\n        \"stock_item\": 123,\n        \"field_values\": [\n            {\n                \"id\": 1,\n                \"field\": 1,\n                \"field_name\": \"batch_number\",\n                \"field_label\": \"Batch Number\",\n                \"field_type\": \"text\",\n                \"field_help_text\": \"Manufacturing batch or lot number\",\n                \"field_required\": false,\n                \"value\": \"LOT-2024-001\"\n            },\n            {\n                \"id\": 2,\n                \"field\": 2,\n                \"field_name\": \"expiry_date\",\n                \"field_label\": \"Expiry Date\",\n                \"field_type\": \"date\",\n                \"field_help_text\": \"Product expiration date\",\n                \"field_required\": true,\n                \"value\": \"2025-12-31\"\n            }\n        ],\n        \"fields_data\": {\n            \"batch_number\": {\n                \"value\": \"LOT-2024-001\",\n                \"label\": \"Batch Number\",\n                \"field_type\": \"text\",\n                \"help_text\": \"Manufacturing batch or lot number\",\n                \"required\": false\n            },\n            \"expiry_date\": {\n                \"value\": \"2025-12-31\",\n                \"label\": \"Expiry Date\",\n                \"field_type\": \"date\",\n                \"help_text\": \"Product expiration date\",\n                \"required\": true\n            }\n        }\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Get Stock Extra Data by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/:id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"extra",
+								":id",
+								""
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Extra data record ID"
+								}
+							]
+						},
+						"description": "Retrieve a specific stock extra data record by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Stock Extra Data by Stock ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/stock/:stock_id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"extra",
+								"stock",
+								":stock_id",
+								""
+							],
+							"variable": [
+								{
+									"key": "stock_id",
+									"value": "123",
+									"description": "Stock item ID"
+								}
+							]
+						},
+						"description": "Get or create extra data for a specific stock item.\n\nIf the stock item doesn't have extra data yet, it will be created automatically."
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/stock/123/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"extra",
+										"stock",
+										"123",
+										""
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": 1,\n    \"stock_item\": 123,\n    \"field_values\": [\n        {\n            \"id\": 1,\n            \"field\": 1,\n            \"field_name\": \"batch_number\",\n            \"field_label\": \"Batch Number\",\n            \"field_type\": \"text\",\n            \"field_help_text\": \"Manufacturing batch or lot number\",\n            \"field_required\": false,\n            \"value\": \"LOT-2024-001\"\n        }\n    ],\n    \"fields_data\": {\n        \"batch_number\": {\n            \"value\": \"LOT-2024-001\",\n            \"label\": \"Batch Number\",\n            \"field_type\": \"text\",\n            \"help_text\": \"Manufacturing batch or lot number\",\n            \"required\": false\n        }\n    }\n}"
+						},
+						{
+							"name": "Stock Not Found",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/stock/999/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"extra",
+										"stock",
+										"999",
+										""
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"error\": \"Stock item not found\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Stock Field Values",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"fields\": {\n        \"batch_number\": \"LOT-2024-001\",\n        \"expiry_date\": \"2025-12-31\",\n        \"storage_location\": \"Warehouse A, Shelf 3\",\n        \"quality_notes\": \"Passed all quality checks\",\n        \"temperature\": \"20\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/stock/:stock_id/update/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"extra",
+								"stock",
+								":stock_id",
+								"update",
+								""
+							],
+							"variable": [
+								{
+									"key": "stock_id",
+									"value": "123",
+									"description": "Stock item ID"
+								}
+							]
+						},
+						"description": "Update field values for a specific stock item.\n\n**Request Body:**\n- `fields` (object, required): Dictionary of field names and their values\n\n**Notes:**\n- Only active fields will be updated\n- If a field doesn't exist or is inactive, it will be skipped\n- Field values are created if they don't exist\n- Extra data record is created automatically if it doesn't exist"
+					},
+					"response": [
+						{
+							"name": "Success Response",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"fields\": {\n        \"batch_number\": \"LOT-2024-001\",\n        \"expiry_date\": \"2025-12-31\"\n    }\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/stock/123/update/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"extra",
+										"stock",
+										"123",
+										"update",
+										""
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": 1,\n    \"stock_item\": 123,\n    \"field_values\": [\n        {\n            \"id\": 1,\n            \"field\": 1,\n            \"field_name\": \"batch_number\",\n            \"field_label\": \"Batch Number\",\n            \"field_type\": \"text\",\n            \"field_help_text\": \"Manufacturing batch or lot number\",\n            \"field_required\": false,\n            \"value\": \"LOT-2024-001\"\n        },\n        {\n            \"id\": 2,\n            \"field\": 2,\n            \"field_name\": \"expiry_date\",\n            \"field_label\": \"Expiry Date\",\n            \"field_type\": \"date\",\n            \"field_help_text\": \"Product expiration date\",\n            \"field_required\": true,\n            \"value\": \"2025-12-31\"\n        }\n    ],\n    \"fields_data\": {\n        \"batch_number\": {\n            \"value\": \"LOT-2024-001\",\n            \"label\": \"Batch Number\",\n            \"field_type\": \"text\",\n            \"help_text\": \"Manufacturing batch or lot number\",\n            \"required\": false\n        },\n        \"expiry_date\": {\n            \"value\": \"2025-12-31\",\n            \"label\": \"Expiry Date\",\n            \"field_type\": \"date\",\n            \"help_text\": \"Product expiration date\",\n            \"required\": true\n        }\n    }\n}"
+						},
+						{
+							"name": "Stock Not Found",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Token {{api_token}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"fields\": {\n        \"batch_number\": \"LOT-2024-001\"\n    }\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/stock/999/update/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"plugin",
+										"dataflows-depo-stocks",
+										"api",
+										"extra",
+										"stock",
+										"999",
+										"update",
+										""
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"error\": \"Stock item not found\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Create Stock Extra Data",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"stock_item\": 123\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"extra",
+								""
+							]
+						},
+						"description": "Create a new stock extra data record.\n\n**Request Body:**\n- `stock_item` (integer, required): Stock item ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Stock Extra Data",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"stock_item\": 123\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/:id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"extra",
+								":id",
+								""
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Extra data record ID"
+								}
+							]
+						},
+						"description": "Update a stock extra data record."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Stock Extra Data",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Token {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/plugin/dataflows-depo-stocks/api/extra/:id/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"plugin",
+								"dataflows-depo-stocks",
+								"api",
+								"extra",
+								":id",
+								""
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Extra data record ID"
+								}
+							]
+						},
+						"description": "Delete a stock extra data record. **Warning**: This will also delete all associated field values."
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for managing stock extra data and field values."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "api_token",
+			"value": "your_api_token_here",
+			"type": "string"
+		}
+	]
+}
