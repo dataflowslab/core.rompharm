@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 ## [1.11.0] - 2024-12-XX
 
 ### Added
+- **Reusable Document Manager Component**
+  - Generic `DocumentManager.tsx` component for async document generation
+  - Supports both Procurement and Requests modules
+  - Single document per template (no versioning clutter)
+  - Automatic status checking after generation
+  - Auto-download when document is ready
+  - Manual refresh button for status verification
+  - Regenerate button (auto-deletes old document)
+  - Template-based configuration
+  - Job-based async generation via docu.dataflows.ro
+  - Status badges: queued (gray), processing (blue), done (green), failed (red)
+  - Clean UI with Paper cards per template
+  - Retry button for failed generations
+  - Component location: `src/frontend/src/components/Common/DocumentManager.tsx`
+
 - **Requests Module - Complete Implementation**
   - **Tab Items**: Editable items table with batch code management
     - Description, Quantity, Batch Code columns
