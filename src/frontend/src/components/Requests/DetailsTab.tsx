@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal, Paper } from '@mantine/core';
+import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
-import { IconDeviceFloppy, IconTrash, IconPlus, IconFileText } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconTrash, IconPlus } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
+import { DocumentManager } from '../Common/DocumentManager';
 
 interface StockLocation {
   pk: number;
@@ -244,80 +245,29 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
 
   const canEdit = !hasSignatures && !checkingSignatures;
 
-  // Generate Document Component
-  const GenerateDocumentButton = ({ requestId, reference, status }: { requestId: string; reference: string; status: string }) => {
-    const [generating, setGenerating] = useState(false);
-
-    const handleGenerate = async () => {
-      setGenerating(true);
-      try {
-        const response = await api.post(
-          '/api/documents/stock-request/generate',
-          {
-            request_id: requestId,
-            template_code: '6LL5WVTR8BTY',
-            template_name: 'P-Distrib-102_F1'
-          },
-          { responseType: 'blob' }
-        );
-
-        // Download PDF
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `Fisa_Solicitare_${reference}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-
-        notifications.show({
-          title: t('Success'),
-          message: t('Document generated successfully'),
-          color: 'green'
-        });
-      } catch (error: any) {
-        console.error('Failed to generate document:', error);
-        notifications.show({
-          title: t('Error'),
-          message: error.response?.data?.detail || t('Failed to generate document'),
-          color: 'red'
-        });
-      } finally {
-        setGenerating(false);
-      }
-    };
-
-    return (
-      <>
-        <Button
-          leftSection={<IconFileText size={16} />}
-          onClick={handleGenerate}
-          loading={generating}
-          disabled={status !== 'Approved'}
-        >
-          {t('Generate P-Distrib-102_F1')}
-        </Button>
-        {status !== 'Approved' && (
-          <Text size="sm" c="dimmed" mt="xs">
-            {t('Document can only be generated after approval')}
-          </Text>
-        )}
-      </>
-    );
-  };
+  // Document templates configuration
+  const documentTemplates = [
+    {
+      code: '6LL5WVTR8BTY',
+      name: 'P-Distrib-102_F1',
+      label: t('P-Distrib-102_F1'),
+      disabled: request.status !== 'Approved',
+      disabledMessage: request.status !== 'Approved' ? t('Document can only be generated after approval') : undefined
+    }
+  ];
 
   return (
     <>
       <Grid gutter="md">
         {/* Left side - Documents (1/4 width) */}
         <Grid.Col span={3}>
-        <Paper withBorder p="md" style={{ position: 'sticky', top: 20 }}>
-          <Title order={5} mb="md">{t('Documents')}</Title>
-          
-          <GenerateDocumentButton requestId={request._id} reference={request.reference} status={request.status} />
-        </Paper>
-      </Grid.Col>
+          <DocumentManager
+            entityId={request._id}
+            entityType="stock-request"
+            templates={documentTemplates}
+            onDocumentGenerated={onUpdate}
+          />
+        </Grid.Col>
 
       {/* Right side - Form (3/4 width) */}
       <Grid.Col span={9}>

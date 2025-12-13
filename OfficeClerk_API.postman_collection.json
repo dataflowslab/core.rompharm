@@ -1,0 +1,535 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "OfficeClerk API v1.0.2",
+		"description": "# OfficeClerk API Documentation\n\n## Overview\nOfficeClerk is a document templating service that generates PDF, HTML, and text documents from templates with dynamic data using Jinja2 templating.\n\n## Authentication\nAll endpoints require Bearer token authentication stored in MongoDB `tokens` collection.\n- Token must be active and not expired\n- Token must have appropriate scopes: `read` for GET operations, `write` for POST/PUT/DELETE\n- Token is automatically associated with templates it creates\n\n## Core Concepts\n\n### Template Bundle\nA template is composed of multiple **parts** grouped by a 12-character alphanumeric **code**:\n- **base**: Main HTML body with Jinja2 variables (required)\n- **header**: Running header HTML (optional)\n- **footer**: Running footer HTML (optional)\n- **css**: Stylesheet for print/screen (optional)\n- **code**: JavaScript (optional, not executed during PDF render)\n\n### Workflow\n1. Create template parts (base is required, others optional)\n2. Parts with same code form a template bundle\n3. Create a job with template_code + data\n4. Poll job status or use realtime endpoint\n5. Download generated document\n\n## Frontend Integration Notes\n- Store API token in config file\n- Template codes are returned when creating first part\n- Use template codes to reference templates in jobs\n- Jobs are processed asynchronously (poll status) or synchronously (realtime endpoint)\n- Generated files are retained for 30 days (configurable)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "12345678"
+	},
+	"item": [
+		{
+			"name": "Templates",
+			"item": [
+				{
+					"name": "List All Templates",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'read' scope"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/templates",
+							"host": ["{{base_url}}"],
+							"path": ["templates"]
+						},
+						"description": "**Purpose**: List all template bundles with summary information\n\n**Auth**: Requires `read` scope\n\n**Response**: Array of template summaries\n```json\n[\n  {\n    \"code\": \"ABC123DEF456\",\n    \"name\": \"Invoice Template\",\n    \"types\": [\"base\", \"header\", \"css\"],\n    \"parts\": 3,\n    \"updated_at\": \"2025-01-15T10:30:00Z\"\n  }\n]\n```\n\n**Frontend Use**:\n- Display template list in UI\n- Show which parts each template has\n- Sort by updated_at for recent templates\n- Use `code` to reference template in other operations"
+					},
+					"response": []
+				},
+				{
+					"name": "List Templates by Type",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'read' scope"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/templates?type=base",
+							"host": ["{{base_url}}"],
+							"path": ["templates"],
+							"query": [
+								{
+									"key": "type",
+									"value": "base",
+									"description": "Filter by part type: base, header, footer, css, code"
+								}
+							]
+						},
+						"description": "**Purpose**: Filter templates that contain a specific part type\n\n**Auth**: Requires `read` scope\n\n**Query Params**:\n- `type`: Part type to filter by (base, header, footer, css, code)\n\n**Response**: Same as List All Templates, but filtered\n\n**Frontend Use**:\n- Filter templates by capabilities\n- Example: Show only templates with headers for letterhead documents\n- Validate template has required parts before using"
+					},
+					"response": []
+				},
+				{
+					"name": "Create New Template (First Part)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'write' scope"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"base\",\n  \"content\": \"<html><body><h1>{{title}}</h1><p>{{content}}</p></body></html>\",\n  \"name\": \"Simple Invoice Template\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/templates",
+							"host": ["{{base_url}}"],
+							"path": ["templates"]
+						},
+						"description": "**Purpose**: Create a new template by creating its first part. Server generates unique 12-char code.\n\n**Auth**: Requires `write` scope\n\n**Request Body**:\n```json\n{\n  \"type\": \"base\",           // Required: base, header, footer, css, code\n  \"content\": \"<html>...\",   // Required: Template content with Jinja2 variables\n  \"name\": \"My Template\"     // Optional: Human-readable name\n}\n```\n\n**Response**: Template bundle with generated code\n```json\n{\n  \"code\": \"ABC123DEF456\",   // SAVE THIS! Use for adding more parts\n  \"parts\": [\n    {\n      \"id\": \"507f1f77bcf86cd799439011\",\n      \"code\": \"ABC123DEF456\",\n      \"type\": \"base\",\n      \"name\": \"My Template\",\n      \"content_hash\": \"sha256...\",\n      \"created_at\": \"2025-01-15T10:30:00Z\",\n      \"updated_at\": \"2025-01-15T10:30:00Z\"\n    }\n  ]\n}\n```\n\n**Important**:\n- Template is automatically associated with your token\n- Code is unique identifier - store it for future operations\n- Content uses Jinja2 syntax: {{variable}}, {% for %}, {% if %}\n- Avoid field names: items, keys, values (Python built-ins)\n\n**Frontend Use**:\n1. User creates template in UI\n2. Send POST with base part content\n3. Store returned `code` in your database\n4. Use code to add more parts (header, footer, css)"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Part to Existing Template",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'write' scope"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"ABC123DEF456\",\n  \"type\": \"header\",\n  \"content\": \"<div style='text-align: center; font-weight: bold;'>{{company_name}} - Invoice</div>\",\n  \"name\": \"Invoice Header\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/templates",
+							"host": ["{{base_url}}"],
+							"path": ["templates"]
+						},
+						"description": "**Purpose**: Add another part (header, footer, css) to existing template\n\n**Auth**: Requires `write` scope\n\n**Request Body**:\n```json\n{\n  \"code\": \"ABC123DEF456\",  // Required: Existing template code\n  \"type\": \"header\",         // Required: Part type to add\n  \"content\": \"<div>...\",    // Required: Part content\n  \"name\": \"Header\"          // Optional: Part name\n}\n```\n\n**Response**: Updated template bundle with all parts\n\n**Rules**:\n- One part per (code, type) - duplicate returns 409 Conflict\n- Use PUT to update existing part\n- All parts with same code form one template\n\n**Frontend Use**:\n1. User adds header/footer/css to template\n2. Send POST with existing code + new part\n3. Update UI with new part list\n4. Show error if part type already exists"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Template Bundle Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'read' scope"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/templates/{{template_code}}",
+							"host": ["{{base_url}}"],
+							"path": ["templates", "{{template_code}}"]
+						},
+						"description": "**Purpose**: Get complete template bundle with all parts metadata (no content)\n\n**Auth**: Requires `read` scope\n\n**Path Params**:\n- `template_code`: 12-char template code\n\n**Response**: Template bundle\n```json\n{\n  \"code\": \"ABC123DEF456\",\n  \"parts\": [\n    {\n      \"id\": \"...\",\n      \"code\": \"ABC123DEF456\",\n      \"type\": \"base\",\n      \"name\": \"Invoice Base\",\n      \"content_hash\": \"sha256...\",\n      \"created_at\": \"...\",\n      \"updated_at\": \"...\"\n    },\n    {\n      \"id\": \"...\",\n      \"type\": \"header\",\n      \"name\": \"Invoice Header\",\n      ...\n    }\n  ]\n}\n```\n\n**Frontend Use**:\n- Display template details page\n- Show all parts in template\n- List part types and names\n- Navigate to edit individual parts"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Part Metadata",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'read' scope"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/templates/{{template_code}}/base",
+							"host": ["{{base_url}}"],
+							"path": ["templates", "{{template_code}}", "base"]
+						},
+						"description": "**Purpose**: Get metadata for specific part (without content)\n\n**Auth**: Requires `read` scope\n\n**Path Params**:\n- `template_code`: Template code\n- `type`: Part type (base, header, footer, css, code)\n\n**Response**: Part metadata\n```json\n{\n  \"id\": \"507f1f77bcf86cd799439011\",\n  \"code\": \"ABC123DEF456\",\n  \"type\": \"base\",\n  \"name\": \"Invoice Base\",\n  \"content_hash\": \"sha256...\",\n  \"created_at\": \"2025-01-15T10:30:00Z\",\n  \"updated_at\": \"2025-01-15T10:30:00Z\"\n}\n```\n\n**Frontend Use**:\n- Check if part exists before operations\n- Display part info without loading full content\n- Show last updated timestamp"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Part Raw Content",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'read' scope"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/templates/{{template_code}}/base/raw",
+							"host": ["{{base_url}}"],
+							"path": ["templates", "{{template_code}}", "base", "raw"]
+						},
+						"description": "**Purpose**: Get raw content of template part for editing\n\n**Auth**: Requires `read` scope\n\n**Path Params**:\n- `template_code`: Template code\n- `type`: Part type\n\n**Response**: Plain text content (text/plain)\n```html\n<html>\n<body>\n  <h1>{{title}}</h1>\n  <p>{{content}}</p>\n</body>\n</html>\n```\n\n**Frontend Use**:\n- Load content into code editor\n- Display in textarea for editing\n- Syntax highlighting for HTML/CSS/JS\n- Show Jinja2 variables"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Template Part",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'write' scope"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"content\": \"<html><body><h1>Updated: {{title}}</h1><p>{{content}}</p><p>Last updated: {{date}}</p></body></html>\",\n  \"name\": \"Updated Invoice Template\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/templates/{{template_code}}/base",
+							"host": ["{{base_url}}"],
+							"path": ["templates", "{{template_code}}", "base"]
+						},
+						"description": "**Purpose**: Update existing part's content and/or name\n\n**Auth**: Requires `write` scope\n\n**Path Params**:\n- `template_code`: Template code\n- `type`: Part type to update\n\n**Request Body** (both optional, but at least one required):\n```json\n{\n  \"content\": \"<html>...\",  // Optional: New content\n  \"name\": \"New Name\"        // Optional: New name\n}\n```\n\n**Response**: Updated part metadata\n\n**Frontend Use**:\n1. User edits template in code editor\n2. Send PUT with new content\n3. Show success message\n4. Update UI with new updated_at timestamp"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Template Part",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'write' scope"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/templates/{{template_code}}/header",
+							"host": ["{{base_url}}"],
+							"path": ["templates", "{{template_code}}", "header"]
+						},
+						"description": "**Purpose**: Delete a specific part from template bundle\n\n**Auth**: Requires `write' scope\n\n**Path Params**:\n- `template_code`: Template code\n- `type`: Part type to delete (header, footer, css, code)\n\n**Response**: 204 No Content on success, 404 if not found\n\n**Important**:\n- Cannot delete 'base' part if it's the only part (delete bundle instead)\n- Other parts remain intact\n- Template code stays the same\n\n**Frontend Use**:\n- Remove optional parts (header, footer, css)\n- Show confirmation dialog before delete\n- Update UI to remove part from list"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Entire Template",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Token with 'write' scope"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/templates/{{template_code}}",
+							"host": ["{{base_url}}"],
+							"path": ["templates", "{{template_code}}"]
+						},
+						"description": "**Purpose**: Delete entire template bundle (all parts)\n\n**Auth**: Requires `write` scope\n\n**Path Params**:\n- `template_code`: Template code to delete\n\n**Response**: 204 No Content on success, 404 if not found\n\n**Warning**: This is permanent and deletes ALL parts!\n\n**Frontend Use**:\n- Delete template from management UI\n- Show strong confirmation dialog\n- Remove from template list after success\n- Consider soft delete in your frontend DB"
+					},
+					"response": []
+				}
+			],
+			"description": "## Template Management\n\nTemplates are composed of parts grouped by a 12-character code. Each template needs at least a 'base' part to function.\n\n**Required Scopes**:\n- GET operations: `read` scope\n- POST/PUT/DELETE operations: `write` scope\n\n**Template Association**:\n- Templates created via API are automatically associated with the token\n- Token document contains `templates` array with template codes"
+		},
+		{
+			"name": "Jobs",
+			"item": [
+				{
+					"name": "Create Job (PDF)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text",
+								"description": "Required: Valid token (any scope)"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template_code\": \"ABC123DEF456\",\n  \"data\": {\n    \"title\": \"Sample Invoice\",\n    \"content\": \"This is a sample invoice for testing purposes.\",\n    \"company_name\": \"ACME Corp\",\n    \"date\": \"2024-01-15\",\n    \"items\": [\n      {\n        \"name\": \"Widget A\",\n        \"quantity\": 2,\n        \"price\": 25.00\n      },\n      {\n        \"name\": \"Widget B\",\n        \"quantity\": 1,\n        \"price\": 50.00\n      }\n    ]\n  },\n  \"format\": \"pdf\",\n  \"filename\": \"sample-invoice\",\n  \"options\": {\n    \"page_size\": \"A4\",\n    \"margin\": \"1cm\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						},
+						"description": "**Purpose**: Create async job to generate PDF document\n\n**Auth**: Any valid token (no specific scope required)\n\n**Request Body**:\n```json\n{\n  \"template_code\": \"ABC123DEF456\",  // Required: Template to use\n  \"data\": {                          // Required: Jinja2 context variables\n    \"title\": \"Invoice\",\n    \"items\": [...]\n  },\n  \"format\": \"pdf\",                  // Required: pdf, html, text\n  \"filename\": \"invoice\",            // Optional: Name without extension\n  \"options\": {                       // Optional: Rendering options\n    \"page_size\": \"A4\",              // A4, Letter, Legal\n    \"margin\": \"1cm\"                 // CSS margin value\n  }\n}\n```\n\n**Response**: Job created (202 Accepted)\n```json\n{\n  \"id\": \"507f1f77bcf86cd799439011\",  // SAVE THIS! Use to check status\n  \"template_code\": \"ABC123DEF456\",\n  \"status\": \"queued\",                // queued -> processing -> done/failed\n  \"format\": \"pdf\",\n  \"filename\": \"invoice\",\n  \"queued_at\": \"2025-01-15T10:30:00Z\",\n  \"updated_at\": \"2025-01-15T10:30:00Z\",\n  \"error\": null,\n  \"artifact_path\": null              // Set when status=done\n}\n```\n\n**Important**:\n- Job is queued and processed asynchronously\n- Poll GET /jobs/{job_id} to check status\n- Template must have 'base' part (header/footer/css optional)\n- Data fields must match template variables\n\n**Frontend Use**:\n1. User fills form with document data\n2. Send POST to create job\n3. Store job_id\n4. Poll status every 2-3 seconds\n5. Download when status=done"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Job (HTML)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template_code\": \"ABC123DEF456\",\n  \"data\": {\n    \"title\": \"HTML Report\",\n    \"content\": \"This is an HTML report.\",\n    \"company_name\": \"ACME Corp\",\n    \"date\": \"2024-01-15\"\n  },\n  \"format\": \"html\",\n  \"filename\": \"report\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						},
+						"description": "**Purpose**: Generate HTML document (same as PDF but format=html)\n\n**Use Case**: Preview documents in browser before generating PDF\n\n**Frontend Use**:\n- Preview button in UI\n- Generate HTML first, show in iframe\n- User confirms, then generate PDF"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Job (Text)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template_code\": \"ABC123DEF456\",\n  \"data\": {\n    \"title\": \"Text Document\",\n    \"content\": \"Plain text content.\",\n    \"date\": \"2024-01-15\"\n  },\n  \"format\": \"text\",\n  \"filename\": \"document\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						},
+						"description": "**Purpose**: Generate plain text document\n\n**Use Case**: Email bodies, plain text reports\n\n**Frontend Use**:\n- Generate text for email sending\n- Plain text exports"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}"]
+						},
+						"description": "**Purpose**: Check job processing status\n\n**Auth**: Any valid token\n\n**Path Params**:\n- `job_id`: Job ID from create response\n\n**Response**: Job details\n```json\n{\n  \"id\": \"507f1f77bcf86cd799439011\",\n  \"template_code\": \"ABC123DEF456\",\n  \"status\": \"done\",              // queued, processing, done, failed\n  \"format\": \"pdf\",\n  \"filename\": \"invoice\",\n  \"queued_at\": \"2025-01-15T10:30:00Z\",\n  \"updated_at\": \"2025-01-15T10:30:15Z\",\n  \"error\": null,                 // Error message if status=failed\n  \"artifact_path\": \"job-ABC.../invoice.pdf\"  // Set when done\n}\n```\n\n**Status Flow**:\n1. `queued`: Job waiting in queue\n2. `processing`: Worker is generating document\n3. `done`: Document ready for download\n4. `failed`: Error occurred (check error field)\n\n**Frontend Use**:\n```javascript\n// Poll every 2 seconds\nconst pollJob = async (jobId) => {\n  const response = await fetch(`/jobs/${jobId}`);\n  const job = await response.json();\n  \n  if (job.status === 'done') {\n    // Download document\n    window.location = `/download/${jobId}`;\n  } else if (job.status === 'failed') {\n    // Show error\n    alert(job.error);\n  } else {\n    // Still processing, poll again\n    setTimeout(() => pollJob(jobId), 2000);\n  }\n};\n```"
+					},
+					"response": []
+				},
+				{
+					"name": "Download Document",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/download/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["download", "{{job_id}}"]
+						},
+						"description": "**Purpose**: Download generated document or get status\n\n**Auth**: Any valid token\n\n**Path Params**:\n- `job_id`: Job ID\n\n**Response**:\n- If status=done: File download (application/pdf, text/html, text/plain)\n- If status=queued/processing: JSON with status\n- If status=failed: JSON with error\n- If file expired: 410 Gone\n\n**Headers**:\n```\nContent-Type: application/pdf (or text/html, text/plain)\nContent-Disposition: attachment; filename=\"invoice.pdf\"\n```\n\n**Frontend Use**:\n```javascript\n// Direct download\nwindow.location = `/download/${jobId}`;\n\n// Or fetch and handle\nconst response = await fetch(`/download/${jobId}`);\nif (response.headers.get('content-type').includes('json')) {\n  // Still processing or failed\n  const status = await response.json();\n  console.log(status);\n} else {\n  // File ready, trigger download\n  const blob = await response.blob();\n  const url = URL.createObjectURL(blob);\n  const a = document.createElement('a');\n  a.href = url;\n  a.download = 'document.pdf';\n  a.click();\n}\n```\n\n**File Retention**: Files are kept for 30 days (configurable)"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Realtime Job (Immediate)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template_code\": \"ABC123DEF456\",\n  \"data\": {\n    \"title\": \"Urgent Invoice\",\n    \"content\": \"Immediate processing\"\n  },\n  \"format\": \"pdf\",\n  \"filename\": \"urgent-invoice\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs/realtime",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "realtime"]
+						},
+						"description": "**Purpose**: Create and process job immediately, return file directly\n\n**Auth**: Any valid token\n\n**Request Body**: Same as regular job creation\n\n**Response**:\n- Success: File download directly (no polling needed)\n- Timeout (60s): 408 Request Timeout\n- Processing error: 422 with error details\n- Server error: 500\n\n**Advantages**:\n- No polling needed\n- Immediate result\n- Simpler frontend code\n\n**Disadvantages**:\n- Blocks request for up to 60 seconds\n- Limited to 2 concurrent realtime jobs\n- Not suitable for high-volume\n- Timeout for complex documents\n\n**When to Use**:\n- User-facing \"Generate Now\" button\n- Small/simple documents\n- Low traffic applications\n- Testing/development\n\n**When NOT to Use**:\n- Batch processing\n- Complex documents (>10 pages)\n- High-volume production\n- Background jobs\n\n**Frontend Use**:\n```javascript\n// Show loading spinner\nconst response = await fetch('/jobs/realtime', {\n  method: 'POST',\n  body: JSON.stringify(jobData)\n});\n\nif (response.ok && response.headers.get('content-type').includes('pdf')) {\n  // Success - download file\n  const blob = await response.blob();\n  // ... trigger download\n} else {\n  // Error - show message\n  const error = await response.json();\n  alert(error.message);\n}\n```"
+					},
+					"response": []
+				}
+			],
+			"description": "## Document Generation\n\nJobs process templates with data to generate documents. Two modes:\n\n**Async Mode** (POST /jobs):\n- Job queued and processed in background\n- Poll status with GET /jobs/{id}\n- Download when status=done\n- Best for production\n\n**Realtime Mode** (POST /jobs/realtime):\n- Immediate processing\n- Returns file directly\n- 60 second timeout\n- Best for user-facing actions\n\n**No specific scope required** - any valid token can create jobs"
+		},
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": ["{{base_url}}"],
+					"path": ["health"]
+				},
+				"description": "**Purpose**: Check API health and get system status\n\n**Auth**: None required (public endpoint)\n\n**Response**: Detailed system status\n```json\n{\n  \"status\": \"healthy\",\n  \"timestamp\": \"2025-01-15T10:30:00Z\",\n  \"version\": \"1.0.0\",\n  \"uptime_seconds\": 3600,\n  \"server\": {\n    \"status\": \"ok\",\n    \"port\": 12012\n  },\n  \"database\": {\n    \"status\": \"healthy\",\n    \"connection\": \"connected\",\n    \"collections\": [\"template_parts\", \"jobs\", \"tokens\"],\n    \"job_counts\": {\n      \"queued\": 5,\n      \"processing\": 2,\n      \"done\": 150,\n      \"failed\": 3,\n      \"total\": 160\n    }\n  },\n  \"worker\": {\n    \"status\": \"active\",\n    \"poll_interval\": 1.0\n  },\n  \"renderer\": {\n    \"prince_available\": true,\n    \"pdf_generation\": \"available\"\n  }\n}\n```\n\n**Frontend Use**:\n- Display system status page\n- Check before operations\n- Monitor job queue depth\n- Alert if database unhealthy"
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-set variables from previous responses",
+					"// Example: Save template_code from create response",
+					"// pm.environment.set('template_code', pm.response.json().code);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-save response values",
+					"if (pm.response.code === 201 && pm.response.json().code) {",
+					"    pm.environment.set('template_code', pm.response.json().code);",
+					"    console.log('Saved template_code:', pm.response.json().code);",
+					"}",
+					"if (pm.response.code === 202 && pm.response.json().id) {",
+					"    pm.environment.set('job_id', pm.response.json().id);",
+					"    console.log('Saved job_id:', pm.response.json().id);",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:12012",
+			"type": "string",
+			"description": "API base URL - update if deployed elsewhere"
+		},
+		{
+			"key": "api_token",
+			"value": "E49948C6D04E4701B8245D0AFEE4B69F",
+			"type": "string",
+			"description": "Your API token from MongoDB tokens collection. Must have 'read' and 'write' scopes. Store in frontend config file."
+		},
+		{
+			"key": "template_code",
+			"value": "",
+			"type": "string",
+			"description": "12-character template code (auto-filled from create response)"
+		},
+		{
+			"key": "job_id",
+			"value": "",
+			"type": "string",
+			"description": "Job ID (auto-filled from job create response)"
+		},
+		{
+			"key": "template_type",
+			"value": "base",
+			"type": "string",
+			"description": "Part type for filtering: base, header, footer, css, code"
+		}
+	]
+}
