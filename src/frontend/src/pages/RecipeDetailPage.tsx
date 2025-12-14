@@ -20,7 +20,6 @@ import {
   Divider,
   Tabs,
   Grid,
-  Box,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
