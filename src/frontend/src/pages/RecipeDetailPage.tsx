@@ -681,7 +681,7 @@ export function RecipeDetailPage() {
           </Paper>
         </Tabs.Panel>
 
-        {/* Journal Tab */}
+        {/* Journal Tab - Include Created/Updated info here */}
         <Tabs.Panel value="journal">
           <Grid mt="md" gutter="md">
             {/* 2/3 - Logs Table */}
@@ -749,30 +749,30 @@ export function RecipeDetailPage() {
               </Paper>
             </Grid.Col>
           </Grid>
+
+          {/* Recipe Info - Moved inside Journal tab */}
+          <Paper p="md" withBorder mt="md">
+            <Stack gap="xs">
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t('Created')}:
+                </Text>
+                <Text size="sm">
+                  {formatDate(recipe.created_at)} {t('by')} {recipe.created_by}
+                </Text>
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">
+                  {t('Updated')}:
+                </Text>
+                <Text size="sm">
+                  {formatDate(recipe.updated_at)} {t('by')} {recipe.updated_by}
+                </Text>
+              </Group>
+            </Stack>
+          </Paper>
         </Tabs.Panel>
       </Tabs>
-
-      {/* Recipe Info */}
-      <Paper p="md" withBorder>
-        <Stack gap="xs">
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              {t('Created')}:
-            </Text>
-            <Text size="sm">
-              {formatDate(recipe.created_at)} {t('by')} {recipe.created_by}
-            </Text>
-          </Group>
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              {t('Updated')}:
-            </Text>
-            <Text size="sm">
-              {formatDate(recipe.updated_at)} {t('by')} {recipe.updated_by}
-            </Text>
-          </Group>
-        </Stack>
-      </Paper>
 
       {/* Add Ingredient Modal */}
       <Modal
