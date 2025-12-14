@@ -45,7 +45,7 @@ export function RequestsPage() {
   const [parts, setParts] = useState<Part[]>([]);
   const [partSearch, setPartSearch] = useState('');
   const [stockInfo, setStockInfo] = useState<any>(null);
-  const [bomComponents, setBomComponents] = useState<any[]>([]);
+  const [recipeData, setRecipeData] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     source: '',
@@ -113,14 +113,13 @@ export function RequestsPage() {
     }
   };
 
-  const loadBOM = async (partId: number) => {
+  const loadRecipe = async (partId: number) => {
     try {
-      const response = await api.get(`/api/requests/parts/${partId}/bom`);
-      const bomItems = response.data.results || [];
-      setBomComponents(bomItems);
+      const response = await api.get(`/api/requests/parts/${partId}/recipe`);
+      setRecipeData(response.data);
     } catch (error) {
-      console.error('Failed to load BOM:', error);
-      setBomComponents([]);
+      console.error('Failed to load recipe:', error);
+      setRecipeData(null);
     }
   };
 
@@ -129,10 +128,10 @@ export function RequestsPage() {
     if (value) {
       const partId = parseInt(value);
       loadStockInfo(partId);
-      loadBOM(partId);
+      loadRecipe(partId);
     } else {
       setStockInfo(null);
-      setBomComponents([]);
+      setRecipeData(null);
     }
   };
 
@@ -389,16 +388,25 @@ export function RequestsPage() {
             </Grid.Col>
           )}
 
-          {bomComponents.length > 0 && (
+          {recipeData && recipeData.items && recipeData.items.length > 0 && (
             <Grid.Col span={12}>
               <Paper p="xs" withBorder>
-                <Text size="sm" fw={500} mb="xs" c="blue">
-                  {t('This part has')} {bomComponents.length} {t('component(s)')}
-                </Text>
+                <Group justify="space-between" mb="xs">
+                  <Text size="sm" fw={500} c="blue">
+                    {t('This part has')} {recipeData.items.length} {t('component(s)')}
+                  </Text>
+                  <Badge size="sm" color={recipeData.source === 'recipe' ? 'green' : 'gray'}>
+                    {recipeData.source === 'recipe' ? t('From Recipe') : t('From BOM')}
+                  </Badge>
+                </Group>
                 <Text size="xs" c="dimmed">
-                  {t('Components')}: {bomComponents.map((bom: any) => 
-                    bom.sub_part_detail?.name || bom.sub_part
-                  ).join(', ')}
+                  {t('Components')}: {recipeData.items.map((item: any) => {
+                    if (item.type === 2 && item.alternatives) {
+                      // Alternative group
+                      return item.alternatives.map((alt: any) => alt.name).join(' / ');
+                    }
+                    return item.name;
+                  }).join(', ')}
                 </Text>
               </Paper>
             </Grid.Col>
