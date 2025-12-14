@@ -29,6 +29,8 @@ import {
   IconChefHat,
   IconDeviceFloppy,
   IconEdit,
+  IconChevronDown,
+  IconChevronRight,
 } from '@tabler/icons-react';
 import api from '../services/api';
 import { EditIngredientModal } from '../components/Recipes/EditIngredientModal';
@@ -95,6 +97,9 @@ export function RecipeDetailPage() {
   const [duplicateProductId, setDuplicateProductId] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState(false);
 
+  // Expandable rows state
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+
   // Form state for adding ingredient
   const [itemType, setItemType] = useState<string>('1');
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
@@ -104,6 +109,16 @@ export function RecipeDetailPage() {
   const [mandatory, setMandatory] = useState(true);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const toggleGroup = (index: number) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedGroups(newExpanded);
+  };
 
   useEffect(() => {
     if (id) {
