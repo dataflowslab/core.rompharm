@@ -1,25 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Modal,
   Stack,
-  Select,
   NumberInput,
   Checkbox,
   Textarea,
   Button,
   Group,
   Divider,
+  TextInput,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import api from '../../services/api';
-
-interface Part {
-  id: number;
-  name: string;
-  IPN: string;
-}
 
 interface RecipeItem {
   type: number;
@@ -29,6 +23,10 @@ interface RecipeItem {
   fin?: string;
   mandatory: boolean;
   notes?: string;
+  part_detail?: {
+    name: string;
+    IPN: string;
+  };
 }
 
 interface EditIngredientModalProps {
@@ -51,14 +49,9 @@ export function EditIngredientModal({
   onSuccess,
 }: EditIngredientModalProps) {
   const { t } = useTranslation();
-  const [parts, setParts] = useState<Part[]>([]);
-  const [searchValue, setSearchValue] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Form state
-  const [selectedPart, setSelectedPart] = useState<string | null>(
-    item.id ? String(item.id) : null
-  );
   const [quantity, setQuantity] = useState<number>(item.q || 1);
   const [startDate, setStartDate] = useState<Date | null>(
     item.start ? new Date(item.start) : new Date()
@@ -69,31 +62,6 @@ export function EditIngredientModal({
   const [mandatory, setMandatory] = useState(item.mandatory);
   const [notes, setNotes] = useState(item.notes || '');
 
-  useEffect(() => {
-    if (opened && item.type === 1) {
-      // Load initial part if exists
-      if (item.id) {
-        searchParts(String(item.id));
-      }
-    }
-  }, [opened, item]);
-
-  const searchParts = async (query: string) => {
-    if (!query || query.length < 2) {
-      setParts([]);
-      return;
-    }
-
-    try {
-      const response = await api.get('/api/recipes/parts', {
-        params: { search: query },
-      });
-      setParts(response.data);
-    } catch (error) {
-      console.error('Failed to search parts:', error);
-    }
-  };
-
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -103,7 +71,7 @@ export function EditIngredientModal({
       };
 
       if (item.type === 1) {
-        updateData.product_id = selectedPart ? parseInt(selectedPart) : item.id;
+        updateData.product_id = item.id; // Product cannot be changed
         updateData.q = quantity;
         updateData.start = startDate?.toISOString();
         if (endDate) {
@@ -143,27 +111,11 @@ export function EditIngredientModal({
       <Stack gap="md">
         {item.type === 1 && (
           <>
-            <Select
+            <TextInput
               label={t('Product')}
-              placeholder={t('Search for product...')}
-              data={parts.map((part) => ({
-                value: String(part.id),
-                label: `${part.name} (${part.IPN})`,
-              }))}
-              value={selectedPart}
-              onChange={setSelectedPart}
-              onSearchChange={(query) => {
-                setSearchValue(query);
-                searchParts(query);
-              }}
-              searchValue={searchValue}
-              searchable
-              clearable
-              nothingFoundMessage={
-                searchValue.length < 2
-                  ? t('Type at least 2 characters')
-                  : t('No products found')
-              }
+              value={item.part_detail ? `${item.part_detail.name} (${item.part_detail.IPN})` : `Product ${item.id}`}
+              disabled
+              description={t('Product cannot be changed. To change product, delete this ingredient and add a new one.')}
             />
 
             <NumberInput
