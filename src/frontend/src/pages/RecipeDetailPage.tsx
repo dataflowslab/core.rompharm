@@ -88,6 +88,13 @@ export function RecipeDetailPage() {
   const [addAltModalOpened, setAddAltModalOpened] = useState(false);
   const [addAltItemIndex, setAddAltItemIndex] = useState<number | null>(null);
 
+  // Duplicate modal state
+  const [duplicateModalOpened, setDuplicateModalOpened] = useState(false);
+  const [duplicateParts, setDuplicateParts] = useState<Part[]>([]);
+  const [duplicateSearch, setDuplicateSearch] = useState('');
+  const [duplicateProductId, setDuplicateProductId] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
+
   // Form state for adding ingredient
   const [itemType, setItemType] = useState<string>('1');
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
@@ -134,6 +141,88 @@ export function RecipeDetailPage() {
       setParts(response.data);
     } catch (error) {
       console.error('Failed to search parts:', error);
+    }
+  };
+
+  const searchDuplicateParts = async (query: string) => {
+    if (!query || query.length < 2) {
+      setDuplicateParts([]);
+      return;
+    }
+
+    try {
+      const response = await api.get('/api/recipes/parts', {
+        params: { search: query },
+      });
+      setDuplicateParts(response.data);
+    } catch (error) {
+      console.error('Failed to search parts:', error);
+    }
+  };
+
+  const handleIncrementVersion = async () => {
+    if (!confirm(t('Are you sure you want to increment the version? This will update the revision number and date.'))) {
+      return;
+    }
+
+    try {
+      const response = await api.post(`/api/recipes/${id}/increment-version`);
+      
+      notifications.show({
+        title: t('Success'),
+        message: `${t('Version incremented to')} ${response.data.new_rev}`,
+        color: 'green',
+      });
+
+      loadRecipe();
+    } catch (error: any) {
+      console.error('Failed to increment version:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to increment version'),
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDuplicate = async () => {
+    if (!duplicateProductId) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please select a product'),
+        color: 'red',
+      });
+      return;
+    }
+
+    setDuplicating(true);
+    try {
+      const response = await api.post(`/api/recipes/${id}/duplicate`, {
+        product_id: parseInt(duplicateProductId)
+      });
+
+      notifications.show({
+        title: t('Success'),
+        message: t('Recipe duplicated successfully'),
+        color: 'green',
+      });
+
+      setDuplicateModalOpened(false);
+      setDuplicateProductId(null);
+      setDuplicateSearch('');
+      setDuplicateParts([]);
+
+      // Navigate to new recipe
+      navigate(`/recipes/${response.data._id}`);
+    } catch (error: any) {
+      console.error('Failed to duplicate recipe:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to duplicate recipe'),
+        color: 'red',
+      });
+    } finally {
+      setDuplicating(false);
     }
   };
 
@@ -329,7 +418,7 @@ export function RecipeDetailPage() {
 
   return (
     <Container size="xl" py="xl">
-      <Group mb="xl">
+      <Group mb="xl" justify="space-between">
         <Button
           variant="subtle"
           leftSection={<IconArrowLeft size={16} />}
@@ -337,6 +426,21 @@ export function RecipeDetailPage() {
         >
           {t('Back')}
         </Button>
+        <Group>
+          <Button
+            variant="light"
+            onClick={handleIncrementVersion}
+          >
+            {t('Increment Version')}
+          </Button>
+          <Button
+            variant="light"
+            color="green"
+            onClick={() => setDuplicateModalOpened(true)}
+          >
+            {t('Duplicate Recipe')}
+          </Button>
+        </Group>
       </Group>
 
       {/* Recipe Header */}
@@ -383,7 +487,7 @@ export function RecipeDetailPage() {
               <Table.Th>{t('Start Date')}</Table.Th>
               <Table.Th>{t('End Date')}</Table.Th>
               <Table.Th>{t('Mandatory')}</Table.Th>
-              <Table.Th style={{ width: '80px' }}>{t('Actions')}</Table.Th>
+              <Table.Th style={{ width: '120px' }}>{t('Actions')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -530,6 +634,72 @@ export function RecipeDetailPage() {
               loading={saving}
             >
               {t('Add')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Duplicate Recipe Modal */}
+      <Modal
+        opened={duplicateModalOpened}
+        onClose={() => {
+          setDuplicateModalOpened(false);
+          setDuplicateProductId(null);
+          setDuplicateSearch('');
+          setDuplicateParts([]);
+        }}
+        title={t('Duplicate Recipe')}
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            {t('Select a product for the new recipe. All ingredients will be copied.')}
+          </Text>
+
+          <Select
+            label={t('Product')}
+            placeholder={t('Search for product...')}
+            data={duplicateParts.map((part) => ({
+              value: String(part.id),
+              label: `${part.name} (${part.IPN})`,
+            }))}
+            value={duplicateProductId}
+            onChange={setDuplicateProductId}
+            onSearchChange={(query) => {
+              setDuplicateSearch(query);
+              searchDuplicateParts(query);
+            }}
+            searchValue={duplicateSearch}
+            searchable
+            clearable
+            required
+            nothingFoundMessage={
+              duplicateSearch.length < 2
+                ? t('Type at least 2 characters')
+                : t('No products found')
+            }
+          />
+
+          <Divider />
+
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              onClick={() => {
+                setDuplicateModalOpened(false);
+                setDuplicateProductId(null);
+                setDuplicateSearch('');
+                setDuplicateParts([]);
+              }}
+            >
+              {t('Cancel')}
+            </Button>
+            <Button
+              color="green"
+              onClick={handleDuplicate}
+              loading={duplicating}
+            >
+              {t('Duplicate')}
             </Button>
           </Group>
         </Stack>
