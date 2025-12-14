@@ -334,13 +334,6 @@ export function RecipeDetailPage() {
     return date.toLocaleDateString();
   };
 
-  const renderAlternatives = (items?: RecipeItem[]) => {
-    if (!items || items.length === 0) return '-';
-    return items
-      .map((item) => `${item.part_detail?.name || 'Unknown'} (x${item.q || 0})`)
-      .join(', ');
-  };
-
   const handleDeleteAlternative = async (groupIndex: number, altIndex: number) => {
     if (!confirm(t('Are you sure you want to delete this alternative?'))) {
       return;
