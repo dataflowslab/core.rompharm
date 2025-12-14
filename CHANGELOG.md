@@ -69,6 +69,19 @@ All notable changes to this project will be documented in this file.
       - Success notifications after operations
       - Auto-refresh recipe after edit/add
       - Conditional button display based on item type
+  - **Recipe Versioning System**:
+    - `POST /api/recipes/{id}/increment-version` - Increment recipe version
+    - Increments rev number automatically
+    - Updates rev_date to current timestamp
+    - Complete audit trail with old/new version
+    - Frontend ready for version increment button
+  - **Recipe Duplication System**:
+    - `POST /api/recipes/{id}/duplicate` - Duplicate recipe to new product
+    - Copies all ingredients to new recipe
+    - Resets rev to 0 for new recipe
+    - Validates new product doesn't have existing recipe
+    - Complete audit trail with source recipe reference
+    - Frontend ready for duplicate button
 
 ## [1.11.0] - 2024-12-XX
 
