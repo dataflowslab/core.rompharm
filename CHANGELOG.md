@@ -38,6 +38,13 @@ All notable changes to this project will be documented in this file.
     - `DELETE /api/recipes/{id}/items/{index}/alternatives/{alt_index}` - Remove alternative
     - `GET /api/recipes/parts` - Search products
     - `GET /api/recipes/{id}/logs` - Get change history
+  - **Integration with Requests Module**:
+    - `GET /api/requests/parts/{id}/recipe` - Get recipe for part with BOM fallback
+    - Automatic recipe lookup when creating requests
+    - Filters ingredients by validity (start/fin dates)
+    - Processes alternative groups (Type 2)
+    - Falls back to InvenTree BOM if no recipe exists
+    - Returns structured data: `{source: "recipe"|"bom", items: [...]}`
 
 ## [1.11.0] - 2024-12-XX
 
