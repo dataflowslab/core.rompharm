@@ -19,6 +19,8 @@ import {
   Textarea,
   Divider,
   Tabs,
+  Grid,
+  Box,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
@@ -33,6 +35,8 @@ import {
   IconEdit,
   IconChevronDown,
   IconChevronRight,
+  IconBook,
+  IconHistory,
 } from '@tabler/icons-react';
 import api from '../services/api';
 import { EditIngredientModal } from '../components/Recipes/EditIngredientModal';
@@ -592,19 +596,31 @@ export function RecipeDetailPage() {
         </Group>
       </Paper>
 
-      {/* Ingredients Table */}
-      <Paper withBorder mb="md">
-        <Group justify="space-between" p="md" style={{ borderBottom: '1px solid #dee2e6' }}>
-          <Title order={4}>{t('Ingredients')}</Title>
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={() => setAddModalOpened(true)}
-          >
-            {t('Add Ingredient')}
-          </Button>
-        </Group>
+      {/* Main Tabs: Recipe & Journal */}
+      <Tabs defaultValue="recipe" mb="md">
+        <Tabs.List>
+          <Tabs.Tab value="recipe" leftSection={<IconBook size={16} />}>
+            {t('Recipe')}
+          </Tabs.Tab>
+          <Tabs.Tab value="journal" leftSection={<IconHistory size={16} />}>
+            {t('Journal')}
+          </Tabs.Tab>
+        </Tabs.List>
 
-        <Table striped highlightOnHover>
+        {/* Recipe Tab */}
+        <Tabs.Panel value="recipe">
+          <Paper withBorder mt="md">
+            <Group justify="space-between" p="md" style={{ borderBottom: '1px solid #dee2e6' }}>
+              <Title order={4}>{t('Ingredients')}</Title>
+              <Button
+                leftSection={<IconPlus size={16} />}
+                onClick={() => setAddModalOpened(true)}
+              >
+                {t('Add Ingredient')}
+              </Button>
+            </Group>
+
+            <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>{t('Description')}</Table.Th>
