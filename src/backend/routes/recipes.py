@@ -37,13 +37,13 @@ async def list_recipes(
     """List all recipes with optional search"""
     try:
         # Get all recipes
-        recipes = await db[RecipeModel.Config.collection_name].find().to_list(length=1000)
+        recipes = list(db[RecipeModel.Config.collection_name].find())
         
         # Get product IDs
         product_ids = [r["id"] for r in recipes]
         
         # Get product details from depo_parts
-        parts = await db.depo_parts.find({"id": {"$in": product_ids}}).to_list(length=1000)
+        parts = list(db.depo_parts.find({"id": {"$in": product_ids}}))
         parts_map = {p["id"]: p for p in parts}
         
         # Enrich recipes with product info
@@ -84,12 +84,12 @@ async def get_recipe(
 ):
     """Get recipe details"""
     try:
-        recipe = await db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
         # Get product details
-        product = await db.depo_parts.find_one({"id": recipe["id"]})
+        product = db.depo_parts.find_one({"id": recipe["id"]})
         
         # Get all part IDs from items (recursive)
         def collect_part_ids(items):
@@ -102,7 +102,7 @@ async def get_recipe(
             return ids
         
         part_ids = collect_part_ids(recipe.get("items", []))
-        parts = await db.depo_parts.find({"id": {"$in": part_ids}}).to_list(length=1000)
+        parts = list(db.depo_parts.find({"id": {"$in": part_ids}}))
         parts_map = {p["id"]: p for p in parts}
         
         # Enrich items with part details
@@ -147,7 +147,7 @@ async def create_recipe(
             raise HTTPException(status_code=400, detail="product_id is required")
         
         # Check if recipe already exists
-        existing = await db[RecipeModel.Config.collection_name].find_one({"id": product_id})
+        existing = db[RecipeModel.Config.collection_name].find_one({"id": product_id})
         if existing:
             raise HTTPException(status_code=400, detail="Recipe already exists for this product")
         
@@ -157,7 +157,7 @@ async def create_recipe(
             created_by=current_user["username"]
         )
         
-        result = await db[RecipeModel.Config.collection_name].insert_one(recipe_doc)
+        result = db[RecipeModel.Config.collection_name].insert_one(recipe_doc)
         recipe_id = str(result.inserted_id)
         
         # Log creation
@@ -188,7 +188,7 @@ async def add_item(
 ):
     """Add item to recipe"""
     try:
-        recipe = await db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
@@ -210,7 +210,7 @@ async def add_item(
             new_item["items"] = []
         
         # Add item to recipe
-        await db[RecipeModel.Config.collection_name].update_one(
+        db[RecipeModel.Config.collection_name].update_one(
             {"_id": ObjectId(recipe_id)},
             {
                 "$push": {"items": new_item},
@@ -250,7 +250,7 @@ async def update_item(
 ):
     """Update item in recipe"""
     try:
-        recipe = await db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
@@ -271,7 +271,7 @@ async def update_item(
         items[item_index]["notes"] = data.get("notes", items[item_index].get("notes"))
         
         # Update recipe
-        await db[RecipeModel.Config.collection_name].update_one(
+        db[RecipeModel.Config.collection_name].update_one(
             {"_id": ObjectId(recipe_id)},
             {
                 "$set": {
@@ -310,7 +310,7 @@ async def remove_item(
 ):
     """Remove item from recipe"""
     try:
-        recipe = await db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
@@ -322,7 +322,7 @@ async def remove_item(
         items.pop(item_index)
         
         # Update recipe
-        await db[RecipeModel.Config.collection_name].update_one(
+        db[RecipeModel.Config.collection_name].update_one(
             {"_id": ObjectId(recipe_id)},
             {
                 "$set": {
@@ -362,7 +362,7 @@ async def add_alternative(
 ):
     """Add alternative to group (Type 2 item)"""
     try:
-        recipe = await db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
@@ -390,7 +390,7 @@ async def add_alternative(
         parent_item["items"].append(new_alternative)
         
         # Update recipe
-        await db[RecipeModel.Config.collection_name].update_one(
+        db[RecipeModel.Config.collection_name].update_one(
             {"_id": ObjectId(recipe_id)},
             {
                 "$set": {
@@ -430,7 +430,7 @@ async def remove_alternative(
 ):
     """Remove alternative from group"""
     try:
-        recipe = await db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
@@ -451,7 +451,7 @@ async def remove_alternative(
         parent_item["items"] = alternatives
         
         # Update recipe
-        await db[RecipeModel.Config.collection_name].update_one(
+        db[RecipeModel.Config.collection_name].update_one(
             {"_id": ObjectId(recipe_id)},
             {
                 "$set": {
@@ -497,7 +497,7 @@ async def search_parts(
                 ]
             }
         
-        parts = await db.depo_parts.find(query).limit(50).to_list(length=50)
+        parts = list(db.depo_parts.find(query).limit(50))
         
         return [
             {
@@ -519,9 +519,9 @@ async def get_recipe_logs(
 ):
     """Get recipe change history"""
     try:
-        logs = await db[RecipeLogModel.Config.collection_name].find(
+        logs = list(db[RecipeLogModel.Config.collection_name].find(
             {"recipe_id": recipe_id}
-        ).sort("timestamp", -1).to_list(length=100)
+        ).sort("timestamp", -1))
         
         for log in logs:
             log["_id"] = str(log["_id"])
@@ -529,114 +529,3 @@ async def get_recipe_logs(
         return logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
- 
-  
- @ r o u t e r . p o s t ( " / a p i / r e c i p e s / { r e c i p e _ i d } / i n c r e m e n t - v e r s i o n " )  
- a s y n c   d e f   i n c r e m e n t _ v e r s i o n (  
-         r e c i p e _ i d :   s t r ,  
-         r e q u e s t :   R e q u e s t ,  
-         c u r r e n t _ u s e r :   d i c t   =   D e p e n d s ( v e r i f y _ t o k e n ) ,  
-         d b   =   D e p e n d s ( g e t _ d b )  
- ) :  
-         " " " I n c r e m e n t   r e c i p e   v e r s i o n " " "  
-         f r o m   d a t e t i m e   i m p o r t   d a t e t i m e  
-         f r o m   b s o n   i m p o r t   O b j e c t I d  
-          
-         t r y :  
-                 r e c i p e   =   a w a i t   d b . d e p o _ r e c i p e s . f i n d _ o n e ( { " _ i d " :   O b j e c t I d ( r e c i p e _ i d ) } )  
-                 i f   n o t   r e c i p e :  
-                         r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 4 0 4 ,   d e t a i l = " R e c i p e   n o t   f o u n d " )  
-                  
-                 n e w _ r e v   =   r e c i p e . g e t ( " r e v " ,   0 )   +   1  
-                  
-                 a w a i t   d b . d e p o _ r e c i p e s . u p d a t e _ o n e (  
-                         { " _ i d " :   O b j e c t I d ( r e c i p e _ i d ) } ,  
-                         {  
-                                 " $ s e t " :   {  
-                                         " r e v " :   n e w _ r e v ,  
-                                         " r e v _ d a t e " :   d a t e t i m e . u t c n o w ( ) ,  
-                                         " u p d a t e d _ a t " :   d a t e t i m e . u t c n o w ( ) ,  
-                                         " u p d a t e d _ b y " :   c u r r e n t _ u s e r [ " u s e r n a m e " ]  
-                                 }  
-                         }  
-                 )  
-                  
-                 #   L o g   c h a n g e  
-                 f r o m   . . m o d e l s . r e c i p e _ m o d e l   i m p o r t   R e c i p e L o g M o d e l  
-                 l o g _ e n t r y   =   R e c i p e L o g M o d e l . c r e a t e (  
-                         r e c i p e _ i d = r e c i p e _ i d ,  
-                         a c t i o n = " i n c r e m e n t _ v e r s i o n " ,  
-                         c h a n g e s = { " o l d _ r e v " :   r e c i p e . g e t ( " r e v " ,   0 ) ,   " n e w _ r e v " :   n e w _ r e v } ,  
-                         u s e r = c u r r e n t _ u s e r [ " u s e r n a m e " ] ,  
-                         i p _ a d d r e s s = r e q u e s t . c l i e n t . h o s t ,  
-                         u s e r _ a g e n t = r e q u e s t . h e a d e r s . g e t ( " u s e r - a g e n t " )  
-                 )  
-                 a w a i t   d b . d e p o _ r e c i p e s _ l o g s . i n s e r t _ o n e ( l o g _ e n t r y )  
-                  
-                 r e t u r n   { " m e s s a g e " :   " V e r s i o n   i n c r e m e n t e d   s u c c e s s f u l l y " ,   " n e w _ r e v " :   n e w _ r e v }  
-         e x c e p t   H T T P E x c e p t i o n :  
-                 r a i s e  
-         e x c e p t   E x c e p t i o n   a s   e :  
-                 r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 5 0 0 ,   d e t a i l = s t r ( e ) )  
-  
-  
- @ r o u t e r . p o s t ( " / a p i / r e c i p e s / { r e c i p e _ i d } / d u p l i c a t e " )  
- a s y n c   d e f   d u p l i c a t e _ r e c i p e (  
-         r e c i p e _ i d :   s t r ,  
-         d a t a :   d i c t ,  
-         r e q u e s t :   R e q u e s t ,  
-         c u r r e n t _ u s e r :   d i c t   =   D e p e n d s ( v e r i f y _ t o k e n ) ,  
-         d b   =   D e p e n d s ( g e t _ d b )  
- ) :  
-         " " " D u p l i c a t e   r e c i p e   w i t h   n e w   p r o d u c t " " "  
-         f r o m   d a t e t i m e   i m p o r t   d a t e t i m e  
-         f r o m   b s o n   i m p o r t   O b j e c t I d  
-          
-         t r y :  
-                 n e w _ p r o d u c t _ i d   =   d a t a . g e t ( " p r o d u c t _ i d " )  
-                 i f   n o t   n e w _ p r o d u c t _ i d :  
-                         r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 4 0 0 ,   d e t a i l = " p r o d u c t _ i d   i s   r e q u i r e d " )  
-                  
-                 #   C h e c k   i f   r e c i p e   a l r e a d y   e x i s t s   f o r   n e w   p r o d u c t  
-                 e x i s t i n g   =   a w a i t   d b . d e p o _ r e c i p e s . f i n d _ o n e ( { " i d " :   n e w _ p r o d u c t _ i d } )  
-                 i f   e x i s t i n g :  
-                         r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 4 0 0 ,   d e t a i l = " R e c i p e   a l r e a d y   e x i s t s   f o r   t h i s   p r o d u c t " )  
-                  
-                 #   G e t   s o u r c e   r e c i p e  
-                 s o u r c e _ r e c i p e   =   a w a i t   d b . d e p o _ r e c i p e s . f i n d _ o n e ( { " _ i d " :   O b j e c t I d ( r e c i p e _ i d ) } )  
-                 i f   n o t   s o u r c e _ r e c i p e :  
-                         r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 4 0 4 ,   d e t a i l = " S o u r c e   r e c i p e   n o t   f o u n d " )  
-                  
-                 #   C r e a t e   n e w   r e c i p e  
-                 n e w _ r e c i p e   =   {  
-                         " i d " :   n e w _ p r o d u c t _ i d ,  
-                         " r e v " :   0 ,  
-                         " r e v _ d a t e " :   d a t e t i m e . u t c n o w ( ) ,  
-                         " i t e m s " :   s o u r c e _ r e c i p e . g e t ( " i t e m s " ,   [ ] ) ,  
-                         " c r e a t e d _ a t " :   d a t e t i m e . u t c n o w ( ) ,  
-                         " c r e a t e d _ b y " :   c u r r e n t _ u s e r [ " u s e r n a m e " ] ,  
-                         " u p d a t e d _ a t " :   d a t e t i m e . u t c n o w ( ) ,  
-                         " u p d a t e d _ b y " :   c u r r e n t _ u s e r [ " u s e r n a m e " ]  
-                 }  
-                  
-                 r e s u l t   =   a w a i t   d b . d e p o _ r e c i p e s . i n s e r t _ o n e ( n e w _ r e c i p e )  
-                 n e w _ r e c i p e _ i d   =   s t r ( r e s u l t . i n s e r t e d _ i d )  
-                  
-                 #   L o g   c r e a t i o n  
-                 f r o m   . . m o d e l s . r e c i p e _ m o d e l   i m p o r t   R e c i p e L o g M o d e l  
-                 l o g _ e n t r y   =   R e c i p e L o g M o d e l . c r e a t e (  
-                         r e c i p e _ i d = n e w _ r e c i p e _ i d ,  
-                         a c t i o n = " d u p l i c a t e " ,  
-                         c h a n g e s = { " s o u r c e _ r e c i p e _ i d " :   r e c i p e _ i d ,   " n e w _ p r o d u c t _ i d " :   n e w _ p r o d u c t _ i d } ,  
-                         u s e r = c u r r e n t _ u s e r [ " u s e r n a m e " ] ,  
-                         i p _ a d d r e s s = r e q u e s t . c l i e n t . h o s t ,  
-                         u s e r _ a g e n t = r e q u e s t . h e a d e r s . g e t ( " u s e r - a g e n t " )  
-                 )  
-                 a w a i t   d b . d e p o _ r e c i p e s _ l o g s . i n s e r t _ o n e ( l o g _ e n t r y )  
-                  
-                 r e t u r n   { " _ i d " :   n e w _ r e c i p e _ i d ,   " m e s s a g e " :   " R e c i p e   d u p l i c a t e d   s u c c e s s f u l l y " }  
-         e x c e p t   H T T P E x c e p t i o n :  
-                 r a i s e  
-         e x c e p t   E x c e p t i o n   a s   e :  
-                 r a i s e   H T T P E x c e p t i o n ( s t a t u s _ c o d e = 5 0 0 ,   d e t a i l = s t r ( e ) )  
- 

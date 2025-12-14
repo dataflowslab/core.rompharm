@@ -106,7 +106,7 @@ export function RecipesPage() {
 
   return (
     <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
+      <Group justify="space-between" mb="md">
         <Title order={2}>{t('Recipes')}</Title>
         <Button
           leftSection={<IconPlus size={16} />}
@@ -116,24 +116,19 @@ export function RecipesPage() {
         </Button>
       </Group>
 
-      <Paper p="md" withBorder mb="md">
-        <TextInput
-          placeholder={t('Search by product name or code...')}
-          leftSection={<IconSearch size={16} />}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              loadRecipes();
-            }
-          }}
-          rightSection={
-            <Button size="xs" onClick={loadRecipes}>
-              {t('Search')}
-            </Button>
+      <TextInput
+        placeholder={t('Search by product name or code...')}
+        leftSection={<IconSearch size={16} />}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            loadRecipes();
           }
-        />
-      </Paper>
+        }}
+        mb="md"
+        size="md"
+      />
 
       <Paper withBorder>
         <Table striped highlightOnHover>
