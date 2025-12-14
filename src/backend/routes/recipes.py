@@ -76,6 +76,37 @@ async def list_recipes(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/recipes/parts")
+async def search_parts(
+    search: Optional[str] = None,
+    current_user: dict = Depends(verify_token),
+    db = Depends(get_db)
+):
+    """Search parts from depo_parts"""
+    try:
+        query = {}
+        if search:
+            query = {
+                "$or": [
+                    {"name": {"$regex": search, "$options": "i"}},
+                    {"ipn": {"$regex": search, "$options": "i"}}
+                ]
+            }
+        
+        parts = list(db.depo_parts.find(query).limit(50))
+        
+        return [
+            {
+                "id": p["id"],
+                "name": p.get("name", ""),
+                "IPN": p.get("ipn", "")
+            }
+            for p in parts
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/recipes/{recipe_id}")
 async def get_recipe(
     recipe_id: str,
@@ -545,37 +576,6 @@ async def remove_alternative(
         return {"message": "Alternative removed successfully"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/api/recipes/parts")
-async def search_parts(
-    search: Optional[str] = None,
-    current_user: dict = Depends(verify_token),
-    db = Depends(get_db)
-):
-    """Search parts from depo_parts"""
-    try:
-        query = {}
-        if search:
-            query = {
-                "$or": [
-                    {"name": {"$regex": search, "$options": "i"}},
-                    {"IPN": {"$regex": search, "$options": "i"}}
-                ]
-            }
-        
-        parts = list(db.depo_parts.find(query).limit(50))
-        
-        return [
-            {
-                "id": p["id"],
-                "name": p.get("name", ""),
-                "IPN": p.get("IPN", "")
-            }
-            for p in parts
-        ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
