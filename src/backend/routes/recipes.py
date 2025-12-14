@@ -580,6 +580,53 @@ async def search_parts(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/api/recipes/{recipe_id}/increment-version")
+async def increment_version(
+    recipe_id: str,
+    request: Request,
+    current_user: dict = Depends(verify_token),
+    db = Depends(get_db)
+):
+    """Increment recipe version (revision)"""
+    try:
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        if not recipe:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        
+        old_rev = recipe.get("rev", 0)
+        new_rev = old_rev + 1
+        
+        # Update recipe
+        db[RecipeModel.Config.collection_name].update_one(
+            {"_id": ObjectId(recipe_id)},
+            {
+                "$set": {
+                    "rev": new_rev,
+                    "rev_date": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                    "updated_by": current_user["username"]
+                }
+            }
+        )
+        
+        # Log change
+        log_recipe_change(
+            db=db,
+            recipe_id=recipe_id,
+            action="increment_version",
+            changes={"old_rev": old_rev, "new_rev": new_rev},
+            user=current_user["username"],
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+        
+        return {"message": "Version incremented successfully", "new_rev": new_rev}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/recipes/{recipe_id}/logs")
 async def get_recipe_logs(
     recipe_id: str,
