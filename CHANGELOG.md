@@ -81,7 +81,16 @@ All notable changes to this project will be documented in this file.
     - Resets rev to 0 for new recipe
     - Validates new product doesn't have existing recipe
     - Complete audit trail with source recipe reference
-    - Frontend ready for duplicate button
+    - **Frontend Implementation Complete**:
+      - Increment Version button with confirmation dialog
+      - Duplicate Recipe modal with product search
+      - Navigate to new recipe after duplication
+      - Success notifications for both operations
+  - **Alternative Selection Component**:
+    - `AlternativeSelector.tsx` - Radio group for selecting alternatives
+    - Used in Requests module for Type 2 (group) items
+    - Shows quantity badge for each alternative
+    - Clean UI with Paper wrapper
 
 ## [1.11.0] - 2024-12-XX
 
