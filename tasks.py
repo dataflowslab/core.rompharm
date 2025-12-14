@@ -303,6 +303,121 @@ def db_init(c):
 
 
 @task
+def backup_db(c):
+    """Backup MongoDB database to backups folder"""
+    import yaml
+    from datetime import datetime
+    import subprocess
+    
+    print("=" * 60)
+    print("MONGODB DATABASE BACKUP")
+    print("=" * 60)
+    print()
+    
+    # Load config
+    print("1. Loading configuration...")
+    try:
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+        print("   ✓ Configuration loaded")
+    except Exception as e:
+        print(f"   ✗ Failed to load config: {e}")
+        return
+    
+    # Get MongoDB connection string
+    connection_string = config['mongo'].get('auth_string') or config['mongo'].get('connection_string')
+    
+    if not connection_string:
+        print("   ✗ MongoDB connection string not found in config!")
+        return
+    
+    # Extract database name from connection string
+    try:
+        from pymongo import MongoClient
+        client = MongoClient(connection_string, serverSelectionTimeoutMS=5000)
+        db = client.get_default_database()
+        db_name = db.name
+        client.close()
+        print(f"   Database: {db_name}")
+    except Exception as e:
+        print(f"   ✗ Failed to connect to MongoDB: {e}")
+        return
+    
+    # Create backup filename with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_dir = f"backups/mongodb_{timestamp}"
+    
+    print(f"\n2. Creating backup...")
+    print(f"   Output: {backup_dir}")
+    
+    # Ensure backups directory exists
+    os.makedirs("backups", exist_ok=True)
+    
+    # Build mongodump command
+    # Note: mongodump must be installed separately (MongoDB Database Tools)
+    cmd = f'mongodump --uri="{connection_string}" --out="{backup_dir}"'
+    
+    try:
+        # Run mongodump
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minutes timeout
+        )
+        
+        if result.returncode == 0:
+            print("   ✓ Backup completed successfully!")
+            print(f"\n3. Backup details:")
+            print(f"   Location: {backup_dir}")
+            print(f"   Database: {db_name}")
+            print(f"   Timestamp: {timestamp}")
+            
+            # Show backup size
+            try:
+                import shutil
+                total_size = 0
+                for dirpath, dirnames, filenames in os.walk(backup_dir):
+                    for filename in filenames:
+                        filepath = os.path.join(dirpath, filename)
+                        total_size += os.path.getsize(filepath)
+                
+                size_mb = total_size / (1024 * 1024)
+                print(f"   Size: {size_mb:.2f} MB")
+            except:
+                pass
+            
+            print("\n" + "=" * 60)
+            print("BACKUP SUCCESSFUL ✓")
+            print("=" * 60)
+            print("\nTo restore this backup, use:")
+            print(f'  mongorestore --uri="YOUR_CONNECTION_STRING" "{backup_dir}"')
+            
+        else:
+            print(f"   ✗ Backup failed!")
+            print(f"\n   Error output:")
+            print(result.stderr)
+            
+            if "command not found" in result.stderr or "not recognized" in result.stderr:
+                print("\n   [INFO] mongodump not found!")
+                print("   Please install MongoDB Database Tools:")
+                print("   https://www.mongodb.com/try/download/database-tools")
+                print("\n   Windows: Download and add to PATH")
+                print("   Linux: sudo apt-get install mongodb-database-tools")
+                print("   macOS: brew install mongodb-database-tools")
+            
+    except subprocess.TimeoutExpired:
+        print("   ✗ Backup timeout (>5 minutes)")
+    except Exception as e:
+        print(f"   ✗ Backup error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    print()
+
+
+@task
 def job_run(c, name):
     """Run a specific job manually
     
@@ -584,6 +699,7 @@ def help(c):
     print("    invoke test-backend     - Run backend tests")
     print("\n  Database:")
     print("    invoke db-init          - Initialize database")
+    print("    invoke backup-db        - Backup MongoDB database")
     print("    invoke test-config      - Test configuration and connections")
     print("\n  Email:")
     print("    invoke test-email       - Test email configuration")
