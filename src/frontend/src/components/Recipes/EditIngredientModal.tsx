@@ -37,6 +37,7 @@ interface EditIngredientModalProps {
   recipeId: string;
   item: RecipeItem;
   itemIndex: number;
+  altIndex?: number; // Optional: if editing an alternative
   onSuccess: () => void;
 }
 
@@ -46,6 +47,7 @@ export function EditIngredientModal({
   recipeId,
   item,
   itemIndex,
+  altIndex,
   onSuccess,
 }: EditIngredientModalProps) {
   const { t } = useTranslation();
@@ -97,7 +99,6 @@ export function EditIngredientModal({
     try {
       const updateData: any = {
         type: item.type,
-        mandatory,
         notes: notes || undefined,
       };
 
@@ -110,7 +111,17 @@ export function EditIngredientModal({
         }
       }
 
-      await api.put(`/api/recipes/${recipeId}/items/${itemIndex}`, updateData);
+      // If altIndex is provided, we're editing an alternative
+      if (altIndex !== undefined) {
+        await api.put(
+          `/api/recipes/${recipeId}/items/${itemIndex}/alternatives/${altIndex}`,
+          updateData
+        );
+      } else {
+        // Otherwise, editing a regular item
+        updateData.mandatory = mandatory;
+        await api.put(`/api/recipes/${recipeId}/items/${itemIndex}`, updateData);
+      }
 
       onSuccess();
       onClose();
