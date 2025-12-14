@@ -84,7 +84,7 @@ export function RecipeDetailPage() {
 
   // Edit ingredient modal state
   const [editModalOpened, setEditModalOpened] = useState(false);
-  const [editingItem, setEditingItem] = useState<{ item: RecipeItem; index: number } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ item: RecipeItem; index: number; altIndex?: number } | null>(null);
 
   // Add alternative modal state
   const [addAltModalOpened, setAddAltModalOpened] = useState(false);
@@ -483,15 +483,29 @@ export function RecipeDetailPage() {
             <Table.Td><Text size="sm">{formatDate(alt.fin)}</Text></Table.Td>
             <Table.Td>-</Table.Td>
             <Table.Td>
-              <ActionIcon
-                color="red"
-                variant="subtle"
-                size="sm"
-                onClick={() => handleDeleteAlternative(index, altIndex)}
-                title={t('Delete Alternative')}
-              >
-                <IconTrash size={14} />
-              </ActionIcon>
+              <Group gap="xs">
+                <ActionIcon
+                  color="blue"
+                  variant="subtle"
+                  size="sm"
+                  onClick={() => {
+                    setEditingItem({ item: alt, index, altIndex });
+                    setEditModalOpened(true);
+                  }}
+                  title={t('Edit Alternative')}
+                >
+                  <IconEdit size={14} />
+                </ActionIcon>
+                <ActionIcon
+                  color="red"
+                  variant="subtle"
+                  size="sm"
+                  onClick={() => handleDeleteAlternative(index, altIndex)}
+                  title={t('Delete Alternative')}
+                >
+                  <IconTrash size={14} />
+                </ActionIcon>
+              </Group>
             </Table.Td>
           </Table.Tr>
         );
@@ -829,6 +843,7 @@ export function RecipeDetailPage() {
           recipeId={id!}
           item={editingItem.item}
           itemIndex={editingItem.index}
+          altIndex={editingItem.altIndex}
           onSuccess={() => {
             loadRecipe();
             notifications.show({
