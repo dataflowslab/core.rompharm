@@ -12,6 +12,7 @@ import {
   IconClipboardList,
   IconFileText,
   IconTemplate,
+  IconChefHat,
 } from '@tabler/icons-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -50,6 +51,14 @@ export function Navbar() {
         rightSection={<IconChevronRight size={14} />}
         active={isActive('/requests')}
         onClick={() => navigate('/requests')}
+      />
+
+      <NavLink
+        label={t('Recipes')}
+        leftSection={<IconChefHat size={20} />}
+        rightSection={<IconChevronRight size={14} />}
+        active={isActive('/recipes')}
+        onClick={() => navigate('/recipes')}
       />
 
       <NavLink

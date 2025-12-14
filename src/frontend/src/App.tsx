@@ -15,6 +15,9 @@ import { SubmissionsListPage } from './pages/SubmissionsListPage';
 import { SubmissionDetailPage } from './pages/SubmissionDetailPage';
 import { RequestsPage } from './pages/RequestsPage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
+import { RecipesPage } from './pages/RecipesPage';
+import { NewRecipePage } from './pages/NewRecipePage';
+import { RecipeDetailPage } from './pages/RecipeDetailPage';
 import { ProcurementPage } from './pages/ProcurementPage';
 import { ProcurementDetailPage } from './pages/ProcurementDetailPage';
 import { SalesPage } from './pages/SalesPage';
@@ -124,6 +127,9 @@ function App() {
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/requests" element={<ProtectedRoute><RequestsPage /></ProtectedRoute>} />
           <Route path="/requests/:id" element={<ProtectedRoute><RequestDetailPage /></ProtectedRoute>} />
+          <Route path="/recipes" element={<ProtectedRoute><RecipesPage /></ProtectedRoute>} />
+          <Route path="/recipes/new" element={<ProtectedRoute><NewRecipePage /></ProtectedRoute>} />
+          <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetailPage /></ProtectedRoute>} />
           <Route path="/build-orders" element={<ProtectedRoute><BuildOrdersPage /></ProtectedRoute>} />
           <Route path="/build-simulation" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/procurement" element={<ProtectedRoute><ProcurementPage /></ProtectedRoute>} />
