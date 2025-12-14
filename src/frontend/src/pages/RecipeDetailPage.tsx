@@ -28,8 +28,11 @@ import {
   IconTrash,
   IconChefHat,
   IconDeviceFloppy,
+  IconEdit,
 } from '@tabler/icons-react';
 import api from '../services/api';
+import { EditIngredientModal } from '../components/Recipes/EditIngredientModal';
+import { AddAlternativeModal } from '../components/Recipes/AddAlternativeModal';
 
 interface PartDetail {
   name: string;
@@ -76,6 +79,14 @@ export function RecipeDetailPage() {
   const [addModalOpened, setAddModalOpened] = useState(false);
   const [parts, setParts] = useState<Part[]>([]);
   const [searchValue, setSearchValue] = useState('');
+
+  // Edit ingredient modal state
+  const [editModalOpened, setEditModalOpened] = useState(false);
+  const [editingItem, setEditingItem] = useState<{ item: RecipeItem; index: number } | null>(null);
+
+  // Add alternative modal state
+  const [addAltModalOpened, setAddAltModalOpened] = useState(false);
+  const [addAltItemIndex, setAddAltItemIndex] = useState<number | null>(null);
 
   // Form state for adding ingredient
   const [itemType, setItemType] = useState<string>('1');
@@ -257,13 +268,42 @@ export function RecipeDetailPage() {
           </Badge>
         </Table.Td>
         <Table.Td>
-          <ActionIcon
-            color="red"
-            variant="subtle"
-            onClick={() => handleDeleteItem(index)}
-          >
-            <IconTrash size={16} />
-          </ActionIcon>
+          <Group gap="xs">
+            {!isGroup && (
+              <ActionIcon
+                color="blue"
+                variant="subtle"
+                onClick={() => {
+                  setEditingItem({ item, index });
+                  setEditModalOpened(true);
+                }}
+                title={t('Edit')}
+              >
+                <IconEdit size={16} />
+              </ActionIcon>
+            )}
+            {isGroup && (
+              <ActionIcon
+                color="green"
+                variant="subtle"
+                onClick={() => {
+                  setAddAltItemIndex(index);
+                  setAddAltModalOpened(true);
+                }}
+                title={t('Add Alternative')}
+              >
+                <IconPlus size={16} />
+              </ActionIcon>
+            )}
+            <ActionIcon
+              color="red"
+              variant="subtle"
+              onClick={() => handleDeleteItem(index)}
+              title={t('Delete')}
+            >
+              <IconTrash size={16} />
+            </ActionIcon>
+          </Group>
         </Table.Td>
       </Table.Tr>
     );
@@ -494,6 +534,49 @@ export function RecipeDetailPage() {
           </Group>
         </Stack>
       </Modal>
+
+      {/* Edit Ingredient Modal */}
+      {editingItem && (
+        <EditIngredientModal
+          opened={editModalOpened}
+          onClose={() => {
+            setEditModalOpened(false);
+            setEditingItem(null);
+          }}
+          recipeId={id!}
+          item={editingItem.item}
+          itemIndex={editingItem.index}
+          onSuccess={() => {
+            loadRecipe();
+            notifications.show({
+              title: t('Success'),
+              message: t('Ingredient updated successfully'),
+              color: 'green',
+            });
+          }}
+        />
+      )}
+
+      {/* Add Alternative Modal */}
+      {addAltItemIndex !== null && (
+        <AddAlternativeModal
+          opened={addAltModalOpened}
+          onClose={() => {
+            setAddAltModalOpened(false);
+            setAddAltItemIndex(null);
+          }}
+          recipeId={id!}
+          itemIndex={addAltItemIndex}
+          onSuccess={() => {
+            loadRecipe();
+            notifications.show({
+              title: t('Success'),
+              message: t('Alternative added successfully'),
+              color: 'green',
+            });
+          }}
+        />
+      )}
     </Container>
   );
 }
