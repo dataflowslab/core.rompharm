@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.12.0] - 2024-12-14
+
+### Added
+- **Recipes System (Production Recipes)**
+  - Complete production recipe management system as alternative to InvenTree BOM
+  - Backend models: `RecipeModel`, `RecipeItem`, `RecipeLogModel`
+  - Full CRUD API endpoints for recipes and ingredients
+  - Support for single products (Type 1) and alternative groups (Type 2)
+  - Hierarchical structure support (nested groups)
+  - Temporal validity with start/end dates for components
+  - Mandatory/optional ingredient flags
+  - Revision tracking (rev number and date)
+  - Complete audit trail for all changes
+  - Frontend pages:
+    - `RecipesPage`: List with search and sortable columns
+    - `NewRecipePage`: Create recipe with product selection
+    - `RecipeDetailPage`: Full ingredient management with add/delete
+  - Add ingredient modal with Type 1 (Single) and Type 2 (Alternatives)
+  - Display alternatives as comma-separated list: "Product A (x10), Product B (x8)"
+  - Integration with `depo_parts` for product data
+  - Menu integration with chef hat icon
+  - Documentation: `utils/RECIPES_SYSTEM.md`
+  - API endpoints:
+    - `GET /api/recipes` - List all recipes with search
+    - `POST /api/recipes` - Create new recipe
+    - `GET /api/recipes/{id}` - Get recipe details
+    - `POST /api/recipes/{id}/items` - Add ingredient
+    - `DELETE /api/recipes/{id}/items/{index}` - Remove ingredient
+    - `GET /api/recipes/parts` - Search products
+    - `GET /api/recipes/{id}/logs` - Get change history
+
 ## [1.11.0] - 2024-12-XX
 
 ### Added
