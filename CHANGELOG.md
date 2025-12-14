@@ -62,6 +62,13 @@ All notable changes to this project will be documented in this file.
       - Product search, quantity, dates, notes
       - Validates parent item is Type 2
       - Auto-refresh after adding
+    - **RecipeDetailPage Integration**:
+      - Edit button for Type 1 (Single) ingredients
+      - Add Alternative button for Type 2 (Group) ingredients
+      - Modal state management and handlers
+      - Success notifications after operations
+      - Auto-refresh recipe after edit/add
+      - Conditional button display based on item type
 
 ## [1.11.0] - 2024-12-XX
 
