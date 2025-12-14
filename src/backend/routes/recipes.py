@@ -54,7 +54,7 @@ async def list_recipes(
                 "_id": str(recipe["_id"]),
                 "id": recipe["id"],
                 "name": product.get("name", f"Product {recipe['id']}"),
-                "code": product.get("ipd", ""),
+                "code": product.get("ipn", ""),
                 "items_count": len(recipe.get("items", [])),
                 "created_at": recipe.get("created_at"),
                 "created_by": recipe.get("created_by"),
