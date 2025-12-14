@@ -45,6 +45,12 @@ All notable changes to this project will be documented in this file.
     - Processes alternative groups (Type 2)
     - Falls back to InvenTree BOM if no recipe exists
     - Returns structured data: `{source: "recipe"|"bom", items: [...]}`
+    - Frontend integration in RequestsPage:
+      - Replaced BOM endpoint with recipe endpoint
+      - Display source badge (From Recipe / From BOM)
+      - Show alternatives as slash-separated list (Product A / Product B)
+      - Auto-load recipe when part selected
+      - Visual distinction between recipe and BOM sources
 
 ## [1.11.0] - 2024-12-XX
 
