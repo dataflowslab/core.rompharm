@@ -341,27 +341,67 @@ export function RecipeDetailPage() {
       .join(', ');
   };
 
+  const handleDeleteAlternative = async (groupIndex: number, altIndex: number) => {
+    if (!confirm(t('Are you sure you want to delete this alternative?'))) {
+      return;
+    }
+
+    try {
+      await api.delete(`/api/recipes/${id}/items/${groupIndex}/alternatives/${altIndex}`);
+
+      notifications.show({
+        title: t('Success'),
+        message: t('Alternative deleted successfully'),
+        color: 'green',
+      });
+
+      loadRecipe();
+    } catch (error: any) {
+      console.error('Failed to delete alternative:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to delete alternative'),
+        color: 'red',
+      });
+    }
+  };
+
   const renderItemRow = (item: RecipeItem, index: number) => {
     const isGroup = item.type === 2;
     const isExpired = item.fin && new Date(item.fin) < new Date();
     const isActive = !isExpired && (!item.start || new Date(item.start) <= new Date());
+    const isExpanded = expandedGroups.has(index);
 
-    return (
+    const rows = [];
+
+    // Main row
+    rows.push(
       <Table.Tr 
-        key={index}
+        key={`main-${index}`}
         style={{ 
           backgroundColor: isExpired ? '#f5f5f5' : (isActive ? '#f0fdf4' : 'transparent'),
-          opacity: isExpired ? 0.6 : 1
+          opacity: isExpired ? 0.6 : 1,
+          cursor: isGroup ? 'pointer' : 'default'
         }}
+        onClick={() => isGroup && toggleGroup(index)}
       >
         <Table.Td>
-          {isGroup ? (
-            <Text fw={500}>{renderAlternatives(item.items)}</Text>
-          ) : (
-            <Text>{item.part_detail?.name || `Product ${item.id}`}</Text>
-          )}
+          <Group gap="xs">
+            {isGroup && (
+              <ActionIcon size="sm" variant="subtle" color="gray">
+                {isExpanded ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+              </ActionIcon>
+            )}
+            {isGroup ? (
+              <Text fw={500}>
+                {t('Alternative Group')} ({item.items?.length || 0} {t('items')})
+              </Text>
+            ) : (
+              <Text>{item.part_detail?.name || `Product ${item.id}`}</Text>
+            )}
+          </Group>
           {item.notes && (
-            <Text size="xs" c="dimmed" mt={4}>
+            <Text size="xs" c="dimmed" mt={4} ml={isGroup ? 28 : 0}>
               {item.notes}
             </Text>
           )}
@@ -379,7 +419,7 @@ export function RecipeDetailPage() {
             {item.mandatory ? t('Yes') : t('No')}
           </Badge>
         </Table.Td>
-        <Table.Td>
+        <Table.Td onClick={(e) => e.stopPropagation()}>
           <Group gap="xs">
             {!isGroup && (
               <ActionIcon
@@ -419,6 +459,53 @@ export function RecipeDetailPage() {
         </Table.Td>
       </Table.Tr>
     );
+
+    // Subrows for alternatives (if group is expanded)
+    if (isGroup && isExpanded && item.items) {
+      item.items.forEach((alt, altIndex) => {
+        const altExpired = alt.fin && new Date(alt.fin) < new Date();
+        const altActive = !altExpired && (!alt.start || new Date(alt.start) <= new Date());
+        
+        rows.push(
+          <Table.Tr 
+            key={`alt-${index}-${altIndex}`}
+            style={{ 
+              backgroundColor: altExpired ? '#f8f8f8' : (altActive ? '#f7fef9' : '#fafafa'),
+              opacity: altExpired ? 0.5 : 0.9
+            }}
+          >
+            <Table.Td style={{ paddingLeft: '48px' }}>
+              <Text size="sm">↳ {alt.part_detail?.name || `Product ${alt.id}`}</Text>
+              {alt.notes && (
+                <Text size="xs" c="dimmed" mt={2}>
+                  {alt.notes}
+                </Text>
+              )}
+            </Table.Td>
+            <Table.Td>
+              <Badge size="sm" color="gray" variant="outline">{t('Alternative')}</Badge>
+            </Table.Td>
+            <Table.Td>{alt.q}</Table.Td>
+            <Table.Td><Text size="sm">{formatDate(alt.start)}</Text></Table.Td>
+            <Table.Td><Text size="sm">{formatDate(alt.fin)}</Text></Table.Td>
+            <Table.Td>-</Table.Td>
+            <Table.Td>
+              <ActionIcon
+                color="red"
+                variant="subtle"
+                size="sm"
+                onClick={() => handleDeleteAlternative(index, altIndex)}
+                title={t('Delete Alternative')}
+              >
+                <IconTrash size={14} />
+              </ActionIcon>
+            </Table.Td>
+          </Table.Tr>
+        );
+      });
+    }
+
+    return rows;
   };
 
   if (loading) {
