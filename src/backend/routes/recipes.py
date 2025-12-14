@@ -34,10 +34,10 @@ async def list_recipes(
     current_user: dict = Depends(verify_token),
     db = Depends(get_db)
 ):
-    """List all recipes with optional search"""
+    """List all recipes with optional search (latest revision only)"""
     try:
-        # Get all recipes
-        recipes = list(db[RecipeModel.Config.collection_name].find())
+        # Get all recipes from latest view (only latest revisions)
+        recipes = list(db.depo_recipes_latest.find())
         
         # Get product IDs
         product_ids = [r["id"] for r in recipes]
@@ -623,6 +623,42 @@ async def increment_version(
         return {"message": "Version incremented successfully", "new_rev": new_rev}
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/recipes/{recipe_id}/revisions")
+async def get_recipe_revisions(
+    recipe_id: str,
+    current_user: dict = Depends(verify_token),
+    db = Depends(get_db)
+):
+    """Get all revisions for a recipe's product"""
+    try:
+        # Get current recipe to find product_id
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        if not recipe:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        
+        product_id = recipe["id"]
+        
+        # Get all revisions for this product, sorted by revision desc
+        revisions = list(db[RecipeModel.Config.collection_name].find(
+            {"id": product_id}
+        ).sort("rev", -1))
+        
+        result = []
+        for rev in revisions:
+            result.append({
+                "_id": str(rev["_id"]),
+                "rev": rev.get("rev", 0),
+                "rev_date": rev.get("rev_date"),
+                "updated_at": rev.get("updated_at"),
+                "updated_by": rev.get("updated_by"),
+                "is_current": str(rev["_id"]) == recipe_id
+            })
+        
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
