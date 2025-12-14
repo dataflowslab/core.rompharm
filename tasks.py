@@ -317,9 +317,23 @@ def backup_db(c):
     # Load config
     print("1. Loading configuration...")
     try:
-        with open('config.yaml', 'r') as f:
+        # Try multiple config locations
+        config_paths = ['config/config.yaml', 'config.yaml', 'config_sample.yaml']
+        config_file = None
+        
+        for path in config_paths:
+            if os.path.exists(path):
+                config_file = path
+                break
+        
+        if not config_file:
+            print("   ✗ No configuration file found!")
+            print("   Tried: config/config.yaml, config.yaml, config_sample.yaml")
+            return
+        
+        with open(config_file, 'r') as f:
             config = yaml.safe_load(f)
-        print("   ✓ Configuration loaded")
+        print(f"   ✓ Configuration loaded from {config_file}")
     except Exception as e:
         print(f"   ✗ Failed to load config: {e}")
         return
