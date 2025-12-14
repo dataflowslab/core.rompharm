@@ -18,6 +18,8 @@ import {
   Checkbox,
   Textarea,
   Divider,
+  Tabs,
+  Grid,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
@@ -637,6 +639,21 @@ export function RecipeDetailPage() {
             )}
           </Table.Tbody>
         </Table>
+      </Paper>
+
+      {/* Journal Tab */}
+      <Paper withBorder mb="md">
+        <Tabs defaultValue="journal">
+          <Tabs.List>
+            <Tabs.Tab value="journal">{t('Journal')}</Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="journal" pt="md">
+            <Text size="sm" c="dimmed" p="md">
+              {t('Journal functionality coming soon...')}
+            </Text>
+          </Tabs.Panel>
+        </Tabs>
       </Paper>
 
       {/* Recipe Info */}
