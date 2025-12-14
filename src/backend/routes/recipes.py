@@ -114,7 +114,7 @@ async def get_recipe(
                     part = parts_map.get(item["id"], {})
                     enriched_item["part_detail"] = {
                         "name": part.get("name", f"Part {item['id']}"),
-                        "IPN": part.get("IPN", "")
+                        "IPN": part.get("ipn", "")
                     }
                 if item.get("items"):
                     enriched_item["items"] = enrich_items(item["items"])
@@ -124,7 +124,7 @@ async def get_recipe(
         recipe["_id"] = str(recipe["_id"])
         recipe["product_detail"] = {
             "name": product.get("name", f"Product {recipe['id']}") if product else f"Product {recipe['id']}",
-            "IPN": product.get("IPN", "") if product else ""
+            "IPN": product.get("ipn", "") if product else ""
         }
         recipe["items"] = enrich_items(recipe.get("items", []))
         

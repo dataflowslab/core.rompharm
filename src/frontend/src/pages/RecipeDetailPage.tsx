@@ -22,6 +22,7 @@ import {
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import {
   IconArrowLeft,
   IconPlus,
@@ -175,29 +176,36 @@ export function RecipeDetailPage() {
     }
   };
 
-  const handleIncrementVersion = async () => {
-    if (!confirm(t('Are you sure you want to increment the version? This will update the revision number and date.'))) {
-      return;
-    }
+  const handleIncrementVersion = () => {
+    modals.openConfirmModal({
+      title: t('Increment Version'),
+      children: (
+        <Text size="sm">
+          {t('Are you sure you want to increment the version? This will update the revision number and date.')}
+        </Text>
+      ),
+      labels: { confirm: t('Confirm'), cancel: t('Cancel') },
+      onConfirm: async () => {
+        try {
+          const response = await api.post(`/api/recipes/${id}/increment-version`);
+          
+          notifications.show({
+            title: t('Success'),
+            message: `${t('Version incremented to')} ${response.data.new_rev}`,
+            color: 'green',
+          });
 
-    try {
-      const response = await api.post(`/api/recipes/${id}/increment-version`);
-      
-      notifications.show({
-        title: t('Success'),
-        message: `${t('Version incremented to')} ${response.data.new_rev}`,
-        color: 'green',
-      });
-
-      loadRecipe();
-    } catch (error: any) {
-      console.error('Failed to increment version:', error);
-      notifications.show({
-        title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to increment version'),
-        color: 'red',
-      });
-    }
+          loadRecipe();
+        } catch (error: any) {
+          console.error('Failed to increment version:', error);
+          notifications.show({
+            title: t('Error'),
+            message: error.response?.data?.detail || t('Failed to increment version'),
+            color: 'red',
+          });
+        }
+      },
+    });
   };
 
   const handleDuplicate = async () => {
