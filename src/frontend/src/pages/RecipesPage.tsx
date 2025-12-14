@@ -11,6 +11,7 @@ interface Recipe {
   id: number;
   name: string;
   code: string;
+  rev: number;
   items_count: number;
   created_at: string;
   created_by: string;
@@ -163,15 +164,6 @@ export function RecipesPage() {
               </Table.Th>
               <Table.Th
                 style={{ cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => handleSort('created_at')}
-              >
-                <Group gap="xs">
-                  {t('Created')}
-                  <SortIcon field="created_at" />
-                </Group>
-              </Table.Th>
-              <Table.Th
-                style={{ cursor: 'pointer', userSelect: 'none' }}
                 onClick={() => handleSort('updated_at')}
               >
                 <Group gap="xs">
@@ -185,13 +177,13 @@ export function RecipesPage() {
           <Table.Tbody>
             {loading ? (
               <Table.Tr>
-                <Table.Td colSpan={6} style={{ textAlign: 'center' }}>
+                <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
                   {t('Loading...')}
                 </Table.Td>
               </Table.Tr>
             ) : sortedRecipes.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={6} style={{ textAlign: 'center' }}>
+                <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
                   <Text c="dimmed">{t('No recipes found')}</Text>
                 </Table.Td>
               </Table.Tr>
@@ -202,16 +194,14 @@ export function RecipesPage() {
                   style={{ cursor: 'pointer' }}
                   onClick={() => navigate(`/recipes/${recipe._id}`)}
                 >
-                  <Table.Td>{recipe.name}</Table.Td>
+                  <Table.Td>
+                    {recipe.name} <Text span c="dimmed">(rev {recipe.rev})</Text>
+                  </Table.Td>
                   <Table.Td>
                     <Badge variant="light">{recipe.code || '-'}</Badge>
                   </Table.Td>
                   <Table.Td>
                     <Badge color="blue">{recipe.items_count}</Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{formatDate(recipe.created_at)}</Text>
-                    <Text size="xs" c="dimmed">{recipe.created_by}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm">{formatDate(recipe.updated_at)}</Text>
