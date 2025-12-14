@@ -91,6 +91,12 @@ All notable changes to this project will be documented in this file.
     - Used in Requests module for Type 2 (group) items
     - Shows quantity badge for each alternative
     - Clean UI with Paper wrapper
+  - **Recipes Page UI Improvements**:
+    - Search bar now full width (like Procurement page)
+    - Removed Paper wrapper from search for cleaner look
+    - Code column displays IPN from depo_parts collection
+    - Search bar size increased to 'md' for better visibility
+    - Real-time search on Enter key press
 
 ## [1.11.0] - 2024-12-XX
 
