@@ -51,6 +51,17 @@ All notable changes to this project will be documented in this file.
       - Show alternatives as slash-separated list (Product A / Product B)
       - Auto-load recipe when part selected
       - Visual distinction between recipe and BOM sources
+  - **Frontend Enhancement Components**:
+    - `EditIngredientModal.tsx` - Modal for editing existing ingredients
+      - Edit product, quantity, dates, mandatory flag, notes
+      - Product search with autocomplete
+      - Date pickers for start/end dates
+      - Works with Type 1 (Single) ingredients
+    - `AddAlternativeModal.tsx` - Modal for adding alternatives to groups
+      - Add alternative products to Type 2 (Alternative Group) items
+      - Product search, quantity, dates, notes
+      - Validates parent item is Type 2
+      - Auto-refresh after adding
 
 ## [1.11.0] - 2024-12-XX
 
