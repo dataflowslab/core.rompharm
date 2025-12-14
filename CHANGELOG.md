@@ -18,8 +18,11 @@ All notable changes to this project will be documented in this file.
   - Frontend pages:
     - `RecipesPage`: List with search and sortable columns
     - `NewRecipePage`: Create recipe with product selection
-    - `RecipeDetailPage`: Full ingredient management with add/delete
+    - `RecipeDetailPage`: Full ingredient management with add/edit/delete
   - Add ingredient modal with Type 1 (Single) and Type 2 (Alternatives)
+  - Edit ingredient functionality for updating existing items
+  - Add alternatives to Type 2 (group) items
+  - Remove alternatives from groups
   - Display alternatives as comma-separated list: "Product A (x10), Product B (x8)"
   - Integration with `depo_parts` for product data
   - Menu integration with chef hat icon
@@ -29,7 +32,10 @@ All notable changes to this project will be documented in this file.
     - `POST /api/recipes` - Create new recipe
     - `GET /api/recipes/{id}` - Get recipe details
     - `POST /api/recipes/{id}/items` - Add ingredient
+    - `PUT /api/recipes/{id}/items/{index}` - Update ingredient
     - `DELETE /api/recipes/{id}/items/{index}` - Remove ingredient
+    - `POST /api/recipes/{id}/items/{index}/alternatives` - Add alternative to group
+    - `DELETE /api/recipes/{id}/items/{index}/alternatives/{alt_index}` - Remove alternative
     - `GET /api/recipes/parts` - Search products
     - `GET /api/recipes/{id}/logs` - Get change history
 
