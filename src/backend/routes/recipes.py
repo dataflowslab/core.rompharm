@@ -419,6 +419,75 @@ async def add_alternative(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.put("/api/recipes/{recipe_id}/items/{item_index}/alternatives/{alt_index}")
+async def update_alternative(
+    recipe_id: str,
+    item_index: int,
+    alt_index: int,
+    data: dict,
+    request: Request,
+    current_user: dict = Depends(verify_token),
+    db = Depends(get_db)
+):
+    """Update alternative in group"""
+    try:
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        if not recipe:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        
+        items = recipe.get("items", [])
+        if item_index < 0 or item_index >= len(items):
+            raise HTTPException(status_code=404, detail="Item not found")
+        
+        parent_item = items[item_index]
+        if parent_item.get("type") != 2:
+            raise HTTPException(status_code=400, detail="Item is not a group")
+        
+        alternatives = parent_item.get("items", [])
+        if alt_index < 0 or alt_index >= len(alternatives):
+            raise HTTPException(status_code=404, detail="Alternative not found")
+        
+        old_alt = dict(alternatives[alt_index])
+        
+        # Update alternative fields
+        alternatives[alt_index]["id"] = data.get("product_id", alternatives[alt_index].get("id"))
+        alternatives[alt_index]["q"] = data.get("q", alternatives[alt_index].get("q"))
+        alternatives[alt_index]["start"] = datetime.fromisoformat(data.get("start")) if data.get("start") else alternatives[alt_index].get("start")
+        alternatives[alt_index]["fin"] = datetime.fromisoformat(data.get("fin")) if data.get("fin") else alternatives[alt_index].get("fin")
+        alternatives[alt_index]["notes"] = data.get("notes", alternatives[alt_index].get("notes"))
+        
+        parent_item["items"] = alternatives
+        
+        # Update recipe
+        db[RecipeModel.Config.collection_name].update_one(
+            {"_id": ObjectId(recipe_id)},
+            {
+                "$set": {
+                    "items": items,
+                    "updated_at": datetime.utcnow(),
+                    "updated_by": current_user["username"]
+                }
+            }
+        )
+        
+        # Log change
+        log_recipe_change(
+            db=db,
+            recipe_id=recipe_id,
+            action="update_alternative",
+            changes={"item_index": item_index, "alt_index": alt_index, "old_alternative": old_alt, "new_alternative": alternatives[alt_index]},
+            user=current_user["username"],
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+        
+        return {"message": "Alternative updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/api/recipes/{recipe_id}/items/{item_index}/alternatives/{alt_index}")
 async def remove_alternative(
     recipe_id: str,
