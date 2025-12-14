@@ -328,9 +328,17 @@ export function RecipeDetailPage() {
 
   const renderItemRow = (item: RecipeItem, index: number) => {
     const isGroup = item.type === 2;
+    const isExpired = item.fin && new Date(item.fin) < new Date();
+    const isActive = !isExpired && (!item.start || new Date(item.start) <= new Date());
 
     return (
-      <Table.Tr key={index}>
+      <Table.Tr 
+        key={index}
+        style={{ 
+          backgroundColor: isExpired ? '#f5f5f5' : (isActive ? '#f0fdf4' : 'transparent'),
+          opacity: isExpired ? 0.6 : 1
+        }}
+      >
         <Table.Td>
           {isGroup ? (
             <Text fw={500}>{renderAlternatives(item.items)}</Text>
@@ -498,7 +506,17 @@ export function RecipeDetailPage() {
                 </Table.Td>
               </Table.Tr>
             ) : (
-              recipe.items.map((item, index) => renderItemRow(item, index))
+              // Sort items: active first (green), then expired (gray) at the end
+              [...recipe.items]
+                .map((item, originalIndex) => ({ item, originalIndex }))
+                .sort((a, b) => {
+                  const aExpired = a.item.fin && new Date(a.item.fin) < new Date();
+                  const bExpired = b.item.fin && new Date(b.item.fin) < new Date();
+                  if (aExpired && !bExpired) return 1;  // a expired, move to end
+                  if (!aExpired && bExpired) return -1; // b expired, move to end
+                  return 0; // keep original order
+                })
+                .map(({ item, originalIndex }) => renderItemRow(item, originalIndex))
             )}
           </Table.Tbody>
         </Table>
