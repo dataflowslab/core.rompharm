@@ -1,0 +1,1 @@
+{"options":{"viewOn":"depo_recipes","pipeline":[{"$setWindowFields":{"partitionBy":"$id","sortBy":{"rev":{"$numberInt":"-1"}},"output":{"rank":{"$documentNumber":{}}}}},{"$match":{"rank":{"$numberInt":"1"}}},{"$unset":"rank"}]},"indexes":[],"collectionName":"depo_recipes_latest","type":"view"}

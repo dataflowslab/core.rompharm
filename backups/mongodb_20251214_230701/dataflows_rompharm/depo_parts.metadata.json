@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"3b0b9bc968454ae28656fe2675b8d43b","collectionName":"depo_parts","type":"collection"}
