@@ -361,7 +361,12 @@ export function RequestsPage() {
         opened={modalOpened}
         onClose={() => setModalOpened(false)}
         title={t('New Request')}
-        size="lg"
+        size="80%"
+        styles={{
+          content: {
+            maxWidth: '80%'
+          }
+        }}
       >
         <Grid>
           <Grid.Col span={12}>
