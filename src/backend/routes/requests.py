@@ -150,14 +150,32 @@ async def get_part_stock_info(
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
-    """Get stock information for a part from MongoDB depo_stocks with batches"""
+    """Get stock information for a part from MongoDB depo_stocks with batches
+    
+    Link: depo_parts._id (ObjectId) <-> depo_stocks.part_id (ObjectId)
+    """
+    from bson import ObjectId
+    
     try:
-        # Get all stock records for this part (grouped by batch)
-        stock_records = list(db.depo_stocks.find({"part_id.$oid": str(part_id)}))
+        # Get the part from depo_parts to get its _id (ObjectId)
+        part = db.depo_parts.find_one({"id": part_id})
         
-        # If no records found, try with integer part_id
-        if not stock_records:
-            stock_records = list(db.depo_stocks.find({"part_id": part_id}))
+        if not part:
+            # Part not found in depo_parts
+            return {
+                "part_id": part_id,
+                "total": 0,
+                "in_sales": 0,
+                "in_builds": 0,
+                "in_procurement": 0,
+                "available": 0,
+                "batches": []
+            }
+        
+        part_oid = part.get("_id")  # This is the ObjectId
+        
+        # Query depo_stocks using part_id = depo_parts._id (ObjectId)
+        stock_records = list(db.depo_stocks.find({"part_id": part_oid}))
         
         if stock_records:
             # Calculate totals
@@ -167,11 +185,20 @@ async def get_part_stock_info(
             batches = []
             for stock in stock_records:
                 if stock.get("q", 0) > 0:
+                    # Extract location_id (handle both ObjectId and string formats)
+                    location = stock.get("location")
+                    if isinstance(location, ObjectId):
+                        location_id = str(location)
+                    elif isinstance(location, dict) and "$oid" in location:
+                        location_id = location["$oid"]
+                    else:
+                        location_id = str(location) if location else ""
+                    
                     batches.append({
                         "batch_code": stock.get("batch_code", ""),
                         "supplier_batch_code": stock.get("supplier_batch_code", ""),
                         "quantity": stock.get("q", 0),
-                        "location_id": str(stock.get("location", {}).get("$oid", "")) if isinstance(stock.get("location"), dict) else str(stock.get("location", ""))
+                        "location_id": location_id
                     })
             
             return {
@@ -184,7 +211,7 @@ async def get_part_stock_info(
                 "batches": batches
             }
         else:
-            # Part not found in depo_stocks, return zeros
+            # No stock records found
             return {
                 "part_id": part_id,
                 "total": 0,
@@ -195,6 +222,9 @@ async def get_part_stock_info(
                 "batches": []
             }
     except Exception as e:
+        print(f"[ERROR] Failed to fetch stock info for part {part_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock info: {str(e)}")
 
 
