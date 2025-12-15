@@ -107,31 +107,40 @@ async def get_stock_locations(
 async def get_parts(
     request: Request,
     search: Optional[str] = None,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(verify_admin),
+    db = Depends(get_db)
 ):
-    """Get list of parts from InvenTree with search"""
+    """Get list of parts from MongoDB depo_parts with search"""
     if not search or len(search.strip()) < 2:
         return {"results": [], "count": 0}
     
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    params = {
-        'search': search.strip(),
-        'limit': 30
-    }
-    
     try:
-        response = requests.get(
-            f"{inventree_url}/api/part/",
-            headers=headers,
-            params=params,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
+        search_term = search.strip()
+        
+        # Search in depo_parts collection by name or IPN (case-insensitive)
+        query = {
+            "$or": [
+                {"name": {"$regex": search_term, "$options": "i"}},
+                {"ipn": {"$regex": search_term, "$options": "i"}}
+            ]
+        }
+        
+        parts = list(db.depo_parts.find(query).limit(30))
+        
+        # Format results to match expected structure
+        results = []
+        for part in parts:
+            results.append({
+                "pk": part.get("id"),  # Use 'id' field as pk
+                "name": part.get("name", ""),
+                "IPN": part.get("ipn", "")  # Map 'ipn' to 'IPN'
+            })
+        
+        return {
+            "results": results,
+            "count": len(results)
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch parts: {str(e)}")
 
 
