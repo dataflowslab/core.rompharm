@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../services/api';
 import { notifications } from '@mantine/notifications';
+import { ComponentsTable } from '../components/Requests/ComponentsTable';
 
 interface StockLocation {
   pk: number;
@@ -438,25 +439,14 @@ export function RequestsPage() {
 
           {recipeData && recipeData.items && recipeData.items.length > 0 && (
             <Grid.Col span={12}>
-              <Paper p="xs" withBorder>
-                <Group justify="space-between" mb="xs">
-                  <Text size="sm" fw={500} c="blue">
-                    {t('This part has')} {recipeData.items.length} {t('component(s)')}
-                  </Text>
-                  <Badge size="sm" color={recipeData.source === 'recipe' ? 'green' : 'gray'}>
-                    {recipeData.source === 'recipe' ? t('From Recipe') : t('From BOM')}
-                  </Badge>
-                </Group>
-                <Text size="xs" c="dimmed">
-                  {t('Components')}: {recipeData.items.map((item: any) => {
-                    if (item.type === 2 && item.alternatives) {
-                      // Alternative group
-                      return item.alternatives.map((alt: any) => alt.name).join(' / ');
-                    }
-                    return item.name;
-                  }).join(', ')}
-                </Text>
-              </Paper>
+              <ComponentsTable
+                recipeData={recipeData}
+                productQuantity={formData.quantity}
+                onComponentsChange={(components) => {
+                  // Store components for later use when creating request
+                  console.log('Components updated:', components);
+                }}
+              />
             </Grid.Col>
           )}
 
