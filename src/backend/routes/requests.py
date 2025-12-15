@@ -150,19 +150,38 @@ async def get_part_stock_info(
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
-    """Get stock information for a part from MongoDB depo_stocks"""
+    """Get stock information for a part from MongoDB depo_stocks with batches"""
     try:
-        # Get stock from MongoDB depo_stocks collection
-        stock_doc = db.depo_stocks.find_one({"part_id": part_id})
+        # Get all stock records for this part (grouped by batch)
+        stock_records = list(db.depo_stocks.find({"part_id.$oid": str(part_id)}))
         
-        if stock_doc:
+        # If no records found, try with integer part_id
+        if not stock_records:
+            stock_records = list(db.depo_stocks.find({"part_id": part_id}))
+        
+        if stock_records:
+            # Calculate totals
+            total = sum(s.get("q", 0) for s in stock_records)
+            
+            # Get batches with stock > 0
+            batches = []
+            for stock in stock_records:
+                if stock.get("q", 0) > 0:
+                    batches.append({
+                        "batch_code": stock.get("batch_code", ""),
+                        "supplier_batch_code": stock.get("supplier_batch_code", ""),
+                        "quantity": stock.get("q", 0),
+                        "location_id": str(stock.get("location", {}).get("$oid", "")) if isinstance(stock.get("location"), dict) else str(stock.get("location", ""))
+                    })
+            
             return {
                 "part_id": part_id,
-                "total": stock_doc.get("total", 0),
-                "in_sales": stock_doc.get("in_sales", 0),
-                "in_builds": stock_doc.get("in_builds", 0),
-                "in_procurement": stock_doc.get("in_procurement", 0),
-                "available": stock_doc.get("available", 0)
+                "total": total,
+                "in_sales": 0,  # TODO: Calculate from allocations
+                "in_builds": 0,  # TODO: Calculate from allocations
+                "in_procurement": 0,  # TODO: Calculate from allocations
+                "available": total,  # For now, total = available
+                "batches": batches
             }
         else:
             # Part not found in depo_stocks, return zeros
@@ -172,7 +191,8 @@ async def get_part_stock_info(
                 "in_sales": 0,
                 "in_builds": 0,
                 "in_procurement": 0,
-                "available": 0
+                "available": 0,
+                "batches": []
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock info: {str(e)}")
