@@ -125,6 +125,7 @@ export function RequestsPage() {
 
   const handlePartChange = (value: string | null) => {
     setFormData({ ...formData, part: value || '' });
+    setPartSearch(''); // Reset search when clearing
     if (value) {
       const partId = parseInt(value);
       loadStockInfo(partId);
@@ -156,14 +157,43 @@ export function RequestsPage() {
 
     setSubmitting(true);
     try {
-      await api.post('/api/requests/', {
-        source: parseInt(formData.source),
-        destination: parseInt(formData.destination),
-        items: [{
+      // Prepare items list
+      let itemsToSend: any[] = [];
+
+      // If recipe/BOM exists with components, use components instead of main part
+      if (recipeData && recipeData.items && recipeData.items.length > 0) {
+        // Flatten recipe items (handle alternatives by taking first alternative)
+        for (const item of recipeData.items) {
+          if (item.type === 2 && item.alternatives && item.alternatives.length > 0) {
+            // Alternative group - take first alternative
+            const firstAlt = item.alternatives[0];
+            itemsToSend.push({
+              part: firstAlt.part,
+              quantity: firstAlt.quantity * formData.quantity,
+              notes: formData.notes || undefined
+            });
+          } else if (item.type === 1 && item.part) {
+            // Regular component
+            itemsToSend.push({
+              part: item.part,
+              quantity: item.quantity * formData.quantity,
+              notes: formData.notes || undefined
+            });
+          }
+        }
+      } else {
+        // No recipe/BOM, use the selected part directly
+        itemsToSend = [{
           part: parseInt(formData.part),
           quantity: formData.quantity,
           notes: formData.notes || undefined
-        }],
+        }];
+      }
+
+      await api.post('/api/requests/', {
+        source: parseInt(formData.source),
+        destination: parseInt(formData.destination),
+        items: itemsToSend,
         notes: formData.notes || undefined
       });
 
@@ -181,6 +211,8 @@ export function RequestsPage() {
         notes: ''
       });
       setStockInfo(null);
+      setRecipeData(null);
+      setPartSearch('');
       setModalOpened(false);
       loadRequests();
     } catch (error: any) {

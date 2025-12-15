@@ -138,57 +138,34 @@ async def get_parts(
 @router.get("/parts/{part_id}/stock-info")
 async def get_part_stock_info(
     part_id: int,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(verify_admin),
+    db = Depends(get_db)
 ):
-    """Get stock information for a part (total, allocated, available)"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
+    """Get stock information for a part from MongoDB depo_stocks"""
     try:
-        # Get part details
-        part_response = requests.get(
-            f"{inventree_url}/api/part/{part_id}/",
-            headers=headers,
-            timeout=10
-        )
-        part_response.raise_for_status()
-        part_data = part_response.json()
+        # Get stock from MongoDB depo_stocks collection
+        stock_doc = db.depo_stocks.find_one({"part_id": part_id})
         
-        # Get stock items for this part (only transferable: status 10 or 80)
-        stock_response = requests.get(
-            f"{inventree_url}/api/stock/",
-            headers=headers,
-            params={'part': part_id, 'in_stock': 'true'},
-            timeout=10
-        )
-        stock_response.raise_for_status()
-        stock_data = stock_response.json()
-        stock_items = stock_data if isinstance(stock_data, list) else stock_data.get('results', [])
-        
-        # Calculate totals (only status 10 or 80)
-        total = 0
-        for item in stock_items:
-            status = item.get('status', 0)
-            if status in [10, 80]:  # OK or În carantină (tranzacționabil)
-                total += item.get('quantity', 0)
-        
-        # Get allocations from part data
-        in_sales = part_data.get('allocated_to_sales_orders', 0)
-        in_builds = part_data.get('allocated_to_build_orders', 0)
-        in_procurement = part_data.get('ordering', 0)
-        
-        available = total - in_sales - in_builds
-        
-        return {
-            "part_id": part_id,
-            "total": total,
-            "in_sales": in_sales,
-            "in_builds": in_builds,
-            "in_procurement": in_procurement,
-            "available": max(0, available)
-        }
-    except requests.exceptions.RequestException as e:
+        if stock_doc:
+            return {
+                "part_id": part_id,
+                "total": stock_doc.get("total", 0),
+                "in_sales": stock_doc.get("in_sales", 0),
+                "in_builds": stock_doc.get("in_builds", 0),
+                "in_procurement": stock_doc.get("in_procurement", 0),
+                "available": stock_doc.get("available", 0)
+            }
+        else:
+            # Part not found in depo_stocks, return zeros
+            return {
+                "part_id": part_id,
+                "total": 0,
+                "in_sales": 0,
+                "in_builds": 0,
+                "in_procurement": 0,
+                "available": 0
+            }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock info: {str(e)}")
 
 
