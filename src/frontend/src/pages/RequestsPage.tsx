@@ -43,6 +43,7 @@ export function RequestsPage() {
   
   const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
+  const [selectedPartData, setSelectedPartData] = useState<Part | null>(null);
   const [partSearch, setPartSearch] = useState('');
   const [stockInfo, setStockInfo] = useState<any>(null);
   const [recipeData, setRecipeData] = useState<any>(null);
@@ -125,14 +126,19 @@ export function RequestsPage() {
 
   const handlePartChange = (value: string | null) => {
     setFormData({ ...formData, part: value || '' });
-    setPartSearch(''); // Reset search when clearing
+    
     if (value) {
       const partId = parseInt(value);
+      // Find and save selected part data
+      const selected = parts.find(p => String(p.pk) === value);
+      setSelectedPartData(selected || null);
       loadStockInfo(partId);
       loadRecipe(partId);
     } else {
+      setSelectedPartData(null);
       setStockInfo(null);
       setRecipeData(null);
+      setPartSearch(''); // Reset search when clearing
     }
   };
 
@@ -388,10 +394,20 @@ export function RequestsPage() {
           <Select
           label={t('Part')}
           placeholder={t('Search for part...')}
-          data={parts.map(part => ({
-          value: String(part.pk),
-          label: `${part.name} (${part.IPN})`
-          }))}
+          data={[
+            // Include selected part if exists
+            ...(selectedPartData ? [{
+              value: String(selectedPartData.pk),
+              label: `${selectedPartData.name} (${selectedPartData.IPN})`
+            }] : []),
+            // Add search results (filter out selected to avoid duplicates)
+            ...parts
+              .filter(p => !selectedPartData || p.pk !== selectedPartData.pk)
+              .map(part => ({
+                value: String(part.pk),
+                label: `${part.name} (${part.IPN})`
+              }))
+          ]}
           value={formData.part}
           onChange={handlePartChange}
           onSearchChange={(query) => {
