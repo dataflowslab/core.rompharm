@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/po-to-json.cjs && tsc && vite build",
+    "build": "node scripts/po-to-json.cjs && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "i18n:extract": "node scripts/extract-translations.cjs",

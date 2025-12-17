@@ -26,7 +26,7 @@ import { BuildOrdersPage } from './pages/BuildOrdersPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { ArticlesPage } from './pages/ArticlesPage';
 import { ArticleDetailPage } from './pages/ArticleDetailPage';
-import { SuppliersPage, SupplierDetailPage, ManufacturersPage, ManufacturerDetailPage, ClientsPage, ClientDetailPage, StocksPage } from '../../modules/inventory/frontend/pages';
+import { SuppliersPage, SupplierDetailPage, ManufacturersPage, ManufacturerDetailPage, ClientsPage, ClientDetailPage, StocksPage } from '../../../modules/inventory/frontend/pages';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Navbar } from './components/Layout/Navbar';
 import { useAuth } from './context/AuthContext';

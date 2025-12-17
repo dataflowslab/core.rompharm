@@ -1,0 +1,14 @@
+{
+  "extends": "../../../src/frontend/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "react": ["../../../src/frontend/node_modules/react"],
+      "react-dom": ["../../../src/frontend/node_modules/react-dom"],
+      "react-router-dom": ["../../../src/frontend/node_modules/react-router-dom"],
+      "@mantine/*": ["../../../src/frontend/node_modules/@mantine/*"],
+      "@tabler/icons-react": ["../../../src/frontend/node_modules/@tabler/icons-react"]
+    }
+  },
+  "include": ["pages/**/*"]
+}

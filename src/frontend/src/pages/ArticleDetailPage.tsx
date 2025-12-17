@@ -74,6 +74,10 @@ export function ArticleDetailPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
+  const [stocks, setStocks] = useState<any[]>([]);
+  const [loadingStocks, setLoadingStocks] = useState(false);
+  const [allocations, setAllocations] = useState<any[]>([]);
+  const [loadingAllocations, setLoadingAllocations] = useState(false);
 
   const editor = useEditor({
     extensions: [StarterKit, Link],
@@ -86,14 +90,19 @@ export function ArticleDetailPage() {
       fetchLocations();
       fetchSuppliers();
       fetchCategories();
+      fetchRecipes(); // Auto-load recipes
     }
   }, [id]);
 
   useEffect(() => {
-    if (article && editor) {
-      editor.commands.setContent(article.notes || '');
+    if (article) {
+      fetchStocks(); // Auto-load stocks when article is loaded
+      fetchAllocations(); // Auto-load allocations when article is loaded
+      if (editor) {
+        editor.commands.setContent(article.notes || '');
+      }
     }
-  }, [article, editor]);
+  }, [article]);
 
   const fetchArticle = async () => {
     setLoading(true);
@@ -146,13 +155,35 @@ export function ArticleDetailPage() {
       setRecipes(response.data || []);
     } catch (error) {
       console.error('Failed to fetch recipes:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to fetch recipes',
-        color: 'red',
-      });
     } finally {
       setLoadingRecipes(false);
+    }
+  };
+
+  const fetchStocks = async () => {
+    if (!article) return;
+    setLoadingStocks(true);
+    try {
+      // Search stocks by part_id (article._id)
+      const response = await api.get(`/modules/inventory/api/stocks?part_id=${article._id}`);
+      setStocks(response.data.results || []);
+    } catch (error) {
+      console.error('Failed to fetch stocks:', error);
+    } finally {
+      setLoadingStocks(false);
+    }
+  };
+
+  const fetchAllocations = async () => {
+    if (!article) return;
+    setLoadingAllocations(true);
+    try {
+      // Placeholder - implement when allocations API is ready
+      setAllocations([]);
+    } catch (error) {
+      console.error('Failed to fetch allocations:', error);
+    } finally {
+      setLoadingAllocations(false);
     }
   };
 
@@ -214,10 +245,10 @@ export function ArticleDetailPage() {
             <Tabs.Tab value="details" leftSection={<IconPackage size={16} />}>
               Part Details
             </Tabs.Tab>
-            <Tabs.Tab value="stock" leftSection={<IconBoxSeam size={16} />} disabled>
+            <Tabs.Tab value="stock" leftSection={<IconBoxSeam size={16} />}>
               Stock
             </Tabs.Tab>
-            <Tabs.Tab value="allocations" disabled>
+            <Tabs.Tab value="allocations">
               Allocations
             </Tabs.Tab>
             <Tabs.Tab value="recipes" leftSection={<IconChefHat size={16} />}>
@@ -430,23 +461,91 @@ export function ArticleDetailPage() {
           </Tabs.Panel>
 
           <Tabs.Panel value="stock" pt="md">
-            <p>Stock management coming soon...</p>
+            {loadingStocks && <LoadingOverlay visible />}
+
+            {stocks.length === 0 && !loadingStocks && (
+              <Text c="dimmed">No stock items found for this article.</Text>
+            )}
+
+            {stocks.length > 0 && !loadingStocks && (
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Batch Code</Table.Th>
+                    <Table.Th>Batch Date</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Location</Table.Th>
+                    <Table.Th>Quantity</Table.Th>
+                    <Table.Th>Supplier</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {stocks.map((stock: any) => (
+                    <Table.Tr key={stock._id}>
+                      <Table.Td>{stock.batch_code || '-'}</Table.Td>
+                      <Table.Td>
+                        {stock.batch_date ? new Date(stock.batch_date).toLocaleDateString() : '-'}
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge color={stock.status === 'OK' ? 'green' : 'yellow'}>
+                          {stock.status || 'Unknown'}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>{stock.location_name || '-'}</Table.Td>
+                      <Table.Td>{stock.quantity || 0} {article.um}</Table.Td>
+                      <Table.Td>{stock.supplier_name || '-'}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
           </Tabs.Panel>
 
           <Tabs.Panel value="allocations" pt="md">
-            <p>Allocations coming soon...</p>
+            {loadingAllocations && <LoadingOverlay visible />}
+
+            {allocations.length === 0 && !loadingAllocations && (
+              <Text c="dimmed">No allocations found for this article.</Text>
+            )}
+
+            {allocations.length > 0 && !loadingAllocations && (
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Order</Table.Th>
+                    <Table.Th>Batch Code</Table.Th>
+                    <Table.Th>Allocated Qty</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Date</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {allocations.map((allocation: any) => (
+                    <Table.Tr key={allocation._id}>
+                      <Table.Td>{allocation.order_ref || '-'}</Table.Td>
+                      <Table.Td>{allocation.batch_code || '-'}</Table.Td>
+                      <Table.Td>{allocation.quantity || 0} {article.um}</Table.Td>
+                      <Table.Td>
+                        <Badge color="blue">{allocation.status || 'Pending'}</Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        {allocation.created_at ? new Date(allocation.created_at).toLocaleDateString() : '-'}
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
           </Tabs.Panel>
 
           <Tabs.Panel value="recipes" pt="md">
-            <Button onClick={fetchRecipes} mb="md" loading={loadingRecipes}>
-              Load Recipes
-            </Button>
+            {loadingRecipes && <LoadingOverlay visible />}
 
             {recipes.length === 0 && !loadingRecipes && (
               <Text c="dimmed">No recipes found using this article.</Text>
             )}
 
-            {recipes.length > 0 && (
+            {recipes.length > 0 && !loadingRecipes && (
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
