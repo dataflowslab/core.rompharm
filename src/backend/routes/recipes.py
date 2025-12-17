@@ -36,24 +36,25 @@ async def list_recipes(
 ):
     """List all recipes with optional search (latest revision only)"""
     try:
-        # Get all recipes from latest view (only latest revisions)
-        recipes = list(db.depo_recipes_latest.find())
+        # Get all recipes (use depo_recipes, not depo_recipes_latest)
+        recipes = list(db.depo_recipes.find().sort("rev_date", -1))
         
-        # Get product IDs
-        product_ids = [r["id"] for r in recipes]
+        # Get product IDs (part_id is ObjectId in depo_recipes)
+        product_ids = [r.get("part_id") for r in recipes if r.get("part_id")]
         
-        # Get product details from depo_parts
-        parts = list(db.depo_parts.find({"id": {"$in": product_ids}}))
-        parts_map = {p["id"]: p for p in parts}
+        # Get product details from depo_parts using _id
+        parts = list(db.depo_parts.find({"_id": {"$in": product_ids}}))
+        parts_map = {p["_id"]: p for p in parts}
         
         # Enrich recipes with product info
         result = []
         for recipe in recipes:
-            product = parts_map.get(recipe["id"], {})
+            part_id = recipe.get("part_id")
+            product = parts_map.get(part_id, {})
             recipe_data = {
                 "_id": str(recipe["_id"]),
-                "id": recipe["id"],
-                "name": product.get("name", f"Product {recipe['id']}"),
+                "part_id": str(part_id) if part_id else None,
+                "name": product.get("name", "Unknown Product"),
                 "code": product.get("ipn", ""),
                 "rev": recipe.get("rev", 0),
                 "items_count": len(recipe.get("items", [])),

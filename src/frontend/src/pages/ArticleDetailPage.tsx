@@ -23,6 +23,8 @@ import { RichTextEditor, Link } from '@mantine/tiptap';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { api } from '../services/api';
+import { AddStockModal } from '../components/AddStockModal';
+import { RecipesTable } from '../components/RecipesTable';
 
 interface Article {
   _id: string;
@@ -78,6 +80,24 @@ export function ArticleDetailPage() {
   const [loadingStocks, setLoadingStocks] = useState(false);
   const [allocations, setAllocations] = useState<any[]>([]);
   const [loadingAllocations, setLoadingAllocations] = useState(false);
+  
+  // Add Stock Modal
+  const [addStockModalOpened, setAddStockModalOpened] = useState(false);
+  const [stockStatuses, setStockStatuses] = useState<any[]>([]);
+  const [currencies, setCurrencies] = useState<any[]>([]);
+  const [newStock, setNewStock] = useState({
+    supplier_id: '',
+    part_id: '',
+    quantity: 0,
+    batch_code: '',
+    supplier_batch_code: '',
+    batch_date: null as Date | null,
+    expiry_date: null as Date | null,
+    status: '',
+    purchase_price: 0,
+    currency_id: '',
+    notes: '',
+  });
 
   const editor = useEditor({
     extensions: [StarterKit, Link],
@@ -184,6 +204,84 @@ export function ArticleDetailPage() {
       console.error('Failed to fetch allocations:', error);
     } finally {
       setLoadingAllocations(false);
+    }
+  };
+
+  const fetchStockStatuses = async () => {
+    try {
+      const response = await api.get('/api/depo_stocks_states');
+      setStockStatuses(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch stock statuses:', error);
+    }
+  };
+
+  const fetchCurrencies = async () => {
+    try {
+      const response = await api.get('/api/currencies');
+      setCurrencies(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch currencies:', error);
+    }
+  };
+
+  const openAddStockModal = () => {
+    // Reset form and set part_id to current article
+    setNewStock({
+      supplier_id: '',
+      part_id: article?._id || '',
+      quantity: 0,
+      batch_code: '',
+      supplier_batch_code: '',
+      batch_date: null,
+      expiry_date: null,
+      status: '',
+      purchase_price: 0,
+      currency_id: '',
+      notes: '',
+    });
+    
+    // Fetch required data
+    fetchStockStatuses();
+    fetchCurrencies();
+    
+    setAddStockModalOpened(true);
+  };
+
+  const handleAddStock = async () => {
+    if (!newStock.part_id || !newStock.quantity || !newStock.batch_code) {
+      notifications.show({
+        title: 'Validation Error',
+        message: 'Please fill in all required fields',
+        color: 'red',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.post('/modules/inventory/api/stocks', {
+        ...newStock,
+        batch_date: newStock.batch_date?.toISOString(),
+        expiry_date: newStock.expiry_date?.toISOString(),
+      });
+      
+      notifications.show({
+        title: 'Success',
+        message: 'Stock added successfully',
+        color: 'green',
+      });
+      
+      setAddStockModalOpened(false);
+      fetchStocks(); // Reload stocks
+    } catch (error: any) {
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.detail || 'Failed to add stock',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -461,6 +559,10 @@ export function ArticleDetailPage() {
           </Tabs.Panel>
 
           <Tabs.Panel value="stock" pt="md">
+            <Button mb="md" onClick={openAddStockModal}>
+              Add Stock
+            </Button>
+
             {loadingStocks && <LoadingOverlay visible />}
 
             {stocks.length === 0 && !loadingStocks && (
@@ -476,6 +578,7 @@ export function ArticleDetailPage() {
                     <Table.Th>Status</Table.Th>
                     <Table.Th>Location</Table.Th>
                     <Table.Th>Quantity</Table.Th>
+                    <Table.Th>Stock Value</Table.Th>
                     <Table.Th>Supplier</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
@@ -491,8 +594,9 @@ export function ArticleDetailPage() {
                           {stock.status || 'Unknown'}
                         </Badge>
                       </Table.Td>
-                      <Table.Td>{stock.location_name || '-'}</Table.Td>
+                      <Table.Td>{stock.location_detail?.name || '-'}</Table.Td>
                       <Table.Td>{stock.quantity || 0} {article.um}</Table.Td>
+                      <Table.Td>{stock.stock_value ? `${stock.stock_value.toFixed(2)} EUR` : '-'}</Table.Td>
                       <Table.Td>{stock.supplier_name || '-'}</Table.Td>
                     </Table.Tr>
                   ))}
@@ -539,48 +643,7 @@ export function ArticleDetailPage() {
           </Tabs.Panel>
 
           <Tabs.Panel value="recipes" pt="md">
-            {loadingRecipes && <LoadingOverlay visible />}
-
-            {recipes.length === 0 && !loadingRecipes && (
-              <Text c="dimmed">No recipes found using this article.</Text>
-            )}
-
-            {recipes.length > 0 && !loadingRecipes && (
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Product Code</Table.Th>
-                    <Table.Th>Product Name</Table.Th>
-                    <Table.Th>Revision</Table.Th>
-                    <Table.Th>Rev Date</Table.Th>
-                    <Table.Th>Actions</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {recipes.map((recipe) => (
-                    <Table.Tr key={recipe._id}>
-                      <Table.Td>{recipe.product_code || '-'}</Table.Td>
-                      <Table.Td>{recipe.product_name || '-'}</Table.Td>
-                      <Table.Td>
-                        <Badge color="blue">Rev {recipe.rev || 0}</Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        {recipe.rev_date ? new Date(recipe.rev_date).toLocaleDateString() : '-'}
-                      </Table.Td>
-                      <Table.Td>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          onClick={() => navigate(`/recipes/${recipe._id}`)}
-                        >
-                          View Recipe
-                        </Button>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            )}
+            <RecipesTable recipes={recipes} loading={loadingRecipes} />
           </Tabs.Panel>
 
           <Tabs.Panel value="attachments" pt="md">
@@ -588,6 +651,16 @@ export function ArticleDetailPage() {
           </Tabs.Panel>
         </Tabs>
       </Paper>
+
+      {/* Add Stock Modal */}
+      <AddStockModal
+        opened={addStockModalOpened}
+        onClose={() => setAddStockModalOpened(false)}
+        onSuccess={fetchStocks}
+        fixedArticleId={article._id}
+        fixedArticleName={article.name}
+        fixedArticleIpn={article.ipn}
+      />
     </Container>
   );
 }

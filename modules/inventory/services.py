@@ -33,18 +33,27 @@ def serialize_doc(doc):
     return doc
 
 
-async def get_stocks_list(search=None, skip=0, limit=100):
+async def get_stocks_list(search=None, skip=0, limit=100, part_id=None):
     """Get list of stocks with enriched data"""
     db = get_db()
     stocks_collection = db['depo_stocks']
     
     query = {}
+    
+    # Filter by part_id if provided
+    if part_id:
+        query['part_id'] = part_id
+    
     if search:
-        query['$or'] = [
+        search_conditions = [
             {'batch_code': {'$regex': search, '$options': 'i'}},
             {'serial_numbers': {'$regex': search, '$options': 'i'}},
             {'notes': {'$regex': search, '$options': 'i'}}
         ]
+        if query:
+            query['$and'] = [{'part_id': part_id}, {'$or': search_conditions}]
+        else:
+            query['$or'] = search_conditions
     
     try:
         # Get total count
@@ -79,11 +88,17 @@ async def get_stocks_list(search=None, skip=0, limit=100):
                         'description': location.get('description', '')
                     }
             
-            # Determine supplier based on purchase_order_id or build_order_id
+            # Determine supplier based on supplier_id, purchase_order_id or build_order_id
             supplier_name = None
             
+            # First check if supplier_id is directly in stock
+            if stock.get('supplier_id'):
+                supplier = db['depo_companies'].find_one({'_id': ObjectId(stock['supplier_id'])})
+                if supplier:
+                    supplier_name = supplier.get('name')
+            
             # Check if it's from a build order (internal production)
-            if stock.get('build_order_id'):
+            elif stock.get('build_order_id'):
                 # Get organization name from config
                 org_config = db['config'].find_one({'slug': 'organizatie'})
                 if org_config:

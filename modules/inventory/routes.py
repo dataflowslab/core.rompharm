@@ -380,16 +380,29 @@ async def get_article_recipes(
     """Get all recipes that use this article"""
     db = get_db()
     recipes_collection = db['depo_recipes']
+    parts_collection = db['depo_parts']
     
     try:
         # Find recipes where this article is used in items
         # Check both single items (type 1) and alternatives (type 2)
+        # part_id is stored as ObjectId in depo_recipes
         recipes = list(recipes_collection.find({
             '$or': [
-                {'items.part_id': article_id},
-                {'items.alternatives.part_id': article_id}
+                {'items.part_id': ObjectId(article_id)},
+                {'items.alternatives.part_id': ObjectId(article_id)},
+                {'part_id': ObjectId(article_id)}
             ]
-        }).sort('product_name', 1))
+        }).sort('rev_date', -1))
+        
+        # Enrich recipes with product details from depo_parts
+        for recipe in recipes:
+            if recipe.get('part_id'):
+                # part_id is already an ObjectId in the recipe document
+                part_id = recipe['part_id'] if isinstance(recipe['part_id'], ObjectId) else ObjectId(recipe['part_id'])
+                part = parts_collection.find_one({'_id': part_id})
+                if part:
+                    recipe['product_code'] = part.get('ipn', '')
+                    recipe['product_name'] = part.get('name', '')
         
         return serialize_doc(recipes)
     except Exception as e:
@@ -400,13 +413,14 @@ async def get_article_recipes(
 async def get_stocks(
     request: Request,
     search: Optional[str] = Query(None),
+    part_id: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     current_user: dict = Depends(verify_token)
 ):
     """Get list of stocks with enriched data including supplier information"""
     from modules.inventory.services import get_stocks_list
-    return await get_stocks_list(search, skip, limit)
+    return await get_stocks_list(search, skip, limit, part_id)
 
 
 @router.get("/stocks/{stock_id}")
