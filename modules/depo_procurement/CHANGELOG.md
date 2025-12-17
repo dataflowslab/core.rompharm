@@ -1,5 +1,19 @@
 # Changelog - DEPO Procurement Module
 
+## Version 2.0.1 - Stock Reception Enhancement
+
+### Changed
+- **Stock Reception**: Ensured that `purchase_order_id` is properly saved in `depo_stocks` collection when receiving goods
+- The `purchase_order_id` field now stores the ObjectId from `depo_purchase_orders` collection
+- This enables proper tracking of stock origin and supplier information
+
+### Technical
+- Modified `receive_stock_item` function to ensure `purchase_order_id` is saved as ObjectId
+- Added `purchase_order_reference` field for easier reference lookup
+- Stock records now properly linked to their source purchase orders
+
+---
+
 ## Version 2.0.0 - MongoDB Migration
 
 ### Changed

@@ -1,0 +1,306 @@
+import { useState, useEffect } from 'react';
+import {
+  Container,
+  Title,
+  Paper,
+  Table,
+  Button,
+  Group,
+  TextInput,
+  ActionIcon,
+  Modal,
+  Checkbox,
+  LoadingOverlay,
+  Text,
+} from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { IconPlus, IconEdit, IconTrash, IconSearch } from '@tabler/icons-react';
+import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../../../../src/frontend/src/services/api';
+
+interface Client {
+  _id: string;
+  name: string;
+  code?: string;
+  vatno?: string;
+  regno?: string;
+  is_Client: boolean;
+  is_manufacturer: boolean;
+  is_client: boolean;
+  addresses?: Array<{
+    name: string;
+    country?: string;
+    city?: string;
+    address?: string;
+  }>;
+  created_at?: string;
+}
+
+export function ClientsPage() {
+  const navigate = useNavigate();
+  const [Clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [opened, { open, close }] = useDisclosure(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    code: '',
+    vatno: '',
+    regno: '',
+    payment_conditions: '',
+    is_Client: true,
+    is_manufacturer: false,
+    is_client: false,
+  });
+
+  useEffect(() => {
+    fetchClients();
+  }, [search]);
+
+  const fetchClients = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+
+      const response = await api.get(`/modules/inventory/api/clients?${params.toString()}`);
+      setClients(response.data.results || []);
+    } catch (error) {
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to fetch Clients',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    // Validate at least one checkbox is selected
+    if (!formData.is_Client && !formData.is_manufacturer && !formData.is_client) {
+      notifications.show({
+        title: 'Validation Error',
+        message: 'At least one of Client, Manufacturer, or Client must be selected',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      await api.post('/modules/inventory/api/clients', formData);
+      notifications.show({
+        title: 'Success',
+        message: 'Client created successfully',
+        color: 'green',
+      });
+      close();
+      resetForm();
+      fetchClients();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.detail || 'Failed to create Client',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    modals.openConfirmModal({
+      title: 'Delete Client',
+      children: (
+        <Text size="sm">
+          Are you sure you want to delete <strong>{name}</strong>? This action cannot be undone.
+        </Text>
+      ),
+      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          await api.delete(`/modules/inventory/api/clients/${id}`);
+          notifications.show({
+            title: 'Success',
+            message: 'Client deleted successfully',
+            color: 'green',
+          });
+          fetchClients();
+        } catch (error) {
+          notifications.show({
+            title: 'Error',
+            message: 'Failed to delete Client',
+            color: 'red',
+          });
+        }
+      },
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      code: '',
+      vatno: '',
+      regno: '',
+      payment_conditions: '',
+      is_Client: true,
+      is_manufacturer: false,
+      is_client: false,
+    });
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    open();
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getCountry = (Client: Client) => {
+    if (Client.addresses && Client.addresses.length > 0) {
+      return Client.addresses[0].country || '-';
+    }
+    return '-';
+  };
+
+  return (
+    <Container size="xl">
+      <Group justify="space-between" mb="md">
+        <Title order={2}>Clients</Title>
+        <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+          New Client
+        </Button>
+      </Group>
+
+      <Paper p="md" mb="md">
+        <TextInput
+          placeholder="Search Clients..."
+          leftSection={<IconSearch size={16} />}
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
+        />
+      </Paper>
+
+      <Paper p="md" pos="relative">
+        <LoadingOverlay visible={loading} />
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Name</Table.Th>
+              <Table.Th>Country</Table.Th>
+              <Table.Th>VAT</Table.Th>
+              <Table.Th>Created on</Table.Th>
+              <Table.Th>Actions</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {Clients.map((Client) => (
+              <Table.Tr key={Client._id}>
+                <Table.Td>{Client.name}</Table.Td>
+                <Table.Td>{getCountry(Client)}</Table.Td>
+                <Table.Td>{Client.vatno || '-'}</Table.Td>
+                <Table.Td>{formatDate(Client.created_at)}</Table.Td>
+                <Table.Td>
+                  <Group gap="xs">
+                    <ActionIcon
+                      variant="light"
+                      color="blue"
+                      onClick={() => navigate(`/inventory/Clients/${Client._id}`)}
+                    >
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                    <ActionIcon
+                      variant="light"
+                      color="red"
+                      onClick={() => handleDelete(Client._id, Client.name)}
+                    >
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Paper>
+
+      <Modal opened={opened} onClose={close} title="New Client" size="lg">
+        <TextInput
+          label="Name"
+          placeholder="Client name"
+          required
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <TextInput
+          label="Code"
+          placeholder="Client code"
+          value={formData.code}
+          onChange={(e) => setFormData({ ...formData, code: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <TextInput
+          label="VAT Number"
+          placeholder="VAT number"
+          value={formData.vatno}
+          onChange={(e) => setFormData({ ...formData, vatno: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <TextInput
+          label="Registration Number"
+          placeholder="Registration number"
+          value={formData.regno}
+          onChange={(e) => setFormData({ ...formData, regno: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <TextInput
+          label="Payment Conditions"
+          placeholder="e.g., 30 days"
+          value={formData.payment_conditions}
+          onChange={(e) => setFormData({ ...formData, payment_conditions: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <Text size="sm" fw={500} mb="xs">
+          Type *
+        </Text>
+        <Group mb="md">
+          <Checkbox
+            label="Client"
+            checked={formData.is_Client}
+            onChange={(e) => setFormData({ ...formData, is_Client: e.currentTarget.checked })}
+          />
+          <Checkbox
+            label="Manufacturer"
+            checked={formData.is_manufacturer}
+            onChange={(e) => setFormData({ ...formData, is_manufacturer: e.currentTarget.checked })}
+          />
+          <Checkbox
+            label="Client"
+            checked={formData.is_client}
+            onChange={(e) => setFormData({ ...formData, is_client: e.currentTarget.checked })}
+          />
+        </Group>
+
+        <Group justify="flex-end">
+          <Button variant="default" onClick={close}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate}>Create</Button>
+        </Group>
+      </Modal>
+    </Container>
+  );
+}

@@ -2,6 +2,142 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.0] - 2024-12-XX
+
+### Changed
+- **Module Reorganization**: Complete self-contained module structure
+  - Moved all backend routes into respective modules
+  - Created `requests` module with all request-related routes
+  - Removed `src/backend/routes/procurement.py` (now in `modules/depo_procurement/`)
+  - Removed `src/backend/routes/requests.py` (now in `modules/requests/`)
+  - Removed `src/backend/routes/requests_operations.py` (now in `modules/requests/`)
+  - All modules now contain both frontend and backend code
+
+### Technical
+- Modules are now completely self-contained
+- Backend routes in `modules/MODULE_NAME/routes.py`
+- Frontend pages in `modules/MODULE_NAME/frontend/pages/`
+- Each module has `__init__.py`, `config.json`, `README.md`, `CHANGELOG.md`
+- Modules loaded dynamically via `register_modules(app)`
+- Removed old route imports from `app.py`
+
+### Modules Structure
+```
+modules/
+├── depo_procurement/
+│   ├── frontend/
+│   ├── routes.py
+│   ├── services.py
+│   ├── config.json
+│   ├── README.md
+│   └── CHANGELOG.md
+├── inventory/
+│   ├── frontend/
+│   ├── routes.py
+│   ├── services.py
+│   ├── config.json
+│   ├── README.md
+│   └── CHANGELOG.md
+└── requests/
+    ├── routes.py
+    ├── config.json
+    ├── README.md
+    └── CHANGELOG.md
+```
+
+### Configuration
+- Added `requests` module to `config.yaml`
+- All three modules active: `depo_procurement`, `inventory`, `requests`
+
+### Notes
+- Everything related to a module is now inside the module folder
+- No more split between `src/backend/routes/` and `modules/`
+- Cleaner architecture following self-contained module pattern
+- See `CREATE_NEW_MODULE.md` for guidelines
+
+---
+
+## [1.17.0] - 2024-12-XX
+
+### Added
+- **Inventory Module v1.4.0**: Stocks Section Frontend
+  - Complete frontend implementation for stocks listing
+  - Created `StocksPage.tsx` with full table display
+  - Columns: Batch Code, Batch Date, Product, IPN, Status, Location, Quantity, Stock Value, Supplier
+  - Status badges with color coding (OK, Quarantine, Attention, Damaged, etc.)
+  - Currency formatting for stock values (RON)
+  - Search functionality across batch codes and notes
+  - Menu item activated in Navbar
+
+### Technical
+- Frontend page: `modules/inventory/frontend/pages/StocksPage.tsx`
+- Route added: `/inventory/stocks`
+- Uses existing backend API from v1.1.0
+- Mantine UI components for consistent styling
+
+### Notes
+- Backend was already implemented in Inventory Module v1.1.0
+- This release adds the frontend interface
+- All data comes from `depo_stocks` collection with enriched information
+- Supplier detection works for both purchase orders and build orders
+
+---
+
+## [1.16.0] - 2024-12-XX
+
+### Added
+- **Inventory Module v1.3.0**: Manufacturers and Clients sections
+  - Complete CRUD for manufacturers (companies with is_manufacturer=true)
+  - Complete CRUD for clients (companies with is_client=true)
+  - Same structure as Suppliers: list, detail with 5 tabs
+  - Backend endpoints for manufacturers and clients
+  - Frontend pages: ManufacturersPage, ManufacturerDetailPage, ClientsPage, ClientDetailPage
+  - Menu items activated for Suppliers, Manufacturers, and Clients
+
+### Technical
+- Companies can be suppliers, manufacturers, clients, or any combination
+- All three sections use the same `depo_companies` collection
+- Filtering by `is_supplier`, `is_manufacturer`, or `is_client` flags
+- Reuse supplier logic for manufacturers and clients
+- Validation: At least one checkbox must be selected
+
+### Frontend
+- Added routes in App.tsx for all three sections
+- Activated menu items in Navbar (removed disabled flags)
+- Imported pages from module: `modules/inventory/frontend/pages`
+
+### Notes
+- Manufacturers and Clients are clones of Suppliers with different filtering
+- All functionality is identical (Details, Addresses, Contacts, Articles tabs)
+- Purchase Orders tab remains placeholder for all three
+
+---
+
+## [1.15.0] - 2024-12-XX
+
+### Added
+- **Module Structure Guidelines**: Created `CREATE_NEW_MODULE.md` documentation
+  - Complete guidelines for creating self-contained modules
+  - Module structure requirements and best practices
+  - Frontend and backend integration instructions
+  - Common mistakes to avoid
+  - Example module structures
+
+### Changed
+- **Inventory Module**: Reorganized to self-contained structure
+  - Created `modules/inventory/frontend/` directory
+  - Moved frontend pages to module folder
+  - Added module-specific frontend README
+  - Updated module documentation
+
+### Notes
+- All modules must now follow self-contained structure
+- Frontend components belong inside module folders
+- Documentation limited to README and CHANGELOG per module
+- See `CREATE_NEW_MODULE.md` for complete guidelines
+
+---
+
 ## [1.14.0] - 2024-12-XX
 
 ### Changed

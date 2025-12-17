@@ -1,0 +1,306 @@
+import { useState, useEffect } from 'react';
+import {
+  Container,
+  Title,
+  Paper,
+  Table,
+  Button,
+  Group,
+  TextInput,
+  ActionIcon,
+  Modal,
+  Checkbox,
+  LoadingOverlay,
+  Text,
+} from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { IconPlus, IconEdit, IconTrash, IconSearch } from '@tabler/icons-react';
+import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../../../../src/frontend/src/services/api';
+
+interface Manufacturer {
+  _id: string;
+  name: string;
+  code?: string;
+  vatno?: string;
+  regno?: string;
+  is_supplier: boolean;
+  is_manufacturer: boolean;
+  is_client: boolean;
+  addresses?: Array<{
+    name: string;
+    country?: string;
+    city?: string;
+    address?: string;
+  }>;
+  created_at?: string;
+}
+
+export function ManufacturersPage() {
+  const navigate = useNavigate();
+  const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [opened, { open, close }] = useDisclosure(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    code: '',
+    vatno: '',
+    regno: '',
+    payment_conditions: '',
+    is_supplier: false,
+    is_manufacturer: true,
+    is_client: false,
+  });
+
+  useEffect(() => {
+    fetchManufacturers();
+  }, [search]);
+
+  const fetchManufacturers = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+
+      const response = await api.get(`/modules/inventory/api/manufacturers?${params.toString()}`);
+      setManufacturers(response.data.results || []);
+    } catch (error) {
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to fetch manufacturers',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    // Validate at least one checkbox is selected
+    if (!formData.is_supplier && !formData.is_manufacturer && !formData.is_client) {
+      notifications.show({
+        title: 'Validation Error',
+        message: 'At least one of Supplier, Manufacturer, or Client must be selected',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      await api.post('/modules/inventory/api/manufacturers', formData);
+      notifications.show({
+        title: 'Success',
+        message: 'Manufacturer created successfully',
+        color: 'green',
+      });
+      close();
+      resetForm();
+      fetchManufacturers();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.detail || 'Failed to create manufacturer',
+        color: 'red',
+      });
+    }
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    modals.openConfirmModal({
+      title: 'Delete Manufacturer',
+      children: (
+        <Text size="sm">
+          Are you sure you want to delete <strong>{name}</strong>? This action cannot be undone.
+        </Text>
+      ),
+      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          await api.delete(`/modules/inventory/api/manufacturers/${id}`);
+          notifications.show({
+            title: 'Success',
+            message: 'Manufacturer deleted successfully',
+            color: 'green',
+          });
+          fetchManufacturers();
+        } catch (error) {
+          notifications.show({
+            title: 'Error',
+            message: 'Failed to delete manufacturer',
+            color: 'red',
+          });
+        }
+      },
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      code: '',
+      vatno: '',
+      regno: '',
+      payment_conditions: '',
+      is_supplier: false,
+      is_manufacturer: true,
+      is_client: false,
+    });
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    open();
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getCountry = (manufacturer: Manufacturer) => {
+    if (manufacturer.addresses && manufacturer.addresses.length > 0) {
+      return manufacturer.addresses[0].country || '-';
+    }
+    return '-';
+  };
+
+  return (
+    <Container size="xl">
+      <Group justify="space-between" mb="md">
+        <Title order={2}>Manufacturers</Title>
+        <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+          New Manufacturer
+        </Button>
+      </Group>
+
+      <Paper p="md" mb="md">
+        <TextInput
+          placeholder="Search manufacturers..."
+          leftSection={<IconSearch size={16} />}
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
+        />
+      </Paper>
+
+      <Paper p="md" pos="relative">
+        <LoadingOverlay visible={loading} />
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Name</Table.Th>
+              <Table.Th>Country</Table.Th>
+              <Table.Th>VAT</Table.Th>
+              <Table.Th>Created on</Table.Th>
+              <Table.Th>Actions</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {manufacturers.map((manufacturer) => (
+              <Table.Tr key={manufacturer._id}>
+                <Table.Td>{manufacturer.name}</Table.Td>
+                <Table.Td>{getCountry(manufacturer)}</Table.Td>
+                <Table.Td>{manufacturer.vatno || '-'}</Table.Td>
+                <Table.Td>{formatDate(manufacturer.created_at)}</Table.Td>
+                <Table.Td>
+                  <Group gap="xs">
+                    <ActionIcon
+                      variant="light"
+                      color="blue"
+                      onClick={() => navigate(`/inventory/manufacturers/${manufacturer._id}`)}
+                    >
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                    <ActionIcon
+                      variant="light"
+                      color="red"
+                      onClick={() => handleDelete(manufacturer._id, manufacturer.name)}
+                    >
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Paper>
+
+      <Modal opened={opened} onClose={close} title="New Manufacturer" size="lg">
+        <TextInput
+          label="Name"
+          placeholder="Manufacturer name"
+          required
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <TextInput
+          label="Code"
+          placeholder="Manufacturer code"
+          value={formData.code}
+          onChange={(e) => setFormData({ ...formData, code: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <TextInput
+          label="VAT Number"
+          placeholder="VAT number"
+          value={formData.vatno}
+          onChange={(e) => setFormData({ ...formData, vatno: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <TextInput
+          label="Registration Number"
+          placeholder="Registration number"
+          value={formData.regno}
+          onChange={(e) => setFormData({ ...formData, regno: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <TextInput
+          label="Payment Conditions"
+          placeholder="e.g., 30 days"
+          value={formData.payment_conditions}
+          onChange={(e) => setFormData({ ...formData, payment_conditions: e.currentTarget.value })}
+          mb="sm"
+        />
+
+        <Text size="sm" fw={500} mb="xs">
+          Type *
+        </Text>
+        <Group mb="md">
+          <Checkbox
+            label="Supplier"
+            checked={formData.is_supplier}
+            onChange={(e) => setFormData({ ...formData, is_supplier: e.currentTarget.checked })}
+          />
+          <Checkbox
+            label="Manufacturer"
+            checked={formData.is_manufacturer}
+            onChange={(e) => setFormData({ ...formData, is_manufacturer: e.currentTarget.checked })}
+          />
+          <Checkbox
+            label="Client"
+            checked={formData.is_client}
+            onChange={(e) => setFormData({ ...formData, is_client: e.currentTarget.checked })}
+          />
+        </Group>
+
+        <Group justify="flex-end">
+          <Button variant="default" onClick={close}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate}>Create</Button>
+        </Group>
+      </Modal>
+    </Container>
+  );
+}

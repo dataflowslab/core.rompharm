@@ -1,0 +1,15 @@
+{
+  "name": "requests",
+  "display_name": "Stock Requests",
+  "version": "1.0.0",
+  "description": "Internal stock transfer request management system",
+  "author": "DataFlows",
+  "dependencies": [],
+  "menu_items": [
+    {
+      "label": "Requests",
+      "path": "/requests",
+      "icon": "IconClipboardList"
+    }
+  ]
+}

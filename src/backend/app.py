@@ -18,10 +18,7 @@ from .routes import audit
 from .routes import system
 from .routes import external
 from .routes import approvals
-from .routes import procurement
 from .routes import sales
-from .routes import requests
-from .routes import requests_operations
 from .routes import recipes
 from .utils.db import close_db
 from .scheduler import get_scheduler
@@ -59,10 +56,7 @@ app.include_router(audit.router)
 app.include_router(system.router)
 app.include_router(external.router)
 app.include_router(approvals.router)
-app.include_router(procurement.router)
 app.include_router(sales.router)
-app.include_router(requests.router)
-app.include_router(requests_operations.router)
 app.include_router(recipes.router)
 
 # Register modules dynamically

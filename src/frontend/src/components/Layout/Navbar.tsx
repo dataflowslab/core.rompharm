@@ -92,25 +92,21 @@ export function Navbar() {
           label={t('Stocks')}
           active={isActive('/inventory/stocks')}
           onClick={() => navigate('/inventory/stocks')}
-          disabled
         />
         <NavLink
           label={t('Suppliers')}
           active={isActive('/inventory/suppliers')}
           onClick={() => navigate('/inventory/suppliers')}
-          disabled
         />
         <NavLink
           label={t('Manufacturers')}
           active={isActive('/inventory/manufacturers')}
           onClick={() => navigate('/inventory/manufacturers')}
-          disabled
         />
         <NavLink
           label={t('Clients')}
           active={isActive('/inventory/clients')}
           onClick={() => navigate('/inventory/clients')}
-          disabled
         />
       </NavLink>
 

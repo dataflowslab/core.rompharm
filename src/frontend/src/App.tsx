@@ -26,6 +26,7 @@ import { BuildOrdersPage } from './pages/BuildOrdersPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { ArticlesPage } from './pages/ArticlesPage';
 import { ArticleDetailPage } from './pages/ArticleDetailPage';
+import { SuppliersPage, SupplierDetailPage, ManufacturersPage, ManufacturerDetailPage, ClientsPage, ClientDetailPage, StocksPage } from '../../modules/inventory/frontend/pages';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Navbar } from './components/Layout/Navbar';
 import { useAuth } from './context/AuthContext';
@@ -140,6 +141,13 @@ function App() {
           <Route path="/sales/:id" element={<ProtectedRoute><SalesDetailPage /></ProtectedRoute>} />
           <Route path="/inventory/articles" element={<ProtectedRoute><ArticlesPage /></ProtectedRoute>} />
           <Route path="/inventory/articles/:id" element={<ProtectedRoute><ArticleDetailPage /></ProtectedRoute>} />
+          <Route path="/inventory/suppliers" element={<ProtectedRoute><SuppliersPage /></ProtectedRoute>} />
+          <Route path="/inventory/suppliers/:id" element={<ProtectedRoute><SupplierDetailPage /></ProtectedRoute>} />
+          <Route path="/inventory/manufacturers" element={<ProtectedRoute><ManufacturersPage /></ProtectedRoute>} />
+          <Route path="/inventory/manufacturers/:id" element={<ProtectedRoute><ManufacturerDetailPage /></ProtectedRoute>} />
+          <Route path="/inventory/clients" element={<ProtectedRoute><ClientsPage /></ProtectedRoute>} />
+          <Route path="/inventory/clients/:id" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
+          <Route path="/inventory/stocks" element={<ProtectedRoute><StocksPage /></ProtectedRoute>} />
           <Route path="/returns" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/withdrawals" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/deliveries" element={<ProtectedRoute><div /></ProtectedRoute>} />
