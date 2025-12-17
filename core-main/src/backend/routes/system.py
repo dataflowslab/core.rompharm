@@ -13,6 +13,7 @@ from ..utils.db import get_db
 from ..models.job_model import JobModel
 from ..scheduler import get_scheduler
 from ..routes.auth import verify_admin
+from ..modules import get_module_menu_items
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
@@ -87,6 +88,15 @@ async def get_system_status() -> Dict[str, Any]:
         },
         'identity_server': config.get('identity_server', 'inventree')
     }
+
+
+@router.get("/modules/menu")
+async def get_modules_menu() -> List[Dict[str, Any]]:
+    """
+    Get menu items from all enabled modules
+    Public endpoint
+    """
+    return get_module_menu_items()
 
 
 @router.get("/notifications")

@@ -238,75 +238,54 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
                     )}
                   </Group>
                   
-                  {!doc ? (
-                    // No document generated yet
-                    <>
-                      <Button
-                        variant="light"
-                        size="sm"
-                        fullWidth
-                        onClick={() => handleGenerateDocument(template)}
-                        loading={isGenerating}
-                        leftSection={<IconFileTypePdf size={16} />}
-                        disabled={template.disabled}
-                      >
-                        {t('Generate')}
-                      </Button>
-                      {template.disabled && template.disabledMessage && (
-                        <Text size="xs" c="dimmed">{template.disabledMessage}</Text>
-                      )}
-                    </>
-                  ) : doc.has_document ? (
-                    // Document ready for download
-                    <Group gap="xs">
-                      <Button
-                        size="sm"
-                        variant="light"
-                        fullWidth
-                        leftSection={<IconDownload size={14} />}
-                        onClick={() => handleDownloadDocument(template.code)}
-                        loading={isDownloading}
-                      >
-                        {t('Download')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="light"
-                        color="blue"
-                        onClick={() => handleGenerateDocument(template)}
-                        loading={isGenerating}
-                        leftSection={<IconFileTypePdf size={14} />}
-                      >
-                        {t('Regenerate')}
-                      </Button>
-                    </Group>
-                  ) : doc.status === 'failed' ? (
-                    // Generation failed
-                    <>
-                      <Badge size="sm" color="red" fullWidth>
-                        {t('Failed')}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="light"
-                        fullWidth
-                        onClick={() => handleGenerateDocument(template)}
-                        loading={isGenerating}
-                        leftSection={<IconFileTypePdf size={14} />}
-                      >
-                        {t('Retry')}
-                      </Button>
-                    </>
-                  ) : (
-                    // Processing or queued
-                    <>
-                      <Badge size="sm" color={getStatusColor(doc.status)} fullWidth>
-                        {doc.status === 'processing' ? t('Processing...') : t('Queued')}
-                      </Badge>
-                      <Text size="xs" c="dimmed" ta="center">
-                        {t('Click refresh icon to check status')}
-                      </Text>
-                    </>
+                  {/* Generate button - always visible */}
+                  <Button
+                    variant="light"
+                    size="sm"
+                    fullWidth
+                    onClick={() => handleGenerateDocument(template)}
+                    loading={isGenerating}
+                    leftSection={<IconFileTypePdf size={16} />}
+                    disabled={template.disabled}
+                  >
+                    {template.label}
+                  </Button>
+                  
+                  {template.disabled && template.disabledMessage && (
+                    <Text size="xs" c="dimmed">{template.disabledMessage}</Text>
+                  )}
+                  
+                  {/* Status and action buttons */}
+                  {doc && (
+                    <Stack gap="xs">
+                      {doc.status === 'failed' ? (
+                        <Badge size="sm" color="red" fullWidth>
+                          {t('Failed')}: {doc.error || t('Unknown error')}
+                        </Badge>
+                      ) : !doc.has_document && doc.status !== 'done' ? (
+                        <>
+                          <Badge size="sm" color={getStatusColor(doc.status)} fullWidth>
+                            {doc.status === 'processing' ? t('Processing...') : t('Queued')}
+                          </Badge>
+                          <Text size="xs" c="dimmed" ta="center">
+                            {t('Click refresh icon to check status')}
+                          </Text>
+                        </>
+                      ) : doc.has_document ? (
+                        // Document ready - show download and delete buttons
+                        <Group gap="xs" grow>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            leftSection={<IconDownload size={14} />}
+                            onClick={() => handleDownloadDocument(template.code)}
+                            loading={isDownloading}
+                          >
+                            {t('Download')}
+                          </Button>
+                        </Group>
+                      ) : null}
+                    </Stack>
                   )}
                 </Stack>
               </Paper>

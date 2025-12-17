@@ -30,10 +30,12 @@ async def upload_file(
     file: UploadFile = File(...),
     title: Optional[str] = None,
     description: Optional[str] = None,
+    main: Optional[str] = None,
     user = Depends(verify_token)
 ):
     """
     Upload a file to the library
+    main: 'false' to hide from main library (for module-specific files)
     """
     try:
         # Save file using existing secure system
@@ -54,6 +56,10 @@ async def upload_file(
             description=description,
         )
         
+        # Add main flag if specified
+        if main == 'false':
+            file_doc['main'] = False
+        
         result = files_collection.insert_one(file_doc)
         file_doc['_id'] = result.inserted_id
         
@@ -65,7 +71,7 @@ async def upload_file(
             resource_type='file',
             resource_id=str(result.inserted_id),
             resource_name=file_doc['title'],
-            details={'filename': file_doc['original_filename'], 'size': file_doc['size']}
+            details={'filename': file_doc['original_filename'], 'size': file_doc['size'], 'main': main != 'false'}
         )
         
         return FileModel.to_dict(file_doc)
@@ -83,14 +89,16 @@ async def get_my_files(
 ):
     """
     Get files owned by current user with pagination and search
+    Excludes module-specific files (main=false)
     """
     db = get_db()
     files_collection = db[FileModel.collection_name]
     
-    # Build query
+    # Build query - exclude files with main=false
     query = {
         'owner': user['username'],
-        'deleted': {'$ne': True}
+        'deleted': {'$ne': True},
+        'main': {'$ne': False}
     }
     
     # Add search if provided
@@ -401,6 +409,7 @@ async def get_all_files(
 ):
     """
     Get all accessible files (own + shared) for file picker
+    Excludes module-specific files (main=false)
     """
     db = get_db()
     files_collection = db[FileModel.collection_name]
@@ -410,7 +419,7 @@ async def get_all_files(
     user_doc = users_collection.find_one({'username': user['username']})
     user_role = user_doc.get('role', '') if user_doc else ''
     
-    # Build query for accessible files
+    # Build query for accessible files - exclude files with main=false
     query = {
         '$or': [
             {'owner': user['username']},
@@ -419,7 +428,8 @@ async def get_all_files(
             {'tags': 'shared'},
             {'is_shared': True}
         ],
-        'deleted': {'$ne': True}
+        'deleted': {'$ne': True},
+        'main': {'$ne': False}
     }
     
     # Add search if provided

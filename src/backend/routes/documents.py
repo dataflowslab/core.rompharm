@@ -1019,14 +1019,19 @@ async def generate_stock_request_document(
         except Exception as e:
             print(f"Warning: Failed to get destination location: {e}")
     
-    # Get part details for items
+    # Get part details for items and fetch prices from depo_parts
     items_with_details = []
+    depo_parts_collection = db['depo_parts']
+    
     for item in req.get('items', []):
         item_data = item.copy()
-        if item.get('part'):
+        part_id = item.get('part')
+        
+        # Get part details from InvenTree
+        if part_id:
             try:
                 part_response = requests.get(
-                    f"{inventree_url}/api/part/{item['part']}/",
+                    f"{inventree_url}/api/part/{part_id}/",
                     headers=headers,
                     timeout=10
                 )
@@ -1034,6 +1039,25 @@ async def generate_stock_request_document(
                     item_data['part_detail'] = part_response.json()
             except Exception as e:
                 print(f"Warning: Failed to get part details: {e}")
+        
+        # Get price from depo_parts collection
+        purchase_price = None
+        purchase_price_currency = 'RON'  # Default currency
+        
+        if part_id:
+            try:
+                depo_part = depo_parts_collection.find_one({'id': part_id})
+                if depo_part and 'purchase_price' in depo_part:
+                    purchase_price = depo_part.get('purchase_price')
+                    purchase_price_currency = depo_part.get('purchase_price_currency', 'RON')
+                    print(f"[DOCUMENT] Found price for part {part_id}: {purchase_price} {purchase_price_currency}")
+            except Exception as e:
+                print(f"Warning: Failed to get price from depo_parts: {e}")
+        
+        # Add price fields to item
+        item_data['purchase_price'] = purchase_price
+        item_data['purchase_price_currency'] = purchase_price_currency
+        
         items_with_details.append(item_data)
     
     # Initialize DataFlows Docu client
@@ -1055,22 +1079,64 @@ async def generate_stock_request_document(
     filename = f"REQ-{req['reference']}-{request.template_code[:6]}-v{version}"
     print(f"[DOCUMENT] Filename: {filename}")
     
-    # Prepare document data
+    # Generate QR code for the request
+    qr_string = f"{req['reference']}#{req.get('source')}#{req.get('destination')}"
+    print(f"[DOCUMENT] Generating QR code: {qr_string}")
+    
+    # Create QR code as SVG
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=1,
+    )
+    qr.add_data(qr_string)
+    qr.make(fit=True)
+    
+    # Generate SVG
+    factory = qrcode.image.svg.SvgPathImage
+    img = qr.make_image(fill_color="black", back_color="white", image_factory=factory)
+    
+    # Convert to string
+    svg_io = io.BytesIO()
+    img.save(svg_io)
+    qr_svg = svg_io.getvalue().decode('utf-8')
+    print(f"[DOCUMENT] QR code generated ({len(qr_svg)} bytes)")
+    
+    # Calculate total price from items
+    total_price = 0
+    order_currency = 'RON'  # Default currency
+    
+    for item in items_with_details:
+        if item.get('purchase_price') and item.get('quantity'):
+            total_price += float(item['purchase_price']) * float(item['quantity'])
+            if item.get('purchase_price_currency'):
+                order_currency = item['purchase_price_currency']
+    
+    print(f"[DOCUMENT] Calculated total price: {total_price} {order_currency}")
+    
+    # Prepare document data - wrap in 'data' key to match template structure
+    # Template expects: data.order, data.line_items, data.qr_code_svg
     document_data = {
         'data': {
-            'request': {
+            'order': {
                 'reference': req.get('reference'),
                 'source': req.get('source'),
                 'destination': req.get('destination'),
                 'status': req.get('status'),
                 'notes': req.get('notes', ''),
+                'batch_codes': req.get('batch_codes', []),
                 'issue_date': req.get('issue_date').isoformat() if isinstance(req.get('issue_date'), datetime) else str(req.get('issue_date', '')),
                 'created_by': req.get('created_by'),
-                'created_at': req.get('created_at').isoformat() if isinstance(req.get('created_at'), datetime) else str(req.get('created_at', ''))
+                'created_at': req.get('created_at').isoformat() if isinstance(req.get('created_at'), datetime) else str(req.get('created_at', '')),
+                'total_price': round(total_price, 2),  # Calculated total from items
+                'order_currency': order_currency  # Currency from items
             },
             'source_location': source_detail,
             'destination_location': destination_detail,
-            'items': items_with_details,
+            'line_items': items_with_details,  # Items already have price fields from depo_parts
+            'qr_code_svg': qr_svg,
+            'qr_code_data': qr_string,
             'generated_at': datetime.utcnow().isoformat(),
             'generated_by': user.get('username')
         }
@@ -1193,6 +1259,64 @@ async def get_stock_request_documents(
             del doc['document_data']
     
     return {'documents': docs}
+
+
+@router.get("/stock-request/{request_id}/job/{job_id}/status")
+async def get_stock_request_job_status(
+    request_id: str,
+    job_id: str,
+    user = Depends(verify_token)
+):
+    """Check status of a stock request document generation job"""
+    print(f"[DOCUMENT] Checking stock request job status: {job_id}")
+    
+    db = get_db()
+    docs_collection = db['depo_stock_request_documents']
+    
+    job_entry = docs_collection.find_one({
+        'request_id': request_id,
+        'job_id': job_id
+    })
+    
+    if not job_entry:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check status from DataFlows Docu
+    client = DataFlowsDocuClient()
+    job_status = client.get_job_status(job_id)
+    
+    if not job_status:
+        return {
+            'job_id': job_id,
+            'status': job_entry.get('status', 'unknown'),
+            'error': 'Failed to get status from DataFlows Docu'
+        }
+    
+    current_status = job_status.get('status')
+    print(f"[DOCUMENT] Job {job_id} status: {current_status}")
+    
+    # Update job status if changed
+    if current_status != job_entry.get('status'):
+        docs_collection.update_one(
+            {'_id': job_entry['_id']},
+            {
+                '$set': {
+                    'status': current_status,
+                    'updated_at': datetime.utcnow(),
+                    'error': job_status.get('error')
+                }
+            }
+        )
+    
+    return {
+        'job_id': job_id,
+        'status': current_status,
+        'filename': job_entry.get('filename'),
+        'template_name': job_entry.get('template_name'),
+        'created_at': job_entry.get('created_at').isoformat() if isinstance(job_entry.get('created_at'), datetime) else str(job_entry.get('created_at')),
+        'error': job_status.get('error'),
+        'has_document': job_entry.get('document_data') is not None
+    }
 
 
 @router.get("/stock-request/{request_id}/job/{job_id}/download")

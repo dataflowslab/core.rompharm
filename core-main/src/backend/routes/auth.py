@@ -5,14 +5,25 @@ from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-
-from ..utils.db import get_db
-from ..utils.inventree_auth import get_inventree_user_info, verify_inventree_token, get_user_staff_status
-from ..utils.firebase_auth import verify_firebase_token, is_firebase_enabled
-from ..models.user_model import UserModel
-from ..utils.audit import log_action
 import yaml
 import os
+import hashlib
+import secrets
+
+# Try relative imports first, fall back to absolute imports for module compatibility
+try:
+    from ..utils.db import get_db
+    from ..utils.inventree_auth import get_inventree_user_info, verify_inventree_token, get_user_staff_status
+    from ..utils.firebase_auth import verify_firebase_token, is_firebase_enabled
+    from ..models.user_model import UserModel
+    from ..utils.audit import log_action
+except ImportError:
+    # Fallback for when imported from external modules
+    from utils.db import get_db
+    from utils.inventree_auth import get_inventree_user_info, verify_inventree_token, get_user_staff_status
+    from utils.firebase_auth import verify_firebase_token, is_firebase_enabled
+    from models.user_model import UserModel
+    from utils.audit import log_action
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -38,10 +49,76 @@ class LoginResponse(BaseModel):
     message: str
 
 
+@router.post("/login/local", response_model=LoginResponse)
+async def login_local(request_data: LoginRequest, request: Request):
+    """
+    Authenticate with local database (username/password)
+    Independent of InvenTree or Firebase
+    """
+    if not request_data.username or not request_data.password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+    
+    db = get_db()
+    users_collection = db[UserModel.collection_name]
+    
+    # Find user by username
+    user = users_collection.find_one({'username': request_data.username})
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    # Check if user has a local password
+    if 'password' not in user:
+        raise HTTPException(
+            status_code=401, 
+            detail="This user does not have local authentication enabled. Please use InvenTree or Firebase login."
+        )
+    
+    # Verify password
+    password_hash = hashlib.sha256(request_data.password.encode()).hexdigest()
+    if user['password'] != password_hash:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    # Generate new token if user doesn't have one or update existing
+    if 'token' not in user or not user['token']:
+        token = secrets.token_urlsafe(32)
+    else:
+        token = user['token']
+    
+    # Update user with new token and last login
+    users_collection.update_one(
+        {'username': request_data.username},
+        {
+            '$set': {
+                'token': token,
+                'last_login': datetime.utcnow(),
+                'updated_at': datetime.utcnow()
+            }
+        }
+    )
+    
+    # Log login action
+    log_action(
+        action='login',
+        username=request_data.username,
+        request=request,
+        details={'is_staff': user.get('is_staff', False), 'identity_server': 'local'}
+    )
+    
+    return LoginResponse(
+        token=token,
+        username=user['username'],
+        is_staff=user.get('is_staff', False),
+        name=user.get('name') or user.get('email') or user['username'],
+        message="Login successful"
+    )
+
+
 @router.post("/login", response_model=LoginResponse)
 async def login(request_data: LoginRequest, request: Request):
     """
     Authenticate with InvenTree or Firebase based on configuration
+    For local authentication, use /login/local endpoint
     """
     config = load_config()
     identity_server = config.get('identity_server', 'inventree')
@@ -185,46 +262,67 @@ async def verify_token(authorization: Optional[str] = Header(None)):
 async def verify_admin(authorization: Optional[str] = Header(None)):
     """
     Dependency to verify user is administrator
-    Also updates staff status from InvenTree if needed
+    Also updates staff status from InvenTree if needed (only for InvenTree users)
     """
     user = await verify_token(authorization)
     
-    # Check if we need to refresh staff status
-    # Refresh if last update was more than 5 minutes ago or if is_staff is False
-    should_refresh = False
-    if not user.get('is_staff', False):
-        should_refresh = True
-    elif 'updated_at' in user:
-        from datetime import timedelta
-        last_update = user['updated_at']
-        if datetime.utcnow() - last_update > timedelta(minutes=5):
-            should_refresh = True
+    # Only refresh status from InvenTree if user doesn't have a local password
+    # (meaning they authenticate via InvenTree)
+    has_local_password = 'password' in user and user['password']
     
-    if should_refresh:
-        print(f"Refreshing staff status for user {user['username']}")
-        staff_status = get_user_staff_status(user['token'])
+    if not has_local_password:
+        # Check if we need to refresh staff status from InvenTree
+        should_refresh = False
+        if not user.get('is_staff', False):
+            should_refresh = True
+        elif 'updated_at' in user:
+            from datetime import timedelta
+            last_update = user['updated_at']
+            if datetime.utcnow() - last_update > timedelta(minutes=5):
+                should_refresh = True
         
-        if staff_status is not None:
-            # Update user in database
-            db = get_db()
-            users_collection = db[UserModel.collection_name]
-            users_collection.update_one(
-                {'token': user['token']},
-                {
-                    '$set': {
-                        'is_staff': staff_status,
-                        'updated_at': datetime.utcnow()
+        if should_refresh:
+            print(f"Refreshing staff status for user {user['username']}")
+            staff_status = get_user_staff_status(user['token'])
+            
+            if staff_status is not None:
+                # Update user in database
+                db = get_db()
+                users_collection = db[UserModel.collection_name]
+                users_collection.update_one(
+                    {'token': user['token']},
+                    {
+                        '$set': {
+                            'is_staff': staff_status,
+                            'updated_at': datetime.utcnow()
+                        }
                     }
-                }
-            )
-            user['is_staff'] = staff_status
-            print(f"Updated staff status to: {staff_status}")
+                )
+                user['is_staff'] = staff_status
+                print(f"Updated staff status to: {staff_status}")
     
     if not user.get('is_staff', False):
         print(f"Access denied for user {user['username']}: is_staff={user.get('is_staff')}")
         raise HTTPException(status_code=403, detail="Administrator access required")
     
     return user
+
+
+@router.get("/methods")
+async def get_auth_methods():
+    """
+    Get available authentication methods
+    Public endpoint
+    """
+    config = load_config()
+    identity_server = config.get('identity_server', 'inventree')
+    
+    return {
+        'primary': identity_server,
+        'local_enabled': True,  # Local auth is always available
+        'inventree_enabled': identity_server == 'inventree',
+        'firebase_enabled': identity_server == 'firebase'
+    }
 
 
 @router.get("/verify")

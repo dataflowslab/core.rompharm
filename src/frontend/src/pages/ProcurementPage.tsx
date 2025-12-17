@@ -247,7 +247,7 @@ export function ProcurementPage() {
   };
 
   const supplierOptions = [
-    ...suppliers.map(s => ({ value: String(s.pk), label: s.name })),
+    ...suppliers.filter(s => s.pk != null).map(s => ({ value: String(s.pk), label: s.name })),
     { value: '__new__', label: `➕ ${t('New supplier')}` }
   ];
 
@@ -474,7 +474,7 @@ export function ProcurementPage() {
             <Select
               label={t('Destination')}
               placeholder={t('Select stock location')}
-              data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              data={stockLocations.filter(loc => loc.pk != null).map(loc => ({ value: String(loc.pk), label: loc.name }))}
               value={formData.destination}
               onChange={(value) => setFormData({ ...formData, destination: value || '' })}
               searchable

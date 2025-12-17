@@ -22,6 +22,7 @@ from .routes import external
 from .routes import library
 from .utils.db import close_db
 from .scheduler import get_scheduler
+from .modules import register_modules
 
 # Create FastAPI app
 app = FastAPI(
@@ -53,6 +54,9 @@ app.include_router(crm.router)
 app.include_router(templates.router)
 app.include_router(external.router)
 app.include_router(library.router)
+
+# Register dynamic modules
+register_modules(app)
 
 # Mount media directory
 media_path = os.path.join(os.path.dirname(__file__), '..', '..', 'media')

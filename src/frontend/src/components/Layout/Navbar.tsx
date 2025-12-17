@@ -13,6 +13,7 @@ import {
   IconFileText,
   IconTemplate,
   IconChefHat,
+  IconPackage,
 } from '@tabler/icons-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -76,6 +77,42 @@ export function Navbar() {
         active={isActive('/build-simulation')}
         onClick={() => navigate('/build-simulation')}
       />
+
+      <NavLink
+        label={t('Inventory')}
+        leftSection={<IconPackage size={20} />}
+        childrenOffset={28}
+      >
+        <NavLink
+          label={t('Articles')}
+          active={isActive('/inventory/articles')}
+          onClick={() => navigate('/inventory/articles')}
+        />
+        <NavLink
+          label={t('Stocks')}
+          active={isActive('/inventory/stocks')}
+          onClick={() => navigate('/inventory/stocks')}
+          disabled
+        />
+        <NavLink
+          label={t('Suppliers')}
+          active={isActive('/inventory/suppliers')}
+          onClick={() => navigate('/inventory/suppliers')}
+          disabled
+        />
+        <NavLink
+          label={t('Manufacturers')}
+          active={isActive('/inventory/manufacturers')}
+          onClick={() => navigate('/inventory/manufacturers')}
+          disabled
+        />
+        <NavLink
+          label={t('Clients')}
+          active={isActive('/inventory/clients')}
+          onClick={() => navigate('/inventory/clients')}
+          disabled
+        />
+      </NavLink>
 
       <NavLink
         label={t('Procurement')}

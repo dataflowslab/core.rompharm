@@ -53,6 +53,7 @@ class RequestUpdate(BaseModel):
     source: Optional[int] = None
     destination: Optional[int] = None
     notes: Optional[str] = None
+    batch_codes: Optional[List[str]] = None
     status: Optional[str] = None
     issue_date: Optional[str] = None
     items: Optional[List[RequestItemCreate]] = None
@@ -575,6 +576,8 @@ async def update_request(
         update_data['destination'] = request_data.destination
     if request_data.notes is not None:
         update_data['notes'] = request_data.notes
+    if request_data.batch_codes is not None:
+        update_data['batch_codes'] = request_data.batch_codes
     if request_data.status is not None:
         update_data['status'] = request_data.status
     if request_data.issue_date is not None:

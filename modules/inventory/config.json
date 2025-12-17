@@ -1,0 +1,45 @@
+{
+  "name": "inventory",
+  "version": "1.0.0",
+  "display_name": "Inventory",
+  "description": "Inventory management module with articles, stocks, suppliers, manufacturers, and clients",
+  "author": "DataFlows",
+  "requires": {
+    "inventree": ">=1.0.1",
+    "dataflows_core": ">=1.5.0"
+  },
+  "api_prefix": "/modules/inventory/api",
+  "permissions": [
+    "admin"
+  ],
+  "menu_items": [
+    {
+      "label": "Inventory",
+      "icon": "IconPackage",
+      "path": "/inventory",
+      "order": 45,
+      "children": [
+        {
+          "label": "Articles",
+          "path": "/inventory/articles"
+        },
+        {
+          "label": "Stocks",
+          "path": "/inventory/stocks"
+        },
+        {
+          "label": "Suppliers",
+          "path": "/inventory/suppliers"
+        },
+        {
+          "label": "Manufacturers",
+          "path": "/inventory/manufacturers"
+        },
+        {
+          "label": "Clients",
+          "path": "/inventory/clients"
+        }
+      ]
+    }
+  ]
+}

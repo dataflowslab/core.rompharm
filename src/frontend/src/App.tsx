@@ -24,6 +24,8 @@ import { SalesPage } from './pages/SalesPage';
 import { SalesDetailPage } from './pages/SalesDetailPage';
 import { BuildOrdersPage } from './pages/BuildOrdersPage';
 import { TemplatesPage } from './pages/TemplatesPage';
+import { ArticlesPage } from './pages/ArticlesPage';
+import { ArticleDetailPage } from './pages/ArticleDetailPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Navbar } from './components/Layout/Navbar';
 import { useAuth } from './context/AuthContext';
@@ -136,6 +138,8 @@ function App() {
           <Route path="/procurement/:id" element={<ProtectedRoute><ProcurementDetailPage /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><SalesPage /></ProtectedRoute>} />
           <Route path="/sales/:id" element={<ProtectedRoute><SalesDetailPage /></ProtectedRoute>} />
+          <Route path="/inventory/articles" element={<ProtectedRoute><ArticlesPage /></ProtectedRoute>} />
+          <Route path="/inventory/articles/:id" element={<ProtectedRoute><ArticleDetailPage /></ProtectedRoute>} />
           <Route path="/returns" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/withdrawals" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/deliveries" element={<ProtectedRoute><div /></ProtectedRoute>} />

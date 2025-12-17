@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal } from '@mantine/core';
+import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal, TagsInput } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
@@ -35,6 +35,7 @@ interface Request {
   line_items: number;
   status: string;
   notes: string;
+  batch_codes?: string[];
   issue_date: string;
   created_at: string;
   created_by: string;
@@ -63,6 +64,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
     destination: String(request.destination),
     issue_date: request.issue_date ? new Date(request.issue_date) : new Date(),
     notes: request.notes || '',
+    batch_codes: request.batch_codes || [],
     items: [...request.items]
   });
 
@@ -83,6 +85,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
       destination: String(request.destination),
       issue_date: request.issue_date ? new Date(request.issue_date) : new Date(),
       notes: request.notes || '',
+      batch_codes: request.batch_codes || [],
       items: [...request.items]
     });
   }, [request]);
@@ -132,6 +135,17 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
       notifications.show({
         title: t('Error'),
         message: t('Please select a part and enter quantity'),
+        color: 'red'
+      });
+      return;
+    }
+
+    // Check for duplicates
+    const isDuplicate = formData.items.some(item => item.part === parseInt(newItem.part));
+    if (isDuplicate) {
+      notifications.show({
+        title: t('Error'),
+        message: t('This part is already in the list'),
         color: 'red'
       });
       return;
@@ -199,6 +213,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
         destination: parseInt(formData.destination),
         issue_date: formData.issue_date.toISOString().split('T')[0],
         notes: formData.notes || undefined,
+        batch_codes: formData.batch_codes,
         items: formData.items.map(item => ({
           part: item.part,
           quantity: item.quantity,
@@ -232,6 +247,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
       destination: String(request.destination),
       issue_date: request.issue_date ? new Date(request.issue_date) : new Date(),
       notes: request.notes || '',
+      batch_codes: request.batch_codes || [],
       items: [...request.items]
     });
     setEditing(false);
@@ -397,6 +413,23 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
               value={request.notes || ''}
               readOnly
               minRows={3}
+            />
+          )}
+        </Grid.Col>
+
+        <Grid.Col span={12}>
+          {editing ? (
+            <TagsInput
+              label={t('Batch Codes')}
+              placeholder={t('Add batch codes')}
+              value={formData.batch_codes}
+              onChange={(value) => setFormData({ ...formData, batch_codes: value })}
+            />
+          ) : (
+            <TagsInput
+              label={t('Batch Codes')}
+              value={request.batch_codes || []}
+              readOnly
             />
           )}
         </Grid.Col>

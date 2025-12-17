@@ -2,6 +2,186 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.14.0] - 2024-12-XX
+
+### Changed
+- **Procurement Module v2.0.0**: Complete MongoDB migration
+  - Removed all InvenTree dependencies from procurement module
+  - All purchase orders now stored in MongoDB `depo_purchase_orders` collection
+  - Stock items stored in MongoDB `depo_stocks` collection
+  - Suppliers stored in MongoDB `depo_companies` collection
+  - Parts referenced from MongoDB `depo_parts` collection
+  - Locations referenced from MongoDB `depo_locations` collection
+  - Attachments stored in MongoDB `depo_purchase_order_attachments` collection
+
+### Added
+- **Service Layer Architecture** for procurement module
+  - Created `services.py` with business logic functions
+  - Cleaner `routes.py` with route definitions only
+  - Reduced routes.py from ~800 to ~400 lines
+  - Better code organization and maintainability
+  - Easier to test and extend
+
+### Technical
+- Purchase order IDs changed from integers to MongoDB ObjectId strings
+- Item references changed from item_id to item_index (array position)
+- Status values changed from integers to strings
+- Uses MongoDB ObjectId for all references
+- Datetime serialization for JSON responses
+- File attachments stored in `media/files` with hash-based naming
+- Enriched API responses with related data (supplier details, part details)
+
+### Database Collections (Procurement)
+- `depo_purchase_orders` - Purchase order documents with embedded items
+- `depo_stocks` - Stock reception records
+- `depo_companies` - Supplier/manufacturer information
+- `depo_purchase_order_attachments` - File attachments metadata
+- `depo_parts` - Parts/articles (shared with inventory module)
+- `depo_locations` - Storage locations (shared with inventory module)
+
+### Migration Notes
+- Existing InvenTree procurement data needs to be migrated to MongoDB
+- Frontend may need updates to handle ObjectId strings instead of integers
+- Item operations now use array index instead of item ID
+
+---
+
+## [1.13.0] - 2024-12-XX
+
+### Added
+- **Inventory Module**: Complete inventory management system with MongoDB integration
+  - New module structure in `modules/inventory/`
+  - Backend API routes for articles management
+  - Frontend pages for articles list and detail views
+  - Menu integration with submenu items (Articles, Stocks, Suppliers, Manufacturers, Clients)
+  - Full CRUD operations for articles stored in MongoDB `depo_parts` collection
+  
+- **Articles Management**:
+  - List view with AJAX table, search, and column sorting
+  - Columns: Code (IPN), Name, MU, Description, Category, Total Stock, Status, Actions
+  - Create new articles with fields:
+    - Name, IPN, Default Location, Unit of Measure (UM)
+    - Supplier selection from `depo_companies` (is_supplier=true)
+    - Minimum Stock, Default Expiry (days)
+    - Boolean flags: Component, Assembly, Testable, Salable, Active
+    - Notes field
+  - Edit articles with tabbed interface:
+    - Part Details tab (active) - All database fields editable
+    - Stock tab (placeholder)
+    - Allocations tab (placeholder)
+    - Attachments tab (placeholder)
+  - Delete articles with Mantine confirmation modal
+  - Rich text editor (WYSIWYG) for notes field using TipTap
+  - Keywords field with tag/label-style input (TagsInput component)
+  - All schema fields available in edit view:
+    - Basic: name, ipn, um, description, link
+    - References: default_location_id, category_id, supplier_id
+    - Stock: minimum_stock, default_expiry, selection_method (FIFO/LIFO/FEFO)
+    - Metadata: keywords (array), notes (HTML), storage_conditions
+    - Flags: is_component, is_assembly, is_testable, is_salable, is_active, regulated, lotallexp
+
+- **Backend API Endpoints** (`/modules/inventory/api`):
+  - `GET /api/articles` - List articles with pagination, search, and sorting
+  - `GET /api/articles/{id}` - Get article by ID
+  - `POST /api/articles` - Create new article
+  - `PUT /api/articles/{id}` - Update article
+  - `DELETE /api/articles/{id}` - Delete article
+  - `GET /api/locations` - Get storage locations from `depo_locations`
+  - `GET /api/companies` - Get companies (suppliers/manufacturers) from `depo_companies`
+  - `GET /api/categories` - Get categories from `depo_categories`
+
+- **Frontend Pages**:
+  - `ArticlesPage.tsx` - Articles list with search, sort, create, edit, delete
+  - `ArticleDetailPage.tsx` - Article detail view with tabs and full edit form
+  - Navbar updated with Inventory menu and submenu items
+
+### Technical
+- Module configuration: `modules/inventory/config.json`
+- Module enabled in `config.yaml` under `modules.active`
+- MongoDB collections used:
+  - `depo_parts` - Articles/parts data
+  - `depo_locations` - Storage locations
+  - `depo_companies` - Suppliers and manufacturers
+  - `depo_categories` - Part categories
+- ObjectId serialization for MongoDB documents
+- Integration with existing authentication system
+- Mantine UI components throughout
+- TipTap rich text editor for notes
+- TagsInput for keywords management
+
+### Database Schema
+Articles stored in `depo_parts` collection:
+```javascript
+{
+  "_id": ObjectId,
+  "id": number,  // Legacy InvenTree ID
+  "name": string,
+  "ipn": string,  // Internal Part Number
+  "default_location_id": ObjectId,
+  "um": string,  // Unit of measure
+  "description": string,
+  "notes": string,  // HTML content
+  "files": array,
+  "keywords": array,
+  "link": string,
+  "default_expiry": number,  // Days
+  "minimum_stock": number,
+  "is_component": boolean,
+  "is_assembly": boolean,
+  "is_testable": boolean,
+  "is_salable": boolean,
+  "is_active": boolean,
+  "storage_conditions": string,
+  "regulated": boolean,
+  "lotallexp": boolean,
+  "selection_method": string,  // FIFO, LIFO, FEFO
+  "category_id": ObjectId,
+  "supplier_id": ObjectId
+}
+```
+
+### Configuration
+Module enabled in `config.yaml`:
+```yaml
+modules:
+  active:
+    - depo_procurement
+    - inventory
+```
+
+### Features
+- ✅ Complete CRUD operations for articles
+- ✅ Search and sort on all columns
+- ✅ MongoDB integration for data storage
+- ✅ Rich text editor for notes
+- ✅ Tag-based keywords management
+- ✅ Location, supplier, and category selection
+- ✅ Boolean flags for article properties
+- ✅ Tabbed interface for future expansion
+- ✅ Confirmation modals for delete operations
+- ✅ Status badges (Active/Inactive)
+- ✅ Responsive design with Mantine UI
+- ✅ Integration with existing auth system
+
+### Menu Structure
+- Inventory (parent menu with IconPackage)
+  - Articles (active)
+  - Stocks (disabled - coming soon)
+  - Suppliers (disabled - coming soon)
+  - Manufacturers (disabled - coming soon)
+  - Clients (disabled - coming soon)
+
+### Notes
+- Articles data migrated from InvenTree to MongoDB `depo_parts` collection
+- Total Stock column is placeholder (will be calculated from stock data)
+- Stock, Allocations, and Attachments tabs are placeholders for future implementation
+- Suppliers, Manufacturers, Clients, and Stocks menu items disabled pending implementation
+- Module follows same pattern as depo_procurement module
+- All fields from original schema are editable in Part Details tab
+- Selection method supports FIFO (First In First Out), LIFO (Last In First Out), and FEFO (First Expired First Out)
+
+---
+
 ## [1.12.0] - 2024-12-14
 
 ### Added

@@ -1,123 +1,188 @@
 # DEPO Procurement Module
 
-InvenTree procurement integration module for DataFlows Core.
-
-## Version
-1.0.0
+Version: 2.0.0
 
 ## Description
-Complete procurement management system integrated with InvenTree 1.0.1+. Provides purchase order management, supplier management, stock reception, and full integration with InvenTree's procurement workflow.
+
+Procurement management module for DataFlows Core. Manages purchase orders, suppliers, and stock reception using MongoDB as the data source. All data is stored in MongoDB collections instead of InvenTree.
 
 ## Features
 
 ### Purchase Orders
 - Create and manage purchase orders
-- Link orders to suppliers
-- Track order status (Pending, Placed, Complete, Cancelled, etc.)
-- Add line items with parts, quantities, and prices
-- Automatic supplier-part association
-- Order attachments with file upload
-- Stock reception workflow
+- Auto-generated reference numbers (PO-NNNN format)
+- Add/edit/delete line items
+- Track received quantities
+- Status management (Pending, Placed, Complete, Cancelled, Lost, Returned)
+- File attachments support
+- Search and filter capabilities
 
 ### Suppliers
-- List and search suppliers from InvenTree
-- Create new suppliers with custom fields
-- Integration with dataflows-depo-companies plugin
-- Custom fields: cod, reg_code, tax_id
-- Address management
+- Create and manage suppliers in MongoDB
+- Store supplier details (name, currency, tax ID, address, etc.)
+- Custom fields support (cod, reg_code)
 
 ### Stock Reception
 - Receive stock items against purchase orders
-- Batch code tracking
-- Serial number management
-- Packaging information
-- Stock status selection
-- Location assignment
+- Track batch codes, serial numbers, packaging
+- Multiple status options (OK, Attention, Damaged, etc.)
+- Link received stock to purchase orders
 
-### Components
-- **DetailsTab**: Order details with DatePickers and Select components
-- **ApprovalsTab**: Order status management
-- **ReceivedStockTab**: Complete stock reception interface
-- **ItemsTab**: Line items management with search and sort
-- **AttachmentsTab**: File upload and management
-
-## API Endpoints
-
-All endpoints are prefixed with `/modules/depo_procurement/api`
-
-### Suppliers
-- `GET /suppliers` - List suppliers
-- `POST /suppliers` - Create supplier
-
-### Purchase Orders
-- `GET /purchase-orders` - List purchase orders
-- `GET /purchase-orders/{id}` - Get order details
-- `POST /purchase-orders` - Create purchase order
-- `PATCH /purchase-orders/{id}/status` - Update order status
-
-### Line Items
-- `GET /purchase-orders/{id}/items` - List order items
-- `POST /purchase-orders/{id}/items` - Add item (with auto-association)
-- `PUT /purchase-orders/{id}/items/{item_id}` - Update item
-- `DELETE /purchase-orders/{id}/items/{item_id}` - Delete item
-
-### Stock Reception
-- `POST /purchase-orders/{id}/receive-stock` - Receive stock
-- `GET /purchase-orders/{id}/received-items` - List received items
-
-### Attachments
-- `GET /purchase-orders/{id}/attachments` - List attachments
-- `POST /purchase-orders/{id}/attachments` - Upload file
-- `DELETE /purchase-orders/{id}/attachments/{id}` - Delete attachment
-
-### Utilities
-- `GET /parts` - List purchaseable parts
-- `GET /stock-locations` - List stock locations
-- `GET /order-statuses` - Get available order statuses
-
-## Requirements
-
-### InvenTree
-- Version: >= 1.0.1
-- Required plugins:
-  - dataflows-depo-companies (for custom fields)
-
-### DataFlows Core
-- Version: >= 1.5.0
+### Quality Control
+- QC records tracking (placeholder for future implementation)
 
 ## Installation
 
-1. Copy module to `src/backend/modules/depo_procurement/`
-2. Add to `config.yaml`:
+Add module to `config.yaml`:
 ```yaml
 modules:
   active:
     - depo_procurement
 ```
-3. Restart application
 
-## Configuration
+Restart the application to load the module.
 
-Module configuration is stored in `config.json`:
-- API prefix: `/modules/depo_procurement/api`
-- Menu item: "Procurement" (order: 50)
-- Required permissions: admin
+## API Endpoints
 
-## Auto-Association Feature
+### Suppliers
+- `GET /modules/depo_procurement/api/suppliers` - List suppliers (supports search)
+- `POST /modules/depo_procurement/api/suppliers` - Create new supplier
 
-When adding a part to a purchase order, if the part is not associated with the supplier, the module automatically creates the association with a generated SKU: `SUP-{supplier_id}-{part_id}`
+### Purchase Orders
+- `GET /modules/depo_procurement/api/purchase-orders` - List all purchase orders (supports search)
+- `GET /modules/depo_procurement/api/purchase-orders/{id}` - Get purchase order by ID
+- `POST /modules/depo_procurement/api/purchase-orders` - Create new purchase order
+- `PATCH /modules/depo_procurement/api/purchase-orders/{id}/status` - Update order status
 
-This prevents "Supplier must match purchase order" errors and provides seamless user experience.
+### Line Items
+- `GET /modules/depo_procurement/api/purchase-orders/{id}/items` - List order items
+- `POST /modules/depo_procurement/api/purchase-orders/{id}/items` - Add item to order
+- `PUT /modules/depo_procurement/api/purchase-orders/{id}/items/{index}` - Update item
+- `DELETE /modules/depo_procurement/api/purchase-orders/{id}/items/{index}` - Delete item
 
-## Dependencies
+### Stock Reception
+- `POST /modules/depo_procurement/api/purchase-orders/{id}/receive-stock` - Receive stock
+- `GET /modules/depo_procurement/api/purchase-orders/{id}/received-items` - List received items
 
-- FastAPI
-- Pydantic
-- requests
-- PyYAML
+### Attachments
+- `GET /modules/depo_procurement/api/purchase-orders/{id}/attachments` - List attachments
+- `POST /modules/depo_procurement/api/purchase-orders/{id}/attachments` - Upload attachment
+- `DELETE /modules/depo_procurement/api/purchase-orders/{id}/attachments/{id}` - Delete attachment
 
-## Author
-DataFlows
+### Supporting Data
+- `GET /modules/depo_procurement/api/stock-locations` - Get storage locations
+- `GET /modules/depo_procurement/api/parts` - Search parts (supports search)
+- `GET /modules/depo_procurement/api/order-statuses` - Get available order statuses
+- `GET /modules/depo_procurement/api/purchase-orders/{id}/qc-records` - Get QC records
 
-## License
-Proprietary
+## Database Schema
+
+### depo_purchase_orders
+```javascript
+{
+  "_id": ObjectId,
+  "reference": "PO-0001",
+  "supplier_id": ObjectId,
+  "description": string,
+  "supplier_reference": string,
+  "currency": "EUR",
+  "issue_date": string,
+  "target_date": string,
+  "destination_id": ObjectId,
+  "notes": string,
+  "status": "Pending|Placed|Complete|Cancelled|Lost|Returned",
+  "items": [
+    {
+      "part_id": string,
+      "quantity": number,
+      "received": number,
+      "purchase_price": number,
+      "reference": string,
+      "destination_id": string,
+      "purchase_price_currency": string,
+      "notes": string,
+      "part_detail": {
+        "name": string,
+        "ipn": string,
+        "um": string
+      }
+    }
+  ],
+  "line_items": number,  // Count of items with received > 0
+  "lines": number,       // Total count of items
+  "created_at": DateTime,
+  "updated_at": DateTime,
+  "created_by": string
+}
+```
+
+### depo_stocks
+```javascript
+{
+  "_id": ObjectId,
+  "part_id": ObjectId,
+  "location_id": ObjectId,
+  "quantity": number,
+  "batch_code": string,
+  "serial_numbers": string,
+  "packaging": string,
+  "status": "OK|Attention|Damaged|...",
+  "notes": string,
+  "purchase_order_id": ObjectId,
+  "purchase_order_reference": string,
+  "supplier_id": ObjectId,
+  "received_date": DateTime,
+  "received_by": string,
+  "created_at": DateTime
+}
+```
+
+### depo_companies
+```javascript
+{
+  "_id": ObjectId,
+  "name": string,
+  "is_supplier": boolean,
+  "is_manufacturer": boolean,
+  "currency": string,
+  "tax_id": string,
+  "cod": string,
+  "reg_code": string,
+  "address": string,
+  "country": string,
+  "city": string,
+  "created_at": DateTime,
+  "created_by": string
+}
+```
+
+### depo_purchase_order_attachments
+```javascript
+{
+  "_id": ObjectId,
+  "order_id": ObjectId,
+  "filename": string,
+  "file_hash": string,
+  "file_path": string,
+  "content_type": string,
+  "size": number,
+  "comment": string,
+  "created_at": DateTime,
+  "created_by": string
+}
+```
+
+## Requirements
+
+- DataFlows Core >= 1.5.0
+- MongoDB connection configured
+- Collections: `depo_purchase_orders`, `depo_stocks`, `depo_companies`, `depo_parts`, `depo_locations`
+
+## Architecture
+
+The module is organized into:
+- `routes.py` - FastAPI route definitions (lightweight)
+- `services.py` - Business logic and database operations
+- `config.json` - Module configuration
+
+This separation keeps the codebase clean and maintainable.

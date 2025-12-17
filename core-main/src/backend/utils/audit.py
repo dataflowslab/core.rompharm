@@ -3,8 +3,14 @@ Audit logging utilities
 """
 from fastapi import Request
 from typing import Optional
-from ..utils.db import get_db
-from ..models.audit_log_model import AuditLogModel
+
+# Try relative imports first, fall back to absolute imports for module compatibility
+try:
+    from ..utils.db import get_db
+    from ..models.audit_log_model import AuditLogModel
+except ImportError:
+    from utils.db import get_db
+    from models.audit_log_model import AuditLogModel
 
 
 def log_action(

@@ -12,6 +12,7 @@ from .generated_document_model import GeneratedDocumentModel
 from .audit_log_model import AuditLogModel
 from .config_model import ConfigModel
 from .template_model import TemplateModel
+from .log_model import LogModel, LogEntry
 
 __all__ = [
     'UserModel',
@@ -26,5 +27,7 @@ __all__ = [
     'GeneratedDocumentModel',
     'AuditLogModel',
     'ConfigModel',
-    'TemplateModel'
+    'TemplateModel',
+    'LogModel',
+    'LogEntry'
 ]

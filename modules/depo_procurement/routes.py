@@ -1,38 +1,52 @@
 """
-DEPO Procurement Module - InvenTree integration
+DEPO Procurement Module - MongoDB integration
 """
-from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-import requests
-import yaml
+from bson import ObjectId
 import os
 
 # Import from core
 from src.backend.utils.db import get_db
-from src.backend.utils.config import load_config, get_config_value
 from src.backend.routes.auth import verify_token
 
 router = APIRouter(prefix="/modules/depo_procurement/api", tags=["depo_procurement"])
 
 
-def get_inventree_headers(user: dict) -> Dict[str, str]:
-    """Get headers for InvenTree API requests"""
-    token = user.get('token')
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated with InvenTree")
-    
-    return {
-        'Authorization': f'Token {token}',
-        'Content-Type': 'application/json'
-    }
+def serialize_doc(doc):
+    """Convert MongoDB document to JSON-serializable format"""
+    if doc is None:
+        return None
+    if isinstance(doc, list):
+        return [serialize_doc(item) for item in doc]
+    if isinstance(doc, dict):
+        result = {}
+        for key, value in doc.items():
+            if key == '_id':
+                # Convert _id to string and also add as 'pk' for frontend compatibility
+                result[key] = str(value) if value else None
+                result['pk'] = str(value) if value else None
+            elif key.endswith('_id'):
+                result[key] = str(value) if value else None
+            elif isinstance(value, ObjectId):
+                result[key] = str(value)
+            elif isinstance(value, dict):
+                result[key] = serialize_doc(value)
+            elif isinstance(value, list):
+                result[key] = [serialize_doc(item) if isinstance(item, dict) else item for item in value]
+            elif isinstance(value, datetime):
+                result[key] = value.isoformat()
+            else:
+                result[key] = value
+        return result
+    return doc
 
 
 def is_manager(user: dict) -> bool:
     """Check if user is in Managers group"""
     groups = user.get('groups', [])
-    # Check if user has 'Managers' group
     for group in groups:
         if isinstance(group, dict):
             if group.get('name', '').lower() == 'managers':
@@ -41,28 +55,6 @@ def is_manager(user: dict) -> bool:
             if group.lower() == 'managers':
                 return True
     return False
-
-
-def can_access_order(user: dict, order_data: dict) -> bool:
-    """
-    Check if user can access a purchase order
-    - Managers can access all orders
-    - Regular users can only access orders they created (responsible user)
-    """
-    # Managers have full access
-    if is_manager(user):
-        return True
-    
-    # Check if user is the responsible user for this order
-    user_pk = user.get('pk')
-    responsible_user = order_data.get('responsible')
-    
-    # If no responsible user set, allow access (backward compatibility)
-    if not responsible_user:
-        return True
-    
-    # Check if current user is the responsible user
-    return user_pk == responsible_user
 
 
 # Pydantic models
@@ -80,23 +72,23 @@ class NewSupplierRequest(BaseModel):
 
 
 class PurchaseOrderRequest(BaseModel):
-    supplier: int
+    supplier_id: str
     reference: Optional[str] = None
     description: Optional[str] = None
     supplier_reference: Optional[str] = None
-    currency: Optional[str] = None
+    currency: Optional[str] = "EUR"
     issue_date: Optional[str] = None
     target_date: Optional[str] = None
-    destination: Optional[int] = None
+    destination_id: Optional[str] = None
     notes: Optional[str] = None
 
 
 class PurchaseOrderItemRequest(BaseModel):
-    part: int
+    part_id: str
     quantity: float
     purchase_price: Optional[float] = None
     reference: Optional[str] = None
-    destination: Optional[int] = None
+    destination_id: Optional[str] = None
     purchase_price_currency: Optional[str] = None
     notes: Optional[str] = None
 
@@ -105,38 +97,45 @@ class PurchaseOrderItemUpdateRequest(BaseModel):
     quantity: Optional[float] = None
     purchase_price: Optional[float] = None
     reference: Optional[str] = None
-    destination: Optional[int] = None
+    destination_id: Optional[str] = None
     purchase_price_currency: Optional[str] = None
     notes: Optional[str] = None
+
+
+class ReceiveStockRequest(BaseModel):
+    line_item_index: int
+    quantity: float
+    location_id: str
+    batch_code: Optional[str] = None
+    serial_numbers: Optional[str] = None
+    packaging: Optional[str] = None
+    status: Optional[str] = "OK"
+    notes: Optional[str] = None
+
+
+class UpdateOrderStatusRequest(BaseModel):
+    status: str
 
 
 @router.get("/suppliers")
 async def get_suppliers(
     request: Request,
-    search: Optional[str] = None,
+    search: Optional[str] = Query(None),
     current_user: dict = Depends(verify_token)
 ):
-    """Get list of suppliers from InvenTree"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
+    """Get list of suppliers from MongoDB"""
+    db = get_db()
+    collection = db['depo_companies']
     
-    params = {
-        'is_supplier': 'true'
-    }
+    query = {'is_supplier': True}
     if search:
-        params['search'] = search
+        query['name'] = {'$regex': search, '$options': 'i'}
     
     try:
-        response = requests.get(
-            f"{inventree_url}/api/company/",
-            headers=headers,
-            params=params,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
+        cursor = collection.find(query).sort('name', 1)
+        suppliers = list(cursor)
+        return serialize_doc(suppliers)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch suppliers: {str(e)}")
 
 
@@ -146,79 +145,30 @@ async def create_supplier(
     supplier_data: NewSupplierRequest,
     current_user: dict = Depends(verify_token)
 ):
-    """Create a new supplier in InvenTree"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
+    """Create a new supplier in MongoDB"""
+    db = get_db()
+    collection = db['depo_companies']
     
-    # Create company in InvenTree
-    company_payload = {
+    doc = {
         'name': supplier_data.name,
         'is_supplier': supplier_data.is_supplier,
         'is_manufacturer': supplier_data.is_manufacturer,
-        'currency': supplier_data.currency
+        'currency': supplier_data.currency,
+        'tax_id': supplier_data.tax_id,
+        'cod': supplier_data.cod,
+        'reg_code': supplier_data.reg_code,
+        'address': supplier_data.address,
+        'country': supplier_data.country,
+        'city': supplier_data.city,
+        'created_at': datetime.utcnow(),
+        'created_by': current_user.get('username')
     }
     
     try:
-        # Create company
-        response = requests.post(
-            f"{inventree_url}/api/company/",
-            headers=headers,
-            json=company_payload,
-            timeout=10
-        )
-        response.raise_for_status()
-        company = response.json()
-        company_id = company.get('pk') or company.get('id')
-        
-        # Add primary address if provided
-        if supplier_data.address or supplier_data.country or supplier_data.city:
-            address_payload = {
-                'company': company_id,
-                'primary': True
-            }
-            if supplier_data.address:
-                address_payload['line1'] = supplier_data.address
-            if supplier_data.country:
-                address_payload['country'] = supplier_data.country
-            if supplier_data.city:
-                address_payload['postal_city'] = supplier_data.city
-            
-            try:
-                addr_response = requests.post(
-                    f"{inventree_url}/api/company/address/",
-                    headers=headers,
-                    json=address_payload,
-                    timeout=10
-                )
-                addr_response.raise_for_status()
-            except Exception as e:
-                print(f"Warning: Failed to create address: {e}")
-        
-        # Add custom fields via plugin if provided
-        custom_fields = {}
-        if supplier_data.cod:
-            custom_fields['cod'] = supplier_data.cod
-        if supplier_data.reg_code:
-            custom_fields['reg_code'] = supplier_data.reg_code
-        if supplier_data.tax_id:
-            custom_fields['tax_id'] = supplier_data.tax_id
-        
-        if custom_fields:
-            try:
-                plugin_response = requests.post(
-                    f"{inventree_url}/plugin/dataflows-depo-companies/api/extra/company/{company_id}/update/",
-                    headers=headers,
-                    json={'fields': custom_fields},
-                    timeout=10
-                )
-                plugin_response.raise_for_status()
-            except Exception as e:
-                print(f"Warning: Failed to set custom fields: {e}")
-        
-        return company
-        
-    except requests.exceptions.RequestException as e:
+        result = collection.insert_one(doc)
+        doc['_id'] = result.inserted_id
+        return serialize_doc(doc)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create supplier: {str(e)}")
 
 
@@ -227,67 +177,38 @@ async def get_stock_locations(
     request: Request,
     current_user: dict = Depends(verify_token)
 ):
-    """Get list of stock locations from InvenTree"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
+    """Get list of stock locations from MongoDB"""
+    db = get_db()
+    collection = db['depo_locations']
     
     try:
-        response = requests.get(
-            f"{inventree_url}/api/stock/location/",
-            headers=headers,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
+        cursor = collection.find().sort('name', 1)
+        locations = list(cursor)
+        return serialize_doc(locations)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock locations: {str(e)}")
 
 
 @router.get("/purchase-orders")
 async def get_purchase_orders(
     request: Request,
+    search: Optional[str] = Query(None),
     current_user: dict = Depends(verify_token)
 ):
-    """Get list of purchase orders from InvenTree"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    try:
-        response = requests.get(
-            f"{inventree_url}/api/order/po/",
-            headers=headers,
-            params={'supplier_detail': 'true'},
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch purchase orders: {str(e)}")
+    """Get list of purchase orders from MongoDB"""
+    from modules.depo_procurement.services import get_purchase_orders_list
+    return await get_purchase_orders_list(search)
 
 
 @router.get("/purchase-orders/{order_id}")
 async def get_purchase_order(
     request: Request,
-    order_id: int,
+    order_id: str,
     current_user: dict = Depends(verify_token)
 ):
-    """Get a specific purchase order from InvenTree"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    try:
-        response = requests.get(
-            f"{inventree_url}/api/order/po/{order_id}/",
-            headers=headers,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch purchase order: {str(e)}")
+    """Get a specific purchase order from MongoDB"""
+    from modules.depo_procurement.services import get_purchase_order_by_id
+    return await get_purchase_order_by_id(order_id)
 
 
 @router.post("/purchase-orders")
@@ -296,565 +217,106 @@ async def create_purchase_order(
     order_data: PurchaseOrderRequest,
     current_user: dict = Depends(verify_token)
 ):
-    """Create a new purchase order in InvenTree"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    payload = {
-        'supplier': order_data.supplier,
-    }
-    
-    # Auto-generate reference if not provided
-    if not order_data.reference:
-        try:
-            # Get all purchase orders to find the next number
-            po_list_response = requests.get(
-                f"{inventree_url}/api/order/po/",
-                headers=headers,
-                timeout=10
-            )
-            po_list_response.raise_for_status()
-            po_list = po_list_response.json()
-            
-            # Extract numbers from existing PO references
-            max_num = 0
-            if isinstance(po_list, list):
-                orders = po_list
-            else:
-                orders = po_list.get('results', [])
-            
-            for po in orders:
-                ref = po.get('reference', '')
-                if ref.startswith('PO-'):
-                    try:
-                        num = int(ref.replace('PO-', ''))
-                        max_num = max(max_num, num)
-                    except ValueError:
-                        continue
-            
-            # Generate next reference
-            next_num = max_num + 1
-            payload['reference'] = f"PO-{next_num:04d}"
-            print(f"[PROCUREMENT] Auto-generated reference: {payload['reference']}")
-        except Exception as e:
-            print(f"[PROCUREMENT] Warning: Could not auto-generate reference: {e}")
-            # If auto-generation fails, let InvenTree handle it
-    else:
-        payload['reference'] = order_data.reference
-    
-    if order_data.description:
-        payload['description'] = order_data.description
-    if order_data.supplier_reference:
-        payload['supplier_reference'] = order_data.supplier_reference
-    if order_data.currency:
-        payload['order_currency'] = order_data.currency
-    if order_data.issue_date:
-        payload['issue_date'] = order_data.issue_date
-    if order_data.target_date:
-        payload['target_date'] = order_data.target_date
-    if order_data.destination:
-        payload['destination'] = order_data.destination
-    if order_data.notes:
-        payload['notes'] = order_data.notes
-    
-    try:
-        response = requests.post(
-            f"{inventree_url}/api/order/po/",
-            headers=headers,
-            json=payload,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_detail = str(e)
-        if hasattr(e.response, 'text'):
-            error_detail = f"{error_detail}: {e.response.text}"
-        raise HTTPException(status_code=500, detail=f"Failed to create purchase order: {error_detail}")
+    """Create a new purchase order in MongoDB"""
+    from modules.depo_procurement.services import create_new_purchase_order
+    return await create_new_purchase_order(order_data, current_user)
 
 
 @router.get("/purchase-orders/{order_id}/items")
 async def get_purchase_order_items(
     request: Request,
-    order_id: int,
+    order_id: str,
     current_user: dict = Depends(verify_token)
 ):
-    """Get items for a purchase order with complete part details"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    try:
-        # Get po-line items with part_detail
-        response = requests.get(
-            f"{inventree_url}/api/order/po-line/",
-            headers=headers,
-            params={'order': order_id, 'part_detail': 'true'},
-            timeout=10
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        # InvenTree 1.0.1 returns list directly, not dict with results
-        if isinstance(data, list):
-            results = data
-        else:
-            results = data.get('results', [])
-        
-        # part_detail already contains IPN and name - no need to fetch again!
-        # Just ensure the data structure is consistent
-        print(f"Successfully got {len(results)} items with part details")
-        
-        # Return in the same format (list or dict with results)
-        if isinstance(data, list):
-            return {'results': results}
-        return data
-        
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch purchase order items: {str(e)}")
+    """Get items for a purchase order"""
+    from modules.depo_procurement.services import get_order_items
+    return await get_order_items(order_id)
 
 
 @router.post("/purchase-orders/{order_id}/items")
 async def add_purchase_order_item(
     request: Request,
-    order_id: int,
+    order_id: str,
     item_data: PurchaseOrderItemRequest,
     current_user: dict = Depends(verify_token)
 ):
     """Add an item to a purchase order"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    # First, get the purchase order to know the supplier
-    try:
-        po_response = requests.get(
-            f"{inventree_url}/api/order/po/{order_id}/",
-            headers=headers,
-            timeout=10
-        )
-        po_response.raise_for_status()
-        purchase_order = po_response.json()
-        supplier_id = purchase_order.get('supplier')
-        print(f"[PROCUREMENT] Order {order_id} supplier: {supplier_id}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get purchase order: {str(e)}")
-    
-    # Get or create supplier part association
-    supplier_part_id = None
-    try:
-        supplier_parts_response = requests.get(
-            f"{inventree_url}/api/company/part/",
-            headers=headers,
-            params={'part': item_data.part, 'supplier': supplier_id},
-            timeout=10
-        )
-        supplier_parts_response.raise_for_status()
-        supplier_parts_data = supplier_parts_response.json()
-        
-        # Handle both list and dict responses
-        if isinstance(supplier_parts_data, list):
-            supplier_parts = supplier_parts_data
-        else:
-            supplier_parts = supplier_parts_data.get('results', [])
-        
-        # If association exists, use it
-        if supplier_parts and len(supplier_parts) > 0:
-            supplier_part_id = supplier_parts[0].get('pk') or supplier_parts[0].get('id')
-            print(f"[PROCUREMENT] Found existing supplier_part: {supplier_part_id}")
-        else:
-            # Create supplier part association
-            print(f"[PROCUREMENT] Creating supplier_part association for part {item_data.part} and supplier {supplier_id}")
-            
-            supplier_part_payload = {
-                'part': item_data.part,
-                'supplier': supplier_id,
-                'SKU': f"SUP-{supplier_id}-{item_data.part}"
-            }
-            
-            create_response = requests.post(
-                f"{inventree_url}/api/company/part/",
-                headers=headers,
-                json=supplier_part_payload,
-                timeout=10
-            )
-            create_response.raise_for_status()
-            created_supplier_part = create_response.json()
-            supplier_part_id = created_supplier_part.get('pk') or created_supplier_part.get('id')
-            print(f"[PROCUREMENT] Created supplier_part: {supplier_part_id}")
-            
-    except Exception as e:
-        print(f"[PROCUREMENT] Error with supplier_part: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get/create supplier part association: {str(e)}")
-    
-    if not supplier_part_id:
-        raise HTTPException(status_code=500, detail="Could not determine supplier_part ID")
-    
-    # Now add the item to purchase order using supplier_part
-    payload = {
-        'order': order_id,
-        'part': supplier_part_id,  # InvenTree 1.0.1 expects supplier_part ID here
-        'quantity': item_data.quantity
-    }
-    
-    if item_data.purchase_price is not None:
-        payload['purchase_price'] = item_data.purchase_price
-    if item_data.reference:
-        payload['reference'] = item_data.reference
-    if item_data.destination:
-        payload['destination'] = item_data.destination
-    if item_data.purchase_price_currency:
-        payload['purchase_price_currency'] = item_data.purchase_price_currency
-    if item_data.notes:
-        payload['notes'] = item_data.notes
-    
-    print(f"[PROCUREMENT] Adding line item with payload: {payload}")
-    
-    try:
-        response = requests.post(
-            f"{inventree_url}/api/order/po-line/",
-            headers=headers,
-            json=payload,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_detail = str(e)
-        if hasattr(e.response, 'text'):
-            error_detail = f"{error_detail}: {e.response.text}"
-        print(f"[PROCUREMENT] Error adding line item: {error_detail}")
-        raise HTTPException(status_code=500, detail=f"Failed to add item to purchase order: {error_detail}")
+    from modules.depo_procurement.services import add_order_item
+    return await add_order_item(order_id, item_data)
 
 
-@router.put("/purchase-orders/{order_id}/items/{item_id}")
+@router.put("/purchase-orders/{order_id}/items/{item_index}")
 async def update_purchase_order_item(
     request: Request,
-    order_id: int,
-    item_id: int,
+    order_id: str,
+    item_index: int,
     item_data: PurchaseOrderItemUpdateRequest,
     current_user: dict = Depends(verify_token)
 ):
     """Update an item in a purchase order"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    payload = {}
-    
-    if item_data.quantity is not None:
-        payload['quantity'] = item_data.quantity
-    if item_data.purchase_price is not None:
-        payload['purchase_price'] = item_data.purchase_price
-    if item_data.reference is not None:
-        payload['reference'] = item_data.reference
-    if item_data.destination is not None:
-        payload['destination'] = item_data.destination
-    if item_data.purchase_price_currency is not None:
-        payload['purchase_price_currency'] = item_data.purchase_price_currency
-    if item_data.notes is not None:
-        payload['notes'] = item_data.notes
-    
-    try:
-        response = requests.patch(
-            f"{inventree_url}/api/order/po-line/{item_id}/",
-            headers=headers,
-            json=payload,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_detail = str(e)
-        if hasattr(e.response, 'text'):
-            error_detail = f"{error_detail}: {e.response.text}"
-        raise HTTPException(status_code=500, detail=f"Failed to update item: {error_detail}")
+    from modules.depo_procurement.services import update_order_item
+    return await update_order_item(order_id, item_index, item_data)
 
 
-@router.delete("/purchase-orders/{order_id}/items/{item_id}")
+@router.delete("/purchase-orders/{order_id}/items/{item_index}")
 async def delete_purchase_order_item(
     request: Request,
-    order_id: int,
-    item_id: int,
+    order_id: str,
+    item_index: int,
     current_user: dict = Depends(verify_token)
 ):
     """Delete an item from a purchase order"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    try:
-        response = requests.delete(
-            f"{inventree_url}/api/order/po-line/{item_id}/",
-            headers=headers,
-            timeout=10
-        )
-        response.raise_for_status()
-        return {"success": True}
-    except requests.exceptions.RequestException as e:
-        error_detail = str(e)
-        if hasattr(e.response, 'text'):
-            error_detail = f"{error_detail}: {e.response.text}"
-        raise HTTPException(status_code=500, detail=f"Failed to delete item: {error_detail}")
+    from modules.depo_procurement.services import delete_order_item
+    return await delete_order_item(order_id, item_index)
 
 
 @router.get("/parts")
 async def get_parts(
     request: Request,
-    search: Optional[str] = None,
+    search: Optional[str] = Query(None),
     current_user: dict = Depends(verify_token)
 ):
-    """Get list of parts from InvenTree"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
+    """Get list of parts from MongoDB"""
+    db = get_db()
+    collection = db['depo_parts']
     
-    params = {
-        'purchaseable': 'true'
-    }
+    query = {}
     if search:
-        params['search'] = search
+        query['$or'] = [
+            {'name': {'$regex': search, '$options': 'i'}},
+            {'ipn': {'$regex': search, '$options': 'i'}},
+            {'description': {'$regex': search, '$options': 'i'}}
+        ]
     
     try:
-        response = requests.get(
-            f"{inventree_url}/api/part/",
-            headers=headers,
-            params=params,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch parts: {str(e)}")
-
-
-@router.get("/purchase-orders/{order_id}/attachments")
-async def get_attachments(
-    request: Request,
-    order_id: int,
-    current_user: dict = Depends(verify_token)
-):
-    """Get attachments for a purchase order using generic attachment API"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    try:
-        # InvenTree 1.0.1: Use generic attachment endpoint with model_type and model_id
-        response = requests.get(
-            f"{inventree_url}/api/attachment/",
-            headers=headers,
-            params={
-                'model_type': 'purchaseorder',
-                'model_id': order_id
-            },
-            timeout=10
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        print(f"[PROCUREMENT] Got {len(data.get('results', data)) if isinstance(data, dict) else len(data)} attachments for order {order_id}")
-        return data
-    except requests.exceptions.RequestException as e:
-        print(f"[PROCUREMENT] Error fetching attachments: {str(e)}")
-        if hasattr(e, 'response') and hasattr(e.response, 'text'):
-            print(f"[PROCUREMENT] Response: {e.response.text}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch attachments: {str(e)}")
-
-
-@router.post("/purchase-orders/{order_id}/attachments")
-async def upload_attachment(
-    request: Request,
-    order_id: int,
-    file: UploadFile = File(...),
-    comment: Optional[str] = Form(None),
-    current_user: dict = Depends(verify_token)
-):
-    """Upload an attachment to a purchase order using generic attachment API"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    token = current_user.get('token')
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated with InvenTree")
-    
-    try:
-        # Read file content
-        file_content = await file.read()
-        
-        # Prepare multipart form data
-        files = {
-            'attachment': (file.filename, file_content, file.content_type)
-        }
-        
-        # InvenTree 1.0.1: Use model_type and model_id
-        data = {
-            'model_type': 'purchaseorder',
-            'model_id': order_id
-        }
-        
-        if comment:
-            data['comment'] = comment
-        
-        # Upload to InvenTree generic attachment endpoint
-        response = requests.post(
-            f"{inventree_url}/api/attachment/",
-            headers={'Authorization': f'Token {token}'},
-            files=files,
-            data=data,
-            timeout=30
-        )
-        response.raise_for_status()
-        print(f"[PROCUREMENT] Uploaded attachment for order {order_id}")
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_detail = str(e)
-        if hasattr(e, 'response') and hasattr(e.response, 'text'):
-            error_detail = f"{error_detail}: {e.response.text}"
-        print(f"[PROCUREMENT] Error uploading attachment: {error_detail}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload attachment: {error_detail}")
-
-
-@router.delete("/purchase-orders/{order_id}/attachments/{attachment_id}")
-async def delete_attachment(
-    request: Request,
-    order_id: int,
-    attachment_id: int,
-    current_user: dict = Depends(verify_token)
-):
-    """Delete an attachment from a purchase order"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    try:
-        # Use generic attachment endpoint
-        response = requests.delete(
-            f"{inventree_url}/api/attachment/{attachment_id}/",
-            headers=headers,
-            timeout=10
-        )
-        response.raise_for_status()
-        print(f"[PROCUREMENT] Deleted attachment {attachment_id} for order {order_id}")
-        return {"success": True}
-    except requests.exceptions.RequestException as e:
-        error_detail = str(e)
-        if hasattr(e.response, 'text'):
-            error_detail = f"{error_detail}: {e.response.text}"
-        print(f"[PROCUREMENT] Error deleting attachment: {error_detail}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete attachment: {error_detail}")
-
-
-@router.get("/purchase-orders/{order_id}/received-items")
-async def get_received_items(
-    request: Request,
-    order_id: int,
-    current_user: dict = Depends(verify_token)
-):
-    """Get received stock items for a purchase order"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    # Check permissions - get order first
-    try:
-        po_response = requests.get(
-            f"{inventree_url}/api/order/po/{order_id}/",
-            headers=headers,
-            timeout=10
-        )
-        po_response.raise_for_status()
-        purchase_order = po_response.json()
-        
-        # Check if user can access this order
-        if not can_access_order(current_user, purchase_order):
-            raise HTTPException(
-                status_code=403,
-                detail="You don't have permission to access this purchase order"
-            )
-    except HTTPException:
-        raise
+        cursor = collection.find(query).sort('name', 1).limit(50)
+        parts = list(cursor)
+        return serialize_doc(parts)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to verify order access: {str(e)}")
-    
-    try:
-        response = requests.get(
-            f"{inventree_url}/api/stock/",
-            headers=headers,
-            params={'purchase_order': order_id},
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch received items: {str(e)}")
-
-
-class ReceiveStockRequest(BaseModel):
-    line_item: int
-    quantity: float
-    location: int
-    batch_code: Optional[str] = None
-    serial_numbers: Optional[str] = None
-    packaging: Optional[str] = None
-    status: Optional[int] = None
-    notes: Optional[str] = None
+        raise HTTPException(status_code=500, detail=f"Failed to fetch parts: {str(e)}")
 
 
 @router.post("/purchase-orders/{order_id}/receive-stock")
 async def receive_stock(
     request: Request,
-    order_id: int,
+    order_id: str,
     stock_data: ReceiveStockRequest,
     current_user: dict = Depends(verify_token)
 ):
     """Receive stock items for a purchase order line"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    payload = {
-        'line_item': stock_data.line_item,
-        'quantity': stock_data.quantity,
-        'location': stock_data.location
-    }
-    
-    if stock_data.batch_code:
-        payload['batch_code'] = stock_data.batch_code
-    if stock_data.serial_numbers:
-        payload['serial_numbers'] = stock_data.serial_numbers
-    if stock_data.packaging:
-        payload['packaging'] = stock_data.packaging
-    if stock_data.status is not None:
-        payload['status'] = stock_data.status
-    if stock_data.notes:
-        payload['notes'] = stock_data.notes
-    
-    try:
-        response = requests.post(
-            f"{inventree_url}/api/order/po/{order_id}/receive/",
-            headers=headers,
-            json=payload,
-            timeout=10
-        )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_detail = str(e)
-        if hasattr(e, 'response') and hasattr(e.response, 'text'):
-            error_detail = f"{error_detail}: {e.response.text}"
-        raise HTTPException(status_code=500, detail=f"Failed to receive stock: {error_detail}")
+    from modules.depo_procurement.services import receive_stock_item
+    return await receive_stock_item(order_id, stock_data, current_user)
 
 
-@router.get("/purchase-orders/{order_id}/qc-records")
-async def get_qc_records(
+@router.get("/purchase-orders/{order_id}/received-items")
+async def get_received_items(
     request: Request,
-    order_id: int,
+    order_id: str,
     current_user: dict = Depends(verify_token)
 ):
-    """Get QC records for a purchase order (placeholder)"""
-    # This is a placeholder - QC records functionality to be implemented
-    return {"results": []}
+    """Get received stock items for a purchase order"""
+    from modules.depo_procurement.services import get_received_stock_items
+    return await get_received_stock_items(order_id)
 
 
 @router.get("/order-statuses")
@@ -863,53 +325,99 @@ async def get_order_statuses(
     current_user: dict = Depends(verify_token)
 ):
     """Get available purchase order statuses"""
-    # InvenTree 1.0.1 purchase order statuses
     statuses = [
-        {"value": 10, "label": "Pending"},
-        {"value": 20, "label": "Placed"},
-        {"value": 30, "label": "Complete"},
-        {"value": 40, "label": "Cancelled"},
-        {"value": 50, "label": "Lost"},
-        {"value": 60, "label": "Returned"}
+        {"value": "Pending", "label": "Pending"},
+        {"value": "Placed", "label": "Placed"},
+        {"value": "Complete", "label": "Complete"},
+        {"value": "Cancelled", "label": "Cancelled"},
+        {"value": "Lost", "label": "Lost"},
+        {"value": "Returned", "label": "Returned"}
     ]
     return {"statuses": statuses}
-
-
-class UpdateOrderStatusRequest(BaseModel):
-    status: int
 
 
 @router.patch("/purchase-orders/{order_id}/status")
 async def update_order_status(
     request: Request,
-    order_id: int,
+    order_id: str,
     status_data: UpdateOrderStatusRequest,
     current_user: dict = Depends(verify_token)
 ):
     """Update purchase order status"""
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    headers = get_inventree_headers(current_user)
-    
-    payload = {
-        'status': status_data.status
-    }
+    db = get_db()
+    collection = db['depo_purchase_orders']
     
     try:
-        response = requests.patch(
-            f"{inventree_url}/api/order/po/{order_id}/",
-            headers=headers,
-            json=payload,
-            timeout=10
+        result = collection.update_one(
+            {'_id': ObjectId(order_id)},
+            {
+                '$set': {
+                    'status': status_data.status,
+                    'updated_at': datetime.utcnow()
+                }
+            }
         )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_detail = str(e)
-        if hasattr(e, 'response') and hasattr(e.response, 'text'):
-            error_detail = f"{error_detail}: {e.response.text}"
-        raise HTTPException(status_code=500, detail=f"Failed to update order status: {error_detail}")
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+        order = collection.find_one({'_id': ObjectId(order_id)})
+        return serialize_doc(order)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update order status: {str(e)}")
 
 
-#
+@router.get("/purchase-orders/{order_id}/attachments")
+async def get_attachments(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Get attachments for a purchase order"""
+    from modules.depo_procurement.services import get_order_attachments
+    return await get_order_attachments(order_id)
 
+
+@router.post("/purchase-orders/{order_id}/attachments")
+async def upload_attachment(
+    request: Request,
+    order_id: str,
+    file: UploadFile = File(...),
+    comment: Optional[str] = Form(None),
+    current_user: dict = Depends(verify_token)
+):
+    """Upload an attachment to a purchase order"""
+    from modules.depo_procurement.services import upload_order_attachment
+    return await upload_order_attachment(order_id, file, comment, current_user)
+
+
+@router.delete("/purchase-orders/{order_id}/attachments/{attachment_id}")
+async def delete_attachment(
+    request: Request,
+    order_id: str,
+    attachment_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Delete an attachment from a purchase order"""
+    from modules.depo_procurement.services import delete_order_attachment
+    return await delete_order_attachment(attachment_id)
+
+
+@router.get("/purchase-orders/{order_id}/qc-records")
+async def get_qc_records(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Get QC records for a purchase order"""
+    db = get_db()
+    collection = db['depo_procurement_qc']
+    
+    try:
+        cursor = collection.find({'order_id': ObjectId(order_id)}).sort('created_at', -1)
+        qc_records = list(cursor)
+        return {"results": serialize_doc(qc_records)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch QC records: {str(e)}")
