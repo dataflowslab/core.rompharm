@@ -64,6 +64,9 @@ def run_backend(c, reload=False):
     """
     import yaml
     
+    # Detect python command (python3 on Linux, python on Windows)
+    python_cmd = "python3" if sys.platform != "win32" else "python"
+    
     # Load config to get port and host
     try:
         with open('config.yaml', 'r') as f:
@@ -84,7 +87,7 @@ def run_backend(c, reload=False):
     print("\nPress Ctrl+C to stop\n")
     
     reload_flag = "--reload" if reload else ""
-    c.run(f"python -m uvicorn src.backend.app:app --host {host} --port {port} {reload_flag}")
+    c.run(f"{python_cmd} -m uvicorn src.backend.app:app --host {host} --port {port} {reload_flag}")
 
 
 @task
@@ -116,6 +119,9 @@ def run(c):
     """Run the complete application (production mode)"""
     import yaml
     
+    # Detect python command (python3 on Linux, python on Windows)
+    python_cmd = "python3" if sys.platform != "win32" else "python"
+    
     # Load config to get port and host
     try:
         with open('config.yaml', 'r') as f:
@@ -135,7 +141,7 @@ def run(c):
     print(f"API Docs: http://localhost:{port}/docs")
     print("\nPress Ctrl+C to stop\n")
     
-    c.run(f"python -m uvicorn src.backend.app:app --host {host} --port {port}")
+    c.run(f"{python_cmd} -m uvicorn src.backend.app:app --host {host} --port {port}")
 
 
 @task
@@ -438,23 +444,32 @@ def job_run(c, name):
     Args:
         name: Job name (e.g., update_roles)
     """
+    # Detect python command (python3 on Linux, python on Windows)
+    python_cmd = "python3" if sys.platform != "win32" else "python"
+    
     print(f"Running job: {name}")
-    c.run(f"python src/scripts/{name}.py")
+    c.run(f"{python_cmd} src/scripts/{name}.py")
 
 
 @task
 def job_list(c):
     """List all configured jobs"""
+    # Detect python command (python3 on Linux, python on Windows)
+    python_cmd = "python3" if sys.platform != "win32" else "python"
+    
     print("Listing configured jobs from database...")
-    c.run("python -c \"from src.backend.utils.db import get_db; from src.backend.models.job_model import JobModel; db = get_db(); jobs = list(db[JobModel.collection_name].find()); [print(f\\\"- {j['name']}: {j['frequency']} (enabled: {j.get('enabled', True)})\\\") for j in jobs]\"")
+    c.run(f"{python_cmd} -c \"from src.backend.utils.db import get_db; from src.backend.models.job_model import JobModel; db = get_db(); jobs = list(db[JobModel.collection_name].find()); [print(f\\\"- {{j['name']}}: {{j['frequency']}} (enabled: {{j.get('enabled', True)}})\\\") for j in jobs]\"")
 
 
 @task
 def scheduler_start(c):
     """Start the job scheduler service"""
+    # Detect python command (python3 on Linux, python on Windows)
+    python_cmd = "python3" if sys.platform != "win32" else "python"
+    
     print("Starting job scheduler...")
     print("Note: This will run in the foreground. Press Ctrl+C to stop.")
-    c.run("python -c \"from src.backend.scheduler import get_scheduler; import time; scheduler = get_scheduler(); scheduler.start(); print('Scheduler running...'); [time.sleep(1) for _ in iter(int, 1)]\"")
+    c.run(f"{python_cmd} -c \"from src.backend.scheduler import get_scheduler; import time; scheduler = get_scheduler(); scheduler.start(); print('Scheduler running...'); [time.sleep(1) for _ in iter(int, 1)]\"")
 
 
 @task

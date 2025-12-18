@@ -38,6 +38,11 @@ interface StockLocation {
   description?: string;
 }
 
+interface Currency {
+  code: string;
+  name: string;
+}
+
 export function ProcurementPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -46,6 +51,7 @@ export function ProcurementPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
@@ -56,14 +62,14 @@ export function ProcurementPage() {
 
   // Form state for new purchase order
   const [formData, setFormData] = useState({
-    supplier: '',
+    supplier_id: '',
     reference: '',
     description: '',
     supplier_reference: '',
     currency: 'EUR',
     issue_date: new Date(),
     target_date: null as Date | null,
-    destination: '',
+    destination_id: '',
     notes: ''
   });
 
@@ -85,6 +91,7 @@ export function ProcurementPage() {
     loadPurchaseOrders();
     loadSuppliers();
     loadStockLocations();
+    loadCurrencies();
   }, []);
 
   const loadPurchaseOrders = async () => {
@@ -122,6 +129,23 @@ export function ProcurementPage() {
     }
   };
 
+  const loadCurrencies = async () => {
+    try {
+      const response = await api.get(procurementApi.getCurrencies());
+      const currenciesData = response.data.results || response.data || [];
+      
+      // Only use database currencies if they exist, otherwise don't set fallback here
+      if (currenciesData.length > 0) {
+        setCurrencies(currenciesData);
+      } else {
+        // Database is empty, don't set anything - backend will return defaults
+        console.log('No currencies in database, backend will provide defaults');
+      }
+    } catch (error) {
+      console.error('Failed to load currencies:', error);
+    }
+  };
+
   const handleCreateSupplier = async () => {
     if (!newSupplierData.name) {
       notifications.show({
@@ -145,7 +169,7 @@ export function ProcurementPage() {
 
       // Add to suppliers list and select it
       setSuppliers([...suppliers, newSupplier]);
-      setFormData({ ...formData, supplier: String(newSupplier.pk || newSupplier.id) });
+      setFormData({ ...formData, supplier_id: String(newSupplier.pk || newSupplier.id) });
       
       // Reset form and close modal
       setNewSupplierData({
@@ -174,7 +198,7 @@ export function ProcurementPage() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.supplier) {
+    if (!formData.supplier_id) {
       notifications.show({
         title: t('Error'),
         message: t('Please select a supplier'),
@@ -186,14 +210,14 @@ export function ProcurementPage() {
     setSubmitting(true);
     try {
       const payload = {
-        supplier: parseInt(formData.supplier),
+        supplier_id: formData.supplier_id,
         reference: formData.reference || undefined,
         description: formData.description || undefined,
         supplier_reference: formData.supplier_reference || undefined,
         currency: formData.currency || undefined,
         issue_date: formData.issue_date ? formData.issue_date.toISOString().split('T')[0] : undefined,
         target_date: formData.target_date ? formData.target_date.toISOString().split('T')[0] : undefined,
-        destination: formData.destination ? parseInt(formData.destination) : undefined,
+        destination_id: formData.destination_id || undefined,
         notes: formData.notes || undefined
       };
 
@@ -208,14 +232,14 @@ export function ProcurementPage() {
 
       // Reset form and close modal
       setFormData({
-        supplier: '',
+        supplier_id: '',
         reference: '',
         description: '',
         supplier_reference: '',
         currency: 'EUR',
         issue_date: new Date(),
         target_date: null,
-        destination: '',
+        destination_id: '',
         notes: ''
       });
       setOpened(false);
@@ -224,10 +248,28 @@ export function ProcurementPage() {
       navigate(`/procurement/${newOrder.pk || newOrder.id}`);
     } catch (error: any) {
       console.error('Failed to create purchase order:', error);
+      
+      // Extract error message from response
+      let errorMessage = t('Failed to create purchase order');
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          // Handle validation errors array
+          errorMessage = error.response.data.detail.map((err: any) => {
+            if (err.loc && err.msg) {
+              return `${err.loc.join('.')}: ${err.msg}`;
+            }
+            return err.msg || JSON.stringify(err);
+          }).join(', ');
+        } else if (typeof error.response.data.detail === 'string') {
+          errorMessage = error.response.data.detail;
+        }
+      }
+      
       notifications.show({
         title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to create purchase order'),
-        color: 'red'
+        message: errorMessage,
+        color: 'red',
+        autoClose: 10000
       });
     } finally {
       setSubmitting(false);
@@ -235,7 +277,7 @@ export function ProcurementPage() {
   };
 
   const handleSupplierChange = (value: string | null) => {
-    setFormData({ ...formData, supplier: value || '' });
+    setFormData({ ...formData, supplier_id: value || '' });
     
     // Update currency based on supplier
     if (value) {
@@ -430,7 +472,7 @@ export function ProcurementPage() {
               label={t('Supplier')}
               placeholder={t('Select supplier')}
               data={supplierOptions}
-              value={formData.supplier}
+              value={formData.supplier_id}
               onChange={(value) => {
                 if (value === '__new__') {
                   setNewSupplierOpened(true);
@@ -464,9 +506,10 @@ export function ProcurementPage() {
           <Grid.Col span={6}>
             <Select
               label={t('Currency')}
-              data={['EUR', 'USD', 'RON', 'GBP']}
+              data={currencies.map(c => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
               value={formData.currency}
               onChange={(value) => setFormData({ ...formData, currency: value || 'EUR' })}
+              searchable
             />
           </Grid.Col>
 
@@ -475,15 +518,15 @@ export function ProcurementPage() {
               label={t('Destination')}
               placeholder={t('Select stock location')}
               data={stockLocations.filter(loc => loc.pk != null).map(loc => ({ value: String(loc.pk), label: loc.name }))}
-              value={formData.destination}
-              onChange={(value) => setFormData({ ...formData, destination: value || '' })}
+              value={formData.destination_id}
+              onChange={(value) => setFormData({ ...formData, destination_id: value || '' })}
               searchable
             />
           </Grid.Col>
 
           <Grid.Col span={6}>
             <DatePickerInput
-              label={t('Start Date')}
+              label={t('Order Date')}
               placeholder={t('Select date')}
               value={formData.issue_date}
               onChange={(value) => setFormData({ ...formData, issue_date: value || new Date() })}
@@ -542,9 +585,10 @@ export function ProcurementPage() {
           <Grid.Col span={6}>
             <Select
               label={t('Currency')}
-              data={['EUR', 'USD', 'RON', 'GBP']}
+              data={currencies.map(c => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
               value={newSupplierData.currency}
               onChange={(value) => setNewSupplierData({ ...newSupplierData, currency: value || 'EUR' })}
+              searchable
             />
           </Grid.Col>
 

@@ -29,6 +29,9 @@ export const procurementApi = {
   // Stock Locations
   getStockLocations: () => `${API_PREFIX}/stock-locations`,
   
+  // Currencies
+  getCurrencies: () => `${API_PREFIX}/currencies`,
+  
   // Attachments
   getAttachments: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/attachments`,
   uploadAttachment: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/attachments`,

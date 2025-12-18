@@ -203,6 +203,26 @@ async def get_stock_locations(
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock locations: {str(e)}")
 
 
+@router.get("/currencies")
+async def get_currencies(
+    request: Request,
+    current_user: dict = Depends(verify_token)
+):
+    """Get list of currencies from MongoDB"""
+    db = get_db()
+    collection = db['depo_currencies']
+    
+    try:
+        cursor = collection.find().sort('code', 1)
+        currencies = list(cursor)
+        
+        # If no currencies in database, return empty list (frontend will handle)
+        return serialize_doc(currencies)
+    except Exception as e:
+        # Return empty list on error
+        return []
+
+
 @router.get("/purchase-orders")
 async def get_purchase_orders(
     request: Request,
@@ -338,49 +358,65 @@ async def get_order_statuses(
     request: Request,
     current_user: dict = Depends(verify_token)
 ):
-    """Get available purchase order statuses"""
-    statuses = [
-        {"value": "Pending", "label": "Pending"},
-        {"value": "Placed", "label": "Placed"},
-        {"value": "Complete", "label": "Complete"},
-        {"value": "Cancelled", "label": "Cancelled"},
-        {"value": "Lost", "label": "Lost"},
-        {"value": "Returned", "label": "Returned"}
-    ]
-    return {"statuses": statuses}
-
-
-@router.patch("/purchase-orders/{order_id}/status")
-async def update_order_status(
-    request: Request,
-    order_id: str,
-    status_data: UpdateOrderStatusRequest,
-    current_user: dict = Depends(verify_token)
-):
-    """Update purchase order status"""
+    """Get available purchase order statuses/states"""
     db = get_db()
-    collection = db['depo_purchase_orders']
+    collection = db['depo_purchase_orders_states']
     
     try:
-        result = collection.update_one(
-            {'_id': ObjectId(order_id)},
-            {
-                '$set': {
-                    'status': status_data.status,
-                    'updated_at': datetime.utcnow()
-                }
-            }
-        )
-        
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Purchase order not found")
-        
-        order = collection.find_one({'_id': ObjectId(order_id)})
-        return serialize_doc(order)
-    except HTTPException:
-        raise
+        cursor = collection.find().sort('value', 1)
+        states = list(cursor)
+        return {"statuses": serialize_doc(states)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update order status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch order states: {str(e)}")
+
+
+@router.patch("/purchase-orders/{order_id}/state")
+async def update_order_state(
+    request: Request,
+    order_id: str,
+    state_name: str,
+    reason: Optional[str] = None,
+    current_user: dict = Depends(verify_token)
+):
+    """Update purchase order state"""
+    from modules.depo_procurement.services import change_order_state
+    
+    # Check permissions
+    db = get_db()
+    order = db['depo_purchase_orders'].find_one({'_id': ObjectId(order_id)})
+    if not order:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Check if user can change state
+    is_admin = current_user.get('is_staff', False) or current_user.get('is_superuser', False)
+    is_creator = order.get('created_by') == current_user.get('username')
+    
+    # For Cancel: admin or creator can cancel
+    if state_name == 'Canceled':
+        if not (is_admin or is_creator):
+            raise HTTPException(status_code=403, detail="Only admin or creator can cancel the order")
+    
+    # For Refuse: must be admin or must_sign user
+    elif state_name == 'Refused':
+        if not is_admin:
+            # Check if user is in must_sign list
+            config = db['config'].find_one({'slug': 'procurement_approval_flows'})
+            if config and config.get('items'):
+                flow_config = next((item for item in config['items'] if item.get('slug') == 'referate'), None)
+                if flow_config:
+                    must_sign_users = [u.get('username') for u in flow_config.get('must_sign', [])]
+                    if current_user.get('username') not in must_sign_users:
+                        raise HTTPException(status_code=403, detail="Only admin or must_sign users can refuse the order")
+        
+        if not reason:
+            raise HTTPException(status_code=400, detail="Reason is required when refusing an order")
+    
+    # For Finish: only admin can manually finish
+    elif state_name == 'Finished':
+        if not is_admin:
+            raise HTTPException(status_code=403, detail="Only admin can manually finish the order")
+    
+    return await change_order_state(order_id, state_name, current_user, reason)
 
 
 @router.get("/purchase-orders/{order_id}/attachments")

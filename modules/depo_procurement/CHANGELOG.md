@@ -1,5 +1,37 @@
 # Changelog - DEPO Procurement Module
 
+## Version 2.0.3 - Purchase Order Form Improvements
+
+### Changed
+- **Currency Selection**: Now loads currencies from `depo_currencies` MongoDB collection
+  - Falls back to default currencies (EUR, USD, RON, GBP) if database is empty or unavailable
+  - Displays currency code and name in dropdown (e.g., "EUR - Euro")
+  - Searchable currency dropdown
+- **Field Name Consistency**: Changed frontend field from `supplier` to `supplier_id` to match backend API
+  - Fixed validation error "Field required" for supplier_id
+  - Updated all form references to use correct field names
+- **Date Label**: Changed "Start Date" to "Order Date" for better clarity
+- **Error Handling**: Improved error messages display
+  - Validation errors now show detailed field-level messages
+  - Errors displayed as notifications instead of blank page
+  - Extended auto-close time to 10 seconds for better readability
+
+### Added
+- **GET /currencies** endpoint to fetch currencies from database
+- Fallback currency list if database query fails
+
+### Fixed
+- Supplier selection now correctly updates form state
+- Purchase order creation no longer shows blank page on validation errors
+- Field name mismatch between frontend and backend resolved
+
+### Technical
+- Added `Currency` interface in frontend
+- Updated `ProcurementPage.tsx` with proper field names
+- Enhanced error extraction from API responses (handles both array and string formats)
+
+---
+
 ## Version 2.0.2 - Stock Reception Complete Data Capture
 
 ### Changed

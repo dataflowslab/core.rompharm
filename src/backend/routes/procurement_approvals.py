@@ -248,7 +248,7 @@ async def sign_purchase_order(
     
     print(f"[PROCUREMENT] Required signatures: {required_count}, Collected: {required_signed}")
     
-    # If all required officers have signed, mark as approved AND issue order (place it)
+    # If all required officers have signed, mark as approved AND change state to Processing
     if required_signed == required_count:
         db.approval_flows.update_one(
             {"_id": ObjectId(flow["_id"])},
@@ -261,27 +261,28 @@ async def sign_purchase_order(
             }
         )
         
-        # Issue order (place it) - InvenTree 1.0.1 requires using /issue/ endpoint
+        # Change order state to Processing
         try:
-            token = current_user.get('token')
-            if token:
-                headers = {
-                    'Authorization': f'Token {token}',
-                    'Content-Type': 'application/json'
-                }
-                print(f"[PROCUREMENT] Issuing (placing) order {order_id}")
-                response = requests.post(
-                    f"{inventree_url}/api/order/po/{order_id}/issue/",
-                    headers=headers,
-                    json={},  # Empty payload for issue
-                    timeout=10
+            # Get Processing state
+            processing_state = db['depo_purchase_orders_states'].find_one({'name': 'Processing'})
+            if processing_state:
+                db['depo_purchase_orders'].update_one(
+                    {'_id': ObjectId(order_id)},
+                    {
+                        '$set': {
+                            'state_id': processing_state['_id'],
+                            'status': 'Processing',
+                            'updated_at': timestamp,
+                            'approved_at': timestamp,
+                            'approved_by': username
+                        }
+                    }
                 )
-                response.raise_for_status()
-                print(f"[PROCUREMENT] Order {order_id} issued successfully - status is now PLACED")
+                print(f"[PROCUREMENT] Order {order_id} state changed to Processing")
+            else:
+                print(f"[PROCUREMENT] WARNING: Processing state not found in database")
         except Exception as e:
-            print(f"[PROCUREMENT] ERROR: Failed to issue order: {e}")
-            if hasattr(e, 'response') and hasattr(e.response, 'text'):
-                print(f"[PROCUREMENT] Response: {e.response.text}")
+            print(f"[PROCUREMENT] ERROR: Failed to change order state: {e}")
             # Don't raise exception, just log it
     
     # Get updated flow
