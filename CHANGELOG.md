@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.1] - 2024-12-XX
+
+### Changed
+- **Frontend Navigation Enhancement**: Inventory submenu now stays open and highlights active page
+  - When on any Inventory subpage (Articles, Stocks, Suppliers, etc.), the Inventory menu remains expanded
+  - Active subpage is displayed in bold for better visual feedback
+  - Applies to all menu items with submenus
+
+- **Procurement Stock Reception Enhancement**: Complete supplier batch data capture
+  - Each goods receipt now creates a separate entry in `depo_stocks` collection
+  - All fields from reception form saved to stock entry:
+    - supplier_batch_code, manufacturing_date, expected_quantity
+    - expiry_date or reset_date (toggle-based)
+    - containers (array with detailed container information)
+    - containers_cleaned, supplier_ba_no, supplier_ba_date
+    - accord_ba, is_list_supplier
+    - clean_transport, temperature_control, temperature_conditions_met
+  - Full traceability and compliance with quality control requirements
+
+### Technical
+- Updated `Navbar.tsx` with `isInSection` helper and `defaultOpened` prop
+- Added bold styling to active submenu items
+- Modified `receive_stock_item` in `services.py` to save all supplier batch fields
+- Updated `ReceiveStockRequest` model with all additional fields
+- Each reception creates unique stock entry with complete metadata
+
+### Notes
+- Menu state persists across page navigation within same section
+- Stock entries now contain complete reception data for audit trail
+- All supplier batch information preserved in MongoDB
+
+---
+
 ## [1.18.0] - 2024-12-XX
 
 ### Changed

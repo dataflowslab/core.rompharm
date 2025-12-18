@@ -1,5 +1,20 @@
 # Changelog - DEPO Procurement Module
 
+## Version 2.0.2 - Stock Reception Complete Data Capture
+
+### Changed
+- **Stock Reception**: Each goods receipt now creates a separate entry in `depo_stocks` with complete supplier batch data
+- All fields from the reception form are now saved directly to `depo_stocks` collection
+- Includes: supplier_batch_code, manufacturing_date, expected_quantity, expiry_date, reset_date, containers, containers_cleaned, supplier_ba_no, supplier_ba_date, accord_ba, is_list_supplier, clean_transport, temperature_control, temperature_conditions_met
+- This ensures full traceability and compliance with quality control requirements
+
+### Technical
+- Updated `ReceiveStockRequest` model to include all supplier batch fields
+- Modified `receive_stock_item` function to save all fields to depo_stocks
+- Each reception creates a unique stock entry with complete metadata
+
+---
+
 ## Version 2.0.1 - Stock Reception Enhancement
 
 ### Changed

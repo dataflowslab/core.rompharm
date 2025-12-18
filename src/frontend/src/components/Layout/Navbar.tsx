@@ -35,6 +35,7 @@ export function Navbar() {
   }, []);
 
   const isActive = (path: string) => location.pathname === path;
+  const isInSection = (basePath: string) => location.pathname.startsWith(basePath);
 
   return (
     <Stack gap="xs">
@@ -82,31 +83,38 @@ export function Navbar() {
         label={t('Inventory')}
         leftSection={<IconPackage size={20} />}
         childrenOffset={28}
+        defaultOpened={isInSection('/inventory')}
+        active={isInSection('/inventory')}
       >
         <NavLink
           label={t('Articles')}
           active={isActive('/inventory/articles')}
           onClick={() => navigate('/inventory/articles')}
+          style={{ fontWeight: isActive('/inventory/articles') ? 'bold' : 'normal' }}
         />
         <NavLink
           label={t('Stocks')}
           active={isActive('/inventory/stocks')}
           onClick={() => navigate('/inventory/stocks')}
+          style={{ fontWeight: isActive('/inventory/stocks') ? 'bold' : 'normal' }}
         />
         <NavLink
           label={t('Suppliers')}
           active={isActive('/inventory/suppliers')}
           onClick={() => navigate('/inventory/suppliers')}
+          style={{ fontWeight: isActive('/inventory/suppliers') ? 'bold' : 'normal' }}
         />
         <NavLink
           label={t('Manufacturers')}
           active={isActive('/inventory/manufacturers')}
           onClick={() => navigate('/inventory/manufacturers')}
+          style={{ fontWeight: isActive('/inventory/manufacturers') ? 'bold' : 'normal' }}
         />
         <NavLink
           label={t('Clients')}
           active={isActive('/inventory/clients')}
           onClick={() => navigate('/inventory/clients')}
+          style={{ fontWeight: isActive('/inventory/clients') ? 'bold' : 'normal' }}
         />
       </NavLink>
 

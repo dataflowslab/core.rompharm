@@ -299,7 +299,7 @@ async def delete_order_item(order_id: str, item_index: int):
 
 
 async def receive_stock_item(order_id: str, stock_data, current_user):
-    """Receive stock items for a purchase order line"""
+    """Receive stock items for a purchase order line - creates separate depo_stocks entry"""
     db = get_db()
     po_collection = db['depo_purchase_orders']
     stock_collection = db['depo_stocks']
@@ -316,12 +316,13 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         
         item = items[stock_data.line_item_index]
         
-        # Create stock entry
+        # Create separate stock entry in depo_stocks with all supplier batch data
         stock_doc = {
             'part_id': ObjectId(item['part_id']),
             'location_id': ObjectId(stock_data.location_id),
             'quantity': stock_data.quantity,
             'batch_code': stock_data.batch_code or '',
+            'supplier_batch_code': getattr(stock_data, 'supplier_batch_code', '') or '',
             'serial_numbers': stock_data.serial_numbers or '',
             'packaging': stock_data.packaging or '',
             'status': stock_data.status or 'OK',
@@ -331,7 +332,21 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
             'supplier_id': order.get('supplier_id'),
             'received_date': datetime.utcnow(),
             'received_by': current_user.get('username'),
-            'created_at': datetime.utcnow()
+            'created_at': datetime.utcnow(),
+            # Additional supplier batch data fields
+            'manufacturing_date': getattr(stock_data, 'manufacturing_date', None),
+            'expected_quantity': getattr(stock_data, 'expected_quantity', None),
+            'expiry_date': getattr(stock_data, 'expiry_date', None),
+            'reset_date': getattr(stock_data, 'reset_date', None),
+            'containers': getattr(stock_data, 'containers', None),
+            'containers_cleaned': getattr(stock_data, 'containers_cleaned', False),
+            'supplier_ba_no': getattr(stock_data, 'supplier_ba_no', '') or '',
+            'supplier_ba_date': getattr(stock_data, 'supplier_ba_date', None),
+            'accord_ba': getattr(stock_data, 'accord_ba', False),
+            'is_list_supplier': getattr(stock_data, 'is_list_supplier', False),
+            'clean_transport': getattr(stock_data, 'clean_transport', False),
+            'temperature_control': getattr(stock_data, 'temperature_control', False),
+            'temperature_conditions_met': getattr(stock_data, 'temperature_conditions_met', None),
         }
         
         result = stock_collection.insert_one(stock_doc)

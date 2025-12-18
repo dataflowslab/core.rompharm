@@ -107,10 +107,24 @@ class ReceiveStockRequest(BaseModel):
     quantity: float
     location_id: str
     batch_code: Optional[str] = None
+    supplier_batch_code: Optional[str] = None
     serial_numbers: Optional[str] = None
     packaging: Optional[str] = None
     status: Optional[str] = "OK"
     notes: Optional[str] = None
+    manufacturing_date: Optional[str] = None
+    expected_quantity: Optional[float] = None
+    expiry_date: Optional[str] = None
+    reset_date: Optional[str] = None
+    containers: Optional[List[Dict[str, Any]]] = None
+    containers_cleaned: Optional[bool] = False
+    supplier_ba_no: Optional[str] = None
+    supplier_ba_date: Optional[str] = None
+    accord_ba: Optional[bool] = False
+    is_list_supplier: Optional[bool] = False
+    clean_transport: Optional[bool] = False
+    temperature_control: Optional[bool] = False
+    temperature_conditions_met: Optional[bool] = None
 
 
 class UpdateOrderStatusRequest(BaseModel):
