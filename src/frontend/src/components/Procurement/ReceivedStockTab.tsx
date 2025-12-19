@@ -5,6 +5,7 @@ import { DateInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
+import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
 
 interface ReceivedItem {
@@ -103,7 +104,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
 
   const loadStockStatuses = async () => {
     try {
-      const response = await api.get('/api/procurement/stock-statuses');
+      const response = await api.get(procurementApi.getStockStatuses());
       setStockStatuses(response.data.statuses || []);
     } catch (error) {
       console.error('Failed to load stock statuses:', error);
@@ -117,7 +118,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
 
   const loadReceivedItems = async () => {
     try {
-      const response = await api.get(`/api/procurement/purchase-orders/${orderId}/received-items`);
+      const response = await api.get(procurementApi.getReceivedItems(orderId));
       setReceivedItems(response.data.results || response.data || []);
     } catch (error) {
       console.error('Failed to load received items:', error);
@@ -142,7 +143,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/api/procurement/stock-items/${item.pk}`);
+          await api.delete(`/modules/depo_procurement/api/stock-items/${item.pk}`);
           notifications.show({
             title: t('Success'),
             message: t('Stock item deleted successfully'),
@@ -186,7 +187,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
         notes: receiveData.notes || undefined
       };
 
-      const receiveResponse = await api.post(`/api/procurement/purchase-orders/${orderId}/receive-stock`, receivePayload);
+      const receiveResponse = await api.post(procurementApi.receiveStock(orderId), receivePayload);
       
       // Get the stock item ID from response
       const stockItemId = receiveResponse.data?.stock_item_id || receiveResponse.data?.id;
@@ -213,7 +214,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
         };
 
         // Save extra data
-        await api.post(`/api/procurement/stock-extra-data`, extraDataPayload);
+        await api.post(`/modules/depo_procurement/api/stock-extra-data`, extraDataPayload);
       }
 
       notifications.show({
@@ -425,7 +426,9 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
             <Select
               label={t('Location')}
               placeholder={t('Select location')}
-              data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              data={stockLocations
+                .filter(loc => loc.pk != null && loc.pk !== undefined)
+                .map(loc => ({ value: String(loc.pk), label: loc.name }))}
               value={receiveData.location}
               onChange={(value) => setReceiveData({ ...receiveData, location: value || '' })}
               searchable

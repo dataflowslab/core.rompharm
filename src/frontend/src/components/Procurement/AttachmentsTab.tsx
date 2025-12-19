@@ -22,7 +22,8 @@ import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 
 interface Attachment {
-  pk: number;
+  _id: string;
+  pk?: number;
   attachment: string;
   filename: string;
   comment: string;
@@ -75,7 +76,7 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
     }
   };
 
-  const handleDeleteAttachment = async (attachmentId: number) => {
+  const handleDeleteAttachment = async (attachmentId: string) => {
     if (!confirm(t('Are you sure you want to delete this attachment?'))) return;
 
     try {
@@ -131,7 +132,7 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
           ) : (
             <Stack gap="xs">
               {attachments.map((attachment) => (
-                <Paper key={attachment.pk} p="sm" withBorder>
+                <Paper key={attachment._id || attachment.pk} p="sm" withBorder>
                   <Group justify="space-between">
                     <Group>
                       <IconFile size={20} />
@@ -162,7 +163,7 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
                         <ActionIcon
                           variant="subtle"
                           color="red"
-                          onClick={() => handleDeleteAttachment(attachment.pk)}
+                          onClick={() => handleDeleteAttachment(attachment._id || String(attachment.pk))}
                         >
                           <IconTrash size={16} />
                         </ActionIcon>

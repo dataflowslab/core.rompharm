@@ -136,6 +136,62 @@ async def create_new_purchase_order(order_data, current_user):
     try:
         result = collection.insert_one(doc)
         doc['_id'] = result.inserted_id
+        order_id = str(result.inserted_id)
+        
+        # Auto-create approval flow based on config
+        try:
+            config_collection = db['config']
+            approval_config = config_collection.find_one({'slug': 'procurement_approval_flows'})
+            
+            if approval_config and 'items' in approval_config:
+                # Get the referate flow config (first item with slug='referate')
+                flow_config = None
+                for item in approval_config.get('items', []):
+                    if item.get('slug') == 'referate' and item.get('enabled', True):
+                        flow_config = item
+                        break
+                
+                if flow_config:
+                    # Build can_sign list
+                    can_sign_officers = []
+                    for user in flow_config.get('can_sign', []):
+                        can_sign_officers.append({
+                            "type": "person",
+                            "reference": user.get('user_id'),
+                            "username": user.get('username'),
+                            "action": "can_sign"
+                        })
+                    
+                    # Build must_sign list
+                    must_sign_officers = []
+                    for user in flow_config.get('must_sign', []):
+                        must_sign_officers.append({
+                            "type": "person",
+                            "reference": user.get('user_id'),
+                            "username": user.get('username'),
+                            "action": "must_sign"
+                        })
+                    
+                    flow_data = {
+                        "object_type": "procurement_order",
+                        "object_source": "depo_procurement",
+                        "object_id": order_id,
+                        "config_slug": flow_config.get('slug'),
+                        "min_signatures": flow_config.get('min_signatures', 1),
+                        "required_officers": must_sign_officers,
+                        "optional_officers": can_sign_officers,
+                        "signatures": [],
+                        "status": "pending",
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                    
+                    db['approval_flows'].insert_one(flow_data)
+                    print(f"[PROCUREMENT] Auto-created approval flow for order {order_id}")
+        except Exception as e:
+            print(f"[PROCUREMENT] Warning: Failed to auto-create approval flow: {e}")
+            # Don't fail the order creation if approval flow creation fails
+        
         return serialize_doc(doc)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create purchase order: {str(e)}")

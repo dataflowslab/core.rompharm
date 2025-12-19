@@ -7,9 +7,9 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 import requests
 
-from ..utils.db import get_db
-from ..utils.config import load_config
-from .auth import verify_admin, verify_token
+from src.backend.utils.db import get_db
+from src.backend.utils.config import load_config
+from src.backend.routes.auth import verify_admin, verify_token
 
 router = APIRouter(prefix="/modules/requests/api", tags=["requests"])
 
@@ -755,7 +755,7 @@ async def sign_request(
 ):
     """Sign a request approval flow"""
     from bson import ObjectId
-    from ..models.approval_flow_model import ApprovalFlowModel
+    from src.backend.models.approval_flow_model import ApprovalFlowModel
     
     db = get_db()
     requests_collection = db['depo_requests_items']

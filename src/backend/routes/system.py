@@ -14,7 +14,7 @@ from ..models.job_model import JobModel
 from ..scheduler import get_scheduler
 from ..routes.auth import verify_admin
 
-router = APIRouter(prefix="/api/system", tags=["system"])
+router = APIRouter(prefix="/api", tags=["system"])
 
 
 class JobCreate(BaseModel):
@@ -37,7 +37,32 @@ def load_config():
         return yaml.safe_load(f)
 
 
-@router.get("/status")
+@router.get("/currencies")
+async def get_currencies():
+    """
+    Get list of currencies
+    Public endpoint - used across multiple modules
+    """
+    db = get_db()
+    collection = db['depo_currencies']
+    
+    try:
+        cursor = collection.find().sort('code', 1)
+        currencies = list(cursor)
+        
+        # Convert ObjectId to string
+        for currency in currencies:
+            if '_id' in currency:
+                currency['_id'] = str(currency['_id'])
+                currency['pk'] = str(currency['_id'])
+        
+        return currencies
+    except Exception as e:
+        # Return empty list on error
+        return []
+
+
+@router.get("/system/status")
 async def get_system_status() -> Dict[str, Any]:
     """
     Get system status and configuration
@@ -72,7 +97,7 @@ async def get_system_status() -> Dict[str, Any]:
     }
 
 
-@router.get("/notifications")
+@router.get("/system/notifications")
 async def get_system_notifications() -> Dict[str, Any]:
     """
     Get system notifications (warnings, errors, info)
@@ -119,7 +144,7 @@ async def get_system_notifications() -> Dict[str, Any]:
     }
 
 
-@router.get("/jobs")
+@router.get("/system/jobs")
 async def list_jobs(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
     """
     List all configured jobs
@@ -132,7 +157,7 @@ async def list_jobs(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
     return [JobModel.to_dict(job) for job in jobs]
 
 
-@router.post("/jobs")
+@router.post("/system/jobs")
 async def create_job(job_data: JobCreate, user = Depends(verify_admin)) -> Dict[str, Any]:
     """
     Create a new job configuration
@@ -168,7 +193,7 @@ async def create_job(job_data: JobCreate, user = Depends(verify_admin)) -> Dict[
     return JobModel.to_dict(job_doc)
 
 
-@router.put("/jobs/{job_name}")
+@router.put("/system/jobs/{job_name}")
 async def update_job(job_name: str, job_data: JobUpdate, user = Depends(verify_admin)) -> Dict[str, Any]:
     """
     Update job configuration
@@ -210,7 +235,7 @@ async def update_job(job_name: str, job_data: JobUpdate, user = Depends(verify_a
     return JobModel.to_dict(updated_job)
 
 
-@router.post("/jobs/{job_name}/run")
+@router.post("/system/jobs/{job_name}/run")
 async def run_job_now(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
     """
     Manually trigger a job to run immediately
@@ -235,7 +260,7 @@ async def run_job_now(job_name: str, user = Depends(verify_admin)) -> Dict[str, 
         raise HTTPException(status_code=500, detail=f"Failed to run job: {str(e)}")
 
 
-@router.delete("/jobs/{job_name}")
+@router.delete("/system/jobs/{job_name}")
 async def delete_job(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
     """
     Delete a job configuration

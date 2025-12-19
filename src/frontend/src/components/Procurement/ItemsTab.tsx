@@ -489,7 +489,9 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
             <Select
               label={t('Destination')}
               placeholder={t('Select stock location')}
-              data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              data={stockLocations
+                .filter(loc => loc.pk != null && loc.pk !== undefined)
+                .map(loc => ({ value: String(loc.pk), label: loc.name }))}
               value={newItemData.destination}
               onChange={(value) => setNewItemData({ ...newItemData, destination: value || '' })}
               searchable
@@ -573,7 +575,9 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
             <Select
               label={t('Destination')}
               placeholder={t('Select stock location')}
-              data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              data={stockLocations
+                .filter(loc => loc.pk != null && loc.pk !== undefined)
+                .map(loc => ({ value: String(loc.pk), label: loc.name }))}
               value={editItemData.destination}
               onChange={(value) => setEditItemData({ ...editItemData, destination: value || '' })}
               searchable

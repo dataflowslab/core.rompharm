@@ -4,6 +4,7 @@ import { DatePickerInput } from '@mantine/dates';
 import { IconPlus, IconCheck, IconEdit } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
+import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
 
 interface QCRecord {
@@ -40,7 +41,7 @@ interface ReceivedItem {
 }
 
 interface QualityControlTabProps {
-  orderId: number;
+  orderId: string;
 }
 
 export function QualityControlTab({ orderId }: QualityControlTabProps) {
@@ -75,7 +76,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
 
   const loadQCRecords = async () => {
     try {
-      const response = await api.get(`/api/procurement/purchase-orders/${orderId}/qc-records`);
+      const response = await api.get(procurementApi.getQCRecords(orderId));
       setQcRecords(response.data.results || response.data || []);
     } catch (error) {
       console.error('Failed to load QC records:', error);
@@ -84,7 +85,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
 
   const loadReceivedItems = async () => {
     try {
-      const response = await api.get(`/api/procurement/purchase-orders/${orderId}/received-items`);
+      const response = await api.get(procurementApi.getReceivedItems(orderId));
       const items = response.data.results || response.data || [];
       
       // Separate LOTALLEXP items (custom field id 3)
@@ -130,7 +131,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
         confirmed: false
       };
 
-      await api.post(`/api/procurement/purchase-orders/${orderId}/qc-records`, payload);
+      await api.post(procurementApi.createQCRecord(orderId), payload);
 
       notifications.show({
         title: t('Success'),
@@ -174,7 +175,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
         transactionable: qcData.test_result === 'conform'
       };
 
-      await api.post(`/api/procurement/purchase-orders/${orderId}/qc-records`, payload);
+      await api.post(procurementApi.createQCRecord(orderId), payload);
 
       notifications.show({
         title: t('Success'),
@@ -230,7 +231,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
         confirmed: false
       };
 
-      await api.patch(`/api/procurement/purchase-orders/${orderId}/qc-records/${editingRecord._id}`, payload);
+      await api.patch(procurementApi.updateQCRecord(orderId, editingRecord._id), payload);
 
       notifications.show({
         title: t('Success'),
@@ -268,7 +269,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
         confirmed: true
       };
 
-      await api.patch(`/api/procurement/purchase-orders/${orderId}/qc-records/${editingRecord._id}`, payload);
+      await api.patch(procurementApi.updateQCRecord(orderId, editingRecord._id), payload);
 
       notifications.show({
         title: t('Success'),

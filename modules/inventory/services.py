@@ -88,6 +88,17 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None):
                         'description': location.get('description', '')
                     }
             
+            # Get status details from depo_stocks_states using state_id
+            if stock.get('state_id'):
+                state = db['depo_stocks_states'].find_one({'_id': ObjectId(stock['state_id'])})
+                if state:
+                    stock['status'] = state.get('name')
+                    stock['status_detail'] = {
+                        'name': state.get('name'),
+                        'value': state.get('value'),
+                        'color': state.get('color', 'gray')
+                    }
+            
             # Determine supplier based on supplier_id, purchase_order_id or build_order_id
             supplier_name = None
             
@@ -171,6 +182,17 @@ async def get_stock_by_id(stock_id: str):
                 stock['location_detail'] = {
                     'name': location.get('name'),
                     'description': location.get('description', '')
+                }
+        
+        # Get status details from depo_stocks_states using state_id
+        if stock.get('state_id'):
+            state = db['depo_stocks_states'].find_one({'_id': ObjectId(stock['state_id'])})
+            if state:
+                stock['status'] = state.get('name')
+                stock['status_detail'] = {
+                    'name': state.get('name'),
+                    'value': state.get('value'),
+                    'color': state.get('color', 'gray')
                 }
         
         # Determine supplier

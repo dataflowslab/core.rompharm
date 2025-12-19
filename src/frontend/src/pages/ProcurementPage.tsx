@@ -9,13 +9,15 @@ import { procurementApi } from '../services/procurement';
 import { notifications } from '@mantine/notifications';
 
 interface PurchaseOrder {
-  pk: number;
+  _id?: string;
+  pk?: string;
   reference: string;
   description: string;
   supplier: number;
   supplier_detail?: {
     name: string;
-    pk: number;
+    pk?: string;
+    _id?: string;
   };
   status: number;
   status_text: string;
@@ -27,13 +29,15 @@ interface PurchaseOrder {
 }
 
 interface Supplier {
-  pk: number;
+  _id?: string;
+  pk?: string;
   name: string;
   currency?: string;
 }
 
 interface StockLocation {
-  pk: number;
+  _id?: string;
+  pk?: string;
   name: string;
   description?: string;
 }
@@ -169,7 +173,7 @@ export function ProcurementPage() {
 
       // Add to suppliers list and select it
       setSuppliers([...suppliers, newSupplier]);
-      setFormData({ ...formData, supplier_id: String(newSupplier.pk || newSupplier.id) });
+      setFormData({ ...formData, supplier_id: String(newSupplier.pk || newSupplier._id) });
       
       // Reset form and close modal
       setNewSupplierData({
@@ -245,7 +249,7 @@ export function ProcurementPage() {
       setOpened(false);
 
       // Navigate to the new purchase order detail page
-      navigate(`/procurement/${newOrder.pk || newOrder.id}`);
+      navigate(`/procurement/${newOrder._id}`);
     } catch (error: any) {
       console.error('Failed to create purchase order:', error);
       
@@ -281,7 +285,7 @@ export function ProcurementPage() {
     
     // Update currency based on supplier
     if (value) {
-      const supplier = suppliers.find(s => String(s.pk) === value);
+      const supplier = suppliers.find(s => String(s.pk || s._id) === value);
       if (supplier?.currency) {
         setFormData(prev => ({ ...prev, currency: supplier.currency || 'EUR' }));
       }
@@ -289,7 +293,10 @@ export function ProcurementPage() {
   };
 
   const supplierOptions = [
-    ...suppliers.filter(s => s.pk != null).map(s => ({ value: String(s.pk), label: s.name })),
+    ...suppliers.filter(s => (s.pk || s._id) != null).map(s => ({ 
+      value: String(s.pk || s._id), 
+      label: s.name 
+    })),
     { value: '__new__', label: `➕ ${t('New supplier')}` }
   ];
 
@@ -429,9 +436,9 @@ export function ProcurementPage() {
               
               return (
                 <Table.Tr 
-                  key={order.pk} 
+                  key={order.pk || order._id} 
                   style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/procurement/${order.pk}`)}
+                  onClick={() => navigate(`/procurement/${order._id}`)}
                 >
                   <Table.Td>{order.reference}</Table.Td>
                   <Table.Td>{order.supplier_detail?.name || '-'}</Table.Td>
@@ -517,7 +524,10 @@ export function ProcurementPage() {
             <Select
               label={t('Destination')}
               placeholder={t('Select stock location')}
-              data={stockLocations.filter(loc => loc.pk != null).map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              data={stockLocations.filter(loc => (loc.pk || loc._id) != null).map(loc => ({ 
+                value: String(loc.pk || loc._id), 
+                label: loc.name 
+              }))}
               value={formData.destination_id}
               onChange={(value) => setFormData({ ...formData, destination_id: value || '' })}
               searchable

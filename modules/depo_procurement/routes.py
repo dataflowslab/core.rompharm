@@ -2,225 +2,28 @@
 DEPO Procurement Module - MongoDB integration
 """
 from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Query
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional
 from datetime import datetime
 from bson import ObjectId
-import os
 
 # Import from core
 from src.backend.utils.db import get_db
 from src.backend.routes.auth import verify_token
 
+# Import from module
+from modules.depo_procurement.models import (
+    NewSupplierRequest,
+    PurchaseOrderRequest,
+    PurchaseOrderItemRequest,
+    PurchaseOrderItemUpdateRequest,
+    ReceiveStockRequest,
+    UpdateOrderStatusRequest
+)
+from modules.depo_procurement.utils import serialize_doc, is_manager
+
 router = APIRouter(prefix="/modules/depo_procurement/api", tags=["depo_procurement"])
 
 
-def serialize_doc(doc):
-    """Convert MongoDB document to JSON-serializable format"""
-    if doc is None:
-        return None
-    if isinstance(doc, list):
-        return [serialize_doc(item) for item in doc]
-    if isinstance(doc, dict):
-        result = {}
-        for key, value in doc.items():
-            if key == '_id':
-                # Convert _id to string and also add as 'pk' for frontend compatibility
-                result[key] = str(value) if value else None
-                result['pk'] = str(value) if value else None
-            elif key.endswith('_id'):
-                result[key] = str(value) if value else None
-            elif isinstance(value, ObjectId):
-                result[key] = str(value)
-            elif isinstance(value, dict):
-                result[key] = serialize_doc(value)
-            elif isinstance(value, list):
-                result[key] = [serialize_doc(item) if isinstance(item, dict) else item for item in value]
-            elif isinstance(value, datetime):
-                result[key] = value.isoformat()
-            else:
-                result[key] = value
-        return result
-    return doc
-
-
-def is_manager(user: dict) -> bool:
-    """Check if user is in Managers group"""
-    groups = user.get('groups', [])
-    for group in groups:
-        if isinstance(group, dict):
-            if group.get('name', '').lower() == 'managers':
-                return True
-        elif isinstance(group, str):
-            if group.lower() == 'managers':
-                return True
-    return False
-
-
-# Pydantic models
-class NewSupplierRequest(BaseModel):
-    name: str
-    currency: str = "EUR"
-    tax_id: Optional[str] = None
-    is_supplier: bool = True
-    is_manufacturer: bool = False
-    cod: Optional[str] = None
-    reg_code: Optional[str] = None
-    address: Optional[str] = None
-    country: Optional[str] = None
-    city: Optional[str] = None
-
-
-class PurchaseOrderRequest(BaseModel):
-    supplier_id: str
-    reference: Optional[str] = None
-    description: Optional[str] = None
-    supplier_reference: Optional[str] = None
-    currency: Optional[str] = "EUR"
-    issue_date: Optional[str] = None
-    target_date: Optional[str] = None
-    destination_id: Optional[str] = None
-    notes: Optional[str] = None
-
-
-class PurchaseOrderItemRequest(BaseModel):
-    part_id: str
-    quantity: float
-    purchase_price: Optional[float] = None
-    reference: Optional[str] = None
-    destination_id: Optional[str] = None
-    purchase_price_currency: Optional[str] = None
-    notes: Optional[str] = None
-
-
-class PurchaseOrderItemUpdateRequest(BaseModel):
-    quantity: Optional[float] = None
-    purchase_price: Optional[float] = None
-    reference: Optional[str] = None
-    destination_id: Optional[str] = None
-    purchase_price_currency: Optional[str] = None
-    notes: Optional[str] = None
-
-
-class ReceiveStockRequest(BaseModel):
-    line_item_index: int
-    quantity: float
-    location_id: str
-    batch_code: Optional[str] = None
-    supplier_batch_code: Optional[str] = None
-    serial_numbers: Optional[str] = None
-    packaging: Optional[str] = None
-    status: Optional[str] = "OK"
-    notes: Optional[str] = None
-    manufacturing_date: Optional[str] = None
-    expected_quantity: Optional[float] = None
-    expiry_date: Optional[str] = None
-    reset_date: Optional[str] = None
-    containers: Optional[List[Dict[str, Any]]] = None
-    containers_cleaned: Optional[bool] = False
-    supplier_ba_no: Optional[str] = None
-    supplier_ba_date: Optional[str] = None
-    accord_ba: Optional[bool] = False
-    is_list_supplier: Optional[bool] = False
-    clean_transport: Optional[bool] = False
-    temperature_control: Optional[bool] = False
-    temperature_conditions_met: Optional[bool] = None
-
-
-class UpdateOrderStatusRequest(BaseModel):
-    status: str
-
-
-@router.get("/suppliers")
-async def get_suppliers(
-    request: Request,
-    search: Optional[str] = Query(None),
-    current_user: dict = Depends(verify_token)
-):
-    """Get list of suppliers from MongoDB"""
-    db = get_db()
-    collection = db['depo_companies']
-    
-    query = {'is_supplier': True}
-    if search:
-        query['name'] = {'$regex': search, '$options': 'i'}
-    
-    try:
-        cursor = collection.find(query).sort('name', 1)
-        suppliers = list(cursor)
-        return serialize_doc(suppliers)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch suppliers: {str(e)}")
-
-
-@router.post("/suppliers")
-async def create_supplier(
-    request: Request,
-    supplier_data: NewSupplierRequest,
-    current_user: dict = Depends(verify_token)
-):
-    """Create a new supplier in MongoDB"""
-    db = get_db()
-    collection = db['depo_companies']
-    
-    doc = {
-        'name': supplier_data.name,
-        'is_supplier': supplier_data.is_supplier,
-        'is_manufacturer': supplier_data.is_manufacturer,
-        'currency': supplier_data.currency,
-        'tax_id': supplier_data.tax_id,
-        'cod': supplier_data.cod,
-        'reg_code': supplier_data.reg_code,
-        'address': supplier_data.address,
-        'country': supplier_data.country,
-        'city': supplier_data.city,
-        'created_at': datetime.utcnow(),
-        'created_by': current_user.get('username')
-    }
-    
-    try:
-        result = collection.insert_one(doc)
-        doc['_id'] = result.inserted_id
-        return serialize_doc(doc)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create supplier: {str(e)}")
-
-
-@router.get("/stock-locations")
-async def get_stock_locations(
-    request: Request,
-    current_user: dict = Depends(verify_token)
-):
-    """Get list of stock locations from MongoDB"""
-    db = get_db()
-    collection = db['depo_locations']
-    
-    try:
-        cursor = collection.find().sort('name', 1)
-        locations = list(cursor)
-        return serialize_doc(locations)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch stock locations: {str(e)}")
-
-
-@router.get("/currencies")
-async def get_currencies(
-    request: Request,
-    current_user: dict = Depends(verify_token)
-):
-    """Get list of currencies from MongoDB"""
-    db = get_db()
-    collection = db['depo_currencies']
-    
-    try:
-        cursor = collection.find().sort('code', 1)
-        currencies = list(cursor)
-        
-        # If no currencies in database, return empty list (frontend will handle)
-        return serialize_doc(currencies)
-    except Exception as e:
-        # Return empty list on error
-        return []
 
 
 @router.get("/purchase-orders")
@@ -254,6 +57,42 @@ async def create_purchase_order(
     """Create a new purchase order in MongoDB"""
     from modules.depo_procurement.services import create_new_purchase_order
     return await create_new_purchase_order(order_data, current_user)
+
+
+@router.patch("/purchase-orders/{order_id}")
+async def update_purchase_order(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Update a purchase order in MongoDB"""
+    db = get_db()
+    
+    # Get the JSON body
+    body = await request.json()
+    
+    # Remove fields that shouldn't be updated directly
+    body.pop('_id', None)
+    body.pop('created_at', None)
+    body.pop('created_by', None)
+    
+    # Add updated timestamp
+    body['updated_at'] = datetime.utcnow()
+    
+    try:
+        result = db['depo_purchase_orders'].update_one(
+            {'_id': ObjectId(order_id)},
+            {'$set': body}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+        # Return updated order
+        updated_order = db['depo_purchase_orders'].find_one({'_id': ObjectId(order_id)})
+        return serialize_doc(updated_order)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update purchase order: {str(e)}")
 
 
 @router.get("/purchase-orders/{order_id}/items")
@@ -369,7 +208,22 @@ async def get_order_statuses(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch order states: {str(e)}")
 
-
+@router.get("/stock-statuses")
+async def get_stock_statuses(
+    request: Request,
+    current_user: dict = Depends(verify_token)
+):
+    """Get available stock statuses"""
+    db = get_db()
+    collection = db['depo_stock_statuses']
+    
+    try:
+        cursor = collection.find().sort('value', 1)
+        statuses = list(cursor)
+        return {"statuses": serialize_doc(statuses)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stock statuses: {str(e)}")
+    
 @router.patch("/purchase-orders/{order_id}/state")
 async def update_order_state(
     request: Request,
@@ -466,8 +320,264 @@ async def get_qc_records(
     collection = db['depo_procurement_qc']
     
     try:
-        cursor = collection.find({'order_id': ObjectId(order_id)}).sort('created_at', -1)
+        # Convert order_id string to ObjectId for MongoDB query
+        order_obj_id = ObjectId(order_id)
+        cursor = collection.find({'order_id': order_obj_id}).sort('created_at', -1)
         qc_records = list(cursor)
         return {"results": serialize_doc(qc_records)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch QC records: {str(e)}")
+    
+# ==================== APPROVAL FLOW ENDPOINTS ====================
+
+@router.get("/purchase-orders/{order_id}/approval-flow")
+async def get_order_approval_flow(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Get approval flow for a purchase order"""
+    db = get_db()
+    
+    flow = db.approval_flows.find_one({
+        "object_type": "procurement_order",
+        "object_id": order_id
+    })
+    
+    if not flow:
+        return {"flow": None}
+    
+    flow["_id"] = str(flow["_id"])
+    
+    for signature in flow.get("signatures", []):
+        user = db.users.find_one({"_id": ObjectId(signature["user_id"])})
+        if user:
+            signature["user_name"] = user.get("name") or user.get("username")
+    
+    return {"flow": serialize_doc(flow)}
+
+
+@router.post("/purchase-orders/{order_id}/approval-flow")
+async def create_order_approval_flow(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Create approval flow for a purchase order using config from MongoDB"""
+    db = get_db()
+    
+    existing = db.approval_flows.find_one({
+        "object_type": "procurement_order",
+        "object_id": order_id
+    })
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Approval flow already exists for this order")
+    
+    config_collection = db['config']
+    approval_config = config_collection.find_one({'slug': 'procurement_approval_flows'})
+    
+    if not approval_config or 'items' not in approval_config:
+        raise HTTPException(status_code=404, detail="No procurement approval flow configuration found")
+    
+    flow_config = None
+    for item in approval_config.get('items', []):
+        if item.get('slug') == 'referate' and item.get('enabled', True):
+            flow_config = item
+            break
+    
+    if not flow_config:
+        raise HTTPException(status_code=404, detail="No enabled approval flow found")
+    
+    can_sign_officers = []
+    for user in flow_config.get('can_sign', []):
+        can_sign_officers.append({
+            "type": "person",
+            "reference": user.get('user_id'),
+            "username": user.get('username'),
+            "action": "can_sign"
+        })
+    
+    must_sign_officers = []
+    for user in flow_config.get('must_sign', []):
+        must_sign_officers.append({
+            "type": "person",
+            "reference": user.get('user_id'),
+            "username": user.get('username'),
+            "action": "must_sign"
+        })
+    
+    flow_data = {
+        "object_type": "procurement_order",
+        "object_source": "depo_procurement",
+        "object_id": order_id,
+        "config_slug": flow_config.get('slug'),
+        "min_signatures": flow_config.get('min_signatures', 1),
+        "required_officers": must_sign_officers,
+        "optional_officers": can_sign_officers,
+        "signatures": [],
+        "status": "pending",
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    result = db.approval_flows.insert_one(flow_data)
+    flow_data["_id"] = str(result.inserted_id)
+    
+    return serialize_doc(flow_data)
+
+
+@router.post("/purchase-orders/{order_id}/sign")
+async def sign_purchase_order(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Sign a purchase order approval flow"""
+    from src.backend.models.approval_flow_model import ApprovalFlowModel
+    
+    db = get_db()
+    
+    flow = db.approval_flows.find_one({
+        "object_type": "procurement_order",
+        "object_id": order_id
+    })
+    
+    if not flow:
+        raise HTTPException(status_code=404, detail="No approval flow found for this order")
+    
+    user_id = str(current_user["_id"])
+    existing_signature = next(
+        (s for s in flow.get("signatures", []) if s["user_id"] == user_id),
+        None
+    )
+    
+    if existing_signature:
+        raise HTTPException(status_code=400, detail="You have already signed this order")
+    
+    username = current_user["username"]
+    can_sign = False
+    
+    for officer in flow.get("required_officers", []):
+        if officer["type"] == "person" and officer["reference"] == user_id:
+            can_sign = True
+            break
+    
+    if not can_sign:
+        for officer in flow.get("optional_officers", []):
+            if officer["type"] == "person" and officer["reference"] == user_id:
+                can_sign = True
+                break
+    
+    if not can_sign:
+        raise HTTPException(status_code=403, detail="You are not authorized to sign this order")
+    
+    timestamp = datetime.utcnow()
+    signature_hash = ApprovalFlowModel.generate_signature_hash(
+        user_id=user_id,
+        object_type="procurement_order",
+        object_id=order_id,
+        timestamp=timestamp
+    )
+    
+    signature = {
+        "user_id": user_id,
+        "username": username,
+        "signed_at": timestamp,
+        "signature_hash": signature_hash,
+        "ip_address": request.client.host,
+        "user_agent": request.headers.get("user-agent")
+    }
+    
+    db.approval_flows.update_one(
+        {"_id": ObjectId(flow["_id"])},
+        {
+            "$push": {"signatures": signature},
+            "$set": {
+                "status": "in_progress",
+                "updated_at": timestamp
+            }
+        }
+    )
+    
+    updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    required_count = len(updated_flow.get("required_officers", []))
+    
+    required_signed = 0
+    for officer in updated_flow.get("required_officers", []):
+        if officer["type"] == "person":
+            if any(s["user_id"] == officer["reference"] for s in updated_flow.get("signatures", [])):
+                required_signed += 1
+    
+    if required_signed == required_count:
+        db.approval_flows.update_one(
+            {"_id": ObjectId(flow["_id"])},
+            {
+                "$set": {
+                    "status": "approved",
+                    "completed_at": timestamp,
+                    "updated_at": timestamp
+                }
+            }
+        )
+        
+        processing_state = db['depo_purchase_orders_states'].find_one({'name': 'Processing'})
+        if processing_state:
+            db['depo_purchase_orders'].update_one(
+                {'_id': ObjectId(order_id)},
+                {
+                    '$set': {
+                        'state_id': processing_state['_id'],
+                        'status': 'Processing',
+                        'updated_at': timestamp,
+                        'approved_at': timestamp,
+                        'approved_by': username
+                    }
+                }
+            )
+    
+    flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    return serialize_doc(flow)
+
+
+@router.delete("/purchase-orders/{order_id}/signatures/{user_id}")
+async def remove_order_signature(
+    request: Request,
+    order_id: str,
+    user_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Remove signature from purchase order approval flow (admin only)"""
+    db = get_db()
+    
+    is_admin = current_user.get('is_staff', False) or current_user.get('is_superuser', False)
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Only admin can remove signatures")
+    
+    flow = db.approval_flows.find_one({
+        "object_type": "procurement_order",
+        "object_id": order_id
+    })
+    
+    if not flow:
+        raise HTTPException(status_code=404, detail="No approval flow found for this order")
+    
+    result = db.approval_flows.update_one(
+        {"_id": ObjectId(flow["_id"])},
+        {
+            "$pull": {"signatures": {"user_id": user_id}},
+            "$set": {"updated_at": datetime.utcnow()}
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Signature not found")
+    
+    updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    if len(updated_flow.get("signatures", [])) == 0:
+        db.approval_flows.update_one(
+            {"_id": ObjectId(flow["_id"])},
+            {"$set": {"status": "pending"}}
+        )
+    
+    return {"message": "Signature removed successfully"}

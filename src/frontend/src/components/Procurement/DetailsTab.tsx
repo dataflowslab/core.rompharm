@@ -17,7 +17,8 @@ interface StockLocation {
 }
 
 interface PurchaseOrder {
-  pk: number;
+  pk?: number;
+  _id?: string;
   reference: string;
   description: string;
   supplier: number;
@@ -127,7 +128,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
       {/* Document Sidebar - 1/4 width */}
       <Grid.Col span={3}>
         <DocumentManager
-          entityId={order.pk}
+          entityId={order.pk || order._id}
           entityType="procurement-order"
           templates={documentTemplates}
           onDocumentGenerated={() => {
@@ -215,7 +216,9 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
                 label={t('Destination')}
                 value={formData.destination}
                 onChange={(value) => setFormData({ ...formData, destination: value || '' })}
-                data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
+                data={stockLocations
+                  .filter(loc => loc.pk != null && loc.pk !== undefined)
+                  .map(loc => ({ value: String(loc.pk), label: loc.name }))}
                 disabled={!canEdit}
                 searchable
                 clearable

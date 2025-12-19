@@ -31,26 +31,32 @@ import {
   AttachmentsTab,
 } from '../components/Procurement';
 interface PurchaseOrder {
-  pk: number;
+  _id?: string;
+  pk?: number;
   reference: string;
   description: string;
-  supplier: number;
+  supplier?: number;
+  supplier_id?: string;
   supplier_detail?: {
     name: string;
-    pk: number;
+    pk?: number;
+    _id?: string;
   };
   supplier_reference: string;
-  order_currency: string;
+  order_currency?: string;
+  currency?: string;
   issue_date: string;
   target_date: string;
   destination?: number;
+  destination_id?: string;
   destination_detail?: {
     name: string;
   };
   notes: string;
-  status: number;
-  status_text: string;
+  status: string;  // MongoDB: string status name (e.g., "Pending", "Processing")
+  status_text?: string;  // Legacy InvenTree field
   responsible?: number;
+  created_by?: string;
 }
 
 interface PurchaseOrderItem {
@@ -163,7 +169,7 @@ export function ProcurementDetailPage() {
 
   const handleUpdateOrder = async (data: any) => {
     try {
-      await api.patch(`/api/procurement/purchase-orders/${id}`, data);
+      await api.patch(procurementApi.getPurchaseOrder(id!), data);
       await loadPurchaseOrder();
     } catch (error) {
       throw error;
@@ -199,7 +205,7 @@ export function ProcurementDetailPage() {
 
   const loadApprovalFlow = async () => {
     try {
-      const response = await api.get(`/api/procurement/purchase-orders/${id}/approval-flow`);
+      const response = await api.get(`${procurementApi.getPurchaseOrder(id!)}/approval-flow`);
       setApprovalFlow(response.data.flow);
     } catch (error) {
       console.error('Failed to load approval flow:', error);
@@ -238,13 +244,17 @@ export function ProcurementDetailPage() {
     return false;
   };
 
-  const getStatusColor = (status: number) => {
-    switch (status) {
-      case 10: return 'gray'; // Pending
-      case 20: return 'blue'; // Placed
-      case 30: return 'yellow'; // Complete
-      case 40: return 'green'; // Received
-      case 50: return 'red'; // Cancelled
+  const getStatusColor = (status: string) => {
+    // MongoDB status names
+    switch (status?.toLowerCase()) {
+      case 'pending': return 'gray';
+      case 'processing': return 'blue';
+      case 'approved': return 'cyan';
+      case 'complete': return 'yellow';
+      case 'finished': return 'green';
+      case 'canceled': 
+      case 'cancelled': 
+      case 'refused': return 'red';
       default: return 'gray';
     }
   };
@@ -285,7 +295,7 @@ export function ProcurementDetailPage() {
           <Text size="sm" c="dimmed">{order.supplier_detail?.name}</Text>
         </div>
         <Badge color={getStatusColor(order.status)} size="lg">
-          {order.status_text}
+          {order.status || order.status_text || 'Unknown'}
         </Badge>
       </Group>
 
@@ -356,7 +366,7 @@ export function ProcurementDetailPage() {
 
         <Tabs.Panel value="quality-control" pt="md">
           <QualityControlTab
-            orderId={parseInt(id!)}
+            orderId={id!}
           />
         </Tabs.Panel>
 

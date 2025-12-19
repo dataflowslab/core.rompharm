@@ -121,42 +121,51 @@ async def get_recipe(
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
-        # Get product details
-        product = db.depo_parts.find_one({"id": recipe["id"]})
+        # Get product details using part_id (ObjectId)
+        product = None
+        if recipe.get("part_id"):
+            part_id = recipe["part_id"] if isinstance(recipe["part_id"], ObjectId) else ObjectId(recipe["part_id"])
+            product = db.depo_parts.find_one({"_id": part_id})
         
-        # Get all part IDs from items (recursive)
+        # Get all part IDs from items (recursive) - part_id is ObjectId
         def collect_part_ids(items):
             ids = []
             for item in items:
-                if item.get("type") == 1 and item.get("id"):
-                    ids.append(item["id"])
+                if item.get("type") == 1 and item.get("part_id"):
+                    part_id = item["part_id"] if isinstance(item["part_id"], ObjectId) else ObjectId(item["part_id"])
+                    ids.append(part_id)
                 if item.get("items"):
                     ids.extend(collect_part_ids(item["items"]))
             return ids
         
         part_ids = collect_part_ids(recipe.get("items", []))
-        parts = list(db.depo_parts.find({"id": {"$in": part_ids}}))
-        parts_map = {p["id"]: p for p in parts}
+        parts = list(db.depo_parts.find({"_id": {"$in": part_ids}}))
+        parts_map = {p["_id"]: p for p in parts}
         
         # Enrich items with part details
         def enrich_items(items):
             enriched = []
             for item in items:
                 enriched_item = dict(item)
-                if item.get("type") == 1 and item.get("id"):
-                    part = parts_map.get(item["id"], {})
+                if item.get("type") == 1 and item.get("part_id"):
+                    part_id = item["part_id"] if isinstance(item["part_id"], ObjectId) else ObjectId(item["part_id"])
+                    part = parts_map.get(part_id, {})
                     enriched_item["part_detail"] = {
-                        "name": part.get("name", f"Part {item['id']}"),
+                        "name": part.get("name", f"Part {str(part_id)}"),
                         "IPN": part.get("ipn", "")
                     }
+                    # Convert ObjectId to string for JSON
+                    enriched_item["part_id"] = str(part_id)
                 if item.get("items"):
                     enriched_item["items"] = enrich_items(item["items"])
                 enriched.append(enriched_item)
             return enriched
         
         recipe["_id"] = str(recipe["_id"])
+        if recipe.get("part_id"):
+            recipe["part_id"] = str(recipe["part_id"])
         recipe["product_detail"] = {
-            "name": product.get("name", f"Product {recipe['id']}") if product else f"Product {recipe['id']}",
+            "name": product.get("name", "Unknown Product") if product else "Unknown Product",
             "IPN": product.get("ipn", "") if product else ""
         }
         recipe["items"] = enrich_items(recipe.get("items", []))
@@ -637,16 +646,19 @@ async def get_recipe_revisions(
 ):
     """Get all revisions for a recipe's product"""
     try:
-        # Get current recipe to find product_id
+        # Get current recipe to find part_id (ObjectId)
         recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
-        product_id = recipe["id"]
+        if not recipe.get("part_id"):
+            raise HTTPException(status_code=400, detail="Recipe has no part_id")
+        
+        part_id = recipe["part_id"] if isinstance(recipe["part_id"], ObjectId) else ObjectId(recipe["part_id"])
         
         # Get all revisions for this product, sorted by revision desc
         revisions = list(db[RecipeModel.Config.collection_name].find(
-            {"id": product_id}
+            {"part_id": part_id}
         ).sort("rev", -1))
         
         result = []

@@ -67,7 +67,8 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
   const checkDocumentStatus = async (templateCode: string, jobId: string) => {
     setCheckingStatus(prev => ({ ...prev, [templateCode]: true }));
     try {
-      const response = await api.get(`/api/documents/${entityType}/${entityId}/job/${jobId}/status`);
+      // Use global job status endpoint - works for any document type
+      const response = await api.get(`/api/documents/job/${jobId}/status`);
       const status = response.data;
       
       // Update document in state

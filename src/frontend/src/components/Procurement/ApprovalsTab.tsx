@@ -4,6 +4,7 @@ import { IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
 
 interface ApprovalSignature {
@@ -65,12 +66,12 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
   const loadApprovalFlow = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/api/procurement/purchase-orders/${order.pk}/approval-flow`);
+      const response = await api.get(`${procurementApi.getPurchaseOrder(order.pk)}/approval-flow`);
       
       // If no flow exists, create it automatically
       if (!response.data.flow) {
         try {
-          const createResponse = await api.post(`/api/procurement/purchase-orders/${order.pk}/approval-flow`);
+          const createResponse = await api.post(`${procurementApi.getPurchaseOrder(order.pk)}/approval-flow`);
           setFlow(createResponse.data);
         } catch (createError: any) {
           console.error('Failed to create approval flow:', createError);
@@ -91,7 +92,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
   const handleCreateFlow = async () => {
     setSubmitting(true);
     try {
-      const response = await api.post(`/api/procurement/purchase-orders/${order.pk}/approval-flow`);
+      const response = await api.post(`${procurementApi.getPurchaseOrder(order.pk)}/approval-flow`);
       setFlow(response.data);
       
       notifications.show({
@@ -115,7 +116,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
     setSignModalOpened(false);
     setSubmitting(true);
     try {
-      const response = await api.post(`/api/procurement/purchase-orders/${order.pk}/sign`);
+      const response = await api.post(`${procurementApi.getPurchaseOrder(order.pk)}/sign`);
       setFlow(response.data);
       
       notifications.show({
@@ -148,7 +149,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
     
     setRemoveModalOpened(false);
     try {
-      await api.delete(`/api/procurement/purchase-orders/${order.pk}/signatures/${userToRemove}`);
+      await api.delete(`${procurementApi.getPurchaseOrder(order.pk)}/signatures/${userToRemove}`);
       
       notifications.show({
         title: t('Success'),
@@ -218,19 +219,9 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
   if (!flow) {
     return (
       <Paper p="md" withBorder>
-        <Stack>
-          <Alert icon={<IconAlertCircle size={16} />} title={t('No Approval Flow')} color="blue">
-            {t('This purchase order does not have an approval flow yet.')}
-          </Alert>
-          
-          {isStaff && (
-            <Group justify="flex-end">
-              <Button onClick={handleCreateFlow} loading={submitting}>
-                {t('Create Approval Flow')}
-              </Button>
-            </Group>
-          )}
-        </Stack>
+        <Alert icon={<IconAlertCircle size={16} />} title={t('No Approval Flow')} color="blue">
+          {t('This purchase order does not have an approval flow. Approval flows are automatically created for new orders based on the configured approval template.')}
+        </Alert>
       </Paper>
     );
   }

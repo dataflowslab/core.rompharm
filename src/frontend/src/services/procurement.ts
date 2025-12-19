@@ -7,9 +7,9 @@ import { getModuleApiPrefix } from '../config/modules';
 const API_PREFIX = getModuleApiPrefix('procurement');
 
 export const procurementApi = {
-  // Suppliers
-  getSuppliers: () => `${API_PREFIX}/suppliers`,
-  createSupplier: () => `${API_PREFIX}/suppliers`,
+  // Suppliers - FROM INVENTORY MODULE
+  getSuppliers: () => `/modules/inventory/api/suppliers`,
+  createSupplier: () => `/modules/inventory/api/suppliers`,
   
   // Purchase Orders
   getPurchaseOrders: () => `${API_PREFIX}/purchase-orders`,
@@ -23,14 +23,14 @@ export const procurementApi = {
   updateOrderItem: (orderId: string | number, itemId: number) => `${API_PREFIX}/purchase-orders/${orderId}/items/${itemId}`,
   deleteOrderItem: (orderId: string | number, itemId: number) => `${API_PREFIX}/purchase-orders/${orderId}/items/${itemId}`,
   
-  // Parts
-  getParts: () => `${API_PREFIX}/parts`,
+  // Parts - FROM INVENTORY MODULE
+  getParts: () => `/modules/inventory/api/parts`,
   
-  // Stock Locations
-  getStockLocations: () => `${API_PREFIX}/stock-locations`,
+  // Stock Locations - FROM INVENTORY MODULE
+  getStockLocations: () => `/modules/inventory/api/locations`,
   
-  // Currencies
-  getCurrencies: () => `${API_PREFIX}/currencies`,
+  // Currencies - FROM GLOBAL API
+  getCurrencies: () => `/api/currencies`,
   
   // Attachments
   getAttachments: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/attachments`,
@@ -43,4 +43,10 @@ export const procurementApi = {
   
   // Statuses
   getOrderStatuses: () => `${API_PREFIX}/order-statuses`,
+  getStockStatuses: () => `${API_PREFIX}/stock-statuses`,
+  
+  // QC Records
+  getQCRecords: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/qc-records`,
+  createQCRecord: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/qc-records`,
+  updateQCRecord: (orderId: string | number, recordId: string) => `${API_PREFIX}/purchase-orders/${orderId}/qc-records/${recordId}`,
 };

@@ -4,6 +4,7 @@ import { Paper, Title, Tabs, Button, Group, Badge, Text } from '@mantine/core';
 import { IconArrowLeft, IconFileText, IconSignature, IconTruck, IconPackage, IconList } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
+import { requestsApi } from '../services/requests';
 import { notifications } from '@mantine/notifications';
 import { DetailsTab } from '../components/Requests/DetailsTab';
 import { ApprovalsTab } from '../components/Requests/ApprovalsTab';
@@ -61,7 +62,7 @@ export function RequestDetailPage() {
 
   const loadRequest = async () => {
     try {
-      const response = await api.get(`/api/requests/${id}`);
+      const response = await api.get(requestsApi.getRequest(id!));
       setRequest(response.data);
     } catch (error) {
       console.error('Failed to load request:', error);

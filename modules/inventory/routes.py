@@ -78,6 +78,54 @@ class ArticleUpdateRequest(BaseModel):
     supplier_id: Optional[str] = None
 
 
+@router.get("/parts")
+async def get_parts(
+    request: Request,
+    search: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    sort_by: Optional[str] = Query("name"),
+    sort_order: Optional[str] = Query("asc"),
+    current_user: dict = Depends(verify_token)
+):
+    """Get list of parts (alias for articles) from MongoDB with search, pagination and sorting"""
+    db = get_db()
+    collection = db['depo_parts']
+    
+    # Build query
+    query = {}
+    if search:
+        query['$or'] = [
+            {'name': {'$regex': search, '$options': 'i'}},
+            {'ipn': {'$regex': search, '$options': 'i'}},
+            {'description': {'$regex': search, '$options': 'i'}}
+        ]
+    
+    # Build sort
+    sort_direction = 1 if sort_order == 'asc' else -1
+    sort = [(sort_by, sort_direction)]
+    
+    try:
+        # Get total count
+        total = collection.count_documents(query)
+        
+        # Get paginated results
+        cursor = collection.find(query).sort(sort).skip(skip).limit(limit)
+        parts = list(cursor)
+        
+        # Serialize results
+        serialized_parts = serialize_doc(parts)
+        
+        return {
+            'results': serialized_parts,
+            'total': total,
+            'skip': skip,
+            'limit': limit
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch parts: {str(e)}")
+
+
 @router.get("/articles")
 async def get_articles(
     request: Request,

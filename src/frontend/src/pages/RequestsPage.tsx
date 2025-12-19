@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../services/api';
+import { requestsApi } from '../services/requests';
 import { notifications } from '@mantine/notifications';
 import { ComponentsTable } from '../components/Requests/ComponentsTable';
 
@@ -64,7 +65,7 @@ export function RequestsPage() {
 
   const loadRequests = async () => {
     try {
-      const response = await api.get('/api/requests/');
+      const response = await api.get(requestsApi.getRequests());
       setRequests(response.data.results || []);
     } catch (error) {
       console.error('Failed to load requests:', error);
@@ -80,7 +81,7 @@ export function RequestsPage() {
 
   const loadStockLocations = async () => {
     try {
-      const response = await api.get('/api/requests/stock-locations');
+      const response = await api.get(requestsApi.getStockLocations());
       const locations = response.data.results || response.data || [];
       setStockLocations(locations);
     } catch (error) {
@@ -95,7 +96,7 @@ export function RequestsPage() {
     }
     
     try {
-      const response = await api.get('/api/requests/parts', {
+      const response = await api.get(requestsApi.getParts(), {
         params: { search: query }
       });
       const results = response.data.results || response.data || [];
@@ -107,7 +108,7 @@ export function RequestsPage() {
 
   const loadStockInfo = async (partId: number) => {
     try {
-      const response = await api.get(`/api/requests/parts/${partId}/stock-info`);
+      const response = await api.get(requestsApi.getPartStockInfo(partId));
       setStockInfo(response.data);
     } catch (error) {
       console.error('Failed to load stock info:', error);
@@ -117,7 +118,7 @@ export function RequestsPage() {
 
   const loadRecipe = async (partId: number) => {
     try {
-      const response = await api.get(`/api/requests/parts/${partId}/recipe`);
+      const response = await api.get(requestsApi.getPartRecipe(partId));
       setRecipeData(response.data);
     } catch (error) {
       console.error('Failed to load recipe:', error);
@@ -197,7 +198,7 @@ export function RequestsPage() {
         }];
       }
 
-      await api.post('/api/requests/', {
+      await api.post(requestsApi.createRequest(), {
         source: parseInt(formData.source),
         destination: parseInt(formData.destination),
         items: itemsToSend,
@@ -248,7 +249,7 @@ export function RequestsPage() {
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/api/requests/${request._id}`);
+          await api.delete(requestsApi.deleteRequest(request._id));
           notifications.show({
             title: t('Success'),
             message: t('Request deleted successfully'),

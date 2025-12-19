@@ -538,7 +538,7 @@ async def get_procurement_order_templates(user = Depends(verify_token)):
 
 
 class GenerateProcurementDocumentRequest(BaseModel):
-    order_id: int
+    order_id: str  # MongoDB ObjectId as string
     template_code: str
     template_name: str
 
@@ -557,43 +557,26 @@ async def generate_procurement_document(
     
     db = get_db()
     
-    # Get procurement order data from InvenTree
-    config = load_config()
-    inventree_url = config['inventree']['url'].rstrip('/')
-    token = user.get('token')
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated with InvenTree")
-    
-    headers = {
-        'Authorization': f'Token {token}',
-        'Content-Type': 'application/json'
-    }
-    
+    # Convert order_id to ObjectId
     try:
-        # Get purchase order details
-        po_response = requests.get(
-            f"{inventree_url}/api/order/po/{request.order_id}/",
-            headers=headers,
-            timeout=10
-        )
-        po_response.raise_for_status()
-        purchase_order = po_response.json()
+        order_obj_id = ObjectId(request.order_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+    
+    # Get procurement order data from MongoDB
+    try:
+        purchase_order = db['depo_purchase_orders'].find_one({'_id': order_obj_id})
+        if not purchase_order:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
         
-        # Get supplier details
-        supplier_id = purchase_order.get('supplier')
+        print(f"[DOCUMENT] Purchase order found: {purchase_order.get('reference')}")
+        
+        # Get supplier details from MongoDB
         supplier_detail = None
-        if supplier_id:
-            try:
-                supplier_response = requests.get(
-                    f"{inventree_url}/api/company/{supplier_id}/",
-                    headers=headers,
-                    timeout=10
-                )
-                supplier_response.raise_for_status()
-                supplier_detail = supplier_response.json()
+        if purchase_order.get('supplier_id'):
+            supplier_detail = db['depo_companies'].find_one({'_id': ObjectId(purchase_order['supplier_id'])})
+            if supplier_detail:
                 print(f"[DOCUMENT] Supplier details: {supplier_detail.get('name')}")
-            except Exception as e:
-                print(f"[DOCUMENT] WARNING: Failed to get supplier details: {e}")
         
         # Get company info from MongoDB config (buyer info)
         company_info = None
@@ -611,30 +594,26 @@ async def generate_procurement_document(
             print(f"[DOCUMENT] WARNING: Failed to get company info from MongoDB: {e}")
             company_info = {'name': 'Company Name', 'cif': '', 'address': '', 'adresa': ''}
         
-        # Get line items
-        items_response = requests.get(
-            f"{inventree_url}/api/order/po-line/",
-            headers=headers,
-            params={'order': request.order_id, 'part_detail': 'true'},
-            timeout=10
-        )
-        items_response.raise_for_status()
-        items_data = items_response.json()
-        
-        # Extract line items - handle both list and paginated response
-        if isinstance(items_data, list):
-            line_items = items_data
-        elif isinstance(items_data, dict) and 'results' in items_data:
-            line_items = items_data['results']
-        else:
-            print(f"[DOCUMENT] WARNING: Unexpected items_data type: {type(items_data)}")
-            line_items = []
-        
+        # Get line items from MongoDB purchase order
+        line_items = purchase_order.get('items', [])
         print(f"[DOCUMENT] Found {len(line_items)} line items")
+        
+        # Enrich line items with part details from depo_parts
+        for item in line_items:
+            if item.get('part_id'):
+                part = db['depo_parts'].find_one({'_id': ObjectId(item['part_id'])})
+                if part:
+                    item['part_detail'] = {
+                        'name': part.get('name'),
+                        'ipn': part.get('ipn'),
+                        'um': part.get('um'),
+                        'description': part.get('description', '')
+                    }
         
         # Generate QR code for the order
         # Format: ORDERID#SUPPLIERID#ISSUEDATE
-        qr_string = f"{request.order_id}#{supplier_id}#{purchase_order.get('issue_date', '')}"
+        supplier_id_str = str(purchase_order.get('supplier_id', ''))
+        qr_string = f"{request.order_id}#{supplier_id_str}#{purchase_order.get('issue_date', '')}"
         print(f"[DOCUMENT] Generating QR code: {qr_string}")
         
         # Create QR code as SVG
@@ -679,14 +658,34 @@ async def generate_procurement_document(
         print(f"[DOCUMENT] Filename: {filename}")
         
         print(f"[DOCUMENT] Preparing document data...")
+        
+        # Helper function to serialize MongoDB documents (convert ObjectId to string)
+        def serialize_for_json(obj):
+            if isinstance(obj, ObjectId):
+                return str(obj)
+            elif isinstance(obj, datetime):
+                return obj.isoformat()
+            elif isinstance(obj, dict):
+                return {k: serialize_for_json(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [serialize_for_json(item) for item in obj]
+            else:
+                return obj
+        
+        # Serialize all data to make it JSON-compatible
+        serialized_order = serialize_for_json(purchase_order)
+        serialized_line_items = serialize_for_json(line_items)
+        serialized_supplier = serialize_for_json(supplier_detail) if supplier_detail else None
+        serialized_company = serialize_for_json(company_info) if company_info else None
+        
         # Prepare data for template - wrap in 'data' key like submissions
         # NOTE: Don't use 'items' as key name - conflicts with dict.items() method in Jinja2
         document_data = {
             'data': {
-                'order': purchase_order,
-                'line_items': line_items,  # Changed from 'items' to 'line_items'
-                'supplier': supplier_detail,  # Full supplier details
-                'company': company_info,  # Buyer/company info
+                'order': serialized_order,
+                'line_items': serialized_line_items,  # Changed from 'items' to 'line_items'
+                'supplier': serialized_supplier,  # Full supplier details
+                'company': serialized_company,  # Buyer/company info
                 'qr_code_svg': qr_svg,  # QR code as SVG string
                 'qr_code_data': qr_string,  # Raw QR code data
                 'generated_at': datetime.utcnow().isoformat(),
@@ -760,9 +759,39 @@ async def generate_procurement_document(
         )
 
 
+@router.get("/job/{job_id}/status")
+async def get_global_job_status(
+    job_id: str,
+    user = Depends(verify_token)
+):
+    """
+    Check status of any document generation job by job_id (global endpoint)
+    Works for any type of document (procurement, stock request, form submission, etc.)
+    """
+    print(f"[DOCUMENT] Checking global job status: {job_id}")
+    
+    # Check status from DataFlows Docu
+    client = DataFlowsDocuClient()
+    job_status = client.get_job_status(job_id)
+    
+    if not job_status:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    current_status = job_status.get('status')
+    print(f"[DOCUMENT] Job {job_id} status: {current_status}")
+    
+    return {
+        'job_id': job_id,
+        'status': current_status,
+        'error': job_status.get('error'),
+        'created_at': job_status.get('created_at'),
+        'updated_at': job_status.get('updated_at')
+    }
+
+
 @router.get("/procurement-order/{order_id}")
 async def get_procurement_order_documents(
-    order_id: int,
+    order_id: str,
     user = Depends(verify_token)
 ):
     """
@@ -774,7 +803,13 @@ async def get_procurement_order_documents(
     db = get_db()
     docs_collection = db['depo_procurement_documents']
     
-    docs = list(docs_collection.find({'order_id': order_id}))
+    # Convert order_id to ObjectId for MongoDB query
+    try:
+        order_obj_id = ObjectId(order_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+    
+    docs = list(docs_collection.find({'order_id': order_obj_id}))
     
     # Check status and auto-download completed documents
     client = DataFlowsDocuClient()
@@ -843,7 +878,7 @@ async def get_procurement_order_documents(
 
 @router.get("/procurement-order/{order_id}/job/{job_id}/download")
 async def download_procurement_job_document(
-    order_id: int,
+    order_id: str,
     job_id: str,
     user = Depends(verify_token)
 ):
@@ -857,8 +892,14 @@ async def download_procurement_job_document(
     db = get_db()
     docs_collection = db['depo_procurement_documents']
     
+    # Convert order_id to ObjectId
+    try:
+        order_obj_id = ObjectId(order_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+    
     job_entry = docs_collection.find_one({
-        'order_id': order_id,
+        'order_id': order_obj_id,
         'job_id': job_id
     })
     
@@ -919,7 +960,7 @@ async def download_procurement_job_document(
 
 @router.delete("/procurement-order/{order_id}/job/{job_id}")
 async def delete_procurement_document(
-    order_id: int,
+    order_id: str,
     job_id: str,
     user = Depends(verify_token)
 ):
@@ -931,9 +972,15 @@ async def delete_procurement_document(
     db = get_db()
     docs_collection = db['depo_procurement_documents']
     
+    # Convert order_id to ObjectId
+    try:
+        order_obj_id = ObjectId(order_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+    
     # Find and delete the document
     result = docs_collection.delete_one({
-        'order_id': order_id,
+        'order_id': order_obj_id,
         'job_id': job_id
     })
     

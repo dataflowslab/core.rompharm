@@ -27,6 +27,22 @@ def install(c):
 
 
 @task
+def generate_routes_doc(c):
+    """Generate ROUTES.md documentation from all route files"""
+    print("=" * 50)
+    print("Generating Routes Documentation")
+    print("=" * 50)
+    
+    # Detect python command
+    python_cmd = "python3" if sys.platform != "win32" else "python"
+    
+    print("\nScanning routes...")
+    c.run(f"{python_cmd} src/scripts/generate_routes_doc.py")
+    
+    print("\n✓ ROUTES.md generated successfully!")
+
+
+@task(pre=[generate_routes_doc])
 def build_frontend(c):
     """Build frontend for production"""
     print("=" * 50)
@@ -718,6 +734,7 @@ def help(c):
     print("\n  Building:")
     print("    invoke build            - Build frontend for production")
     print("    invoke build-frontend   - Build only frontend")
+    print("    invoke generate-routes-doc - Generate ROUTES.md documentation")
     print("\n  Running:")
     print("    invoke run              - Run complete application")
     print("    invoke run-backend      - Run only backend")
