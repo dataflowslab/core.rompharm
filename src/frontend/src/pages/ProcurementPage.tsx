@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { procurementApi } from '../services/procurement';
 import { notifications } from '@mantine/notifications';
+import { ApiSelect } from '../components/Common/ApiSelect';
 
 interface PurchaseOrder {
   _id?: string;
@@ -55,7 +56,6 @@ export function ProcurementPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
-  const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
@@ -95,7 +95,6 @@ export function ProcurementPage() {
     loadPurchaseOrders();
     loadSuppliers();
     loadStockLocations();
-    loadCurrencies();
   }, []);
 
   const loadPurchaseOrders = async () => {
@@ -130,23 +129,6 @@ export function ProcurementPage() {
       setStockLocations(response.data.results || response.data || []);
     } catch (error) {
       console.error('Failed to load stock locations:', error);
-    }
-  };
-
-  const loadCurrencies = async () => {
-    try {
-      const response = await api.get(procurementApi.getCurrencies());
-      const currenciesData = response.data.results || response.data || [];
-      
-      // Only use database currencies if they exist, otherwise don't set fallback here
-      if (currenciesData.length > 0) {
-        setCurrencies(currenciesData);
-      } else {
-        // Database is empty, don't set anything - backend will return defaults
-        console.log('No currencies in database, backend will provide defaults');
-      }
-    } catch (error) {
-      console.error('Failed to load currencies:', error);
     }
   };
 
@@ -511,11 +493,13 @@ export function ProcurementPage() {
           </Grid.Col>
 
           <Grid.Col span={6}>
-            <Select
+            <ApiSelect
               label={t('Currency')}
-              data={currencies.map(c => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
+              endpoint="/api/currencies"
               value={formData.currency}
               onChange={(value) => setFormData({ ...formData, currency: value || 'EUR' })}
+              valueField="_id"
+              labelFormat={(item) => item.abrev ? `${item.name} (${item.abrev})` : item.name}
               searchable
             />
           </Grid.Col>
@@ -593,11 +577,13 @@ export function ProcurementPage() {
           </Grid.Col>
 
           <Grid.Col span={6}>
-            <Select
+            <ApiSelect
               label={t('Currency')}
-              data={currencies.map(c => ({ value: c.code, label: `${c.code} - ${c.name}` }))}
+              endpoint="/api/currencies"
               value={newSupplierData.currency}
               onChange={(value) => setNewSupplierData({ ...newSupplierData, currency: value || 'EUR' })}
+              valueField="_id"
+              labelFormat={(item) => item.abrev ? `${item.name} (${item.abrev})` : item.name}
               searchable
             />
           </Grid.Col>

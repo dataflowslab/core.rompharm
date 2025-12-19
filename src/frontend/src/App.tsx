@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AppShell, Burger, Group, Image, Text, Button, Select } from '@mantine/core';
+import { AppShell, Burger, Group, Image, Text, Button, Select, ScrollArea } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconLogout, IconLanguage } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -26,6 +26,9 @@ import { BuildOrdersPage } from './pages/BuildOrdersPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { ArticlesPage } from './pages/ArticlesPage';
 import { ArticleDetailPage } from './pages/ArticleDetailPage';
+import { StockItemDetailPage } from './pages/StockItemDetailPage';
+import { CategoriesPage } from './pages/CategoriesPage';
+import { LocationsPage } from './pages/LocationsPage';
 import { SuppliersPage, SupplierDetailPage, ManufacturersPage, ManufacturerDetailPage, ClientsPage, ClientDetailPage, StocksPage } from '../../../modules/inventory/frontend/pages';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { Navbar } from './components/Layout/Navbar';
@@ -122,7 +125,9 @@ function App() {
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        <Navbar />
+        <ScrollArea h="calc(100vh - 60px)" type="auto">
+          <Navbar />
+        </ScrollArea>
       </AppShell.Navbar>
 
       <AppShell.Main>
@@ -141,6 +146,8 @@ function App() {
           <Route path="/sales/:id" element={<ProtectedRoute><SalesDetailPage /></ProtectedRoute>} />
           <Route path="/inventory/articles" element={<ProtectedRoute><ArticlesPage /></ProtectedRoute>} />
           <Route path="/inventory/articles/:id" element={<ProtectedRoute><ArticleDetailPage /></ProtectedRoute>} />
+          <Route path="/inventory/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
+          <Route path="/inventory/locations" element={<ProtectedRoute><LocationsPage /></ProtectedRoute>} />
           <Route path="/inventory/suppliers" element={<ProtectedRoute><SuppliersPage /></ProtectedRoute>} />
           <Route path="/inventory/suppliers/:id" element={<ProtectedRoute><SupplierDetailPage /></ProtectedRoute>} />
           <Route path="/inventory/manufacturers" element={<ProtectedRoute><ManufacturersPage /></ProtectedRoute>} />
@@ -148,6 +155,7 @@ function App() {
           <Route path="/inventory/clients" element={<ProtectedRoute><ClientsPage /></ProtectedRoute>} />
           <Route path="/inventory/clients/:id" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
           <Route path="/inventory/stocks" element={<ProtectedRoute><StocksPage /></ProtectedRoute>} />
+          <Route path="/inventory/stocks/:id" element={<ProtectedRoute><StockItemDetailPage /></ProtectedRoute>} />
           <Route path="/returns" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/withdrawals" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/deliveries" element={<ProtectedRoute><div /></ProtectedRoute>} />

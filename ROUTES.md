@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-19 07:48:15
+**Last Updated:** 2025-12-19 22:13:28
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -173,15 +173,22 @@
 ### inventory (`/modules/inventory/api`)
 
 **Articles**
-- `GET /modules/inventory/api/articles` - Get list of articles from MongoDB with search, pagination and sorting
+- `GET /modules/inventory/api/articles` - Get list of articles from MongoDB with search, category filter, pagination and sorting
 - `POST /modules/inventory/api/articles` - Create a new article
 - `DELETE /modules/inventory/api/articles/{article_id}` - Delete an article
 - `GET /modules/inventory/api/articles/{article_id}` - Get a specific article by ID
 - `PUT /modules/inventory/api/articles/{article_id}` - Update an existing article
 - `GET /modules/inventory/api/articles/{article_id}/recipes` - Get all recipes that use this article
+- `GET /modules/inventory/api/articles/{article_id}/suppliers` - Get all suppliers for an article
+- `POST /modules/inventory/api/articles/{article_id}/suppliers` - Add a supplier to an article
+- `DELETE /modules/inventory/api/articles/{article_id}/suppliers/{supplier_relation_id}` - Remove a supplier from an article
+- `PUT /modules/inventory/api/articles/{article_id}/suppliers/{supplier_relation_id}` - Update supplier information for an article
 
 **Categories**
-- `GET /modules/inventory/api/categories` - Get list of categories from MongoDB
+- `GET /modules/inventory/api/categories` - Get list of categories from MongoDB with parent details populated
+- `POST /modules/inventory/api/categories` - Create a new category
+- `DELETE /modules/inventory/api/categories/{category_id}` - Delete a category (only if it has no children and no articles)
+- `PUT /modules/inventory/api/categories/{category_id}` - Update an existing category
 
 **Clients**
 - `GET /modules/inventory/api/clients` - Get list of clients (companies with is_client=true)
@@ -194,7 +201,10 @@
 - `GET /modules/inventory/api/companies` - Get list of companies from MongoDB
 
 **Locations**
-- `GET /modules/inventory/api/locations` - Get list of locations from MongoDB
+- `GET /modules/inventory/api/locations` - Get list of locations from MongoDB with parent details populated
+- `POST /modules/inventory/api/locations` - Create a new location
+- `DELETE /modules/inventory/api/locations/{location_id}` - Delete a location (only if it has no children and no stocks)
+- `PUT /modules/inventory/api/locations/{location_id}` - Update an existing location
 
 **Manufacturers**
 - `GET /modules/inventory/api/manufacturers` - Get list of manufacturers (companies with is_manufacturer=true)
@@ -202,6 +212,9 @@
 - `DELETE /modules/inventory/api/manufacturers/{manufacturer_id}` - Delete a manufacturer
 - `GET /modules/inventory/api/manufacturers/{manufacturer_id}` - Get a specific manufacturer by ID
 - `PUT /modules/inventory/api/manufacturers/{manufacturer_id}` - Update an existing manufacturer
+
+**Parts**
+- `GET /modules/inventory/api/parts` - Get list of parts (alias for articles) from MongoDB with search, pagination and sorting
 
 **Stocks**
 - `GET /modules/inventory/api/stocks` - Get list of stocks with enriched data including supplier information
@@ -217,6 +230,9 @@
 - `POST /modules/inventory/api/suppliers/{supplier_id}/parts` - Add a part to supplier's parts list
 - `DELETE /modules/inventory/api/suppliers/{supplier_id}/parts/{part_id}` - Remove a part from supplier's parts list
 - `PUT /modules/inventory/api/suppliers/{supplier_id}/parts/{part_id}` - Update supplier-specific data for a part
+
+**System Ums**
+- `GET /modules/inventory/api/system-ums` - Get list of system units of measure from MongoDB
 
 ### requests (`/modules/requests/api`)
 

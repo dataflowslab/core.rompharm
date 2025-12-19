@@ -1013,7 +1013,7 @@ async def generate_stock_request_document(
     print(f"[DOCUMENT] Generate stock request doc: request_id={request.request_id}, template_code={request.template_code}")
     
     db = get_db()
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     
     # Get request data
     from bson import ObjectId

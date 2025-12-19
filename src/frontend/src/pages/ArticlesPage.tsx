@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -43,15 +44,23 @@ interface Company {
   name: string;
 }
 
+interface Category {
+  _id: string;
+  name: string;
+}
+
 export function ArticlesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>(searchParams.get('category') || '');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [opened, { open, close }] = useDisclosure(false);
   const [locations, setLocations] = useState<Location[]>([]);
   const [suppliers, setSuppliers] = useState<Company[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -74,13 +83,23 @@ export function ArticlesPage() {
     fetchArticles();
     fetchLocations();
     fetchSuppliers();
-  }, [search, sortBy, sortOrder]);
+    fetchCategories();
+  }, [search, sortBy, sortOrder, categoryFilter]);
+
+  // Update category filter from URL params
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    if (categoryParam) {
+      setCategoryFilter(categoryParam);
+    }
+  }, [searchParams]);
 
   const fetchArticles = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
+      if (categoryFilter) params.append('category', categoryFilter);
       params.append('sort_by', sortBy);
       params.append('sort_order', sortOrder);
 
@@ -112,6 +131,27 @@ export function ArticlesPage() {
       setSuppliers(response.data || []);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/categories');
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    }
+  };
+
+  const handleCategoryFilterChange = (value: string | null) => {
+    const newValue = value || '';
+    setCategoryFilter(newValue);
+    
+    // Update URL params
+    if (newValue) {
+      setSearchParams({ category: newValue });
+    } else {
+      setSearchParams({});
     }
   };
 
@@ -207,12 +247,27 @@ export function ArticlesPage() {
       </Group>
 
       <Paper p="md" mb="md">
-        <TextInput
-          placeholder="Search articles..."
-          leftSection={<IconSearch size={16} />}
-          value={search}
-          onChange={(e) => setSearch(e.currentTarget.value)}
-        />
+        <Group>
+          <TextInput
+            placeholder="Search articles..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            style={{ flex: 1 }}
+          />
+          <Select
+            placeholder="Category filter"
+            data={[
+              { value: '', label: 'All Categories' },
+              ...categories.map(c => ({ value: c._id, label: c.name }))
+            ]}
+            value={categoryFilter}
+            onChange={handleCategoryFilterChange}
+            searchable
+            clearable
+            style={{ minWidth: '200px' }}
+          />
+        </Group>
       </Paper>
 
       <Paper p="md" pos="relative">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -9,6 +10,7 @@ import {
   LoadingOverlay,
   Badge,
   Text,
+  Select,
 } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
@@ -33,20 +35,38 @@ interface Stock {
   received_date?: string;
 }
 
+interface Location {
+  _id: string;
+  name: string;
+}
+
 export function StocksPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [locationFilter, setLocationFilter] = useState<string>(searchParams.get('location') || '');
+  const [locations, setLocations] = useState<Location[]>([]);
 
   useEffect(() => {
     fetchStocks();
-  }, [search]);
+    fetchLocations();
+  }, [search, locationFilter]);
+
+  // Update location filter from URL params
+  useEffect(() => {
+    const locationParam = searchParams.get('location');
+    if (locationParam) {
+      setLocationFilter(locationParam);
+    }
+  }, [searchParams]);
 
   const fetchStocks = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
+      if (locationFilter) params.append('location', locationFilter);
 
       const response = await api.get(`/modules/inventory/api/stocks?${params.toString()}`);
       setStocks(response.data.results || []);
@@ -58,6 +78,27 @@ export function StocksPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLocations = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/locations');
+      setLocations(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch locations:', error);
+    }
+  };
+
+  const handleLocationFilterChange = (value: string | null) => {
+    const newValue = value || '';
+    setLocationFilter(newValue);
+    
+    // Update URL params
+    if (newValue) {
+      setSearchParams({ location: newValue });
+    } else {
+      setSearchParams({});
     }
   };
 
@@ -97,12 +138,27 @@ export function StocksPage() {
       </Group>
 
       <Paper p="md" mb="md">
-        <TextInput
-          placeholder="Search stocks..."
-          leftSection={<IconSearch size={16} />}
-          value={search}
-          onChange={(e) => setSearch(e.currentTarget.value)}
-        />
+        <Group>
+          <TextInput
+            placeholder="Search stocks..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            style={{ flex: 1 }}
+          />
+          <Select
+            placeholder="Location filter"
+            data={[
+              { value: '', label: 'All Locations' },
+              ...locations.map(l => ({ value: l._id, label: l.name }))
+            ]}
+            value={locationFilter}
+            onChange={handleLocationFilterChange}
+            searchable
+            clearable
+            style={{ minWidth: '200px' }}
+          />
+        </Group>
       </Paper>
 
       <Paper p="md" pos="relative">

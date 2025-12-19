@@ -61,7 +61,7 @@ class RequestUpdate(BaseModel):
 
 def generate_request_reference(db) -> str:
     """Generate next request reference (REQ-NNNN)"""
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     
     # Find the highest reference number
     last_request = requests_collection.find_one(
@@ -316,7 +316,7 @@ async def list_requests(
 ):
     """List all requests with location names"""
     db = get_db()
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     config = load_config()
     inventree_url = config['inventree']['url'].rstrip('/')
     headers = get_inventree_headers(current_user)
@@ -379,7 +379,7 @@ async def get_request(
     from bson import ObjectId
     
     db = get_db()
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     config = load_config()
     inventree_url = config['inventree']['url'].rstrip('/')
     headers = get_inventree_headers(current_user)
@@ -453,7 +453,7 @@ async def create_request(
 ):
     """Create a new request"""
     db = get_db()
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     
     # Validate source != destination
     if request_data.source == request_data.destination:
@@ -552,7 +552,7 @@ async def update_request(
     from bson import ObjectId
     
     db = get_db()
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     
     try:
         req_obj_id = ObjectId(request_id)
@@ -623,7 +623,7 @@ async def delete_request(
     from bson import ObjectId
     
     db = get_db()
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     
     try:
         req_obj_id = ObjectId(request_id)
@@ -758,7 +758,7 @@ async def sign_request(
     from src.backend.models.approval_flow_model import ApprovalFlowModel
     
     db = get_db()
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     
     # Get approval flow
     flow = db.approval_flows.find_one({
@@ -956,7 +956,7 @@ async def remove_request_signature(
     from bson import ObjectId
     
     db = get_db()
-    requests_collection = db['depo_requests_items']
+    requests_collection = db['depo_requests']
     
     # Get flow
     flow = db.approval_flows.find_one({

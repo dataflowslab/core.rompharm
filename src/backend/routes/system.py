@@ -44,20 +44,22 @@ async def get_currencies():
     Public endpoint - used across multiple modules
     """
     db = get_db()
-    collection = db['depo_currencies']
+    collection = db['currencies']
     
     try:
-        cursor = collection.find().sort('code', 1)
+        cursor = collection.find().sort('abrev', 1)
         currencies = list(cursor)
         
-        # Convert ObjectId to string
+        # Convert ObjectId to string - NO PK FIELD
         for currency in currencies:
             if '_id' in currency:
                 currency['_id'] = str(currency['_id'])
-                currency['pk'] = str(currency['_id'])
         
         return currencies
     except Exception as e:
+        print(f"Error loading currencies: {e}")
+        import traceback
+        traceback.print_exc()
         # Return empty list on error
         return []
 

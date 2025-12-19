@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
+import { ApiSelect } from '../Common/ApiSelect';
 
 interface PurchaseOrderItem {
   pk: number;
@@ -47,10 +48,12 @@ interface PurchaseOrderItem {
 }
 
 interface Part {
-  pk: number;
+  _id: string;
+  pk?: number; // Legacy field, may not exist
   name: string;
   description: string;
-  IPN: string;
+  IPN?: string;
+  ipn?: string; // MongoDB uses lowercase
 }
 
 interface StockLocation {
@@ -74,9 +77,6 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
   const [editItemModalOpened, setEditItemModalOpened] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingItem, setEditingItem] = useState<PurchaseOrderItem | null>(null);
-  const [parts, setParts] = useState<Part[]>([]);
-  const [partSearchQuery, setPartSearchQuery] = useState('');
-  const [loadingParts, setLoadingParts] = useState(false);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [itemSortField, setItemSortField] = useState<keyof PurchaseOrderItem | null>(null);
   const [itemSortDirection, setItemSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -85,7 +85,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
     part: '',
     quantity: 1,
     purchase_price: 0,
-    purchase_price_currency: orderCurrency || 'EUR',
+    purchase_price_currency: orderCurrency || '',
     destination: '',
     reference: '',
     notes: ''
@@ -94,29 +94,11 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
   const [editItemData, setEditItemData] = useState({
     quantity: 1,
     purchase_price: 0,
-    purchase_price_currency: 'EUR',
+    purchase_price_currency: '',
     destination: '',
     reference: '',
     notes: ''
   });
-
-  const loadParts = async (search: string) => {
-    if (search.length < 2) {
-      setParts([]);
-      return;
-    }
-    
-    setLoadingParts(true);
-    try {
-      const response = await api.get(`${procurementApi.getParts()}?search=${encodeURIComponent(search)}`);
-      setParts(response.data.results || response.data || []);
-    } catch (error) {
-      console.error('Failed to load parts:', error);
-      setParts([]);
-    } finally {
-      setLoadingParts(false);
-    }
-  };
 
   const handleAddItem = async () => {
     if (!newItemData.part) {
@@ -131,11 +113,11 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
     setSubmitting(true);
     try {
       const payload = {
-        part: parseInt(newItemData.part),
+        part_id: newItemData.part, // MongoDB ObjectId as string
         quantity: newItemData.quantity,
         purchase_price: newItemData.purchase_price || undefined,
         purchase_price_currency: newItemData.purchase_price_currency || undefined,
-        destination: newItemData.destination ? parseInt(newItemData.destination) : undefined,
+        destination_id: newItemData.destination || undefined, // MongoDB ObjectId as string
         reference: newItemData.reference || undefined,
         notes: newItemData.notes || undefined
       };
@@ -152,7 +134,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
         part: '',
         quantity: 1,
         purchase_price: 0,
-        purchase_price_currency: orderCurrency || 'EUR',
+        purchase_price_currency: orderCurrency || '',
         destination: '',
         reference: '',
         notes: ''
@@ -430,25 +412,18 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
       >
         <Grid>
           <Grid.Col span={12}>
-            <Select
+            <ApiSelect
               label={t('Part')}
-              placeholder={t('Type at least 2 characters to search...')}
-              data={parts.map(p => ({ 
-                value: String(p.pk), 
-                label: `${p.name} ${p.IPN ? `(${p.IPN})` : ''}` 
-              }))}
+              endpoint={procurementApi.getParts()}
               value={newItemData.part}
               onChange={(value) => setNewItemData({ ...newItemData, part: value || '' })}
-              onSearchChange={(query) => {
-                setPartSearchQuery(query);
-                if (query.length >= 2) {
-                  loadParts(query);
-                }
-              }}
-              searchValue={partSearchQuery}
+              valueField="_id"
+              labelFormat={(item) => `${item.name} ${(item.IPN || item.ipn) ? `(${item.IPN || item.ipn})` : ''}`}
               searchable
+              searchParam="search"
+              dataPath="results"
+              placeholder={t('Type at least 2 characters to search...')}
               required
-              nothingFoundMessage={partSearchQuery.length < 2 ? t('Type at least 2 characters') : loadingParts ? t('Loading...') : t('No parts found')}
             />
           </Grid.Col>
 
@@ -477,25 +452,29 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
           </Grid.Col>
 
           <Grid.Col span={6}>
-            <Select
+            <ApiSelect
               label={t('Currency')}
-              data={['EUR', 'USD', 'RON', 'GBP']}
+              endpoint="/api/currencies"
               value={newItemData.purchase_price_currency}
-              onChange={(value) => setNewItemData({ ...newItemData, purchase_price_currency: value || 'EUR' })}
+              onChange={(value) => setNewItemData({ ...newItemData, purchase_price_currency: value || '' })}
+              valueField="_id"
+              labelFormat={(item) => item.abrev ? `${item.name} (${item.abrev})` : item.name}
+              searchable
+              placeholder={t('Select currency')}
             />
           </Grid.Col>
 
           <Grid.Col span={6}>
-            <Select
+            <ApiSelect
               label={t('Destination')}
-              placeholder={t('Select stock location')}
-              data={stockLocations
-                .filter(loc => loc.pk != null && loc.pk !== undefined)
-                .map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              endpoint="/modules/inventory/api/locations"
               value={newItemData.destination}
               onChange={(value) => setNewItemData({ ...newItemData, destination: value || '' })}
+              valueField="_id"
+              labelField="name"
               searchable
               clearable
+              placeholder={t('Select stock location')}
             />
           </Grid.Col>
 
@@ -563,25 +542,29 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
           </Grid.Col>
 
           <Grid.Col span={6}>
-            <Select
+            <ApiSelect
               label={t('Currency')}
-              data={['EUR', 'USD', 'RON', 'GBP']}
+              endpoint="/api/currencies"
               value={editItemData.purchase_price_currency}
-              onChange={(value) => setEditItemData({ ...editItemData, purchase_price_currency: value || 'EUR' })}
+              onChange={(value) => setEditItemData({ ...editItemData, purchase_price_currency: value || '' })}
+              valueField="_id"
+              labelFormat={(item) => item.abrev ? `${item.name} (${item.abrev})` : item.name}
+              searchable
+              placeholder={t('Select currency')}
             />
           </Grid.Col>
 
           <Grid.Col span={6}>
-            <Select
+            <ApiSelect
               label={t('Destination')}
-              placeholder={t('Select stock location')}
-              data={stockLocations
-                .filter(loc => loc.pk != null && loc.pk !== undefined)
-                .map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              endpoint="/modules/inventory/api/locations"
               value={editItemData.destination}
               onChange={(value) => setEditItemData({ ...editItemData, destination: value || '' })}
+              valueField="_id"
+              labelField="name"
               searchable
               clearable
+              placeholder={t('Select stock location')}
             />
           </Grid.Col>
 

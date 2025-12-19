@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   Modal,
-  Select,
-  TextInput,
-  NumberInput,
-  Textarea,
   Button,
   Group,
 } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
 import { api } from '../services/api';
+import { ReceiveStockForm, ReceiveStockFormData } from './Common/ReceiveStockForm';
 
 interface AddStockModalProps {
   opened: boolean;
@@ -30,92 +26,100 @@ export function AddStockModal({
   fixedArticleIpn,
 }: AddStockModalProps) {
   const [loading, setLoading] = useState(false);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [stockStatuses, setStockStatuses] = useState<any[]>([]);
-  const [currencies, setCurrencies] = useState<any[]>([]);
-  const [articles, setArticles] = useState<any[]>([]);
+  const [stockStatuses, setStockStatuses] = useState<Array<{ value: string; label: string }>>([]);
+  const [locations, setLocations] = useState<Array<{ value: string; label: string }>>([]);
   
-  const [formData, setFormData] = useState({
-    supplier_id: '',
+  const [formData, setFormData] = useState<ReceiveStockFormData>({
     part_id: fixedArticleId || '',
     quantity: 0,
+    location: '',
     batch_code: '',
     supplier_batch_code: '',
-    batch_date: null as Date | null,
-    expiry_date: null as Date | null,
-    status: '',
-    purchase_price: 0,
-    currency_id: '',
+    serial_numbers: '',
+    packaging: '',
+    status: '65', // Quarantine by default
     notes: '',
+    manufacturing_date: null,
+    expected_quantity: 0,
+    expiry_date: null,
+    reset_date: null,
+    use_expiry: true,
+    containers: [],
+    containers_cleaned: false,
+    supplier_ba_no: '',
+    supplier_ba_date: null,
+    accord_ba: false,
+    is_list_supplier: false,
+    clean_transport: false,
+    temperature_control: false,
+    temperature_conditions_met: false,
   });
 
   useEffect(() => {
     if (opened) {
-      fetchSuppliers();
       fetchStockStatuses();
-      fetchCurrencies();
-      if (!fixedArticleId) {
-        fetchArticles();
-      }
+      fetchLocations();
       
       // Reset form when modal opens
       setFormData({
-        supplier_id: '',
         part_id: fixedArticleId || '',
         quantity: 0,
+        location: '',
         batch_code: '',
         supplier_batch_code: '',
-        batch_date: null,
-        expiry_date: null,
-        status: '',
-        purchase_price: 0,
-        currency_id: '',
+        serial_numbers: '',
+        packaging: '',
+        status: '65',
         notes: '',
+        manufacturing_date: null,
+        expected_quantity: 0,
+        expiry_date: null,
+        reset_date: null,
+        use_expiry: true,
+        containers: [],
+        containers_cleaned: false,
+        supplier_ba_no: '',
+        supplier_ba_date: null,
+        accord_ba: false,
+        is_list_supplier: false,
+        clean_transport: false,
+        temperature_control: false,
+        temperature_conditions_met: false,
       });
     }
   }, [opened, fixedArticleId]);
 
-  const fetchSuppliers = async () => {
-    try {
-      const response = await api.get('/modules/inventory/api/companies?is_supplier=true');
-      setSuppliers(response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch suppliers:', error);
-    }
-  };
-
   const fetchStockStatuses = async () => {
     try {
-      const response = await api.get('/api/depo_stocks_states');
-      setStockStatuses(response.data || []);
+      const response = await api.get('/modules/depo_procurement/api/stock-statuses');
+      const statuses = response.data.statuses || response.data || [];
+      setStockStatuses(statuses.map((s: any) => ({ 
+        value: String(s.value), 
+        label: s.name || s.label 
+      })));
     } catch (error) {
       console.error('Failed to fetch stock statuses:', error);
     }
   };
 
-  const fetchCurrencies = async () => {
+  const fetchLocations = async () => {
     try {
-      const response = await api.get('/api/currencies');
-      setCurrencies(response.data || []);
+      const response = await api.get('/modules/inventory/api/locations');
+      const locs = response.data || [];
+      setLocations(locs.map((loc: any) => ({ 
+        value: loc._id, 
+        label: loc.name 
+      })));
     } catch (error) {
-      console.error('Failed to fetch currencies:', error);
-    }
-  };
-
-  const fetchArticles = async () => {
-    try {
-      const response = await api.get('/modules/inventory/api/articles');
-      setArticles(response.data.results || []);
-    } catch (error) {
-      console.error('Failed to fetch articles:', error);
+      console.error('Failed to fetch locations:', error);
     }
   };
 
   const handleSubmit = async () => {
-    if (!formData.part_id || !formData.quantity || !formData.batch_code) {
+    if (!formData.part_id || !formData.quantity || !formData.location) {
       notifications.show({
         title: 'Validation Error',
-        message: 'Please fill in all required fields',
+        message: 'Please fill in all required fields (Article, Quantity, Location)',
         color: 'red',
       });
       return;
@@ -123,11 +127,42 @@ export function AddStockModal({
 
     setLoading(true);
     try {
-      await api.post('/modules/inventory/api/stocks', {
-        ...formData,
-        batch_date: formData.batch_date?.toISOString(),
-        expiry_date: formData.expiry_date?.toISOString(),
-      });
+      // Create stock item
+      const stockPayload = {
+        part_id: formData.part_id,
+        quantity: formData.quantity,
+        location_id: formData.location,
+        batch_code: formData.batch_code || undefined,
+        supplier_batch_code: formData.supplier_batch_code || undefined,
+        status: parseInt(formData.status),
+        notes: formData.notes || undefined,
+      };
+
+      const stockResponse = await api.post('/modules/inventory/api/stocks', stockPayload);
+      const stockItemId = stockResponse.data?._id || stockResponse.data?.id;
+
+      // Save extra data if stock item was created
+      if (stockItemId) {
+        const extraDataPayload = {
+          stock_item_id: stockItemId,
+          supplier_batch_code: formData.supplier_batch_code || null,
+          manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : null,
+          expected_quantity: formData.expected_quantity || null,
+          expiry_date: formData.use_expiry && formData.expiry_date ? formData.expiry_date.toISOString().split('T')[0] : null,
+          reset_date: !formData.use_expiry && formData.reset_date ? formData.reset_date.toISOString().split('T')[0] : null,
+          containers: formData.containers.length > 0 ? formData.containers : null,
+          containers_cleaned: formData.containers_cleaned,
+          supplier_ba_no: formData.supplier_ba_no || null,
+          supplier_ba_date: formData.supplier_ba_date ? formData.supplier_ba_date.toISOString().split('T')[0] : null,
+          accord_ba: formData.accord_ba,
+          is_list_supplier: formData.is_list_supplier,
+          clean_transport: formData.clean_transport,
+          temperature_control: formData.temperature_control,
+          temperature_conditions_met: formData.temperature_control ? formData.temperature_conditions_met : null,
+        };
+
+        await api.post('/modules/depo_procurement/api/stock-extra-data', extraDataPayload);
+      }
       
       notifications.show({
         title: 'Success',
@@ -153,118 +188,23 @@ export function AddStockModal({
       opened={opened}
       onClose={onClose}
       title="Add Stock"
-      size="lg"
+      size="xl"
+      centered
+      styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
     >
-      <Select
-        label="Supplier"
-        placeholder="Select supplier"
-        data={suppliers.map((sup) => ({ value: sup._id, label: sup.name }))}
-        value={formData.supplier_id}
-        onChange={(value) => setFormData({ ...formData, supplier_id: value || '' })}
-        searchable
-        mb="sm"
+      <ReceiveStockForm
+        formData={formData}
+        onChange={setFormData}
+        fixedArticle={fixedArticleId ? {
+          id: fixedArticleId,
+          name: fixedArticleName || '',
+          ipn: fixedArticleIpn || '',
+        } : undefined}
+        locations={locations}
+        stockStatuses={stockStatuses}
       />
 
-      {fixedArticleId ? (
-        <TextInput
-          label="Article"
-          value={`${fixedArticleName} (${fixedArticleIpn})`}
-          disabled
-          mb="sm"
-        />
-      ) : (
-        <Select
-          label="Article"
-          placeholder="Select article"
-          data={articles.map((art) => ({ value: art._id, label: `${art.name} (${art.ipn})` }))}
-          value={formData.part_id}
-          onChange={(value) => setFormData({ ...formData, part_id: value || '' })}
-          searchable
-          required
-          mb="sm"
-        />
-      )}
-
-      <NumberInput
-        label="Quantity"
-        placeholder="0"
-        required
-        value={formData.quantity}
-        onChange={(value) => setFormData({ ...formData, quantity: Number(value) || 0 })}
-        mb="sm"
-      />
-
-      <TextInput
-        label="Batch Code"
-        placeholder="Batch code"
-        required
-        value={formData.batch_code}
-        onChange={(e) => setFormData({ ...formData, batch_code: e.currentTarget.value })}
-        mb="sm"
-      />
-
-      <TextInput
-        label="Supplier Batch Code"
-        placeholder="Supplier batch code"
-        value={formData.supplier_batch_code}
-        onChange={(e) => setFormData({ ...formData, supplier_batch_code: e.currentTarget.value })}
-        mb="sm"
-      />
-
-      <DatePickerInput
-        label="Batch Date"
-        placeholder="Select date"
-        value={formData.batch_date}
-        onChange={(value) => setFormData({ ...formData, batch_date: value })}
-        mb="sm"
-      />
-
-      <DatePickerInput
-        label="Expiry Date"
-        placeholder="Select date"
-        value={formData.expiry_date}
-        onChange={(value) => setFormData({ ...formData, expiry_date: value })}
-        mb="sm"
-      />
-
-      <Select
-        label="Status"
-        placeholder="Select status"
-        data={stockStatuses.map((status) => ({ value: status.value, label: status.name }))}
-        value={formData.status}
-        onChange={(value) => setFormData({ ...formData, status: value || '' })}
-        mb="sm"
-      />
-
-      <NumberInput
-        label="Purchase Price"
-        placeholder="0.00"
-        value={formData.purchase_price}
-        onChange={(value) => setFormData({ ...formData, purchase_price: Number(value) || 0 })}
-        decimalScale={2}
-        mb="sm"
-      />
-
-      <Select
-        label="Currency"
-        placeholder="Select currency"
-        data={currencies.map((curr) => ({ value: curr._id, label: curr.name }))}
-        value={formData.currency_id}
-        onChange={(value) => setFormData({ ...formData, currency_id: value || '' })}
-        searchable
-        mb="sm"
-      />
-
-      <Textarea
-        label="Notes"
-        placeholder="Additional notes"
-        value={formData.notes}
-        onChange={(e) => setFormData({ ...formData, notes: e.currentTarget.value })}
-        rows={3}
-        mb="md"
-      />
-
-      <Group justify="flex-end">
+      <Group justify="flex-end" mt="md">
         <Button variant="default" onClick={onClose}>
           Cancel
         </Button>
