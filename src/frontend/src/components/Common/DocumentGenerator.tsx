@@ -216,6 +216,26 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
     const doc = documents[templateCode];
     if (!doc) return;
 
+    console.log('[DocumentGenerator] Attempting download:', {
+      templateCode,
+      job_id: doc.job_id,
+      status: doc.status,
+      filename: doc.filename
+    });
+
+    // Check status before download
+    if (doc.status !== 'done' && doc.status !== 'completed') {
+      console.warn('[DocumentGenerator] Document not ready for download:', doc.status);
+      notifications.show({
+        title: t('Warning'),
+        message: `Document not ready. Status: ${doc.status}`,
+        color: 'orange'
+      });
+      // Try to refresh status
+      await checkStatus(templateCode, doc.job_id);
+      return;
+    }
+
     try {
       const response = await api.get(`/api/documents/${doc.job_id}/download`, {
         responseType: 'blob'
@@ -236,7 +256,8 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
         color: 'green'
       });
     } catch (error: any) {
-      console.error('Failed to download document:', error);
+      console.error('[DocumentGenerator] Failed to download document:', error);
+      console.error('[DocumentGenerator] Error response:', error.response?.data);
       notifications.show({
         title: t('Error'),
         message: error.response?.data?.detail || t('Failed to download document'),
