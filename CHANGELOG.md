@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.11] - 2024-12-21
+
+### Fixed
+- **Stock State Storage**: Fixed stock creation to save `state_id` (ObjectId) instead of `status` (value)
+  - **Problem**: Stocks were saved with `status: 10` (value) instead of `state_id: ObjectId("...")` 
+  - **Impact**: Status badges displayed "10" instead of "Rejected" because backend couldn't find `state_id` to enrich with `status_detail`
+  - **Solution**: Backend now converts status value to `state_id` before saving
+  - **Process**:
+    1. Receives status value (e.g., 65 for Quarantine)
+    2. Looks up state in `depo_stocks_states` collection by value
+    3. Saves `state_id` (ObjectId) to `depo_stocks` collection
+    4. Falls back to Quarantine state if value not found
+  - **Applies to**:
+    - ✅ Inventory > Articles > Add Stock
+    - ✅ Procurement > Receive Stock (uses same logic)
+
+### Technical
+- Modified `modules/inventory/routes.py` `create_stock()` endpoint:
+  - Added lookup to `depo_stocks_states` collection to find state by value
+  - Changed from `'status': stock_data.status` to `'state_id': state['_id']`
+  - Added fallback to Quarantine state if status value not found
+  - Added `received_date` field for consistency
+- All new stocks now properly saved with `state_id` for correct status display
+- Existing stocks with old `status` field will need migration (manual update)
+
 ## [1.18.10] - 2024-12-21
 
 ### Fixed

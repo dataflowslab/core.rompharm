@@ -1305,6 +1305,17 @@ async def create_stock(
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
     
+    # Find state_id from depo_stocks_states based on status value
+    states_collection = db['depo_stocks_states']
+    status_value = stock_data.status or 65
+    state = states_collection.find_one({'value': status_value})
+    
+    if not state:
+        # Fallback: try to find Quarantine state
+        state = states_collection.find_one({'name': {'$regex': 'quarantin', '$options': 'i'}})
+        if not state:
+            raise HTTPException(status_code=400, detail=f"Stock state with value {status_value} not found")
+    
     # Build stock document with all fields
     doc = {
         'part_id': ObjectId(stock_data.part_id),
@@ -1312,8 +1323,9 @@ async def create_stock(
         'location_id': ObjectId(stock_data.location_id),
         'batch_code': stock_data.batch_code or '',
         'supplier_batch_code': stock_data.supplier_batch_code or '',
-        'status': stock_data.status or 65,
+        'state_id': state['_id'],  # Save state_id instead of status value
         'notes': stock_data.notes or '',
+        'received_date': datetime.utcnow(),
         'created_at': datetime.utcnow(),
         'updated_at': datetime.utcnow(),
         'created_by': current_user.get('username', 'system'),
