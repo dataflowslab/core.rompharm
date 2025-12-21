@@ -66,11 +66,18 @@ export function QCTab({ stockId, stock, onUpdate }: QCTabProps) {
   const fetchStockStatuses = async () => {
     try {
       const response = await api.get('/modules/depo_procurement/api/stock-statuses');
-      const statuses = response.data.map((status: any) => ({
+      
+      // Handle both array and object responses
+      const statusesArray = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.statuses || response.data.results || []);
+      
+      const statuses = statusesArray.map((status: any) => ({
         value: status._id,
         label: status.name,
         color: status.color || 'gray',
       }));
+      
       setStockStatuses(statuses);
     } catch (error: any) {
       console.error('Failed to fetch stock statuses:', error);

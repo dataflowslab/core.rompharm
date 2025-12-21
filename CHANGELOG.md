@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.20] - 2024-12-21
+
+### Fixed
+- **QC Tab Stock Statuses Loading**: Fixed stock statuses not appearing in QC tab dropdown
+  - **Problem**: TypeError `.map is not a function` - backend returns object with `statuses` property, not direct array
+  - **Solution**: Added flexible response handling to check if `response.data` is array or object with `statuses`/`results` property
+  - Status dropdown now loads correctly with colored badges in QC tab
+
+### Technical
+- Modified `QCTab.tsx` `fetchStockStatuses()`:
+  - Added check: `Array.isArray(response.data) ? response.data : (response.data.statuses || response.data.results || [])`
+  - Handles both array responses and object responses with nested arrays
+  - Prevents TypeError when backend response structure varies
+
+### Note
+- PUT endpoint `/modules/inventory/api/stocks/{stock_id}` still needs to be implemented for QC tab save functionality
+
 ## [1.18.19] - 2024-12-21
 
 ### Fixed
