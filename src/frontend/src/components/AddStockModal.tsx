@@ -116,14 +116,20 @@ export function AddStockModal({
       
       setStockStatuses(mappedStatuses);
       
-      // Set default status to "Quarantined" if available
+      // Set default status to "Quarantined" if available - always set when modal opens
       const quarantinedStatus = mappedStatuses.find((s: any) => 
         s.label.toLowerCase().includes('quarantin')
       );
       
-      if (quarantinedStatus && !formData.status) {
+      if (quarantinedStatus) {
         console.log('Setting default status to Quarantined:', quarantinedStatus.value);
         setFormData(prev => ({ ...prev, status: quarantinedStatus.value }));
+      } else {
+        // Fallback to first status if Quarantined not found
+        if (mappedStatuses.length > 0) {
+          console.log('Quarantined not found, using first status:', mappedStatuses[0].value);
+          setFormData(prev => ({ ...prev, status: mappedStatuses[0].value }));
+        }
       }
     } catch (error) {
       console.error('Failed to fetch stock statuses:', error);

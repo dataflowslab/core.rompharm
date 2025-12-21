@@ -158,6 +158,27 @@ export function ReceiveStockForm({
         </Grid.Col>
       )}
 
+      {/* Supplier Field - readonly if from procurement, selectable if from inventory - MOVED TO TOP */}
+      <Grid.Col span={12}>
+        {fixedSupplier ? (
+          <TextInput
+            label={t('Supplier')}
+            value={fixedSupplier.name}
+            disabled
+          />
+        ) : (
+          <Select
+            label={t('Supplier')}
+            placeholder={t('Select supplier')}
+            data={suppliers}
+            value={formData.supplier_id}
+            onChange={(value) => updateField('supplier_id', value || '')}
+            searchable
+            clearable
+          />
+        )}
+      </Grid.Col>
+
       {/* Row 1: Received Quantity, Expected Quantity, Supplier U.M. (3 columns) */}
       <Grid.Col span={4}>
         <NumberInput
@@ -216,27 +237,6 @@ export function ReceiveStockForm({
           value={formData.status}
           onChange={(value) => updateField('status', value || '65')}
         />
-      </Grid.Col>
-
-      {/* Supplier Field - readonly if from procurement, selectable if from inventory */}
-      <Grid.Col span={12}>
-        {fixedSupplier ? (
-          <TextInput
-            label={t('Supplier')}
-            value={fixedSupplier.name}
-            disabled
-          />
-        ) : (
-          <Select
-            label={t('Supplier')}
-            placeholder={t('Select supplier')}
-            data={suppliers}
-            value={formData.supplier_id}
-            onChange={(value) => updateField('supplier_id', value || '')}
-            searchable
-            clearable
-          />
-        )}
       </Grid.Col>
 
       {/* Batch Codes */}

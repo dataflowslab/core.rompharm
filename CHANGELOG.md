@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.13] - 2024-12-21
+
+### Changed
+- **Supplier Field Position**: Moved Supplier field to top of Add/Receive Stock form
+  - Now appears immediately after Article/Line Item selection
+  - Better visibility and logical flow (Supplier → Quantities → Location/Status → Details)
+  - Previous position was after Location/Status fields
+
+### Fixed
+- **Default Status Selection**: Fixed Quarantined status not being set as default
+  - **Problem**: Status was being set to first status in list (Rejected) instead of Quarantined
+  - **Cause**: Logic checked `!formData.status` but empty string `''` is falsy, causing condition to fail after form reset
+  - **Solution**: Always set Quarantined status when statuses are loaded, regardless of current value
+  - **Fallback**: If Quarantined not found, uses first status in list
+  - Status now correctly defaults to "Quarantined" when Add Stock modal opens
+
+### Technical
+- Modified `ReceiveStockForm.tsx`:
+  - Moved Supplier field from after Location/Status to immediately after Article/Line Item
+  - Removed duplicate Supplier field that was left after reorganization
+- Modified `AddStockModal.tsx` `fetchStockStatuses()`:
+  - Removed `!formData.status` condition check
+  - Always sets Quarantined status when found in status list
+  - Added fallback to first status if Quarantined not found
+  - Improved console logging for debugging
+
 ## [1.18.12] - 2024-12-21
 
 ### Added
