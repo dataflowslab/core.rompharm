@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-21 23:35:06
+**Last Updated:** 2025-12-21 23:47:42
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -59,13 +59,12 @@
 - `GET /api/data/{form_id}` - Get all submissions for a form (requires administrator access)
 
 ### Documents
-- `GET /api/documents/for/{object_id}` - Get all documents for an object (by object_id)
-- `POST /api/documents/generate` - Universal document generation - template determines the type
-- `GET /api/documents/job/{job_id}/status` - Check job status by job_id
+- `GET /api/documents/for/{object_id}` - Get all documents for an object
+- `POST /api/documents/generate` - Generate document - returns only job_id
+- `GET /api/documents/job/{job_id}/status` - Check job status
 - `GET /api/documents/templates` - Get all available templates
-- `DELETE /api/documents/{document_id}` - Delete document by document_id
-- `GET /api/documents/{document_id}` - Get document info by document_id
-- `GET /api/documents/{document_id}/download` - Download document by document_id
+- `DELETE /api/documents/{job_id}` - Delete document by job_id
+- `GET /api/documents/{job_id}/download` - Download document by job_id
 
 ### Forms
 - `GET /api/forms/` - List all forms (requires administrator access)
@@ -147,6 +146,7 @@
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/attachments` - Get attachments for a purchase order
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/attachments` - Upload an attachment to a purchase order
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/attachments/{attachment_id}` - Delete an attachment from a purchase order
+- `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}/documents` - Update documents field in purchase order
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/items` - Get items for a purchase order
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/items` - Add an item to a purchase order
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_id}` - Delete an item from a purchase order by item _id

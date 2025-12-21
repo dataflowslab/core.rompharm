@@ -36,6 +36,8 @@ export function DocumentGenerator({ objectId, templateCodes, onDocumentsChange }
   const loadTemplates = async () => {
     try {
       const response = await api.get('/api/documents/templates');
+      console.log('[DocumentGenerator] Templates from API:', response.data);
+      
       const templatesMap: Record<string, { code: string; name: string }> = {};
       
       response.data.forEach((template: any) => {
@@ -47,9 +49,30 @@ export function DocumentGenerator({ objectId, templateCodes, onDocumentsChange }
         }
       });
       
+      console.log('[DocumentGenerator] Filtered templates:', templatesMap);
+      console.log('[DocumentGenerator] Requested codes:', templateCodes);
+      
+      // Fallback: if template not found in API, use code as name
+      templateCodes.forEach(code => {
+        if (!templatesMap[code]) {
+          console.warn(`[DocumentGenerator] Template ${code} not found in API, using fallback`);
+          templatesMap[code] = {
+            code: code,
+            name: code
+          };
+        }
+      });
+      
       setTemplates(templatesMap);
     } catch (error) {
-      console.error('Failed to load templates:', error);
+      console.error('[DocumentGenerator] Failed to load templates:', error);
+      
+      // Fallback: use template codes as names
+      const fallbackMap: Record<string, { code: string; name: string }> = {};
+      templateCodes.forEach(code => {
+        fallbackMap[code] = { code, name: code };
+      });
+      setTemplates(fallbackMap);
     }
   };
 
