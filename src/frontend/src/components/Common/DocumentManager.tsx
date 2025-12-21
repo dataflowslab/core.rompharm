@@ -102,9 +102,8 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
         }
       }
       
-      // Generate new document using global endpoint
+      // Generate new document - template determines the type
       const response = await api.post(`/api/documents/generate`, {
-        object_type: entityType,
         object_id: entityId,
         template_code: template.code,
         template_name: template.name,

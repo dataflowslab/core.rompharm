@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-21 23:13:29
+**Last Updated:** 2025-12-21 23:17:48
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -59,10 +59,10 @@
 - `GET /api/data/{form_id}` - Get all submissions for a form (requires administrator access)
 
 ### Documents
-- `POST /api/documents/generate` - Universal document generation endpoint
+- `GET /api/documents/for/{object_id}` - Get all documents for an object (by object_id)
+- `POST /api/documents/generate` - Universal document generation
 - `GET /api/documents/job/{job_id}/status` - Check job status by job_id
-- `GET /api/documents/object/{object_type}/{object_id}` - Get all documents for an object (procurement order, stock request, etc.)
-- `GET /api/documents/templates` - Get available templates
+- `GET /api/documents/templates` - Get available templates, optionally filtered by object_type
 - `DELETE /api/documents/{document_id}` - Delete document by document_id
 - `GET /api/documents/{document_id}` - Get document info by document_id
 - `GET /api/documents/{document_id}/download` - Download document by document_id

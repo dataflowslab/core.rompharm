@@ -19,18 +19,14 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
 class GenerateDocumentRequest(BaseModel):
-    object_type: str  # 'procurement_order', 'stock_request', etc.
     object_id: str  # MongoDB ObjectId as string
     template_code: str
     template_name: str
 
 
 @router.get("/templates")
-async def get_templates(
-    object_type: Optional[str] = None,
-    user = Depends(verify_token)
-):
-    """Get available templates, optionally filtered by object_type"""
+async def get_templates(user = Depends(verify_token)):
+    """Get all available templates"""
     try:
         db = get_db()
         client = DataFlowsDocuClient()
@@ -40,22 +36,32 @@ async def get_templates(
         
         config_collection = db['config']
         
-        # Get templates based on object_type or all
-        if object_type == 'procurement_order':
-            config = config_collection.find_one({'slug': 'procurement_order'})
-            template_codes = config.get('items', []) if config else []
-        elif object_type == 'stock_request':
-            config = config_collection.find_one({'slug': 'stock_request'})
-            template_codes = config.get('items', []) if config else []
-        else:
-            config = config_collection.find_one({'slug': 'docu_templates'})
-            template_codes = config.get('templates', []) if config else []
+        # Get all template codes from all configs
+        all_template_codes = []
         
-        if not template_codes:
+        # Procurement templates
+        procurement_config = config_collection.find_one({'slug': 'procurement_order'})
+        if procurement_config:
+            all_template_codes.extend(procurement_config.get('items', []))
+        
+        # Stock request templates
+        stock_request_config = config_collection.find_one({'slug': 'stock_request'})
+        if stock_request_config:
+            all_template_codes.extend(stock_request_config.get('items', []))
+        
+        # General templates
+        general_config = config_collection.find_one({'slug': 'docu_templates'})
+        if general_config:
+            all_template_codes.extend(general_config.get('templates', []))
+        
+        # Remove duplicates
+        all_template_codes = list(set(all_template_codes))
+        
+        if not all_template_codes:
             return []
         
         templates = []
-        for code in template_codes:
+        for code in all_template_codes:
             template = client.get_template(code)
             if template:
                 name = code
@@ -77,8 +83,8 @@ async def generate_document(
     request: GenerateDocumentRequest,
     user = Depends(verify_token)
 ):
-    """Universal document generation"""
-    print(f"[DOCUMENT] Generate: type={request.object_type}, id={request.object_id}, template={request.template_code}")
+    """Universal document generation - template determines the type"""
+    print(f"[DOCUMENT] Generate: object_id={request.object_id}, template={request.template_code}")
     
     db = get_db()
     
@@ -87,13 +93,16 @@ async def generate_document(
     except:
         raise HTTPException(status_code=400, detail="Invalid object ID")
     
-    # Route to appropriate handler
-    if request.object_type == 'procurement_order':
+    # Determine object type by checking which collection has this object_id
+    # Try procurement order first
+    if db['depo_purchase_orders'].find_one({'_id': object_obj_id}):
         return await _generate_procurement_order_document(db, object_obj_id, request, user)
-    elif request.object_type == 'stock_request':
+    
+    # Try stock request
+    if db['depo_requests'].find_one({'_id': object_obj_id}):
         return await _generate_stock_request_document(db, object_obj_id, request, user)
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported object type: {request.object_type}")
+    
+    raise HTTPException(status_code=404, detail="Object not found")
 
 
 @router.get("/{document_id}")
