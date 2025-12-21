@@ -144,56 +144,58 @@ async def create_new_purchase_order(order_data, current_user):
         doc['_id'] = result.inserted_id
         order_id = str(result.inserted_id)
         
-        # Auto-create approval flow based on config
+        # Auto-create approval flow based on approval_templates
         try:
-            config_collection = db['config']
-            approval_config = config_collection.find_one({'slug': 'procurement_approval_flows'})
+            templates_collection = db['approval_templates']
+            approval_template = templates_collection.find_one({
+                'object_type': 'procurement_order',
+                'active': True
+            })
             
-            if approval_config and 'items' in approval_config:
-                # Get the referate flow config (first item with slug='referate')
-                flow_config = None
-                for item in approval_config.get('items', []):
-                    if item.get('slug') == 'referate' and item.get('enabled', True):
-                        flow_config = item
-                        break
+            if approval_template:
+                officers = approval_template.get('officers', [])
                 
-                if flow_config:
-                    # Build can_sign list
-                    can_sign_officers = []
-                    for user in flow_config.get('can_sign', []):
-                        can_sign_officers.append({
-                            "type": "person",
-                            "reference": user.get('user_id'),
-                            "username": user.get('username'),
-                            "action": "can_sign"
-                        })
-                    
-                    # Build must_sign list
-                    must_sign_officers = []
-                    for user in flow_config.get('must_sign', []):
-                        must_sign_officers.append({
-                            "type": "person",
-                            "reference": user.get('user_id'),
-                            "username": user.get('username'),
-                            "action": "must_sign"
-                        })
-                    
-                    flow_data = {
-                        "object_type": "procurement_order",
-                        "object_source": "depo_procurement",
-                        "object_id": order_id,
-                        "config_slug": flow_config.get('slug'),
-                        "min_signatures": flow_config.get('min_signatures', 1),
-                        "required_officers": must_sign_officers,
-                        "optional_officers": can_sign_officers,
-                        "signatures": [],
-                        "status": "pending",
-                        "created_at": datetime.utcnow(),
-                        "updated_at": datetime.utcnow()
+                # Separate officers by action type
+                required_officers = []
+                optional_officers = []
+                
+                for officer in officers:
+                    officer_data = {
+                        "type": officer.get('type'),
+                        "reference": officer.get('reference'),
+                        "action": officer.get('action'),
+                        "order": officer.get('order', 0)
                     }
                     
-                    db['approval_flows'].insert_one(flow_data)
-                    print(f"[PROCUREMENT] Auto-created approval flow for order {order_id}")
+                    if officer.get('action') == 'must_sign':
+                        required_officers.append(officer_data)
+                    elif officer.get('action') == 'can_sign':
+                        optional_officers.append(officer_data)
+                
+                # Sort by order
+                required_officers.sort(key=lambda x: x.get('order', 0))
+                optional_officers.sort(key=lambda x: x.get('order', 0))
+                
+                # Count minimum signatures (number of must_sign officers)
+                min_signatures = len(required_officers)
+                
+                flow_data = {
+                    "object_type": "procurement_order",
+                    "object_source": "depo_procurement",
+                    "object_id": order_id,
+                    "template_id": str(approval_template['_id']),
+                    "template_name": approval_template.get('name'),
+                    "min_signatures": min_signatures,
+                    "required_officers": required_officers,
+                    "optional_officers": optional_officers,
+                    "signatures": [],
+                    "status": "pending",
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+                
+                db['approval_flows'].insert_one(flow_data)
+                print(f"[PROCUREMENT] Auto-created approval flow for order {order_id} using template: {approval_template.get('name')}")
         except Exception as e:
             print(f"[PROCUREMENT] Warning: Failed to auto-create approval flow: {e}")
             # Don't fail the order creation if approval flow creation fails

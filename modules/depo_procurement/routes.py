@@ -415,7 +415,7 @@ async def create_order_approval_flow(
     order_id: str,
     current_user: dict = Depends(verify_token)
 ):
-    """Create approval flow for a purchase order using config from MongoDB"""
+    """Create approval flow for a purchase order using approval_templates"""
     db = get_db()
     
     existing = db.approval_flows.find_one({
@@ -426,47 +426,51 @@ async def create_order_approval_flow(
     if existing:
         raise HTTPException(status_code=400, detail="Approval flow already exists for this order")
     
-    config_collection = db['config']
-    approval_config = config_collection.find_one({'slug': 'procurement_approval_flows'})
+    # Get approval template
+    templates_collection = db['approval_templates']
+    approval_template = templates_collection.find_one({
+        'object_type': 'procurement_order',
+        'active': True
+    })
     
-    if not approval_config or 'items' not in approval_config:
-        raise HTTPException(status_code=404, detail="No procurement approval flow configuration found")
+    if not approval_template:
+        raise HTTPException(status_code=404, detail="No active approval template found for procurement orders")
     
-    flow_config = None
-    for item in approval_config.get('items', []):
-        if item.get('slug') == 'referate' and item.get('enabled', True):
-            flow_config = item
-            break
+    officers = approval_template.get('officers', [])
     
-    if not flow_config:
-        raise HTTPException(status_code=404, detail="No enabled approval flow found")
+    # Separate officers by action type
+    required_officers = []
+    optional_officers = []
     
-    can_sign_officers = []
-    for user in flow_config.get('can_sign', []):
-        can_sign_officers.append({
-            "type": "person",
-            "reference": user.get('user_id'),
-            "username": user.get('username'),
-            "action": "can_sign"
-        })
+    for officer in officers:
+        officer_data = {
+            "type": officer.get('type'),
+            "reference": officer.get('reference'),
+            "action": officer.get('action'),
+            "order": officer.get('order', 0)
+        }
+        
+        if officer.get('action') == 'must_sign':
+            required_officers.append(officer_data)
+        elif officer.get('action') == 'can_sign':
+            optional_officers.append(officer_data)
     
-    must_sign_officers = []
-    for user in flow_config.get('must_sign', []):
-        must_sign_officers.append({
-            "type": "person",
-            "reference": user.get('user_id'),
-            "username": user.get('username'),
-            "action": "must_sign"
-        })
+    # Sort by order
+    required_officers.sort(key=lambda x: x.get('order', 0))
+    optional_officers.sort(key=lambda x: x.get('order', 0))
+    
+    # Count minimum signatures (number of must_sign officers)
+    min_signatures = len(required_officers)
     
     flow_data = {
         "object_type": "procurement_order",
         "object_source": "depo_procurement",
         "object_id": order_id,
-        "config_slug": flow_config.get('slug'),
-        "min_signatures": flow_config.get('min_signatures', 1),
-        "required_officers": must_sign_officers,
-        "optional_officers": can_sign_officers,
+        "template_id": str(approval_template['_id']),
+        "template_name": approval_template.get('name'),
+        "min_signatures": min_signatures,
+        "required_officers": required_officers,
+        "optional_officers": optional_officers,
         "signatures": [],
         "status": "pending",
         "created_at": datetime.utcnow(),
