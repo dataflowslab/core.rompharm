@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.9] - 2024-12-21
+
+### Changed
+- **Unified Receive Stock Form**: Refactored Procurement Receive Stock to use shared `ReceiveStockForm` component
+  - **Consistency**: Same form UI and behavior across Inventory (Add Stock) and Procurement (Receive Stock)
+  - **DRY Principle**: Eliminated code duplication (~500 lines of duplicate form code)
+  - **Feature Parity**: Procurement now includes all features from Inventory Add Stock:
+    - ✅ Supplier U.M. field (with default value `694813b6297c9dde6d7065b7`)
+    - ✅ All QC fields (containers, supplier BA, transport conditions)
+    - ✅ Consistent validation and error handling
+    - ✅ Same UX patterns and field layouts
+  - **Context-Aware**: Form adapts to context:
+    - Inventory: Fixed article (pre-selected)
+    - Procurement: Line item selection from purchase order items
+    - Shows remaining quantity for each line item: "Article Name - IPN (received/total)"
+  - **Improved Maintainability**: Single source of truth for stock receiving logic
+
+### Technical
+- Refactored `ReceivedStockTab.tsx` to use `ReceiveStockForm` component
+- Removed ~500 lines of duplicate form code (Grid, inputs, containers table, etc.)
+- Added `systemUms` loading in `ReceivedStockTab`
+- Form data now uses `ReceiveStockFormData` interface for type safety
+- Backend saves `supplier_um_id` in extra data payload
+- Line items prepared as `{ value, label }` array for dropdown
+- Locations converted from `pk` to string format for compatibility
+
 ## [1.18.8] - 2024-12-21
 
 ### Added

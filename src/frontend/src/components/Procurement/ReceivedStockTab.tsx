@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Table, Button, Group, Modal, Grid, Select, NumberInput, TextInput, Textarea, Checkbox, Divider, ActionIcon } from '@mantine/core';
+import { Paper, Title, Text, Table, Button, Group, Modal, ActionIcon } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
-import { DateInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
+import { ReceiveStockForm, ReceiveStockFormData } from '../Common/ReceiveStockForm';
 
 interface ReceivedItem {
   pk: number;
@@ -55,22 +55,11 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [receiveModalOpened, setReceiveModalOpened] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [stockStatuses, setStockStatuses] = useState<{ value: number; label: string }[]>([]);
-
-  // Container row interface
-  interface ContainerRow {
-    id: string;
-    num_containers: number;
-    products_per_container: number;
-    unit: string;
-    value: number;
-    is_damaged: boolean;
-    is_unsealed: boolean;
-    is_mislabeled: boolean;
-  }
-
-  // Form state for receiving stock
-  const [receiveData, setReceiveData] = useState({
+  const [stockStatuses, setStockStatuses] = useState<{ value: string; label: string }[]>([]);
+  const [systemUms, setSystemUms] = useState<{ value: string; label: string }[]>([]);
+  
+  // Form state using ReceiveStockFormData interface
+  const [formData, setFormData] = useState<ReceiveStockFormData>({
     line_item: '',
     quantity: 0,
     location: '',
@@ -79,15 +68,17 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
     serial_numbers: '',
     packaging: '',
     status: '65', // Quarantine status (implicit)
+    supplier_um_id: '694813b6297c9dde6d7065b7', // Default supplier UM
     notes: '',
-    manufacturing_date: null as Date | null,
+    manufacturing_date: null,
     expected_quantity: 0,
-    expiry_date: null as Date | null,
-    reset_date: null as Date | null,
-    use_expiry: true, // true = expiry, false = reset
+    expiry_date: null,
+    reset_date: null,
+    use_expiry: true,
+    containers: [],
     containers_cleaned: false,
     supplier_ba_no: '',
-    supplier_ba_date: null as Date | null,
+    supplier_ba_date: null,
     accord_ba: false,
     is_list_supplier: false,
     clean_transport: false,
@@ -95,24 +86,48 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
     temperature_conditions_met: false,
   });
 
-  const [containers, setContainers] = useState<ContainerRow[]>([]);
-
   useEffect(() => {
     loadReceivedItems();
     loadStockStatuses();
+    loadSystemUms();
   }, [orderId]);
 
   const loadStockStatuses = async () => {
     try {
       const response = await api.get(procurementApi.getStockStatuses());
-      setStockStatuses(response.data.statuses || []);
+      const statuses = response.data.statuses || [];
+      setStockStatuses(statuses.map((s: any) => ({
+        value: String(s.value),
+        label: s.name || s.label
+      })));
+      
+      // Set default status to Quarantined if available
+      const quarantinedStatus = statuses.find((s: any) => 
+        s.name?.toLowerCase().includes('quarantin')
+      );
+      if (quarantinedStatus) {
+        setFormData(prev => ({ ...prev, status: String(quarantinedStatus.value) }));
+      }
     } catch (error) {
       console.error('Failed to load stock statuses:', error);
     }
   };
 
+  const loadSystemUms = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/system-ums');
+      const ums = response.data || [];
+      setSystemUms(ums.map((um: any) => ({ 
+        value: um._id, 
+        label: `${um.name} (${um.abrev})` 
+      })));
+    } catch (error) {
+      console.error('Failed to fetch system UMs:', error);
+    }
+  };
+
   const getStatusLabel = (statusValue: number): string => {
-    const status = stockStatuses.find(s => s.value === statusValue);
+    const status = stockStatuses.find(s => Number(s.value) === statusValue);
     return status ? status.label : String(statusValue);
   };
 
@@ -164,7 +179,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
   };
 
   const handleReceiveStock = async () => {
-    if (!receiveData.line_item || !receiveData.quantity || !receiveData.location) {
+    if (!formData.line_item || !formData.quantity || !formData.location) {
       notifications.show({
         title: t('Error'),
         message: t('Please fill in all required fields'),
@@ -177,14 +192,14 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
     try {
       // First, receive stock in InvenTree
       const receivePayload = {
-        line_item: parseInt(receiveData.line_item),
-        quantity: receiveData.quantity,
-        location: parseInt(receiveData.location),
-        batch_code: receiveData.batch_code || undefined,
-        serial_numbers: receiveData.serial_numbers || undefined,
-        packaging: receiveData.packaging || undefined,
-        status: parseInt(receiveData.status),
-        notes: receiveData.notes || undefined
+        line_item: parseInt(formData.line_item),
+        quantity: formData.quantity,
+        location: parseInt(formData.location),
+        batch_code: formData.batch_code || undefined,
+        serial_numbers: formData.serial_numbers || undefined,
+        packaging: formData.packaging || undefined,
+        status: parseInt(formData.status),
+        notes: formData.notes || undefined
       };
 
       const receiveResponse = await api.post(procurementApi.receiveStock(orderId), receivePayload);
@@ -197,20 +212,21 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
         const extraDataPayload = {
           stock_item_id: stockItemId,
           order_id: orderId,
-          supplier_batch_code: receiveData.supplier_batch_code || null,
-          manufacturing_date: receiveData.manufacturing_date ? receiveData.manufacturing_date.toISOString().split('T')[0] : null,
-          expected_quantity: receiveData.expected_quantity || null,
-          expiry_date: receiveData.use_expiry && receiveData.expiry_date ? receiveData.expiry_date.toISOString().split('T')[0] : null,
-          reset_date: !receiveData.use_expiry && receiveData.reset_date ? receiveData.reset_date.toISOString().split('T')[0] : null,
-          containers: containers.length > 0 ? containers : null,
-          containers_cleaned: receiveData.containers_cleaned,
-          supplier_ba_no: receiveData.supplier_ba_no || null,
-          supplier_ba_date: receiveData.supplier_ba_date ? receiveData.supplier_ba_date.toISOString().split('T')[0] : null,
-          accord_ba: receiveData.accord_ba,
-          is_list_supplier: receiveData.is_list_supplier,
-          clean_transport: receiveData.clean_transport,
-          temperature_control: receiveData.temperature_control,
-          temperature_conditions_met: receiveData.temperature_control ? receiveData.temperature_conditions_met : null,
+          supplier_batch_code: formData.supplier_batch_code || null,
+          supplier_um_id: formData.supplier_um_id || null,
+          manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : null,
+          expected_quantity: formData.expected_quantity || null,
+          expiry_date: formData.use_expiry && formData.expiry_date ? formData.expiry_date.toISOString().split('T')[0] : null,
+          reset_date: !formData.use_expiry && formData.reset_date ? formData.reset_date.toISOString().split('T')[0] : null,
+          containers: formData.containers.length > 0 ? formData.containers : null,
+          containers_cleaned: formData.containers_cleaned,
+          supplier_ba_no: formData.supplier_ba_no || null,
+          supplier_ba_date: formData.supplier_ba_date ? formData.supplier_ba_date.toISOString().split('T')[0] : null,
+          accord_ba: formData.accord_ba,
+          is_list_supplier: formData.is_list_supplier,
+          clean_transport: formData.clean_transport,
+          temperature_control: formData.temperature_control,
+          temperature_conditions_met: formData.temperature_control ? formData.temperature_conditions_met : null,
         };
 
         // Save extra data
@@ -224,7 +240,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
       });
 
       // Reset form
-      setReceiveData({
+      setFormData({
         line_item: '',
         quantity: 0,
         location: '',
@@ -233,12 +249,14 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
         serial_numbers: '',
         packaging: '',
         status: '65',
+        supplier_um_id: '694813b6297c9dde6d7065b7',
         notes: '',
         manufacturing_date: null,
         expected_quantity: 0,
         expiry_date: null,
         reset_date: null,
         use_expiry: true,
+        containers: [],
         containers_cleaned: false,
         supplier_ba_no: '',
         supplier_ba_date: null,
@@ -248,7 +266,6 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
         temperature_control: false,
         temperature_conditions_met: false,
       });
-      setContainers([]);
       setReceiveModalOpened(false);
       loadReceivedItems();
       onReload(); // Reload items to update received quantities
@@ -265,49 +282,41 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
   };
 
   const handleLineItemChange = (value: string | null) => {
-    setReceiveData({ ...receiveData, line_item: value || '' });
+    setFormData({ ...formData, line_item: value || '' });
     
     // Auto-set max quantity based on selected item
     if (value) {
       const item = items.find(i => String(i.pk) === value);
       if (item) {
         const remaining = item.quantity - (item.received || 0);
-        setReceiveData(prev => ({ ...prev, quantity: remaining, expected_quantity: remaining }));
+        setFormData(prev => ({ ...prev, quantity: remaining, expected_quantity: remaining }));
       }
     }
-  };
-
-  // Container management functions
-  const addContainerRow = () => {
-    const newContainer: ContainerRow = {
-      id: Date.now().toString(),
-      num_containers: 1,
-      products_per_container: 1,
-      unit: 'pcs',
-      value: 0,
-      is_damaged: false,
-      is_unsealed: false,
-      is_mislabeled: false,
-    };
-    setContainers([...containers, newContainer]);
-  };
-
-  const removeContainerRow = (id: string) => {
-    setContainers(containers.filter(c => c.id !== id));
-  };
-
-  const updateContainerRow = (id: string, field: keyof ContainerRow, value: any) => {
-    setContainers(containers.map(c => 
-      c.id === id ? { ...c, [field]: value } : c
-    ));
   };
 
   // Get available items (not fully received)
   const availableItems = items.filter(item => (item.received || 0) < item.quantity);
 
   // Get max quantity for selected item
-  const selectedItem = items.find(i => String(i.pk) === receiveData.line_item);
+  const selectedItem = items.find(i => String(i.pk) === formData.line_item);
   const maxQuantity = selectedItem ? selectedItem.quantity - (selectedItem.received || 0) : 0;
+
+  // Prepare line items for ReceiveStockForm
+  const lineItemsData = availableItems.map(item => {
+    const partName = item.part_detail?.name || `Part ${item.part}`;
+    const ipn = item.part_detail?.IPN || '';
+    const received = item.received || 0;
+    const total = item.quantity;
+    return {
+      value: String(item.pk),
+      label: `${partName} - ${ipn} (${received}/${total})`
+    };
+  });
+
+  // Prepare locations for ReceiveStockForm
+  const locationsData = stockLocations
+    .filter(loc => loc.pk != null && loc.pk !== undefined)
+    .map(loc => ({ value: String(loc.pk), label: loc.name }));
 
   return (
     <Paper p="md" withBorder>
@@ -363,7 +372,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
         </Table>
       )}
 
-      {/* Receive Stock Modal */}
+      {/* Receive Stock Modal - Using ReceiveStockForm */}
       <Modal
         opened={receiveModalOpened}
         onClose={() => setReceiveModalOpened(false)}
@@ -372,330 +381,16 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
         centered
         styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
       >
-        <Grid>
-          {/* Line Item Selection */}
-          <Grid.Col span={12}>
-            <Select
-              label={t('Line Item')}
-              placeholder={t('Select item to receive')}
-              data={availableItems.map(item => {
-                const partName = item.part_detail?.name || `Part ${item.part}`;
-                const ipn = item.part_detail?.IPN || '';
-                const received = item.received || 0;
-                const total = item.quantity;
-                return {
-                  value: String(item.pk),
-                  label: `${partName} - ${ipn} (${received}/${total})`
-                };
-              })}
-              value={receiveData.line_item}
-              onChange={handleLineItemChange}
-              searchable
-              required
-            />
-          </Grid.Col>
-
-          {/* Quantity and Expected Quantity */}
-          <Grid.Col span={6}>
-            <NumberInput
-              label={t('Received Quantity')}
-              placeholder="0"
-              value={receiveData.quantity}
-              onChange={(value) => setReceiveData({ ...receiveData, quantity: Number(value) || 0 })}
-              min={0.01}
-              max={maxQuantity}
-              step={1}
-              required
-              description={maxQuantity > 0 ? `${t('Max')}: ${maxQuantity}` : ''}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <NumberInput
-              label={t('Expected Quantity (Delivery Docs)')}
-              placeholder="0"
-              value={receiveData.expected_quantity}
-              onChange={(value) => setReceiveData({ ...receiveData, expected_quantity: Number(value) || 0 })}
-              min={0}
-              step={1}
-            />
-          </Grid.Col>
-
-          {/* Location */}
-          <Grid.Col span={12}>
-            <Select
-              label={t('Location')}
-              placeholder={t('Select location')}
-              data={stockLocations
-                .filter(loc => loc.pk != null && loc.pk !== undefined)
-                .map(loc => ({ value: String(loc.pk), label: loc.name }))}
-              value={receiveData.location}
-              onChange={(value) => setReceiveData({ ...receiveData, location: value || '' })}
-              searchable
-              required
-            />
-          </Grid.Col>
-
-          {/* Batch Codes */}
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('Batch Code')}
-              placeholder={t('Enter batch code')}
-              value={receiveData.batch_code}
-              onChange={(e) => setReceiveData({ ...receiveData, batch_code: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('Supplier Batch Code')}
-              placeholder={t('Enter supplier batch code')}
-              value={receiveData.supplier_batch_code}
-              onChange={(e) => setReceiveData({ ...receiveData, supplier_batch_code: e.target.value })}
-            />
-          </Grid.Col>
-
-          {/* Manufacturing Date */}
-          <Grid.Col span={12}>
-            <DateInput
-              label={t('Manufacturing Date')}
-              placeholder={t('Select date')}
-              value={receiveData.manufacturing_date}
-              onChange={(value) => setReceiveData({ ...receiveData, manufacturing_date: value })}
-              clearable
-            />
-          </Grid.Col>
-
-          {/* Expiry/Reset Date Section */}
-          <Grid.Col span={12}>
-            <Checkbox
-              label={t('Use Expiry Date (uncheck for Reset Date)')}
-              checked={receiveData.use_expiry}
-              onChange={(e) => setReceiveData({ ...receiveData, use_expiry: e.currentTarget.checked })}
-            />
-          </Grid.Col>
-
-          {receiveData.use_expiry ? (
-            <Grid.Col span={12}>
-              <DateInput
-                label={t('Expiry Date')}
-                placeholder={t('Select expiry date')}
-                value={receiveData.expiry_date}
-                onChange={(value) => setReceiveData({ ...receiveData, expiry_date: value })}
-                clearable
-              />
-            </Grid.Col>
-          ) : (
-            <Grid.Col span={12}>
-              <DateInput
-                label={t('Reset Date')}
-                placeholder={t('Select reset date')}
-                value={receiveData.reset_date}
-                onChange={(value) => setReceiveData({ ...receiveData, reset_date: value })}
-                clearable
-              />
-            </Grid.Col>
-          )}
-
-          {/* Containers Section */}
-          <Grid.Col span={12}>
-            <Divider my="md" label={t('Containers')} labelPosition="center" />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <Button 
-              size="xs" 
-              variant="light" 
-              leftSection={<IconPlus size={14} />}
-              onClick={addContainerRow}
-            >
-              {t('Add Container Row')}
-            </Button>
-          </Grid.Col>
-
-          {containers.length > 0 && (
-            <Grid.Col span={12}>
-              <Table withTableBorder withColumnBorders>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>{t('Num')}</Table.Th>
-                    <Table.Th>{t('Products/Container')}</Table.Th>
-                    <Table.Th>{t('Unit')}</Table.Th>
-                    <Table.Th>{t('Value')}</Table.Th>
-                    <Table.Th>{t('Damaged')}</Table.Th>
-                    <Table.Th>{t('Unsealed')}</Table.Th>
-                    <Table.Th>{t('Mislabeled')}</Table.Th>
-                    <Table.Th></Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {containers.map((container) => (
-                    <Table.Tr key={container.id}>
-                      <Table.Td>
-                        <NumberInput
-                          value={container.num_containers}
-                          onChange={(val) => updateContainerRow(container.id, 'num_containers', Number(val) || 1)}
-                          min={1}
-                          size="xs"
-                          styles={{ input: { width: '60px' } }}
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <NumberInput
-                          value={container.products_per_container}
-                          onChange={(val) => updateContainerRow(container.id, 'products_per_container', Number(val) || 1)}
-                          min={1}
-                          size="xs"
-                          styles={{ input: { width: '60px' } }}
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <TextInput
-                          value={container.unit}
-                          onChange={(e) => updateContainerRow(container.id, 'unit', e.target.value)}
-                          size="xs"
-                          styles={{ input: { width: '60px' } }}
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <NumberInput
-                          value={container.value}
-                          onChange={(val) => updateContainerRow(container.id, 'value', Number(val) || 0)}
-                          min={0}
-                          step={0.1}
-                          size="xs"
-                          styles={{ input: { width: '80px' } }}
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <Checkbox
-                          checked={container.is_damaged}
-                          onChange={(e) => updateContainerRow(container.id, 'is_damaged', e.currentTarget.checked)}
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <Checkbox
-                          checked={container.is_unsealed}
-                          onChange={(e) => updateContainerRow(container.id, 'is_unsealed', e.currentTarget.checked)}
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <Checkbox
-                          checked={container.is_mislabeled}
-                          onChange={(e) => updateContainerRow(container.id, 'is_mislabeled', e.currentTarget.checked)}
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <Button
-                          size="xs"
-                          color="red"
-                          variant="subtle"
-                          onClick={() => removeContainerRow(container.id)}
-                        >
-                          <IconTrash size={14} />
-                        </Button>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </Grid.Col>
-          )}
-
-          <Grid.Col span={12}>
-            <Checkbox
-              label={t('Containers Cleaned')}
-              checked={receiveData.containers_cleaned}
-              onChange={(e) => setReceiveData({ ...receiveData, containers_cleaned: e.currentTarget.checked })}
-            />
-          </Grid.Col>
-
-          {/* Supplier BA Section */}
-          <Grid.Col span={12}>
-            <Divider my="md" />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('Supplier BA No')}
-              placeholder={t('Enter BA number')}
-              value={receiveData.supplier_ba_no}
-              onChange={(e) => setReceiveData({ ...receiveData, supplier_ba_no: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <DateInput
-              label={t('Supplier BA Date')}
-              placeholder={t('Select date')}
-              value={receiveData.supplier_ba_date}
-              onChange={(value) => setReceiveData({ ...receiveData, supplier_ba_date: value })}
-              clearable
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <Checkbox
-              label={t('In Accordance with Supplier BA')}
-              checked={receiveData.accord_ba}
-              onChange={(e) => setReceiveData({ ...receiveData, accord_ba: e.currentTarget.checked })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <Checkbox
-              label={t('Supplier in List')}
-              checked={receiveData.is_list_supplier}
-              onChange={(e) => setReceiveData({ ...receiveData, is_list_supplier: e.currentTarget.checked })}
-            />
-          </Grid.Col>
-
-          {/* Transport Section */}
-          <Grid.Col span={12}>
-            <Divider my="md" label={t('Transport')} labelPosition="center" />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <Checkbox
-              label={t('Clean Transport')}
-              checked={receiveData.clean_transport}
-              onChange={(e) => setReceiveData({ ...receiveData, clean_transport: e.currentTarget.checked })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <Checkbox
-              label={t('Temperature Control Transport')}
-              checked={receiveData.temperature_control}
-              onChange={(e) => setReceiveData({ ...receiveData, temperature_control: e.currentTarget.checked })}
-            />
-          </Grid.Col>
-
-          {receiveData.temperature_control && (
-            <Grid.Col span={12}>
-              <Checkbox
-                label={t('Temperature Conditions Met')}
-                checked={receiveData.temperature_conditions_met}
-                onChange={(e) => setReceiveData({ ...receiveData, temperature_conditions_met: e.currentTarget.checked })}
-              />
-            </Grid.Col>
-          )}
-
-          {/* Notes */}
-          <Grid.Col span={12}>
-            <Divider my="md" />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <Textarea
-              label={t('Notes')}
-              placeholder={t('Additional notes')}
-              value={receiveData.notes}
-              onChange={(e) => setReceiveData({ ...receiveData, notes: e.target.value })}
-              minRows={3}
-            />
-          </Grid.Col>
-        </Grid>
+        <ReceiveStockForm
+          formData={formData}
+          onChange={setFormData}
+          lineItems={lineItemsData}
+          onLineItemChange={handleLineItemChange}
+          maxQuantity={maxQuantity}
+          locations={locationsData}
+          stockStatuses={stockStatuses}
+          systemUms={systemUms}
+        />
 
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={() => setReceiveModalOpened(false)}>
