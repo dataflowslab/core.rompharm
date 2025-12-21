@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-21 23:55:37
+**Last Updated:** 2025-12-22 00:01:04
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -129,6 +129,9 @@
 
 ## 📦 Module Routes
 ### depo_procurement (`/modules/depo_procurement/api`)
+
+**Document Templates**
+- `GET /modules/depo_procurement/api/document-templates` - Get document template codes for procurement orders
 
 **Order Statuses**
 - `GET /modules/depo_procurement/api/order-statuses` - Get available purchase order statuses/states

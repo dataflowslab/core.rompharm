@@ -29,9 +29,11 @@ export function DocumentGenerator({ objectId, templateCodes, onDocumentsChange }
   const [checking, setChecking] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    loadTemplates();
-    loadDocuments();
-  }, [objectId]);
+    if (templateCodes.length > 0) {
+      loadTemplates();
+      loadDocuments();
+    }
+  }, [objectId, templateCodes]);
 
   const loadTemplates = async () => {
     try {
