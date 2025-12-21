@@ -44,7 +44,8 @@ interface PurchaseOrderItem {
 }
 
 interface StockLocation {
-  pk: number;
+  _id?: string;
+  pk?: number;
   name: string;
 }
 
@@ -324,8 +325,11 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
 
   // Prepare locations for ReceiveStockForm
   const locationsData = stockLocations
-    .filter(loc => loc.pk != null && loc.pk !== undefined)
-    .map(loc => ({ value: String(loc.pk), label: loc.name }));
+    .filter(loc => (loc._id || loc.pk))  // Has either _id or pk
+    .map(loc => ({ 
+      value: String(loc._id || loc.pk), 
+      label: loc.name 
+    }));
 
   return (
     <Paper p="md" withBorder>
