@@ -422,9 +422,9 @@ async def sign_object(object_id: str, current_user: dict = Depends(verify_token)
             # Check if user has this role (role is ObjectId in users.role field)
             user_role_id = current_user.get("role")  # ObjectId from roles collection
             if user_role_id:
-                # Get role details
+                # Get role details and check slug (lowercase identifier)
                 role = db.roles.find_one({"_id": ObjectId(user_role_id)})
-                if role and role.get("name") == officer["reference"]:
+                if role and role.get("slug") == officer["reference"]:
                     can_sign = True
                     break
     
