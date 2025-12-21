@@ -25,8 +25,12 @@ All notable changes to this project will be documented in this file.
   - Handles both array responses and object responses with nested arrays
   - Prevents TypeError when backend response structure varies
 
-### Note
-- PUT endpoint `/modules/inventory/api/stocks/{stock_id}` still needs to be implemented for QC tab save functionality
+### Added
+- **Stock Update Endpoint**: Implemented PUT `/modules/inventory/api/stocks/{stock_id}` for QC tab save functionality
+  - Accepts: `rompharm_ba_no`, `rompharm_ba_date`, `state_id`
+  - Updates stock with QC information
+  - Returns updated stock document
+  - Includes user tracking (updated_by, updated_at)
 
 ## [1.18.19] - 2024-12-21
 

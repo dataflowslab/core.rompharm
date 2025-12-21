@@ -1377,6 +1377,62 @@ async def create_stock(
         raise HTTPException(status_code=500, detail=f"Failed to create stock: {str(e)}")
 
 
+
+
+class StockUpdateRequest(BaseModel):
+    rompharm_ba_no: Optional[str] = None
+    rompharm_ba_date: Optional[str] = None
+    state_id: Optional[str] = None
+
+
+@router.put("/stocks/{stock_id}")
+async def update_stock(
+    request: Request,
+    stock_id: str,
+    stock_data: StockUpdateRequest,
+    current_user: dict = Depends(verify_token)
+):
+    """Update stock QC information"""
+    db = get_db()
+    collection = db['depo_stocks']
+    
+    # Build update document
+    update_doc = {
+        'updated_at': datetime.utcnow(),
+        'updated_by': current_user.get('username', 'system')
+    }
+    
+    if stock_data.rompharm_ba_no is not None:
+        update_doc['rompharm_ba_no'] = stock_data.rompharm_ba_no
+    
+    if stock_data.rompharm_ba_date is not None:
+        update_doc['rompharm_ba_date'] = stock_data.rompharm_ba_date
+    
+    if stock_data.state_id is not None:
+        update_doc['state_id'] = ObjectId(stock_data.state_id) if stock_data.state_id else None
+    
+    if len(update_doc) == 2:  # Only updated_at and updated_by
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    try:
+        result = collection.update_one(
+            {'_id': ObjectId(stock_id)},
+            {'$set': update_doc}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Stock not found")
+        
+        # Return updated document
+        updated_stock = collection.find_one({'_id': ObjectId(stock_id)})
+        return serialize_doc(updated_stock)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update stock: {str(e)}")
+
+
+
 # Supplier models
 class SupplierAddressRequest(BaseModel):
     name: str
