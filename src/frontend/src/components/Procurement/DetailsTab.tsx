@@ -72,7 +72,10 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
     const loadTemplateCodes = async () => {
       try {
         const response = await api.get('/modules/depo_procurement/api/document-templates');
-        setTemplateCodes(response.data.templates || []);
+        const templatesObj = response.data.templates || {};
+        // Convert object {code: name} to array of codes
+        const codes = Object.keys(templatesObj);
+        setTemplateCodes(codes);
       } catch (error) {
         console.error('Failed to load template codes:', error);
         // Fallback to empty array
@@ -132,8 +135,8 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
 
   return (
     <Grid gutter="md">
-      {/* Document Sidebar - 1/4 width */}
-      <Grid.Col span={3}>
+      {/* Document Sidebar - 1/3 width */}
+      <Grid.Col span={4}>
         <Paper p="md" withBorder>
           <Title order={5} mb="md">{t('Documents')}</Title>
           <DocumentGenerator
@@ -154,8 +157,8 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
         </Paper>
       </Grid.Col>
 
-      {/* Order Details Form - 3/4 width */}
-      <Grid.Col span={9}>
+      {/* Order Details Form - 2/3 width */}
+      <Grid.Col span={8}>
         <Paper p="md" withBorder>
           <Grid>
             <Grid.Col span={6}>

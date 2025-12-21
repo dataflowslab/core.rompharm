@@ -251,10 +251,12 @@ async def get_document_templates(
     config_collection = db['config']
     
     try:
-        config = config_collection.find_one({'slug': 'procurement_details_document_codes'})
+        config = config_collection.find_one({'slug': 'document_templates_cofig'})
         if config and 'items' in config:
-            return {"templates": config['items']}
-        return {"templates": []}
+            # Return procurement templates as object {code: name}
+            procurement_templates = config['items'].get('procurement', {})
+            return {"templates": procurement_templates}
+        return {"templates": {}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch document templates: {str(e)}")
 
