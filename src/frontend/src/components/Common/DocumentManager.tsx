@@ -47,7 +47,7 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
 
   const loadDocuments = async () => {
     try {
-      const response = await api.get(`/api/documents/${entityType}/${entityId}`);
+      const response = await api.get(`/api/documents/object/${entityType}/${entityId}`);
       const docs = response.data || [];
       
       // Convert array to object keyed by template_code (only keep latest per template)
@@ -94,17 +94,18 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
     try {
       // Delete old document if exists
       const existingDoc = documents[template.code];
-      if (existingDoc) {
+      if (existingDoc && existingDoc._id) {
         try {
-          await api.delete(`/api/documents/${entityType}/${entityId}/job/${existingDoc.job_id}`);
+          await api.delete(`/api/documents/${existingDoc._id}`);
         } catch (error) {
           console.error('Failed to delete old document:', error);
         }
       }
       
-      // Generate new document
-      const response = await api.post(`/api/documents/${entityType}/generate`, {
-        [entityType === 'procurement-order' ? 'order_id' : 'request_id']: entityId,
+      // Generate new document using global endpoint
+      const response = await api.post(`/api/documents/generate`, {
+        object_type: entityType,
+        object_id: entityId,
         template_code: template.code,
         template_name: template.name,
       });
@@ -160,10 +161,12 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
     
     setLoadingDocs(prev => ({ ...prev, [templateCode]: true }));
     try {
-      const response = await api.get(
-        `/api/documents/${entityType}/${entityId}/job/${doc.job_id}/download`,
-        { responseType: 'blob' }
-      );
+      // Use document_id if available, otherwise construct old-style URL
+      const downloadUrl = doc._id && doc._id !== doc.job_id
+        ? `/api/documents/${doc._id}/download`
+        : `/api/documents/${entityType}/${entityId}/job/${doc.job_id}/download`;
+      
+      const response = await api.get(downloadUrl, { responseType: 'blob' });
       
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));

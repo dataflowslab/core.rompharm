@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-21 21:43:02
+**Last Updated:** 2025-12-21 23:10:35
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -59,22 +59,13 @@
 - `GET /api/data/{form_id}` - Get all submissions for a form (requires administrator access)
 
 ### Documents
-- `GET /api/documents/form/{form_id}/templates` - Get templates associated with a form (public endpoint)
-- `POST /api/documents/generate` - Generate a document from a form submission (async job)
-- `GET /api/documents/job/{job_id}/status` - Check status of any document generation job by job_id (global endpoint)
-- `GET /api/documents/job/{submission_id}/{job_id}/download` - Download document from completed job and save locally
-- `GET /api/documents/job/{submission_id}/{job_id}/status` - Check status of a document generation job
-- `POST /api/documents/procurement-order/generate` - Generate a document for a procurement order (async job)
-- `GET /api/documents/procurement-order/templates` - Get templates available for procurement orders from MongoDB config
-- `GET /api/documents/procurement-order/{order_id}` - Get all document generation jobs for a procurement order
-- `DELETE /api/documents/procurement-order/{order_id}/job/{job_id}` - Delete a procurement document from MongoDB
-- `GET /api/documents/procurement-order/{order_id}/job/{job_id}/download` - Download document - fetches from DataFlows Docu if not cached, stores in MongoDB
-- `POST /api/documents/stock-request/generate` - Generate document for stock request (Nota de transfer)
-- `GET /api/documents/stock-request/{request_id}` - Get all documents for a stock request with auto-download
-- `GET /api/documents/stock-request/{request_id}/job/{job_id}/download` - Download stock request document
-- `GET /api/documents/stock-request/{request_id}/job/{job_id}/status` - Check status of a stock request document generation job
-- `GET /api/documents/submission/{submission_id}` - Get all document generation jobs for a submission
-- `GET /api/documents/templates` - Get list of available document templates from MongoDB config
+- `POST /api/documents/generate` - Universal document generation endpoint
+- `GET /api/documents/job/{job_id}/status` - Check job status by job_id
+- `GET /api/documents/object/{object_type}/{object_id}` - Get all documents for an object (procurement order, stock request, etc.)
+- `GET /api/documents/templates` - Get available templates
+- `DELETE /api/documents/{document_id}` - Delete document by document_id
+- `GET /api/documents/{document_id}` - Get document info by document_id
+- `GET /api/documents/{document_id}/download` - Download document by document_id
 
 ### Forms
 - `GET /api/forms/` - List all forms (requires administrator access)
