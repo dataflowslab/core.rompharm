@@ -210,7 +210,7 @@ export function ReceiveStockForm({
             label={t('Supplier')}
             placeholder={t('Select supplier')}
             data={suppliers}
-            value={formData.supplier_id}
+            value={formData.supplier_id || null}
             onChange={(value) => updateField('supplier_id', value || '')}
             searchable
             clearable

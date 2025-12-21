@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.19] - 2024-12-21
+
+### Fixed
+- **Supplier ID Not Saved**: Fixed supplier_id not being included in API payload
+  - **Problem**: supplier_id was empty string `''` which became `undefined` in payload, causing it to be omitted from JSON
+  - **Root Cause**: Select onChange used `value || ''` which set empty string when cleared instead of keeping null/undefined
+  - **Solution**: 
+    - Improved validation in `AddStockModal`: check if supplier_id is non-empty string before including in payload
+    - Fixed Select value prop to use `formData.supplier_id || null` for proper display
+  - **Debug Logging**: Added extensive console logging to track supplier_id value, type, and length
+
+### Technical
+- Modified `AddStockModal.tsx` `handleSubmit()`:
+  - Added detailed console logging for supplier_id (value, type, length)
+  - Changed supplier_id validation from `formData.supplier_id || undefined` to `(formData.supplier_id && formData.supplier_id.trim() !== '') ? formData.supplier_id : undefined`
+- Modified `ReceiveStockForm.tsx` Supplier Select:
+  - Changed value prop from `formData.supplier_id` to `formData.supplier_id || null` for proper null handling
+
 ## [1.18.18] - 2024-12-21
 
 ### Fixed

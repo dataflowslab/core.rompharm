@@ -199,6 +199,8 @@ export function AddStockModal({
     setLoading(true);
     try {
       console.log('[AddStockModal] formData.supplier_id:', formData.supplier_id);
+      console.log('[AddStockModal] formData.supplier_id type:', typeof formData.supplier_id);
+      console.log('[AddStockModal] formData.supplier_id length:', formData.supplier_id?.length);
       
       // Create stock item with all data
       const stockPayload = {
@@ -208,7 +210,7 @@ export function AddStockModal({
         batch_code: formData.batch_code || undefined,
         supplier_batch_code: formData.supplier_batch_code || undefined,
         status: parseInt(formData.status),
-        supplier_id: formData.supplier_id || undefined,
+        supplier_id: (formData.supplier_id && formData.supplier_id.trim() !== '') ? formData.supplier_id : undefined,
         supplier_um_id: formData.supplier_um_id || undefined,
         notes: formData.notes || undefined,
         manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : undefined,
