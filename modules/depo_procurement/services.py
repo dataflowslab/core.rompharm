@@ -479,10 +479,11 @@ async def delete_order_item_by_id(order_id: str, item_id: str):
 
 
 async def receive_stock_item(order_id: str, stock_data, current_user):
-    """Receive stock items for a purchase order line - creates separate depo_stocks entry"""
+    """Receive stock items for a purchase order line - creates separate depo_stocks entry and links it to the item"""
     db = get_db()
     po_collection = db['depo_purchase_orders']
     stock_collection = db['depo_stocks']
+    states_collection = db['depo_stocks_states']
     
     try:
         # Get purchase order
@@ -496,6 +497,16 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         
         item = items[stock_data.line_item_index]
         
+        # Find state_id from depo_stocks_states based on status value
+        status_value = getattr(stock_data, 'status', 65)
+        state = states_collection.find_one({'value': status_value})
+        
+        if not state:
+            # Fallback: try to find Quarantine state
+            state = states_collection.find_one({'name': {'$regex': 'quarantin', '$options': 'i'}})
+            if not state:
+                raise HTTPException(status_code=400, detail=f"Stock state with value {status_value} not found")
+        
         # Create separate stock entry in depo_stocks with all supplier batch data
         stock_doc = {
             'part_id': ObjectId(item['part_id']),
@@ -505,14 +516,18 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
             'supplier_batch_code': getattr(stock_data, 'supplier_batch_code', '') or '',
             'serial_numbers': stock_data.serial_numbers or '',
             'packaging': stock_data.packaging or '',
-            'status': stock_data.status or 'OK',
+            'state_id': state['_id'],  # Save state_id instead of status value
             'notes': stock_data.notes or '',
             'purchase_order_id': ObjectId(order_id),
             'purchase_order_reference': order.get('reference'),
             'supplier_id': order.get('supplier_id'),
+            'supplier_um_id': ObjectId(getattr(stock_data, 'supplier_um_id', '694813b6297c9dde6d7065b7')),
             'received_date': datetime.utcnow(),
             'received_by': current_user.get('username'),
             'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow(),
+            'created_by': current_user.get('username'),
+            'updated_by': current_user.get('username'),
             # Additional supplier batch data fields
             'manufacturing_date': getattr(stock_data, 'manufacturing_date', None),
             'expected_quantity': getattr(stock_data, 'expected_quantity', None),
@@ -530,13 +545,28 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         }
         
         result = stock_collection.insert_one(stock_doc)
+        stock_id = result.inserted_id
         
-        # Update received quantity in order
-        item['received'] = item.get('received', 0) + stock_data.quantity
+        # Initialize stocks array if it doesn't exist
+        if 'stocks' not in item:
+            item['stocks'] = []
+        
+        # Add stock_id to item's stocks array
+        item['stocks'].append(stock_id)
         items[stock_data.line_item_index] = item
         
-        # Calculate line_items (number of items with received > 0)
-        line_items = sum(1 for i in items if i.get('received', 0) > 0)
+        # Calculate received quantity from stocks array
+        received_qty = 0
+        for stock_oid in item.get('stocks', []):
+            stock_entry = stock_collection.find_one({'_id': stock_oid})
+            if stock_entry:
+                received_qty += stock_entry.get('quantity', 0)
+        
+        # Update item with calculated received quantity (for backward compatibility and quick access)
+        item['received'] = received_qty
+        
+        # Calculate line_items (number of items with stocks)
+        line_items = sum(1 for i in items if i.get('stocks') and len(i.get('stocks', [])) > 0)
         
         po_collection.update_one(
             {'_id': ObjectId(order_id)},
@@ -552,7 +582,7 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         # Check if all items are received and auto-finish
         await check_and_auto_finish_order(order_id)
         
-        stock_doc['_id'] = result.inserted_id
+        stock_doc['_id'] = stock_id
         return serialize_doc(stock_doc)
     except HTTPException:
         raise

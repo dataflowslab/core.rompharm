@@ -99,14 +99,30 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None):
                         'color': state.get('color', 'gray')
                     }
             
+            # Get supplier UM details
+            if stock.get('supplier_um_id'):
+                supplier_um = db['depo_ums'].find_one({'_id': ObjectId(stock['supplier_um_id'])})
+                if supplier_um:
+                    stock['supplier_um_detail'] = {
+                        'name': supplier_um.get('name'),
+                        'abrev': supplier_um.get('abrev'),
+                        'symbol': supplier_um.get('symbol', '')
+                    }
+            
             # Determine supplier based on supplier_id, purchase_order_id or build_order_id
             supplier_name = None
+            supplier_detail = None
             
             # First check if supplier_id is directly in stock
             if stock.get('supplier_id'):
                 supplier = db['depo_companies'].find_one({'_id': ObjectId(stock['supplier_id'])})
                 if supplier:
                     supplier_name = supplier.get('name')
+                    supplier_detail = {
+                        'name': supplier.get('name'),
+                        'code': supplier.get('code', ''),
+                        '_id': str(supplier['_id'])
+                    }
             
             # Check if it's from a build order (internal production)
             elif stock.get('build_order_id'):
@@ -195,10 +211,32 @@ async def get_stock_by_id(stock_id: str):
                     'color': state.get('color', 'gray')
                 }
         
+        # Get supplier UM details
+        if stock.get('supplier_um_id'):
+            supplier_um = db['depo_ums'].find_one({'_id': ObjectId(stock['supplier_um_id'])})
+            if supplier_um:
+                stock['supplier_um_detail'] = {
+                    'name': supplier_um.get('name'),
+                    'abrev': supplier_um.get('abrev'),
+                    'symbol': supplier_um.get('symbol', '')
+                }
+        
         # Determine supplier
         supplier_name = None
+        supplier_detail = None
         
-        if stock.get('build_order_id'):
+        # First check if supplier_id is directly in stock
+        if stock.get('supplier_id'):
+            supplier = db['depo_companies'].find_one({'_id': ObjectId(stock['supplier_id'])})
+            if supplier:
+                supplier_name = supplier.get('name')
+                supplier_detail = {
+                    'name': supplier.get('name'),
+                    'code': supplier.get('code', ''),
+                    '_id': str(supplier['_id'])
+                }
+        
+        elif stock.get('build_order_id'):
             org_config = db['config'].find_one({'slug': 'organizatie'})
             if org_config:
                 supplier_name = org_config.get('value', {}).get('name', 'Internal Production')

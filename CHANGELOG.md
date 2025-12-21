@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.15] - 2024-12-21
+
+### Changed
+- **Purchase Order Stock Tracking**: Refactored receive stock logic to use associative references instead of duplicating data
+  - **Items structure**: Each item in `depo_purchase_orders.items` now contains:
+    - Expected goods data: `part_id`, `quantity`, `purchase_price`, `destination_id`, etc.
+    - `stocks` array: Contains ObjectId references to `depo_stocks` entries (not data duplication)
+    - `received` field: Calculated dynamically from associated stocks (kept for backward compatibility)
+  - **Benefits**:
+    - ✅ No data duplication - stock details stored only in `depo_stocks`
+    - ✅ Isolated logic - each stock entry is independent
+    - ✅ Multiple receptions - can have multiple stock entries per item (partial deliveries)
+    - ✅ Easy tracking - clear association between order items and received stocks
+  - **Stock creation**: When receiving stock, creates entry in `depo_stocks` and adds its ObjectId to item's `stocks` array
+  - **Supplier tracking**: Stock entries now include `supplier_id` and `supplier_um_id` from order
+
+### Technical
+- Modified `receive_stock_item()` in `modules/depo_procurement/services.py`:
+  - Creates stock entry in `depo_stocks` with all QC data
+  - Adds stock ObjectId to item's `stocks` array
+  - Calculates `received` quantity by summing quantities from all stocks in array
+  - Uses `state_id` instead of `status` value for consistency
+  - Saves `supplier_id` and `supplier_um_id` to stock entry
+- Stock structure maintains referential integrity between purchase orders and inventory
+
 ## [1.18.14] - 2024-12-21
 
 ### Added

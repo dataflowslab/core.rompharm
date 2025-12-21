@@ -1266,6 +1266,7 @@ class StockCreateRequest(BaseModel):
     batch_code: Optional[str] = None
     supplier_batch_code: Optional[str] = None
     status: Optional[int] = 65  # Default to Quarantine
+    supplier_id: Optional[str] = None
     supplier_um_id: Optional[str] = "694813b6297c9dde6d7065b7"  # Default supplier UM
     notes: Optional[str] = None
     manufacturing_date: Optional[str] = None
@@ -1331,6 +1332,10 @@ async def create_stock(
         'created_by': current_user.get('username', 'system'),
         'updated_by': current_user.get('username', 'system')
     }
+    
+    # Add supplier_id if provided
+    if stock_data.supplier_id:
+        doc['supplier_id'] = ObjectId(stock_data.supplier_id)
     
     # Add supplier_um_id if provided
     if stock_data.supplier_um_id:
