@@ -53,9 +53,11 @@ interface ReceivedStockTabProps {
   items: PurchaseOrderItem[];
   stockLocations: StockLocation[];
   onReload: () => void;
+  supplierName?: string;
+  supplierId?: string;
 }
 
-export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: ReceivedStockTabProps) {
+export function ReceivedStockTab({ orderId, items, stockLocations, onReload, supplierName, supplierId }: ReceivedStockTabProps) {
   const { t } = useTranslation();
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [receiveModalOpened, setReceiveModalOpened] = useState(false);
@@ -73,6 +75,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
     serial_numbers: '',
     packaging: '',
     status: '65', // Quarantine status (implicit)
+    supplier_id: supplierId || '',
     supplier_um_id: '694813b6297c9dde6d7065b7', // Default supplier UM
     notes: '',
     manufacturing_date: null,
@@ -254,6 +257,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
         serial_numbers: '',
         packaging: '',
         status: '65',
+        supplier_id: supplierId || '',
         supplier_um_id: '694813b6297c9dde6d7065b7',
         notes: '',
         manufacturing_date: null,
@@ -408,6 +412,11 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
           locations={locationsData}
           stockStatuses={stockStatuses}
           systemUms={systemUms}
+          suppliers={[]}
+          fixedSupplier={supplierName && supplierId ? {
+            id: supplierId,
+            name: supplierName
+          } : undefined}
         />
 
         <Group justify="flex-end" mt="md">

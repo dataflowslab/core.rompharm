@@ -39,6 +39,7 @@ export interface ReceiveStockFormData {
   serial_numbers: string;
   packaging: string;
   status: string;
+  supplier_id: string;
   supplier_um_id: string;
   notes: string;
   manufacturing_date: Date | null;
@@ -77,6 +78,13 @@ interface ReceiveStockFormProps {
   locations: Array<{ value: string; label: string }>;
   stockStatuses: Array<{ value: string; label: string }>;
   systemUms: Array<{ value: string; label: string }>;
+  suppliers: Array<{ value: string; label: string }>;
+  
+  // Supplier context
+  fixedSupplier?: {
+    id: string;
+    name: string;
+  };
 }
 
 export function ReceiveStockForm({
@@ -89,6 +97,8 @@ export function ReceiveStockForm({
   locations,
   stockStatuses,
   systemUms,
+  suppliers,
+  fixedSupplier,
 }: ReceiveStockFormProps) {
   const { t } = useTranslation();
 
@@ -148,8 +158,8 @@ export function ReceiveStockForm({
         </Grid.Col>
       )}
 
-      {/* Quantity and Expected Quantity */}
-      <Grid.Col span={6}>
+      {/* Row 1: Received Quantity, Expected Quantity, Supplier U.M. (3 columns) */}
+      <Grid.Col span={4}>
         <NumberInput
           label={t('Received Quantity')}
           placeholder="0"
@@ -163,9 +173,9 @@ export function ReceiveStockForm({
         />
       </Grid.Col>
 
-      <Grid.Col span={6}>
+      <Grid.Col span={4}>
         <NumberInput
-          label={t('Expected Quantity (Delivery Docs)')}
+          label={t('Expected Quantity')}
           placeholder="0"
           value={formData.expected_quantity}
           onChange={(value) => updateField('expected_quantity', Number(value) || 0)}
@@ -174,8 +184,19 @@ export function ReceiveStockForm({
         />
       </Grid.Col>
 
-      {/* Location */}
-      <Grid.Col span={12}>
+      <Grid.Col span={4}>
+        <Select
+          label={t('Supplier U.M.')}
+          placeholder={t('Select unit')}
+          data={systemUms}
+          value={formData.supplier_um_id}
+          onChange={(value) => updateField('supplier_um_id', value || '694813b6297c9dde6d7065b7')}
+          searchable
+        />
+      </Grid.Col>
+
+      {/* Row 2: Location, Status (2 columns) */}
+      <Grid.Col span={6}>
         <Select
           label={t('Location')}
           placeholder={t('Select location')}
@@ -185,6 +206,37 @@ export function ReceiveStockForm({
           searchable
           required
         />
+      </Grid.Col>
+
+      <Grid.Col span={6}>
+        <Select
+          label={t('Status')}
+          placeholder={t('Select status')}
+          data={stockStatuses}
+          value={formData.status}
+          onChange={(value) => updateField('status', value || '65')}
+        />
+      </Grid.Col>
+
+      {/* Supplier Field - readonly if from procurement, selectable if from inventory */}
+      <Grid.Col span={12}>
+        {fixedSupplier ? (
+          <TextInput
+            label={t('Supplier')}
+            value={fixedSupplier.name}
+            disabled
+          />
+        ) : (
+          <Select
+            label={t('Supplier')}
+            placeholder={t('Select supplier')}
+            data={suppliers}
+            value={formData.supplier_id}
+            onChange={(value) => updateField('supplier_id', value || '')}
+            searchable
+            clearable
+          />
+        )}
       </Grid.Col>
 
       {/* Batch Codes */}
@@ -247,29 +299,6 @@ export function ReceiveStockForm({
           />
         </Grid.Col>
       )}
-
-      {/* Status */}
-      <Grid.Col span={12}>
-        <Select
-          label={t('Status')}
-          placeholder={t('Select status')}
-          data={stockStatuses}
-          value={formData.status}
-          onChange={(value) => updateField('status', value || '65')}
-        />
-      </Grid.Col>
-
-      {/* Supplier U.M. */}
-      <Grid.Col span={12}>
-        <Select
-          label={t('Supplier U.M.')}
-          placeholder={t('Select unit of measure')}
-          data={systemUms}
-          value={formData.supplier_um_id}
-          onChange={(value) => updateField('supplier_um_id', value || '694813b6297c9dde6d7065b7')}
-          searchable
-        />
-      </Grid.Col>
 
       {/* Containers Section */}
       <Grid.Col span={12}>

@@ -29,6 +29,7 @@ export function AddStockModal({
   const [stockStatuses, setStockStatuses] = useState<Array<{ value: string; label: string }>>([]);
   const [locations, setLocations] = useState<Array<{ value: string; label: string }>>([]);
   const [systemUms, setSystemUms] = useState<Array<{ value: string; label: string }>>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ value: string; label: string }>>([]);
   
   const [formData, setFormData] = useState<ReceiveStockFormData>({
     part_id: fixedArticleId || '',
@@ -39,6 +40,7 @@ export function AddStockModal({
     serial_numbers: '',
     packaging: '',
     status: '', // Will be set to Quarantined after loading statuses
+    supplier_id: '',
     supplier_um_id: '694813b6297c9dde6d7065b7', // Default supplier UM
     notes: '',
     manufacturing_date: null,
@@ -62,6 +64,9 @@ export function AddStockModal({
       fetchStockStatuses();
       fetchLocations();
       fetchSystemUms();
+      if (fixedArticleId) {
+        fetchArticleSuppliers(fixedArticleId);
+      }
       
       // Reset form when modal opens - status will be set after loading statuses
       setFormData({
@@ -73,6 +78,7 @@ export function AddStockModal({
         serial_numbers: '',
         packaging: '',
         status: '',
+        supplier_id: '',
         supplier_um_id: '694813b6297c9dde6d7065b7',
         notes: '',
         manufacturing_date: null,
@@ -155,6 +161,25 @@ export function AddStockModal({
     }
   };
 
+  const fetchArticleSuppliers = async (articleId: string) => {
+    try {
+      const response = await api.get(`/modules/inventory/api/articles/${articleId}/suppliers`);
+      const suppliersList = response.data || [];
+      
+      // Map suppliers to select format
+      const mappedSuppliers = suppliersList.map((s: any) => ({
+        value: s.supplier_id,
+        label: s.supplier_detail?.name || 'Unknown Supplier'
+      }));
+      
+      setSuppliers(mappedSuppliers);
+    } catch (error) {
+      console.error('Failed to fetch article suppliers:', error);
+      // If no suppliers found, set empty array
+      setSuppliers([]);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formData.part_id || !formData.quantity || !formData.location) {
       notifications.show({
@@ -233,6 +258,7 @@ export function AddStockModal({
         locations={locations}
         stockStatuses={stockStatuses}
         systemUms={systemUms}
+        suppliers={suppliers}
       />
 
       <Group justify="flex-end" mt="md">

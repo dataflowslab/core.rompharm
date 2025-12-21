@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.12] - 2024-12-21
+
+### Added
+- **Supplier Field in Add Stock Form**: Added supplier selection to stock receiving forms
+  - **Inventory > Articles > Add Stock**: Shows dropdown of suppliers available for that article
+    - Loads suppliers from `/modules/inventory/api/articles/{id}/suppliers` endpoint
+    - Only shows suppliers that are associated with the article
+    - Selectable dropdown (not readonly)
+  - **Procurement > Receive Stock**: Shows supplier from purchase order
+    - Supplier pre-selected from procurement order
+    - Displayed as readonly text field (disabled)
+    - Automatically populated from order's supplier
+
+### Changed
+- **Form Layout Optimization**: Reorganized ReceiveStockForm for better space utilization
+  - **Row 1** (3 columns): Received Quantity | Expected Quantity | Supplier U.M.
+    - Previously: Supplier U.M. was below Status field
+    - Now: All quantity-related fields on same row
+  - **Row 2** (2 columns): Location | Status
+    - Previously: Location was full width, Status was separate
+    - Now: Both on same row for compact layout
+  - **Row 3** (full width): Supplier
+    - Context-aware: readonly for Procurement, selectable for Inventory
+
+### Technical
+- Extended `ReceiveStockFormData` interface with `supplier_id: string` field
+- Added `suppliers` prop to `ReceiveStockForm` component (array of {value, label})
+- Added `fixedSupplier` prop to `ReceiveStockForm` for readonly supplier display
+- Updated `AddStockModal.tsx`:
+  - Added `fetchArticleSuppliers()` function to load article's suppliers
+  - Loads suppliers when modal opens if `fixedArticleId` is provided
+  - Passes `suppliers` array to `ReceiveStockForm`
+- Updated `ReceivedStockTab.tsx`:
+  - Added `supplierName` and `supplierId` props
+  - Passes `fixedSupplier` to `ReceiveStockForm` for readonly display
+  - Initializes `formData.supplier_id` with `supplierId` from order
+- Grid layout changes in `ReceiveStockForm.tsx`:
+  - Received Quantity: `span={4}` (was `span={6}`)
+  - Expected Quantity: `span={4}` (was `span={6}`)
+  - Supplier U.M.: `span={4}` (was `span={12}`, moved from bottom)
+  - Location: `span={6}` (was `span={12}`)
+  - Status: `span={6}` (was `span={12}`)
+
 ## [1.18.11] - 2024-12-21
 
 ### Fixed
