@@ -50,13 +50,11 @@ export function QCTab({ stockId, stock, onUpdate }: QCTabProps) {
   useEffect(() => {
     if (stock) {
       // Initialize fields from stock data
-      // Rompharm BA fields (currently stored in supplier_ba fields, will be separate)
-      setRompharmBaNo(stock.rompharm_ba_no || stock.supplier_ba_no || '');
+      // Rompharm BA fields are separate from Supplier BA fields
+      setRompharmBaNo(stock.rompharm_ba_no || '');
       setRompharmBaDate(
         stock.rompharm_ba_date 
           ? new Date(stock.rompharm_ba_date) 
-          : stock.supplier_ba_date 
-          ? new Date(stock.supplier_ba_date) 
           : null
       );
       setSelectedStatus(stock.state_id || '');
@@ -66,18 +64,11 @@ export function QCTab({ stockId, stock, onUpdate }: QCTabProps) {
   const fetchStockStatuses = async () => {
     try {
       const response = await api.get('/modules/depo_procurement/api/stock-statuses');
-      
-      // Handle both array and object responses
-      const statusesArray = Array.isArray(response.data) 
-        ? response.data 
-        : (response.data.statuses || response.data.results || []);
-      
-      const statuses = statusesArray.map((status: any) => ({
+      const statuses = response.data.map((status: any) => ({
         value: status._id,
         label: status.name,
         color: status.color || 'gray',
       }));
-      
       setStockStatuses(statuses);
     } catch (error: any) {
       console.error('Failed to fetch stock statuses:', error);

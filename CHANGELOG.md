@@ -2,15 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.18.20] - 2024-12-21
+## [1.18.21] - 2024-12-21
 
 ### Fixed
+- **QC Tab Rompharm BA Fields**: Fixed Rompharm BA fields incorrectly displaying Supplier BA data
+  - **Problem**: Rompharm BA No and Rompharm BA Date were showing values from Supplier BA fields as fallback
+  - **Solution**: Removed fallback logic - Rompharm BA fields now only show data from `rompharm_ba_no` and `rompharm_ba_date`
+  - These are separate fields and should remain empty if not set, not copy from Supplier BA
+
 - **QC Tab Stock Statuses Loading**: Fixed stock statuses not appearing in QC tab dropdown
   - **Problem**: TypeError `.map is not a function` - backend returns object with `statuses` property, not direct array
   - **Solution**: Added flexible response handling to check if `response.data` is array or object with `statuses`/`results` property
   - Status dropdown now loads correctly with colored badges in QC tab
 
 ### Technical
+- Modified `QCTab.tsx` initialization logic:
+  - Changed from `stock.rompharm_ba_no || stock.supplier_ba_no || ''` to `stock.rompharm_ba_no || ''`
+  - Changed from fallback chain to direct `stock.rompharm_ba_date ? new Date(stock.rompharm_ba_date) : null`
+  - Rompharm BA and Supplier BA are now completely independent fields
 - Modified `QCTab.tsx` `fetchStockStatuses()`:
   - Added check: `Array.isArray(response.data) ? response.data : (response.data.statuses || response.data.results || [])`
   - Handles both array responses and object responses with nested arrays
