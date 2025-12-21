@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.23] - 2024-12-21
+
+### Refactored
+- **Global Document System**: Complete refactoring of document generation system
+  - **Simplified Endpoints**: Removed object-type specific URLs (procurement-order, stock-request)
+  - **New Structure**:
+    - `POST /api/documents/generate` - Universal generation (all types)
+    - `GET /api/documents/templates` - Get templates (optional filter by object_type)
+    - `GET /api/documents/{document_id}` - Get document info
+    - `GET /api/documents/{document_id}/download` - Download document
+    - `DELETE /api/documents/{document_id}` - Delete document
+    - `GET /api/documents/job/{job_id}/status` - Check job status
+    - `GET /api/documents/object/{object_type}/{object_id}` - Get all documents for object
+  - **ObjectId Consistency**: All IDs stored as ObjectId in MongoDB (no more string/ObjectId mix)
+  - **Benefits**:
+    - ✅ Clean, RESTful API design
+    - ✅ No object-type coupling in URLs
+    - ✅ Single endpoint for all document types
+    - ✅ Consistent ID handling throughout
+    - ✅ Easier to extend with new document types
+
+### Fixed
+- **Document Download 404**: Fixed procurement order document download returning 404
+  - **Problem**: `order_id` stored as string but queried as ObjectId (or vice versa)
+  - **Solution**: Consistent ObjectId storage and querying across all collections
+  - Documents now properly retrieved and downloaded
+
+### Technical
+- Completely rewrote `src/backend/routes/documents.py` (reduced from ~1800 to ~600 lines)
+- All document collections now use `object_id` (ObjectId) and `object_type` (string) fields
+- Internal handlers `_generate_procurement_order_document()` and `_generate_stock_request_document()`
+- Removed all legacy endpoints (procurement-order/*, stock-request/*)
+- Document generation request includes `object_type` and `object_id` fields
+- Response includes `document_id` for direct access to document
+
 ## [1.18.22] - 2024-12-21
 
 ### Refactored
