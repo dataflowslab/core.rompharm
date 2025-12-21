@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -26,6 +26,11 @@ interface Stock {
     um: string;
   };
   status: string;
+  status_detail?: {
+    name: string;
+    value: number;
+    color: string;
+  };
   location_detail?: {
     name: string;
   };
@@ -41,6 +46,7 @@ interface Location {
 }
 
 export function StocksPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(false);
@@ -107,20 +113,20 @@ export function StocksPage() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { color: string; label: string }> = {
-      'OK': { color: 'green', label: 'OK' },
-      'Quarantine': { color: 'yellow', label: 'Quarantine' },
-      'Attention': { color: 'orange', label: 'Attention' },
-      'Damaged': { color: 'red', label: 'Damaged' },
-      'Destroyed': { color: 'red', label: 'Destroyed' },
-      'Rejected': { color: 'red', label: 'Rejected' },
-      'Lost': { color: 'gray', label: 'Lost' },
-      'Returned': { color: 'blue', label: 'Returned' },
-    };
-
-    const statusInfo = statusMap[status] || { color: 'gray', label: status };
-    return <Badge color={statusInfo.color}>{statusInfo.label}</Badge>;
+  const getStatusBadge = (stock: Stock) => {
+    if (stock.status_detail) {
+      return (
+        <Badge
+          style={{
+            backgroundColor: stock.status_detail.color || '#gray',
+            color: '#fff',
+          }}
+        >
+          {stock.status_detail.name}
+        </Badge>
+      );
+    }
+    return <Badge color="gray">{stock.status}</Badge>;
   };
 
   const formatCurrency = (value: number) => {
@@ -188,12 +194,16 @@ export function StocksPage() {
               </Table.Tr>
             ) : (
               stocks.map((stock) => (
-                <Table.Tr key={stock._id}>
+                <Table.Tr
+                  key={stock._id}
+                  onClick={() => navigate(`/inventory/stocks/${stock._id}`)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <Table.Td>{stock.batch_code || '-'}</Table.Td>
                   <Table.Td>{formatDate(stock.batch_date || stock.received_date)}</Table.Td>
                   <Table.Td>{stock.part_detail?.name || '-'}</Table.Td>
                   <Table.Td>{stock.part_detail?.ipn || '-'}</Table.Td>
-                  <Table.Td>{getStatusBadge(stock.status)}</Table.Td>
+                  <Table.Td>{getStatusBadge(stock)}</Table.Td>
                   <Table.Td>{stock.location_detail?.name || '-'}</Table.Td>
                   <Table.Td>
                     {stock.quantity} {stock.part_detail?.um || 'buc'}

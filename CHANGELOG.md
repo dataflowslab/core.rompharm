@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.8] - 2024-12-21
+
+### Added
+- **Stock Detail Page**: New dedicated page for viewing complete stock information
+  - Two tabs: "Stock Details" and "QC" (Quality Control)
+  - **Stock Details tab**: Displays all stock information organized in sections:
+    - Article Information (name, IPN, unit of measure)
+    - Stock Information (quantity, expected quantity, location, supplier, batch codes, stock value)
+    - Dates (manufacturing, received, expiry, reset)
+    - Containers (with damage/unsealed/mislabeled indicators)
+    - Notes
+    - Metadata (created/updated timestamps and users)
+  - **QC tab**: Quality control information:
+    - Supplier BA Information (BA number, date, accordance status, supplier list status)
+    - Transport Conditions (clean transport, temperature control, conditions met)
+    - Quality Status (current status with color badge)
+  - Accessible via `/inventory/stocks/{stock_id}`
+  - Back button to return to previous page
+  - Status badge with color in page header
+
+- **Clickable Stock Rows**: Stock table rows are now clickable
+  - Click any row to navigate to Stock Detail Page
+  - Visual cursor pointer on hover
+  - Improves navigation and user experience
+
+### Changed
+- **Stock Status Colors**: Status badges now use colors from `depo_stocks_states` collection
+  - Backend enriches stocks with `status_detail` containing `name`, `value`, and `color`
+  - Frontend displays badges with custom background color from database
+  - Consistent color scheme across all stock displays (Stocks page, Article details, etc.)
+  - Replaces hardcoded color mapping with dynamic database-driven colors
+  - White text color for better contrast on colored backgrounds
+
+### Technical
+- Created `StockItemDetailPage.tsx` with tabbed interface (Stock Details, QC)
+- Updated `StocksPage.tsx`:
+  - Added `useNavigate` hook for navigation
+  - Added `status_detail` to Stock interface
+  - Modified `getStatusBadge()` to use `status_detail.color` from backend
+  - Added `onClick` handler and cursor style to table rows
+- Backend already returns `status_detail` with color in `get_stocks_list()` and `get_stock_by_id()`
+- Route `/inventory/stocks/:id` displays StockItemDetailPage
+
 ## [1.18.7] - 2024-12-21
 
 ### Added
