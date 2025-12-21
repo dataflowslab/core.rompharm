@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Paper, Group } from '@mantine/core';
+import { Grid, TextInput, Textarea, Select, Button, Paper, Group, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { IconDeviceFloppy } from '@tabler/icons-react';
-import { DocumentManager } from '../Common/DocumentManager';
+import { DocumentGenerator } from '../Common/DocumentGenerator';
 
 interface Supplier {
   pk: number;
@@ -127,17 +127,16 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
     <Grid gutter="md">
       {/* Document Sidebar - 1/4 width */}
       <Grid.Col span={3}>
-        <DocumentManager
-          entityId={order.pk || order._id}
-          entityType="procurement-order"
-          templates={documentTemplates}
-          onDocumentGenerated={() => {
-            // Optionally refresh order data
-            if (onUpdate) {
-              onUpdate({});
-            }
-          }}
-        />
+        <Paper p="md" withBorder>
+          <Title order={5} mb="md">{t('Documents')}</Title>
+          <DocumentGenerator
+            objectId={String(order._id || order.pk)}
+            templateCodes={['ILY5WVAV8SQD']}
+            onDocumentsChange={(docs) => {
+              console.log('Documents updated:', docs);
+            }}
+          />
+        </Paper>
       </Grid.Col>
 
       {/* Order Details Form - 3/4 width */}

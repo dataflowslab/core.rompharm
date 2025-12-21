@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.24] - 2024-12-21
+
+### Added
+- **DocumentGenerator Component**: New reusable component for document generation
+  - **Simple Interface**: Pass `objectId` and array of `templateCodes`
+  - **Auto-Status Checking**: Automatically checks job status every 3 seconds until complete
+  - **Inline Actions**: Generate, check status, and download buttons in compact layout
+  - **Real-time Updates**: Shows current status with colored badges (queued, processing, done, failed)
+  - **Callback Support**: `onDocumentsChange` callback for parent component updates
+  - **Usage Example**:
+    ```tsx
+    <DocumentGenerator
+      objectId={orderId}
+      templateCodes={['ILY5WVAV8SQD', 'TEMPLATE2']}
+      onDocumentsChange={(docs) => console.log(docs)}
+    />
+    ```
+
+### Refactored
+- **Document System Simplified**: Complete refactoring to use only `job_id`
+  - **Removed `document_id`**: All operations use `job_id` from document service
+  - **Removed `object_type`**: Backend auto-detects type by checking collections
+  - **Simplified Endpoints**:
+    - `POST /api/documents/generate` → returns `{job_id, status, filename}`
+    - `GET /api/documents/{job_id}/download` → download by job_id
+    - `DELETE /api/documents/{job_id}` → delete by job_id
+    - `GET /api/documents/job/{job_id}/status` → check status
+    - `GET /api/documents/for/{object_id}` → get all documents for object
+  - **Benefits**:
+    - ✅ Single ID for everything (job_id)
+    - ✅ No confusion between document_id and job_id
+    - ✅ Cleaner API surface
+    - ✅ Easier to understand and maintain
+
+### Fixed
+- **Company Info Parsing**: Fixed `company_info` being stored as JSON string in MongoDB
+  - Added automatic JSON parsing when `content` field is string
+  - Handles both string and dict formats gracefully
+  - Prevents `AttributeError: 'str' object has no attribute 'get'`
+
+### Technical
+- Created `src/frontend/src/components/Common/DocumentGenerator.tsx`
+- Updated `DetailsTab.tsx` to use new `DocumentGenerator` component
+- Backend searches by `job_id` in all document collections
+- MongoDB stores `job_id` as primary identifier for documents
+- Auto-polling mechanism for status updates until document is ready
+
 ## [1.18.23] - 2024-12-21
 
 ### Refactored
