@@ -18,10 +18,11 @@ interface DocumentJob {
 interface DocumentGeneratorProps {
   objectId: string;
   templateCodes: string[];  // Array of template codes to show as buttons
+  templateNames?: Record<string, string>;  // Optional mapping of code -> name
   onDocumentsChange?: (documents: Record<string, DocumentJob>) => void;
 }
 
-export function DocumentGenerator({ objectId, templateCodes, onDocumentsChange }: DocumentGeneratorProps) {
+export function DocumentGenerator({ objectId, templateCodes, templateNames, onDocumentsChange }: DocumentGeneratorProps) {
   const { t } = useTranslation();
   const [documents, setDocuments] = useState<Record<string, DocumentJob>>({});
   const [templates, setTemplates] = useState<Record<string, { code: string; name: string }>>({});
@@ -36,6 +37,21 @@ export function DocumentGenerator({ objectId, templateCodes, onDocumentsChange }
   }, [objectId, templateCodes]);
 
   const loadTemplates = async () => {
+    // If templateNames provided, use them directly
+    if (templateNames) {
+      console.log('[DocumentGenerator] Using provided template names:', templateNames);
+      const templatesMap: Record<string, { code: string; name: string }> = {};
+      templateCodes.forEach(code => {
+        templatesMap[code] = {
+          code: code,
+          name: templateNames[code] || code
+        };
+      });
+      setTemplates(templatesMap);
+      return;
+    }
+
+    // Otherwise, try to load from API
     try {
       const response = await api.get('/api/documents/templates');
       console.log('[DocumentGenerator] Templates from API:', response.data);

@@ -52,6 +52,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [templateCodes, setTemplateCodes] = useState<string[]>([]);
+  const [templateNames, setTemplateNames] = useState<Record<string, string>>({});
   
   // Editable state
   const [formData, setFormData] = useState({
@@ -76,10 +77,12 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
         // Convert object {code: name} to array of codes
         const codes = Object.keys(templatesObj);
         setTemplateCodes(codes);
+        setTemplateNames(templatesObj);
       } catch (error) {
         console.error('Failed to load template codes:', error);
         // Fallback to empty array
         setTemplateCodes([]);
+        setTemplateNames({});
       }
     };
     
@@ -142,6 +145,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
           <DocumentGenerator
             objectId={String(order._id || order.pk)}
             templateCodes={templateCodes}
+            templateNames={templateNames}
             onDocumentsChange={async (docs) => {
               // Save documents to purchase order
               try {
