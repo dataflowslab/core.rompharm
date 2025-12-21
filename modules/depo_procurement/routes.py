@@ -514,16 +514,19 @@ async def sign_purchase_order(
     username = current_user["username"]
     can_sign = False
     
-    for officer in flow.get("required_officers", []):
+    for officer in flow.get("required_officers", []) + flow.get("optional_officers", []):
         if officer["type"] == "person" and officer["reference"] == user_id:
             can_sign = True
             break
-    
-    if not can_sign:
-        for officer in flow.get("optional_officers", []):
-            if officer["type"] == "person" and officer["reference"] == user_id:
-                can_sign = True
-                break
+        elif officer["type"] == "role":
+            # Check if user has this role (role is ObjectId in users.role field)
+            user_role_id = current_user.get("role")  # ObjectId from roles collection
+            if user_role_id:
+                # Get role details
+                role = db.roles.find_one({"_id": ObjectId(user_role_id)})
+                if role and role.get("name") == officer["reference"]:
+                    can_sign = True
+                    break
     
     if not can_sign:
         raise HTTPException(status_code=403, detail="You are not authorized to sign this order")

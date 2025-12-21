@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-22 00:38:27
+**Last Updated:** 2025-12-22 00:48:47
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -145,7 +145,7 @@
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}` - Get a specific purchase order from MongoDB
 - `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}` - Update a purchase order in MongoDB
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/approval-flow` - Get approval flow for a purchase order
-- `POST /modules/depo_procurement/api/purchase-orders/{order_id}/approval-flow` - Create approval flow for a purchase order using config from MongoDB
+- `POST /modules/depo_procurement/api/purchase-orders/{order_id}/approval-flow` - Create approval flow for a purchase order using approval_templates
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/attachments` - Get attachments for a purchase order
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/attachments` - Upload an attachment to a purchase order
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/attachments/{attachment_id}` - Delete an attachment from a purchase order

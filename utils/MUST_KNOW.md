@@ -419,11 +419,14 @@ async def sign_object(object_id: str, current_user: dict = Depends(verify_token)
             can_sign = True
             break
         elif officer["type"] == "role":
-            # Check if user has this role
-            user_roles = current_user.get("roles", [])
-            if officer["reference"] in user_roles:
-                can_sign = True
-                break
+            # Check if user has this role (role is ObjectId in users.role field)
+            user_role_id = current_user.get("role")  # ObjectId from roles collection
+            if user_role_id:
+                # Get role details
+                role = db.roles.find_one({"_id": ObjectId(user_role_id)})
+                if role and role.get("name") == officer["reference"]:
+                    can_sign = True
+                    break
     
     if not can_sign:
         raise HTTPException(status_code=403, detail="Not authorized to sign")
