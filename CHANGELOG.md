@@ -11,14 +11,23 @@ All notable changes to this project will be documented in this file.
   - **Inline Actions**: Generate, check status, and download buttons in compact layout
   - **Real-time Updates**: Shows current status with colored badges (queued, processing, done, failed)
   - **Callback Support**: `onDocumentsChange` callback for parent component updates
+  - **Auto-Save to Parent**: Documents automatically saved to parent object (e.g., `depo_purchase_orders.documents`)
   - **Usage Example**:
     ```tsx
     <DocumentGenerator
       objectId={orderId}
       templateCodes={['ILY5WVAV8SQD', 'TEMPLATE2']}
-      onDocumentsChange={(docs) => console.log(docs)}
+      onDocumentsChange={async (docs) => {
+        await api.patch(`/api/orders/${orderId}/documents`, { documents: docs });
+      }}
     />
     ```
+
+- **Document Tracking Endpoint**: New endpoint for saving documents to parent objects
+  - `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}/documents`
+  - Accepts `{documents: {...}}` payload
+  - Saves document metadata (job_id, status, template_code, etc.) to parent object
+  - Enables tracking of all generated documents per order
 
 ### Refactored
 - **Document System Simplified**: Complete refactoring to use only `job_id`
