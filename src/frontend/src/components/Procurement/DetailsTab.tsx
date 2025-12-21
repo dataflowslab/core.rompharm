@@ -13,7 +13,8 @@ interface Supplier {
 }
 
 interface StockLocation {
-  pk: number;
+  _id?: string;
+  pk?: number;
   name: string;
 }
 
@@ -184,15 +185,6 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
               />
             </Grid.Col>
 
-            <Grid.Col span={12}>
-              <TextInput
-                label={t('Description')}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                readOnly={!canEdit}
-              />
-            </Grid.Col>
-
             <Grid.Col span={6}>
               <TextInput
                 label={t('Supplier')}
@@ -238,12 +230,22 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
                 label={t('Destination')}
                 value={formData.destination}
                 onChange={(value) => setFormData({ ...formData, destination: value || '' })}
-                data={stockLocations
-                  .filter(loc => loc.pk != null && loc.pk !== undefined)
-                  .map(loc => ({ value: String(loc.pk), label: loc.name }))}
+                data={stockLocations.map(loc => ({ 
+                  value: String(loc._id || loc.pk), 
+                  label: loc.name 
+                }))}
                 disabled={!canEdit}
                 searchable
                 clearable
+              />
+            </Grid.Col>
+
+            <Grid.Col span={12}>
+              <TextInput
+                label={t('Description')}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                readOnly={!canEdit}
               />
             </Grid.Col>
 
