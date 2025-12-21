@@ -254,16 +254,15 @@ export function ProcurementDetailPage() {
   };
 
   const getStatusColor = (status: string) => {
-    // MongoDB status names
+    // MongoDB status names based on depo_purchase_orders_states
     switch (status?.toLowerCase()) {
-      case 'pending': return 'gray';
-      case 'processing': return 'blue';
-      case 'approved': return 'cyan';
-      case 'complete': return 'yellow';
-      case 'finished': return 'green';
+      case 'pending': return 'gray';      // value: 0
+      case 'issued': return 'cyan';       // value: 10
+      case 'processing': return 'blue';   // value: 20
+      case 'finished': return 'green';    // value: 30
+      case 'refused': return 'red';       // value: 30
       case 'canceled': 
-      case 'cancelled': 
-      case 'refused': return 'red';
+      case 'cancelled': return 'red';     // value: 90
       default: return 'gray';
     }
   };
