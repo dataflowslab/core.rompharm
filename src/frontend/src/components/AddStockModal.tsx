@@ -198,6 +198,8 @@ export function AddStockModal({
 
     setLoading(true);
     try {
+      console.log('[AddStockModal] formData.supplier_id:', formData.supplier_id);
+      
       // Create stock item with all data
       const stockPayload = {
         part_id: formData.part_id,

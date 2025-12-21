@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.18] - 2024-12-21
+
+### Fixed
+- **Expected Quantity Auto-fill Multi-digit**: Fixed auto-fill stopping at first digit
+  - **Problem**: When typing "100", expected quantity stopped at "1" instead of continuing to "10", "100"
+  - **Cause**: Flag `hasSetExpectedQuantity` was set to true after first digit, preventing further updates
+  - **Solution**: Removed flag logic - now auto-fills on every keystroke while `expected_quantity === 0`
+  - Auto-fill continues until user manually changes expected_quantity field
+  - Once user manually edits expected_quantity, auto-fill stops (field no longer 0)
+
+### Technical
+- Modified `ReceiveStockForm.tsx` `handleQuantityChange()`:
+  - Removed `hasSetExpectedQuantity` flag logic
+  - Simplified condition to `if (formData.expected_quantity === 0 && value > 0)`
+  - Auto-fills for every keystroke until user manually changes expected_quantity
+- Added debug logging in `AddStockModal.tsx` to track `supplier_id` value before submission
+
 ## [1.18.17] - 2024-12-21
 
 ### Fixed

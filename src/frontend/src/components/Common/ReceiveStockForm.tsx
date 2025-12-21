@@ -123,18 +123,18 @@ export function ReceiveStockForm({
       currentExpectedQuantity: formData.expected_quantity
     });
     
-    // Auto-fill Expected Quantity only the first time Received Quantity is set
-    if (!hasSetExpectedQuantity && value > 0 && formData.expected_quantity === 0) {
+    // Auto-fill Expected Quantity: copy value to expected_quantity while it's still 0
+    // This happens for every keystroke until user manually changes expected_quantity
+    if (formData.expected_quantity === 0 && value > 0) {
       console.log('[ReceiveStockForm] Auto-filling expected_quantity with:', value);
-      // Update both fields at once to avoid race condition
+      // Update both fields at once
       onChange({ 
         ...formData, 
         quantity: value,
         expected_quantity: value 
       });
-      setHasSetExpectedQuantity(true);
     } else {
-      // Just update quantity
+      // Just update quantity (user has manually set expected_quantity)
       updateField('quantity', value);
     }
   };
