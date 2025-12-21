@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { DocumentGenerator } from '../Common/DocumentGenerator';
+import api from '../../services/api';
 
 interface Supplier {
   pk: number;
@@ -132,8 +133,16 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
           <DocumentGenerator
             objectId={String(order._id || order.pk)}
             templateCodes={['ILY5WVAV8SQD']}
-            onDocumentsChange={(docs) => {
-              console.log('Documents updated:', docs);
+            onDocumentsChange={async (docs) => {
+              // Save documents to purchase order
+              try {
+                await api.patch(`/modules/depo_procurement/api/purchase-orders/${order._id || order.pk}/documents`, {
+                  documents: docs
+                });
+                console.log('Documents saved to order:', docs);
+              } catch (error) {
+                console.error('Failed to save documents:', error);
+              }
             }}
           />
         </Paper>

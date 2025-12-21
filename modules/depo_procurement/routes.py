@@ -95,6 +95,38 @@ async def update_purchase_order(
         raise HTTPException(status_code=500, detail=f"Failed to update purchase order: {str(e)}")
 
 
+@router.patch("/purchase-orders/{order_id}/documents")
+async def update_order_documents(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Update documents field in purchase order"""
+    db = get_db()
+    
+    # Get the JSON body with documents
+    body = await request.json()
+    documents = body.get('documents', {})
+    
+    try:
+        result = db['depo_purchase_orders'].update_one(
+            {'_id': ObjectId(order_id)},
+            {
+                '$set': {
+                    'documents': documents,
+                    'updated_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+        return {"message": "Documents updated successfully", "documents": documents}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update documents: {str(e)}")
+
+
 @router.get("/purchase-orders/{order_id}/items")
 async def get_purchase_order_items(
     request: Request,
