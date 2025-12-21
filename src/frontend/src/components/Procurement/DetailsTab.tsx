@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Grid, TextInput, Textarea, Select, Button, Paper, Group, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
@@ -51,6 +51,7 @@ interface DetailsTabProps {
 export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: DetailsTabProps) {
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
+  const [templateCodes, setTemplateCodes] = useState<string[]>([]);
   
   // Editable state
   const [formData, setFormData] = useState({
@@ -66,16 +67,21 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
   const issueDate = order.issue_date ? new Date(order.issue_date) : null;
   const targetDate = formData.target_date ? new Date(formData.target_date) : null;
 
-  // Document templates configuration
-  const documentTemplates = [
-    {
-      code: 'ILY5WVAV8SQD',
-      name: 'Comandă Achiziție',
-      label: t('Purchase Order'),
-      disabled: order.status < 20,
-      disabledMessage: order.status < 20 ? t('Available after order is signed') : undefined
-    }
-  ];
+  // Load template codes from backend
+  useEffect(() => {
+    const loadTemplateCodes = async () => {
+      try {
+        const response = await api.get('/modules/depo_procurement/api/document-templates');
+        setTemplateCodes(response.data.templates || []);
+      } catch (error) {
+        console.error('Failed to load template codes:', error);
+        // Fallback to empty array
+        setTemplateCodes([]);
+      }
+    };
+    
+    loadTemplateCodes();
+  }, []);
 
   const handleSave = async () => {
     if (!onUpdate) return;
@@ -132,7 +138,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
           <Title order={5} mb="md">{t('Documents')}</Title>
           <DocumentGenerator
             objectId={String(order._id || order.pk)}
-            templateCodes={['ILY5WVAV8SQD']}
+            templateCodes={templateCodes}
             onDocumentsChange={async (docs) => {
               // Save documents to purchase order
               try {

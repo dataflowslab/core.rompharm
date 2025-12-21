@@ -240,6 +240,24 @@ async def get_order_statuses(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch order states: {str(e)}")
 
+
+@router.get("/document-templates")
+async def get_document_templates(
+    request: Request,
+    current_user: dict = Depends(verify_token)
+):
+    """Get document template codes for procurement orders"""
+    db = get_db()
+    config_collection = db['config']
+    
+    try:
+        config = config_collection.find_one({'slug': 'procurement_details_document_codes'})
+        if config and 'items' in config:
+            return {"templates": config['items']}
+        return {"templates": []}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch document templates: {str(e)}")
+
 @router.get("/stock-statuses")
 async def get_stock_statuses(
     request: Request,
