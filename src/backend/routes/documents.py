@@ -676,21 +676,36 @@ async def generate_procurement_document(
         serialized_order = serialize_for_json(purchase_order)
         serialized_line_items = serialize_for_json(line_items)
         serialized_supplier = serialize_for_json(supplier_detail) if supplier_detail else None
-        serialized_company = serialize_for_json(company_info) if company_info else None
         
-        # Prepare data for template - wrap in 'data' key like submissions
-        # NOTE: Don't use 'items' as key name - conflicts with dict.items() method in Jinja2
-        document_data = {
-            'data': {
-                'order': serialized_order,
-                'line_items': serialized_line_items,  # Changed from 'items' to 'line_items'
-                'supplier': serialized_supplier,  # Full supplier details
-                'company': serialized_company,  # Buyer/company info
-                'qr_code_svg': qr_svg,  # QR code as SVG string
-                'qr_code_data': qr_string,  # Raw QR code data
-                'generated_at': datetime.utcnow().isoformat(),
-                'generated_by': user.get('username')
+        # Map company fields to match template expectations
+        # Template expects: name, tax_id, address, phone, fax, email
+        # Config may have: nume/name, cif/tax_id, adresa/address, telefon/phone, fax, email
+        serialized_company = None
+        if company_info:
+            serialized_company = {
+                'name': company_info.get('name', company_info.get('nume', '')),
+                'tax_id': company_info.get('tax_id', company_info.get('cif', '')),
+                'address': company_info.get('address', company_info.get('adresa', '')),
+                'phone': company_info.get('phone', company_info.get('telefon', '')),
+                'fax': company_info.get('fax', ''),
+                'email': company_info.get('email', '')
             }
+        
+        # Prepare data for template
+        # Template expects variables at root level: company, purchase_order, supplier, line_items, etc.
+        document_data = {
+            'company': serialized_company,  # Buyer/company info
+            'purchase_order': serialized_order,  # Order details
+            'supplier': serialized_supplier,  # Full supplier details
+            'line_items': serialized_line_items,  # Order items
+            'delivery_address': serialized_order.get('delivery_address', ''),  # Delivery address
+            'user': {
+                'name': user.get('username', 'System')
+            },
+            'qr_code_svg': qr_svg,  # QR code as SVG string
+            'qr_code_data': qr_string,  # Raw QR code data
+            'generated_at': datetime.utcnow().isoformat(),
+            'generated_by': user.get('username')
         }
         
         print(f"[DOCUMENT] Creating async job in OfficeClerk...")

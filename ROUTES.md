@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-21 19:17:07
+**Last Updated:** 2025-12-21 21:43:02
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -222,6 +222,7 @@
 - `GET /modules/inventory/api/stocks` - Get list of stocks with enriched data including supplier information
 - `POST /modules/inventory/api/stocks` - Create a new stock item
 - `GET /modules/inventory/api/stocks/{stock_id}` - Get a specific stock entry with enriched data
+- `PUT /modules/inventory/api/stocks/{stock_id}` - Update stock QC information
 
 **Suppliers**
 - `GET /modules/inventory/api/suppliers` - Get list of suppliers (companies with is_supplier=true)
