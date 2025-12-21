@@ -170,7 +170,8 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
                 label={t('Order Reference')}
                 value={formData.reference}
                 onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                readOnly={!canEdit}
+                readOnly
+                disabled
               />
             </Grid.Col>
 

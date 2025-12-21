@@ -223,11 +223,20 @@ export function ProcurementDetailPage() {
       isAdmin,
       currentUserId,
       orderResponsible: order.responsible,
+      orderStatus: order.status,
       approvalFlow,
       signatures: approvalFlow?.signatures?.length || 0,
     });
 
-    // Admin can always edit
+    // Once order is signed/approved (status is Processing or beyond), only Notes can be edited
+    // Status "Pending" = can edit, "Processing" = signed/approved = cannot edit items/details
+    const orderStatus = order.status?.toLowerCase();
+    if (orderStatus && orderStatus !== 'pending') {
+      console.log('[canEdit] Order is signed/approved (status:', order.status, ') - CANNOT EDIT');
+      return false;
+    }
+
+    // Admin can edit pending orders
     if (isAdmin) {
       console.log('[canEdit] User is admin - CAN EDIT');
       return true;
