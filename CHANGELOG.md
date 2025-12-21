@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.22] - 2024-12-21
+
+### Refactored
+- **Inventory Module Code Organization**: Refactored inventory module for better maintainability
+  - **Created `models.py`**: Moved all 16 Pydantic models from routes.py (195 lines)
+    - Article models (Create, Update)
+    - Location models (Create, Update)
+    - Category models (Create, Update)
+    - Stock models (Create, Update)
+    - Supplier models (Create, Update, Address, Contact, Part)
+    - Article-Supplier relationship models
+  - **Created `utils.py`**: Extracted utility functions (28 lines)
+    - `serialize_doc()` - MongoDB document serialization
+  - **Benefits**:
+    - ✅ Reduced routes.py from 1717 to ~1500 lines
+    - ✅ Better code organization and separation of concerns
+    - ✅ Easier to maintain and test
+    - ✅ Models can be reused across modules
+    - ✅ Clear structure: routes (controllers) → services (business logic) → models (data validation)
+
+### Technical
+- Created `modules/inventory/models.py` with all Pydantic request/response models
+- Created `modules/inventory/utils.py` with serialize_doc helper function
+- Routes.py now imports models from models.py and serialize_doc from utils.py
+- No functional changes - pure refactoring for code organization
+
 ## [1.18.21] - 2024-12-21
 
 ### Fixed
