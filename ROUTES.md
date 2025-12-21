@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-21 23:17:48
+**Last Updated:** 2025-12-21 23:24:15
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -60,9 +60,9 @@
 
 ### Documents
 - `GET /api/documents/for/{object_id}` - Get all documents for an object (by object_id)
-- `POST /api/documents/generate` - Universal document generation
+- `POST /api/documents/generate` - Universal document generation - template determines the type
 - `GET /api/documents/job/{job_id}/status` - Check job status by job_id
-- `GET /api/documents/templates` - Get available templates, optionally filtered by object_type
+- `GET /api/documents/templates` - Get all available templates
 - `DELETE /api/documents/{document_id}` - Delete document by document_id
 - `GET /api/documents/{document_id}` - Get document info by document_id
 - `GET /api/documents/{document_id}/download` - Download document by document_id

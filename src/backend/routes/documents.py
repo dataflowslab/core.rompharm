@@ -338,7 +338,22 @@ async def _generate_procurement_order_document(db, order_obj_id, request, user):
     # Get company info
     config_collection = db['config']
     org_config = config_collection.find_one({'slug': 'organizatie'})
-    company_info = org_config.get('content', {}) if org_config else {}
+    
+    # Handle company_info - might be string or dict
+    company_info = {}
+    if org_config:
+        content = org_config.get('content', {})
+        if isinstance(content, str):
+            # If it's a string, try to parse as JSON
+            import json
+            try:
+                company_info = json.loads(content)
+            except:
+                company_info = {}
+        elif isinstance(content, dict):
+            company_info = content
+        else:
+            company_info = {}
     
     # Get line items with part details
     line_items = purchase_order.get('items', [])
