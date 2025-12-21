@@ -55,6 +55,7 @@ interface PurchaseOrder {
   notes: string;
   status: string;  // MongoDB: string status name (e.g., "Pending", "Processing")
   status_text?: string;  // Legacy InvenTree field
+  status_color?: string;  // Color from depo_purchase_orders_states
   responsible?: number;
   created_by?: string;
 }
@@ -302,7 +303,7 @@ export function ProcurementDetailPage() {
           <Title order={2}>{order.reference || t('Purchase Order')}</Title>
           <Text size="sm" c="dimmed">{order.supplier_detail?.name}</Text>
         </div>
-        <Badge color={getStatusColor(order.status)} size="lg">
+        <Badge color={order.status_color || getStatusColor(order.status)} size="lg">
           {order.status || order.status_text || 'Unknown'}
         </Badge>
       </Group>
