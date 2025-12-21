@@ -452,6 +452,20 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
           </Grid.Col>
 
           <Grid.Col span={6}>
+            <ApiSelect
+              label={t('Destination')}
+              endpoint="/modules/inventory/api/locations"
+              value={newItemData.destination}
+              onChange={(value) => setNewItemData({ ...newItemData, destination: value || '' })}
+              valueField="_id"
+              labelField="name"
+              searchable
+              clearable
+              placeholder={t('Select stock location')}
+            />
+          </Grid.Col>
+
+          <Grid.Col span={6}>
             <NumberInput
               label={t('Purchase Price')}
               placeholder="0.00"
@@ -473,20 +487,6 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
               labelFormat={(item) => item.abrev ? `${item.name} (${item.abrev})` : item.name}
               searchable
               placeholder={t('Select currency')}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <ApiSelect
-              label={t('Destination')}
-              endpoint="/modules/inventory/api/locations"
-              value={newItemData.destination}
-              onChange={(value) => setNewItemData({ ...newItemData, destination: value || '' })}
-              valueField="_id"
-              labelField="name"
-              searchable
-              clearable
-              placeholder={t('Select stock location')}
             />
           </Grid.Col>
 
