@@ -32,13 +32,13 @@ interface PurchaseOrder {
   order_currency: string;
   issue_date: string;
   target_date: string;
-  destination?: number;
+  destination_id?: string;  // MongoDB ObjectId
   destination_detail?: {
     name: string;
   };
   notes: string;
-  status: number;
-  status_text: string;
+  status: string;  // Status name from state
+  status_text?: string;
 }
 
 interface DetailsTabProps {
@@ -61,7 +61,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
     supplier_reference: order.supplier_reference || '',
     description: order.description || '',
     target_date: order.target_date || '',
-    destination: order.destination ? String(order.destination) : '',
+    destination_id: order.destination_id || '',
     notes: order.notes || '',
   });
 
@@ -103,8 +103,8 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
         notes: formData.notes,
       };
 
-      if (formData.destination) {
-        updateData.destination = parseInt(formData.destination);
+      if (formData.destination_id) {
+        updateData.destination_id = formData.destination_id;
       }
 
       await onUpdate(updateData);
@@ -132,7 +132,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
       formData.supplier_reference !== (order.supplier_reference || '') ||
       formData.description !== (order.description || '') ||
       formData.target_date !== (order.target_date || '') ||
-      formData.destination !== (order.destination ? String(order.destination) : '') ||
+      formData.destination_id !== (order.destination_id || '') ||
       formData.notes !== (order.notes || '')
     );
   };
@@ -228,8 +228,8 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
             <Grid.Col span={12}>
               <Select
                 label={t('Destination')}
-                value={formData.destination}
-                onChange={(value) => setFormData({ ...formData, destination: value || '' })}
+                value={formData.destination_id}
+                onChange={(value) => setFormData({ ...formData, destination_id: value || '' })}
                 data={stockLocations.map(loc => ({ 
                   value: String(loc._id || loc.pk), 
                   label: loc.name 

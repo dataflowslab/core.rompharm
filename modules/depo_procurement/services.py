@@ -80,11 +80,20 @@ async def get_purchase_order_by_id(order_id: str):
             if supplier:
                 order['supplier_detail'] = serialize_doc(supplier)
         
-        # Enrich with status color from depo_purchase_orders_states
+        # Enrich with status from depo_purchase_orders_states
         if order.get('state_id'):
             state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId(order['state_id'])})
             if state:
+                order['status'] = state.get('name')  # Override hardcoded status with state name
                 order['status_color'] = state.get('color', 'gray')
+        
+        # Enrich with destination details
+        if order.get('destination_id'):
+            location = db['depo_locations'].find_one({'_id': ObjectId(order['destination_id'])})
+            if location:
+                order['destination_detail'] = {
+                    'name': location.get('name')
+                }
         
         return serialize_doc(order)
     except HTTPException:
