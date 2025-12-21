@@ -12,7 +12,7 @@
  * - Inventory > Parts > Add Stock
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Grid, Select, NumberInput, TextInput, Textarea, Checkbox, Divider, Button, Table, ActionIcon } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
@@ -101,16 +101,37 @@ export function ReceiveStockForm({
   fixedSupplier,
 }: ReceiveStockFormProps) {
   const { t } = useTranslation();
+  const [isFirstContainer, setIsFirstContainer] = useState(true);
+  const [hasSetExpectedQuantity, setHasSetExpectedQuantity] = useState(false);
+
+  // Reset flags when form is reset (containers become empty and quantity is 0)
+  useEffect(() => {
+    if (formData.containers.length === 0 && formData.quantity === 0) {
+      setIsFirstContainer(true);
+      setHasSetExpectedQuantity(false);
+    }
+  }, [formData.containers.length, formData.quantity]);
 
   const updateField = (field: keyof ReceiveStockFormData, value: any) => {
     onChange({ ...formData, [field]: value });
+  };
+
+  const handleQuantityChange = (value: number) => {
+    updateField('quantity', value);
+    
+    // Auto-fill Expected Quantity only the first time Received Quantity is set
+    if (!hasSetExpectedQuantity && value > 0 && formData.expected_quantity === 0) {
+      updateField('expected_quantity', value);
+      setHasSetExpectedQuantity(true);
+    }
   };
 
   const addContainerRow = () => {
     const newContainer: ContainerRow = {
       id: Date.now().toString(),
       num_containers: 1,
-      products_per_container: 1,
+      // Set products_per_container to received quantity only for first container
+      products_per_container: isFirstContainer && formData.quantity > 0 ? formData.quantity : 1,
       unit: 'pcs',
       value: 0,
       is_damaged: false,
@@ -118,6 +139,11 @@ export function ReceiveStockForm({
       is_mislabeled: false,
     };
     onChange({ ...formData, containers: [...formData.containers, newContainer] });
+    
+    // Mark that first container has been added
+    if (isFirstContainer) {
+      setIsFirstContainer(false);
+    }
   };
 
   const removeContainerRow = (id: string) => {
@@ -185,7 +211,7 @@ export function ReceiveStockForm({
           label={t('Received Quantity')}
           placeholder="0"
           value={formData.quantity}
-          onChange={(value) => updateField('quantity', Number(value) || 0)}
+          onChange={(value) => handleQuantityChange(Number(value) || 0)}
           min={0.01}
           max={maxQuantity}
           step={1}

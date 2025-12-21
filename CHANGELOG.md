@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.14] - 2024-12-21
+
+### Added
+- **Smart Container Defaults**: First container now auto-fills with Received Quantity
+  - When adding first container, `products_per_container` automatically set to Received Quantity value
+  - Only applies to first container added (one-time behavior)
+  - If container is deleted and re-added, defaults back to 1 (no longer uses Received Quantity)
+  - Improves data entry speed for common case where all products in one container
+
+- **Auto-fill Expected Quantity**: Expected Quantity auto-fills from Received Quantity
+  - When Received Quantity is entered for first time, Expected Quantity automatically copies the value
+  - Only happens once (first time Received Quantity is set from 0 to a positive value)
+  - If Received Quantity is modified later, Expected Quantity remains unchanged (no cascade updates)
+  - User can still manually override Expected Quantity at any time
+  - Reduces redundant data entry for common case where received = expected
+
+### Technical
+- Added state management in `ReceiveStockForm.tsx`:
+  - `isFirstContainer` flag: tracks if first container has been added
+  - `hasSetExpectedQuantity` flag: tracks if Expected Quantity has been auto-filled
+  - Both flags reset when form is reset (containers empty and quantity = 0)
+- Modified `handleQuantityChange()`: checks flags before auto-filling Expected Quantity
+- Modified `addContainerRow()`: 
+  - Sets `products_per_container` to `formData.quantity` only if `isFirstContainer` is true
+  - Sets `isFirstContainer` to false after first container added
+- Added `useEffect` hook to reset flags when form is cleared
+
 ## [1.18.13] - 2024-12-21
 
 ### Changed
