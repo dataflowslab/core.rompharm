@@ -47,7 +47,7 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
 
   const loadDocuments = async () => {
     try {
-      const response = await api.get(`/api/documents/object/${entityType}/${entityId}`);
+      const response = await api.get(`/api/documents/for/${entityId}`);
       const docs = response.data || [];
       
       // Convert array to object keyed by template_code (only keep latest per template)
@@ -161,12 +161,7 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
     
     setLoadingDocs(prev => ({ ...prev, [templateCode]: true }));
     try {
-      // Use document_id if available, otherwise construct old-style URL
-      const downloadUrl = doc._id && doc._id !== doc.job_id
-        ? `/api/documents/${doc._id}/download`
-        : `/api/documents/${entityType}/${entityId}/job/${doc.job_id}/download`;
-      
-      const response = await api.get(downloadUrl, { responseType: 'blob' });
+      const response = await api.get(`/api/documents/${doc._id}/download`, { responseType: 'blob' });
       
       // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));

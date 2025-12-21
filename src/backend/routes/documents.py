@@ -1,6 +1,5 @@
 """
-Global document generation routes
-All document types use the same endpoints
+Global document generation routes - Simple and clean
 """
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
@@ -31,10 +30,7 @@ async def get_templates(
     object_type: Optional[str] = None,
     user = Depends(verify_token)
 ):
-    """
-    Get available templates
-    Optional: filter by object_type (procurement_order, stock_request, etc.)
-    """
+    """Get available templates, optionally filtered by object_type"""
     try:
         db = get_db()
         client = DataFlowsDocuClient()
@@ -52,14 +48,12 @@ async def get_templates(
             config = config_collection.find_one({'slug': 'stock_request'})
             template_codes = config.get('items', []) if config else []
         else:
-            # Get all templates
             config = config_collection.find_one({'slug': 'docu_templates'})
             template_codes = config.get('templates', []) if config else []
         
         if not template_codes:
             return []
         
-        # Fetch template details
         templates = []
         for code in template_codes:
             template = client.get_template(code)
@@ -83,21 +77,17 @@ async def generate_document(
     request: GenerateDocumentRequest,
     user = Depends(verify_token)
 ):
-    """
-    Universal document generation endpoint
-    Works for any object type: procurement_order, stock_request, etc.
-    """
+    """Universal document generation"""
     print(f"[DOCUMENT] Generate: type={request.object_type}, id={request.object_id}, template={request.template_code}")
     
     db = get_db()
     
-    # Convert to ObjectId
     try:
         object_obj_id = ObjectId(request.object_id)
     except:
         raise HTTPException(status_code=400, detail="Invalid object ID")
     
-    # Route to appropriate handler based on object_type
+    # Route to appropriate handler
     if request.object_type == 'procurement_order':
         return await _generate_procurement_order_document(db, object_obj_id, request, user)
     elif request.object_type == 'stock_request':
@@ -107,7 +97,7 @@ async def generate_document(
 
 
 @router.get("/{document_id}")
-async def get_document(
+async def get_document_info(
     document_id: str,
     user = Depends(verify_token)
 ):
@@ -126,13 +116,15 @@ async def get_document(
         doc = db[coll_name].find_one({'_id': doc_obj_id})
         if doc:
             doc['_id'] = str(doc['_id'])
+            if 'object_id' in doc:
+                doc['object_id'] = str(doc['object_id'])
             if 'created_at' in doc and isinstance(doc['created_at'], datetime):
                 doc['created_at'] = doc['created_at'].isoformat()
             if 'updated_at' in doc and isinstance(doc['updated_at'], datetime):
                 doc['updated_at'] = doc['updated_at'].isoformat()
             doc['has_document'] = doc.get('document_data') is not None
             if 'document_data' in doc:
-                del doc['document_data']  # Don't return large base64 in info
+                del doc['document_data']
             return doc
     
     raise HTTPException(status_code=404, detail="Document not found")
@@ -174,7 +166,6 @@ async def download_document(
             print(f"[DOCUMENT] ERROR decoding: {e}")
             raise HTTPException(status_code=500, detail="Failed to decode document")
     else:
-        # Download from service
         print(f"[DOCUMENT] Downloading from service...")
         
         if doc.get('status') not in ['done', 'completed']:
@@ -188,7 +179,6 @@ async def download_document(
         
         print(f"[DOCUMENT] Downloaded {len(document_bytes)} bytes, caching...")
         
-        # Cache in MongoDB
         coll.update_one(
             {'_id': doc['_id']},
             {'$set': {
@@ -217,13 +207,12 @@ async def delete_document(
     except:
         raise HTTPException(status_code=400, detail="Invalid document ID")
     
-    # Try to delete from all collections
     collections = ['depo_procurement_documents', 'depo_stock_request_documents']
     
     for coll_name in collections:
         result = db[coll_name].delete_one({'_id': doc_obj_id})
         if result.deleted_count > 0:
-            return {'message': 'Document deleted successfully', 'document_id': document_id}
+            return {'message': 'Document deleted', 'document_id': document_id}
     
     raise HTTPException(status_code=404, detail="Document not found")
 
@@ -249,13 +238,12 @@ async def get_job_status(
     }
 
 
-@router.get("/object/{object_type}/{object_id}")
+@router.get("/for/{object_id}")
 async def get_documents_for_object(
-    object_type: str,
     object_id: str,
     user = Depends(verify_token)
 ):
-    """Get all documents for an object (procurement order, stock request, etc.)"""
+    """Get all documents for an object (by object_id)"""
     db = get_db()
     
     try:
@@ -263,21 +251,17 @@ async def get_documents_for_object(
     except:
         raise HTTPException(status_code=400, detail="Invalid object ID")
     
-    # Map object_type to collection and field
-    collection_map = {
-        'procurement_order': ('depo_procurement_documents', 'object_id'),
-        'stock_request': ('depo_stock_request_documents', 'object_id')
-    }
+    # Search in all document collections
+    collections = ['depo_procurement_documents', 'depo_stock_request_documents']
+    all_docs = []
     
-    if object_type not in collection_map:
-        raise HTTPException(status_code=400, detail=f"Unsupported object type: {object_type}")
-    
-    coll_name, field_name = collection_map[object_type]
-    docs = list(db[coll_name].find({field_name: obj_id}))
+    for coll_name in collections:
+        docs = list(db[coll_name].find({'object_id': obj_id}))
+        all_docs.extend(docs)
     
     # Auto-check status and download completed documents
     client = DataFlowsDocuClient()
-    for doc in docs:
+    for doc in all_docs:
         if doc.get('document_data') or doc.get('status') == 'failed':
             continue
         
@@ -300,14 +284,21 @@ async def get_documents_for_object(
                             if document_bytes:
                                 update_data['document_data'] = base64.b64encode(document_bytes).decode('utf-8')
                         
-                        db[coll_name].update_one({'_id': doc['_id']}, {'$set': update_data})
+                        # Find which collection this doc belongs to
+                        for coll_name in collections:
+                            if db[coll_name].find_one({'_id': doc['_id']}):
+                                db[coll_name].update_one({'_id': doc['_id']}, {'$set': update_data})
+                                break
+                        
                         doc['status'] = current_status
                         doc['error'] = update_data.get('error')
     
     # Format response
-    for doc in docs:
+    for doc in all_docs:
         doc['_id'] = str(doc['_id'])
-        doc['document_id'] = doc['_id']  # Add document_id for easy reference
+        doc['document_id'] = doc['_id']
+        if 'object_id' in doc:
+            doc['object_id'] = str(doc['object_id'])
         if 'created_at' in doc and isinstance(doc['created_at'], datetime):
             doc['created_at'] = doc['created_at'].isoformat()
         if 'updated_at' in doc and isinstance(doc['updated_at'], datetime):
@@ -316,7 +307,7 @@ async def get_documents_for_object(
         if 'document_data' in doc:
             del doc['document_data']
     
-    return docs
+    return all_docs
 
 
 # ==================== INTERNAL HANDLERS ====================
@@ -414,10 +405,10 @@ async def _generate_procurement_order_document(db, order_obj_id, request, user):
     
     job_id = job_response['id']
     
-    # Save to MongoDB with ObjectId
+    # Save to MongoDB
     docs_collection = db['depo_procurement_documents']
     doc_entry = {
-        'object_id': order_obj_id,  # Store as ObjectId
+        'object_id': order_obj_id,
         'object_type': 'procurement_order',
         'job_id': job_id,
         'template_code': request.template_code,
@@ -431,7 +422,6 @@ async def _generate_procurement_order_document(db, order_obj_id, request, user):
         'error': None
     }
     
-    # Insert and get the document_id
     result = docs_collection.insert_one(doc_entry)
     document_id = str(result.inserted_id)
     
@@ -566,10 +556,10 @@ async def _generate_stock_request_document(db, request_obj_id, request, user):
     
     job_id = job_response['id']
     
-    # Save to MongoDB with ObjectId
+    # Save to MongoDB
     docs_collection = db['depo_stock_request_documents']
     doc_entry = {
-        'object_id': request_obj_id,  # Store as ObjectId
+        'object_id': request_obj_id,
         'object_type': 'stock_request',
         'job_id': job_id,
         'template_code': request.template_code,
