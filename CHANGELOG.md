@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.10] - 2024-12-21
+
+### Fixed
+- **Stock Status Display**: Fixed status badges to show status name instead of value
+  - All stock tables now display `status_detail.name` (e.g., "Rejected") instead of `status_detail.value` (e.g., "10")
+  - Status badges use `status_detail.color` from database as background color
+  - White text color for better contrast on colored backgrounds
+  - Fixed in:
+    - **Inventory > Stocks** table (StocksPage)
+    - **Inventory > Articles > Stock** tab (StockTab)
+    - **Procurement > Receive Stock** tab (ReceivedStockTab)
+  - Backend enrichment added to `get_received_stock_items()` to include `status_detail` with name, value, and color
+
+### Technical
+- Updated `StockTab.tsx` to use `status_detail.name` and `status_detail.color` for badge display
+- Updated `ReceivedStockTab.tsx` interface to include `status_detail` field
+- Modified `modules/depo_procurement/services.py` `get_received_stock_items()` to enrich stocks with:
+  - `status_detail` from `depo_stocks_states` collection (name, value, color)
+  - `location_detail` from `depo_locations` collection
+- Badge rendering now consistent across all stock displays: `<Badge style={{ backgroundColor: color, color: '#fff' }}>{name}</Badge>`
+
 ## [1.18.9] - 2024-12-21
 
 ### Changed

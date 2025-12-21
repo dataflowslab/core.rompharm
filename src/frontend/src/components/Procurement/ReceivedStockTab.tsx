@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Table, Button, Group, Modal, ActionIcon } from '@mantine/core';
+import { Paper, Title, Text, Table, Button, Group, Modal, ActionIcon, Badge } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
@@ -24,6 +24,11 @@ interface ReceivedItem {
   serial: string;
   packaging: string;
   status: number;
+  status_detail?: {
+    name: string;
+    value: number;
+    color: string;
+  };
   notes: string;
 }
 
@@ -355,7 +360,20 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload }: R
                 <Table.Td>{item.quantity}</Table.Td>
                 <Table.Td>{item.location_detail?.name || item.location}</Table.Td>
                 <Table.Td>{item.batch || '-'}</Table.Td>
-                <Table.Td>{getStatusLabel(item.status)}</Table.Td>
+                <Table.Td>
+                  {item.status_detail ? (
+                    <Badge
+                      style={{
+                        backgroundColor: item.status_detail.color || '#gray',
+                        color: '#fff',
+                      }}
+                    >
+                      {item.status_detail.name}
+                    </Badge>
+                  ) : (
+                    <Badge color="gray">{getStatusLabel(item.status)}</Badge>
+                  )}
+                </Table.Td>
                 <Table.Td>
                   <ActionIcon
                     color="red"

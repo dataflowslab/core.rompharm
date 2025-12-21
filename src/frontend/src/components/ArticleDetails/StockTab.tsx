@@ -48,9 +48,18 @@ export function StockTab({ stocks, loadingStocks, articleUm, onAddStock }: Stock
                   {stock.batch_date ? new Date(stock.batch_date).toLocaleDateString() : '-'}
                 </Table.Td>
                 <Table.Td>
-                  <Badge color={stock.status === 'OK' ? 'green' : 'yellow'}>
-                    {stock.status || 'Unknown'}
-                  </Badge>
+                  {stock.status_detail ? (
+                    <Badge
+                      style={{
+                        backgroundColor: stock.status_detail.color || '#gray',
+                        color: '#fff',
+                      }}
+                    >
+                      {stock.status_detail.name}
+                    </Badge>
+                  ) : (
+                    <Badge color="gray">{stock.status || 'Unknown'}</Badge>
+                  )}
                 </Table.Td>
                 <Table.Td>{stock.location_detail?.name || '-'}</Table.Td>
                 <Table.Td>{stock.quantity || 0} {articleUm}</Table.Td>

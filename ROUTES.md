@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-19 22:13:28
+**Last Updated:** 2025-12-21 17:56:34
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -158,8 +158,8 @@
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/attachments/{attachment_id}` - Delete an attachment from a purchase order
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/items` - Get items for a purchase order
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/items` - Add an item to a purchase order
-- `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_index}` - Delete an item from a purchase order
-- `PUT /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_index}` - Update an item in a purchase order
+- `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_id}` - Delete an item from a purchase order by item _id
+- `PUT /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_id}` - Update an item in a purchase order by item _id
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/qc-records` - Get QC records for a purchase order
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/receive-stock` - Receive stock items for a purchase order line
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/received-items` - Get received stock items for a purchase order
@@ -168,7 +168,7 @@
 - `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}/state` - Update purchase order state
 
 **Stock Statuses**
-- `GET /modules/depo_procurement/api/stock-statuses` - Get available stock statuses
+- `GET /modules/depo_procurement/api/stock-statuses` - Get available stock statuses from depo_stocks_states collection
 
 ### inventory (`/modules/inventory/api`)
 
@@ -178,7 +178,9 @@
 - `DELETE /modules/inventory/api/articles/{article_id}` - Delete an article
 - `GET /modules/inventory/api/articles/{article_id}` - Get a specific article by ID
 - `PUT /modules/inventory/api/articles/{article_id}` - Update an existing article
+- `GET /modules/inventory/api/articles/{article_id}/allocations` - Get allocations for an article from sales and purchase orders
 - `GET /modules/inventory/api/articles/{article_id}/recipes` - Get all recipes that use this article
+- `GET /modules/inventory/api/articles/{article_id}/stock-calculations` - Calculate stock metrics for an article
 - `GET /modules/inventory/api/articles/{article_id}/suppliers` - Get all suppliers for an article
 - `POST /modules/inventory/api/articles/{article_id}/suppliers` - Add a supplier to an article
 - `DELETE /modules/inventory/api/articles/{article_id}/suppliers/{supplier_relation_id}` - Remove a supplier from an article
@@ -218,6 +220,7 @@
 
 **Stocks**
 - `GET /modules/inventory/api/stocks` - Get list of stocks with enriched data including supplier information
+- `POST /modules/inventory/api/stocks` - Create a new stock item
 - `GET /modules/inventory/api/stocks/{stock_id}` - Get a specific stock entry with enriched data
 
 **Suppliers**

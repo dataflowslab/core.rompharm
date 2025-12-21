@@ -569,8 +569,9 @@ async def get_received_stock_items(order_id: str):
         cursor = collection.find({'purchase_order_id': ObjectId(order_id)}).sort('received_date', -1)
         stocks = list(cursor)
         
-        # Enrich with part details
+        # Enrich with part details and status details
         for stock in stocks:
+            # Get part details
             if stock.get('part_id'):
                 part = db['depo_parts'].find_one({'_id': ObjectId(stock['part_id'])})
                 if part:
@@ -578,6 +579,26 @@ async def get_received_stock_items(order_id: str):
                         'name': part.get('name'),
                         'ipn': part.get('ipn'),
                         'um': part.get('um')
+                    }
+            
+            # Get location details
+            if stock.get('location_id'):
+                location = db['depo_locations'].find_one({'_id': ObjectId(stock['location_id'])})
+                if location:
+                    stock['location_detail'] = {
+                        'name': location.get('name'),
+                        'description': location.get('description', '')
+                    }
+            
+            # Get status details from depo_stocks_states using state_id
+            if stock.get('state_id'):
+                state = db['depo_stocks_states'].find_one({'_id': ObjectId(stock['state_id'])})
+                if state:
+                    stock['status'] = state.get('name')
+                    stock['status_detail'] = {
+                        'name': state.get('name'),
+                        'value': state.get('value'),
+                        'color': state.get('color', 'gray')
                     }
         
         return serialize_doc(stocks)
