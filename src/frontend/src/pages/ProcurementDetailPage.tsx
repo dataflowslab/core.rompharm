@@ -350,6 +350,7 @@ export function ProcurementDetailPage() {
             items={items}
             orderCurrency={order.order_currency}
             stockLocations={stockLocations}
+            supplierId={order.supplier_id}
             onReload={loadItems}
             canEdit={isEditable}
           />

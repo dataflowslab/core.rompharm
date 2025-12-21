@@ -39,6 +39,7 @@ export interface ReceiveStockFormData {
   serial_numbers: string;
   packaging: string;
   status: string;
+  supplier_um_id: string;
   notes: string;
   manufacturing_date: Date | null;
   expected_quantity: number;
@@ -75,6 +76,7 @@ interface ReceiveStockFormProps {
   // Required: locations and statuses
   locations: Array<{ value: string; label: string }>;
   stockStatuses: Array<{ value: string; label: string }>;
+  systemUms: Array<{ value: string; label: string }>;
 }
 
 export function ReceiveStockForm({
@@ -86,6 +88,7 @@ export function ReceiveStockForm({
   fixedArticle,
   locations,
   stockStatuses,
+  systemUms,
 }: ReceiveStockFormProps) {
   const { t } = useTranslation();
 
@@ -253,6 +256,18 @@ export function ReceiveStockForm({
           data={stockStatuses}
           value={formData.status}
           onChange={(value) => updateField('status', value || '65')}
+        />
+      </Grid.Col>
+
+      {/* Supplier U.M. */}
+      <Grid.Col span={12}>
+        <Select
+          label={t('Supplier U.M.')}
+          placeholder={t('Select unit of measure')}
+          data={systemUms}
+          value={formData.supplier_um_id}
+          onChange={(value) => updateField('supplier_um_id', value || '694813b6297c9dde6d7065b7')}
+          searchable
         />
       </Grid.Col>
 

@@ -118,29 +118,29 @@ async def add_purchase_order_item(
     return await add_order_item(order_id, item_data)
 
 
-@router.put("/purchase-orders/{order_id}/items/{item_index}")
+@router.put("/purchase-orders/{order_id}/items/{item_id}")
 async def update_purchase_order_item(
     request: Request,
     order_id: str,
-    item_index: int,
+    item_id: str,
     item_data: PurchaseOrderItemUpdateRequest,
     current_user: dict = Depends(verify_token)
 ):
-    """Update an item in a purchase order"""
-    from modules.depo_procurement.services import update_order_item
-    return await update_order_item(order_id, item_index, item_data)
+    """Update an item in a purchase order by item _id"""
+    from modules.depo_procurement.services import update_order_item_by_id
+    return await update_order_item_by_id(order_id, item_id, item_data)
 
 
-@router.delete("/purchase-orders/{order_id}/items/{item_index}")
+@router.delete("/purchase-orders/{order_id}/items/{item_id}")
 async def delete_purchase_order_item(
     request: Request,
     order_id: str,
-    item_index: int,
+    item_id: str,
     current_user: dict = Depends(verify_token)
 ):
-    """Delete an item from a purchase order"""
-    from modules.depo_procurement.services import delete_order_item
-    return await delete_order_item(order_id, item_index)
+    """Delete an item from a purchase order by item _id"""
+    from modules.depo_procurement.services import delete_order_item_by_id
+    return await delete_order_item_by_id(order_id, item_id)
 
 
 @router.get("/parts")
@@ -213,9 +213,9 @@ async def get_stock_statuses(
     request: Request,
     current_user: dict = Depends(verify_token)
 ):
-    """Get available stock statuses"""
+    """Get available stock statuses from depo_stocks_states collection"""
     db = get_db()
-    collection = db['depo_stock_statuses']
+    collection = db['depo_stocks_states']
     
     try:
         cursor = collection.find().sort('value', 1)

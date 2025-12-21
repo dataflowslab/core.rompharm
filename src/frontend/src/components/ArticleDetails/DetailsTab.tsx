@@ -101,15 +101,6 @@ export function DetailsTab({
       </Group>
 
       <TextInput
-        label="Unit of Measure"
-        placeholder="e.g., buc, kg, L"
-        required
-        value={article.um}
-        onChange={(e) => setArticle({ ...article, um: e.currentTarget.value })}
-        mb="sm"
-      />
-
-      <TextInput
         label="Description"
         placeholder="Short description"
         value={article.description || ''}

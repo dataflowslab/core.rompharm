@@ -28,6 +28,7 @@ export function AddStockModal({
   const [loading, setLoading] = useState(false);
   const [stockStatuses, setStockStatuses] = useState<Array<{ value: string; label: string }>>([]);
   const [locations, setLocations] = useState<Array<{ value: string; label: string }>>([]);
+  const [systemUms, setSystemUms] = useState<Array<{ value: string; label: string }>>([]);
   
   const [formData, setFormData] = useState<ReceiveStockFormData>({
     part_id: fixedArticleId || '',
@@ -37,7 +38,8 @@ export function AddStockModal({
     supplier_batch_code: '',
     serial_numbers: '',
     packaging: '',
-    status: '65', // Quarantine by default
+    status: '', // Will be set to Quarantined after loading statuses
+    supplier_um_id: '694813b6297c9dde6d7065b7', // Default supplier UM
     notes: '',
     manufacturing_date: null,
     expected_quantity: 0,
@@ -59,8 +61,9 @@ export function AddStockModal({
     if (opened) {
       fetchStockStatuses();
       fetchLocations();
+      fetchSystemUms();
       
-      // Reset form when modal opens
+      // Reset form when modal opens - status will be set after loading statuses
       setFormData({
         part_id: fixedArticleId || '',
         quantity: 0,
@@ -69,7 +72,8 @@ export function AddStockModal({
         supplier_batch_code: '',
         serial_numbers: '',
         packaging: '',
-        status: '65',
+        status: '',
+        supplier_um_id: '694813b6297c9dde6d7065b7',
         notes: '',
         manufacturing_date: null,
         expected_quantity: 0,
@@ -91,14 +95,37 @@ export function AddStockModal({
 
   const fetchStockStatuses = async () => {
     try {
+      console.log('Fetching stock statuses...');
       const response = await api.get('/modules/depo_procurement/api/stock-statuses');
+      console.log('Stock statuses response:', response.data);
+      
       const statuses = response.data.statuses || response.data || [];
-      setStockStatuses(statuses.map((s: any) => ({ 
+      console.log('Parsed statuses:', statuses);
+      
+      const mappedStatuses = statuses.map((s: any) => ({ 
         value: String(s.value), 
         label: s.name || s.label 
-      })));
+      }));
+      console.log('Mapped statuses for Select:', mappedStatuses);
+      
+      setStockStatuses(mappedStatuses);
+      
+      // Set default status to "Quarantined" if available
+      const quarantinedStatus = mappedStatuses.find((s: any) => 
+        s.label.toLowerCase().includes('quarantin')
+      );
+      
+      if (quarantinedStatus && !formData.status) {
+        console.log('Setting default status to Quarantined:', quarantinedStatus.value);
+        setFormData(prev => ({ ...prev, status: quarantinedStatus.value }));
+      }
     } catch (error) {
       console.error('Failed to fetch stock statuses:', error);
+      notifications.show({
+        title: 'Warning',
+        message: 'Failed to load stock statuses',
+        color: 'yellow',
+      });
     }
   };
 
@@ -115,6 +142,19 @@ export function AddStockModal({
     }
   };
 
+  const fetchSystemUms = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/system-ums');
+      const ums = response.data || [];
+      setSystemUms(ums.map((um: any) => ({ 
+        value: um._id, 
+        label: `${um.name} (${um.abrev})` 
+      })));
+    } catch (error) {
+      console.error('Failed to fetch system UMs:', error);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formData.part_id || !formData.quantity || !formData.location) {
       notifications.show({
@@ -127,7 +167,7 @@ export function AddStockModal({
 
     setLoading(true);
     try {
-      // Create stock item
+      // Create stock item with all data
       const stockPayload = {
         part_id: formData.part_id,
         quantity: formData.quantity,
@@ -135,34 +175,24 @@ export function AddStockModal({
         batch_code: formData.batch_code || undefined,
         supplier_batch_code: formData.supplier_batch_code || undefined,
         status: parseInt(formData.status),
+        supplier_um_id: formData.supplier_um_id || undefined,
         notes: formData.notes || undefined,
+        manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : undefined,
+        expected_quantity: formData.expected_quantity || undefined,
+        expiry_date: formData.use_expiry && formData.expiry_date ? formData.expiry_date.toISOString().split('T')[0] : undefined,
+        reset_date: !formData.use_expiry && formData.reset_date ? formData.reset_date.toISOString().split('T')[0] : undefined,
+        containers: formData.containers.length > 0 ? formData.containers : undefined,
+        containers_cleaned: formData.containers_cleaned,
+        supplier_ba_no: formData.supplier_ba_no || undefined,
+        supplier_ba_date: formData.supplier_ba_date ? formData.supplier_ba_date.toISOString().split('T')[0] : undefined,
+        accord_ba: formData.accord_ba,
+        is_list_supplier: formData.is_list_supplier,
+        clean_transport: formData.clean_transport,
+        temperature_control: formData.temperature_control,
+        temperature_conditions_met: formData.temperature_control ? formData.temperature_conditions_met : undefined,
       };
 
-      const stockResponse = await api.post('/modules/inventory/api/stocks', stockPayload);
-      const stockItemId = stockResponse.data?._id || stockResponse.data?.id;
-
-      // Save extra data if stock item was created
-      if (stockItemId) {
-        const extraDataPayload = {
-          stock_item_id: stockItemId,
-          supplier_batch_code: formData.supplier_batch_code || null,
-          manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : null,
-          expected_quantity: formData.expected_quantity || null,
-          expiry_date: formData.use_expiry && formData.expiry_date ? formData.expiry_date.toISOString().split('T')[0] : null,
-          reset_date: !formData.use_expiry && formData.reset_date ? formData.reset_date.toISOString().split('T')[0] : null,
-          containers: formData.containers.length > 0 ? formData.containers : null,
-          containers_cleaned: formData.containers_cleaned,
-          supplier_ba_no: formData.supplier_ba_no || null,
-          supplier_ba_date: formData.supplier_ba_date ? formData.supplier_ba_date.toISOString().split('T')[0] : null,
-          accord_ba: formData.accord_ba,
-          is_list_supplier: formData.is_list_supplier,
-          clean_transport: formData.clean_transport,
-          temperature_control: formData.temperature_control,
-          temperature_conditions_met: formData.temperature_control ? formData.temperature_conditions_met : null,
-        };
-
-        await api.post('/modules/depo_procurement/api/stock-extra-data', extraDataPayload);
-      }
+      await api.post('/modules/inventory/api/stocks', stockPayload);
       
       notifications.show({
         title: 'Success',
@@ -202,6 +232,7 @@ export function AddStockModal({
         } : undefined}
         locations={locations}
         stockStatuses={stockStatuses}
+        systemUms={systemUms}
       />
 
       <Group justify="flex-end" mt="md">

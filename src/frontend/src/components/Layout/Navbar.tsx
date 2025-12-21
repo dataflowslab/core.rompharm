@@ -93,18 +93,6 @@ export function Navbar() {
           style={{ fontWeight: isActive('/inventory/articles') ? 'bold' : 'normal' }}
         />
         <NavLink
-          label={t('Categories')}
-          active={isActive('/inventory/categories')}
-          onClick={() => navigate('/inventory/categories')}
-          style={{ fontWeight: isActive('/inventory/categories') ? 'bold' : 'normal' }}
-        />
-        <NavLink
-          label={t('Locations')}
-          active={isActive('/inventory/locations')}
-          onClick={() => navigate('/inventory/locations')}
-          style={{ fontWeight: isActive('/inventory/locations') ? 'bold' : 'normal' }}
-        />
-        <NavLink
           label={t('Stocks')}
           active={isActive('/inventory/stocks')}
           onClick={() => navigate('/inventory/stocks')}
@@ -127,6 +115,18 @@ export function Navbar() {
           active={isActive('/inventory/clients')}
           onClick={() => navigate('/inventory/clients')}
           style={{ fontWeight: isActive('/inventory/clients') ? 'bold' : 'normal' }}
+        />
+        <NavLink
+          label={t('Locations')}
+          active={isActive('/inventory/locations')}
+          onClick={() => navigate('/inventory/locations')}
+          style={{ fontWeight: isActive('/inventory/locations') ? 'bold' : 'normal' }}
+        />
+        <NavLink
+          label={t('Categories')}
+          active={isActive('/inventory/categories')}
+          onClick={() => navigate('/inventory/categories')}
+          style={{ fontWeight: isActive('/inventory/categories') ? 'bold' : 'normal' }}
         />
       </NavLink>
 

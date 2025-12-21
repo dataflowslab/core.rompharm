@@ -28,7 +28,8 @@ import { procurementApi } from '../../services/procurement';
 import { ApiSelect } from '../Common/ApiSelect';
 
 interface PurchaseOrderItem {
-  pk: number;
+  _id: string;  // MongoDB ObjectId
+  pk?: number;  // Legacy field
   part: number;
   part_detail?: {
     name: string;
@@ -40,6 +41,7 @@ interface PurchaseOrderItem {
   purchase_price: number;
   purchase_price_currency: string;
   destination?: number;
+  destination_id?: string;  // MongoDB ObjectId
   destination_detail?: {
     name: string;
   };
@@ -67,11 +69,12 @@ interface ItemsTabProps {
   items: PurchaseOrderItem[];
   orderCurrency: string;
   stockLocations: StockLocation[];
+  supplierId?: string;
   onReload: () => void;
   canEdit: boolean;
 }
 
-export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onReload, canEdit }: ItemsTabProps) {
+export function ItemsTab({ orderId, items, orderCurrency, stockLocations, supplierId, onReload, canEdit }: ItemsTabProps) {
   const { t } = useTranslation();
   const [itemModalOpened, setItemModalOpened] = useState(false);
   const [editItemModalOpened, setEditItemModalOpened] = useState(false);
@@ -117,7 +120,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
         quantity: newItemData.quantity,
         purchase_price: newItemData.purchase_price || undefined,
         purchase_price_currency: newItemData.purchase_price_currency || undefined,
-        destination_id: newItemData.destination || undefined, // MongoDB ObjectId as string
+        destination_id: newItemData.destination ? newItemData.destination : undefined, // MongoDB ObjectId as string
         reference: newItemData.reference || undefined,
         notes: newItemData.notes || undefined
       };
@@ -159,7 +162,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
       quantity: item.quantity,
       purchase_price: item.purchase_price,
       purchase_price_currency: item.purchase_price_currency,
-      destination: item.destination ? String(item.destination) : '',
+      destination: item.destination_id || (item.destination ? String(item.destination) : ''),
       reference: item.reference || '',
       notes: item.notes || ''
     });
@@ -167,7 +170,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
   };
 
   const handleUpdateItem = async () => {
-    if (!editingItem) return;
+    if (!editingItem || !editingItem._id) return;
 
     setSubmitting(true);
     try {
@@ -175,12 +178,12 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
         quantity: editItemData.quantity,
         purchase_price: editItemData.purchase_price || undefined,
         purchase_price_currency: editItemData.purchase_price_currency || undefined,
-        destination: editItemData.destination ? parseInt(editItemData.destination) : undefined,
+        destination_id: editItemData.destination ? editItemData.destination : undefined,
         reference: editItemData.reference || undefined,
         notes: editItemData.notes || undefined
       };
 
-      await api.put(procurementApi.updateOrderItem(orderId, editingItem.pk), payload);
+      await api.put(procurementApi.updateOrderItem(orderId, editingItem._id), payload);
 
       notifications.show({
         title: t('Success'),
@@ -203,10 +206,19 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
     }
   };
 
-  const handleDeleteItem = async (itemId: number) => {
+  const handleDeleteItem = async (itemId: string) => {
     if (!confirm(t('Are you sure you want to delete this item?'))) return;
 
     try {
+      if (!itemId) {
+        notifications.show({
+          title: t('Error'),
+          message: t('Item not found'),
+          color: 'red'
+        });
+        return;
+      }
+
       await api.delete(procurementApi.deleteOrderItem(orderId, itemId));
       notifications.show({
         title: t('Success'),
@@ -360,7 +372,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
             </Table.Tr>
           ) : (
             filteredAndSortedItems.map((item) => (
-              <Table.Tr key={item.pk}>
+              <Table.Tr key={item._id}>
                 <Table.Td>
                   <div>
                     <Text size="sm" fw={500}>{item.part_detail?.name || item.part}</Text>
@@ -389,7 +401,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
                       <ActionIcon 
                         variant="subtle" 
                         color="red"
-                        onClick={() => handleDeleteItem(item.pk)}
+                        onClick={() => handleDeleteItem(item._id)}
                       >
                         <IconTrash size={16} />
                       </ActionIcon>
@@ -414,7 +426,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, onRelo
           <Grid.Col span={12}>
             <ApiSelect
               label={t('Part')}
-              endpoint={procurementApi.getParts()}
+              endpoint={supplierId ? `${procurementApi.getParts()}?supplier_id=${supplierId}` : procurementApi.getParts()}
               value={newItemData.part}
               onChange={(value) => setNewItemData({ ...newItemData, part: value || '' })}
               valueField="_id"

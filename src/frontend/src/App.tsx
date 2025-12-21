@@ -125,7 +125,7 @@ function App() {
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        <ScrollArea h="calc(100vh - 60px)" type="auto">
+        <ScrollArea h="calc(100vh - 60px)" type="auto" offsetScrollbars scrollbarSize={8}>
           <Navbar />
         </ScrollArea>
       </AppShell.Navbar>

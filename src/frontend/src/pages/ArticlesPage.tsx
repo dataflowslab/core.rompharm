@@ -29,6 +29,14 @@ interface Article {
   name: string;
   ipn: string;
   um: string;
+  system_um_detail?: {
+    name: string;
+    abrev: string;
+    symbol?: string;
+  };
+  category_detail?: {
+    name: string;
+  };
   description?: string;
   category_id?: string;
   is_active: boolean;
@@ -296,9 +304,9 @@ export function ArticlesPage() {
               <Table.Tr key={article._id}>
                 <Table.Td>{article.ipn}</Table.Td>
                 <Table.Td>{article.name}</Table.Td>
-                <Table.Td>{article.um}</Table.Td>
+                <Table.Td>{article.system_um_detail?.abrev || article.um || '-'}</Table.Td>
                 <Table.Td>{article.description || '-'}</Table.Td>
-                <Table.Td>-</Table.Td>
+                <Table.Td>{article.category_detail?.name || '-'}</Table.Td>
                 <Table.Td>-</Table.Td>
                 <Table.Td>
                   <Badge color={article.is_active ? 'green' : 'gray'}>

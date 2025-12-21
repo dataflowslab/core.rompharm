@@ -42,7 +42,7 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None):
     
     # Filter by part_id if provided
     if part_id:
-        query['part_id'] = part_id
+        query['part_id'] = ObjectId(part_id)
     
     if search:
         search_conditions = [

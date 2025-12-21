@@ -85,6 +85,7 @@ class ArticleUpdateRequest(BaseModel):
 async def get_parts(
     request: Request,
     search: Optional[str] = Query(None),
+    supplier_id: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     sort_by: Optional[str] = Query("name"),
@@ -95,14 +96,41 @@ async def get_parts(
     db = get_db()
     collection = db['depo_parts']
     
-    # Build query
-    query = {}
+    # Build query - only show active parts
+    query = {'is_active': True}
     if search:
         query['$or'] = [
             {'name': {'$regex': search, '$options': 'i'}},
             {'ipn': {'$regex': search, '$options': 'i'}},
             {'description': {'$regex': search, '$options': 'i'}}
         ]
+    
+    # Filter by supplier if provided
+    if supplier_id:
+        try:
+            # Find parts that have this supplier in depo_parts_suppliers collection
+            parts_suppliers_collection = db['depo_parts_suppliers']
+            supplier_parts = list(parts_suppliers_collection.find({'supplier_id': ObjectId(supplier_id)}))
+            part_ids = [sp['part_id'] for sp in supplier_parts]
+            
+            if part_ids:
+                # Add to query - parts must be in the supplier's parts list
+                if query:
+                    query = {'$and': [query, {'_id': {'$in': part_ids}}]}
+                else:
+                    query = {'_id': {'$in': part_ids}}
+            else:
+                # No parts for this supplier, return empty result
+                return {
+                    'results': [],
+                    'total': 0,
+                    'skip': skip,
+                    'limit': limit
+                }
+        except Exception as e:
+            # If supplier_id is invalid, just ignore the filter
+            print(f"Invalid supplier_id: {supplier_id}, error: {e}")
+            pass
     
     # Build sort
     sort_direction = 1 if sort_order == 'asc' else -1
@@ -170,6 +198,27 @@ async def get_articles(
         # Get paginated results
         cursor = collection.find(query).sort(sort).skip(skip).limit(limit)
         articles = list(cursor)
+        
+        # Enrich with System UM details
+        ums_collection = db['depo_ums']
+        categories_collection = db['depo_categories']
+        for article in articles:
+            if article.get('system_um_id'):
+                um = ums_collection.find_one({'_id': article['system_um_id']})
+                if um:
+                    article['system_um_detail'] = {
+                        'name': um.get('name', ''),
+                        'abrev': um.get('abrev', ''),
+                        'symbol': um.get('symbol', '')
+                    }
+            
+            # Enrich with Category details
+            if article.get('category_id'):
+                category = categories_collection.find_one({'_id': article['category_id']})
+                if category:
+                    article['category_detail'] = {
+                        'name': category.get('name', '')
+                    }
         
         # Serialize results
         serialized_articles = serialize_doc(articles)
@@ -1208,6 +1257,107 @@ async def get_stock(
     """Get a specific stock entry with enriched data"""
     from modules.inventory.services import get_stock_by_id
     return await get_stock_by_id(stock_id)
+
+
+class StockCreateRequest(BaseModel):
+    part_id: str
+    quantity: float
+    location_id: str
+    batch_code: Optional[str] = None
+    supplier_batch_code: Optional[str] = None
+    status: Optional[int] = 65  # Default to Quarantine
+    supplier_um_id: Optional[str] = "694813b6297c9dde6d7065b7"  # Default supplier UM
+    notes: Optional[str] = None
+    manufacturing_date: Optional[str] = None
+    expected_quantity: Optional[float] = None
+    expiry_date: Optional[str] = None
+    reset_date: Optional[str] = None
+    containers: Optional[List[Dict[str, Any]]] = None
+    containers_cleaned: Optional[bool] = False
+    supplier_ba_no: Optional[str] = None
+    supplier_ba_date: Optional[str] = None
+    accord_ba: Optional[bool] = False
+    is_list_supplier: Optional[bool] = False
+    clean_transport: Optional[bool] = False
+    temperature_control: Optional[bool] = False
+    temperature_conditions_met: Optional[bool] = False
+
+
+@router.post("/stocks")
+async def create_stock(
+    request: Request,
+    stock_data: StockCreateRequest,
+    current_user: dict = Depends(verify_token)
+):
+    """Create a new stock item"""
+    db = get_db()
+    collection = db['depo_stocks']
+    
+    # Validate part exists
+    parts_collection = db['depo_parts']
+    part = parts_collection.find_one({'_id': ObjectId(stock_data.part_id)})
+    if not part:
+        raise HTTPException(status_code=404, detail="Part not found")
+    
+    # Validate location exists
+    locations_collection = db['depo_locations']
+    location = locations_collection.find_one({'_id': ObjectId(stock_data.location_id)})
+    if not location:
+        raise HTTPException(status_code=404, detail="Location not found")
+    
+    # Build stock document with all fields
+    doc = {
+        'part_id': ObjectId(stock_data.part_id),
+        'quantity': stock_data.quantity,
+        'location_id': ObjectId(stock_data.location_id),
+        'batch_code': stock_data.batch_code or '',
+        'supplier_batch_code': stock_data.supplier_batch_code or '',
+        'status': stock_data.status or 65,
+        'notes': stock_data.notes or '',
+        'created_at': datetime.utcnow(),
+        'updated_at': datetime.utcnow(),
+        'created_by': current_user.get('username', 'system'),
+        'updated_by': current_user.get('username', 'system')
+    }
+    
+    # Add supplier_um_id if provided
+    if stock_data.supplier_um_id:
+        doc['supplier_um_id'] = ObjectId(stock_data.supplier_um_id)
+    
+    # Add optional fields if provided
+    if stock_data.manufacturing_date:
+        doc['manufacturing_date'] = stock_data.manufacturing_date
+    if stock_data.expected_quantity is not None:
+        doc['expected_quantity'] = stock_data.expected_quantity
+    if stock_data.expiry_date:
+        doc['expiry_date'] = stock_data.expiry_date
+    if stock_data.reset_date:
+        doc['reset_date'] = stock_data.reset_date
+    if stock_data.containers:
+        doc['containers'] = stock_data.containers
+    if stock_data.containers_cleaned is not None:
+        doc['containers_cleaned'] = stock_data.containers_cleaned
+    if stock_data.supplier_ba_no:
+        doc['supplier_ba_no'] = stock_data.supplier_ba_no
+    if stock_data.supplier_ba_date:
+        doc['supplier_ba_date'] = stock_data.supplier_ba_date
+    if stock_data.accord_ba is not None:
+        doc['accord_ba'] = stock_data.accord_ba
+    if stock_data.is_list_supplier is not None:
+        doc['is_list_supplier'] = stock_data.is_list_supplier
+    if stock_data.clean_transport is not None:
+        doc['clean_transport'] = stock_data.clean_transport
+    if stock_data.temperature_control is not None:
+        doc['temperature_control'] = stock_data.temperature_control
+    if stock_data.temperature_conditions_met is not None:
+        doc['temperature_conditions_met'] = stock_data.temperature_conditions_met
+    
+    try:
+        result = collection.insert_one(doc)
+        doc['_id'] = result.inserted_id
+        return serialize_doc(doc)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create stock: {str(e)}")
 
 
 # Supplier models
