@@ -10,7 +10,6 @@ import {
   Badge,
   Group,
   Button,
-  Divider,
   Stack,
   Card,
 } from '@mantine/core';
@@ -18,6 +17,7 @@ import { IconArrowLeft, IconInfoCircle, IconClipboardCheck } from '@tabler/icons
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
+import { QCTab } from '../components/Stock/QCTab';
 
 interface StockDetail {
   _id: string;
@@ -304,83 +304,11 @@ export function StockItemDetailPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="qc" pt="md">
-          <Stack gap="md">
-            {/* Supplier BA Information */}
-            <Paper shadow="xs" p="md" withBorder>
-              <Title order={4} mb="md">{t('Supplier BA Information')}</Title>
-              <Grid>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Supplier BA No')}</Text>
-                  <Text fw={500}>{stock.supplier_ba_no || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Supplier BA Date')}</Text>
-                  <Text fw={500}>{stock.supplier_ba_date || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('In Accordance with Supplier BA')}</Text>
-                  <Badge color={stock.accord_ba ? 'green' : 'gray'}>
-                    {stock.accord_ba ? t('Yes') : t('No')}
-                  </Badge>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Supplier in List')}</Text>
-                  <Badge color={stock.is_list_supplier ? 'green' : 'gray'}>
-                    {stock.is_list_supplier ? t('Yes') : t('No')}
-                  </Badge>
-                </Grid.Col>
-              </Grid>
-            </Paper>
-
-            {/* Transport Conditions */}
-            <Paper shadow="xs" p="md" withBorder>
-              <Title order={4} mb="md">{t('Transport Conditions')}</Title>
-              <Grid>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Clean Transport')}</Text>
-                  <Badge color={stock.clean_transport ? 'green' : 'gray'}>
-                    {stock.clean_transport ? t('Yes') : t('No')}
-                  </Badge>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Temperature Control Transport')}</Text>
-                  <Badge color={stock.temperature_control ? 'green' : 'gray'}>
-                    {stock.temperature_control ? t('Yes') : t('No')}
-                  </Badge>
-                </Grid.Col>
-                {stock.temperature_control && (
-                  <Grid.Col span={6}>
-                    <Text size="sm" c="dimmed">{t('Temperature Conditions Met')}</Text>
-                    <Badge color={stock.temperature_conditions_met ? 'green' : 'red'}>
-                      {stock.temperature_conditions_met ? t('Yes') : t('No')}
-                    </Badge>
-                  </Grid.Col>
-                )}
-              </Grid>
-            </Paper>
-
-            {/* Quality Status */}
-            <Paper shadow="xs" p="md" withBorder>
-              <Title order={4} mb="md">{t('Quality Status')}</Title>
-              <Grid>
-                <Grid.Col span={12}>
-                  <Text size="sm" c="dimmed">{t('Current Status')}</Text>
-                  {stock.status_detail && (
-                    <Badge
-                      size="lg"
-                      mt="xs"
-                      style={{
-                        backgroundColor: stock.status_detail.color || '#gray',
-                        color: '#fff',
-                      }}
-                    >
-                      {stock.status_detail.name}
-                    </Badge>
-                  )}
-                </Grid.Col>
-              </Grid>
-            </Paper>
-          </Stack>
+          <QCTab 
+            stockId={id!} 
+            stock={stock} 
+            onUpdate={fetchStockDetails}
+          />
         </Tabs.Panel>
       </Tabs>
     </Container>

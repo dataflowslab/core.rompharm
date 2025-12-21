@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.17] - 2024-12-21
+
+### Fixed
+- **Expected Quantity Auto-fill**: Fixed Expected Quantity not auto-filling correctly when entering Received Quantity
+  - **Problem**: When entering 100 in Received Quantity, Expected Quantity showed 1 instead of 100
+  - **Cause**: React batched state updates caused race condition - `expected_quantity` check happened before `quantity` update completed
+  - **Solution**: Update both `quantity` and `expected_quantity` simultaneously in single state update
+  - Now correctly auto-fills Expected Quantity with same value as Received Quantity on first entry
+
+- **Stock Quantity Display**: Fixed stock quantity showing wrong unit of measure
+  - **Problem**: Stock table showed article UM (e.g., "g") instead of supplier UM from stock
+  - **Solution**: Display `supplier_um_detail.abrev` from stock if available, fallback to article UM
+  - Stock quantities now show correct unit based on `supplier_um_id` saved in stock entry
+  - Example: If stock saved with "kg" as supplier UM, displays "100 kg" instead of "100 g"
+
+### Technical
+- Modified `ReceiveStockForm.tsx` `handleQuantityChange()`:
+  - Changed from sequential `updateField()` calls to single `onChange()` call
+  - Updates both `quantity` and `expected_quantity` in same state object
+  - Prevents race condition from React's batched updates
+- Modified `StockTab.tsx` quantity display:
+  - Changed from `{stock.quantity} {articleUm}` to `{stock.quantity} {stock.supplier_um_detail?.abrev || articleUm}`
+  - Prioritizes supplier UM from stock, falls back to article UM if not available
+
+## [1.18.16] - 2024-12-21
+
+### Fixed
+- **Add Stock supplier_id**: Fixed supplier_id not being saved to depo_stocks when adding stock from Articles
+  - Added `supplier_id` to stock creation payload in `AddStockModal.tsx`
+  - Supplier selection now properly saved to database
+- **Expected Quantity auto-fill debugging**: Added console logging to track auto-fill behavior
+  - Logs when `handleQuantityChange` is called
+  - Logs current state of `hasSetExpectedQuantity` flag and `expected_quantity` value
+  - Helps identify why auto-fill may not trigger in some cases
+
+### Technical
+- Modified `AddStockModal.tsx` `handleSubmit()`:
+  - Added `supplier_id: formData.supplier_id || undefined` to stockPayload
+- Added debug logging in `ReceiveStockForm.tsx` `handleQuantityChange()`:
+  - Logs input value, flag state, and current expected_quantity
+  - Logs when auto-fill is triggered
+
 ## [1.18.15] - 2024-12-21
 
 ### Changed

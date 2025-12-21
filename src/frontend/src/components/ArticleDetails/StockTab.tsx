@@ -62,7 +62,9 @@ export function StockTab({ stocks, loadingStocks, articleUm, onAddStock }: Stock
                   )}
                 </Table.Td>
                 <Table.Td>{stock.location_detail?.name || '-'}</Table.Td>
-                <Table.Td>{stock.quantity || 0} {articleUm}</Table.Td>
+                <Table.Td>
+                  {stock.quantity || 0} {stock.supplier_um_detail?.abrev || articleUm}
+                </Table.Td>
                 <Table.Td>{stock.stock_value ? `${stock.stock_value.toFixed(2)} EUR` : '-'}</Table.Td>
                 <Table.Td>{stock.supplier_name || '-'}</Table.Td>
               </Table.Tr>

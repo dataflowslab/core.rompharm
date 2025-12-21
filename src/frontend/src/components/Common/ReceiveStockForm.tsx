@@ -117,12 +117,25 @@ export function ReceiveStockForm({
   };
 
   const handleQuantityChange = (value: number) => {
-    updateField('quantity', value);
+    console.log('[ReceiveStockForm] handleQuantityChange called:', {
+      value,
+      hasSetExpectedQuantity,
+      currentExpectedQuantity: formData.expected_quantity
+    });
     
     // Auto-fill Expected Quantity only the first time Received Quantity is set
     if (!hasSetExpectedQuantity && value > 0 && formData.expected_quantity === 0) {
-      updateField('expected_quantity', value);
+      console.log('[ReceiveStockForm] Auto-filling expected_quantity with:', value);
+      // Update both fields at once to avoid race condition
+      onChange({ 
+        ...formData, 
+        quantity: value,
+        expected_quantity: value 
+      });
       setHasSetExpectedQuantity(true);
+    } else {
+      // Just update quantity
+      updateField('quantity', value);
     }
   };
 

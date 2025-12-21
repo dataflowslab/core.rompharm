@@ -206,6 +206,7 @@ export function AddStockModal({
         batch_code: formData.batch_code || undefined,
         supplier_batch_code: formData.supplier_batch_code || undefined,
         status: parseInt(formData.status),
+        supplier_id: formData.supplier_id || undefined,
         supplier_um_id: formData.supplier_um_id || undefined,
         notes: formData.notes || undefined,
         manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : undefined,
