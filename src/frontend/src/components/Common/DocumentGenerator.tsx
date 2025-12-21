@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Button, Group, Stack, Badge, Text, Loader } from '@mantine/core';
-import { IconFileTypePdf, IconDownload, IconRefresh, IconCheck } from '@tabler/icons-react';
+import { Button, Group, Stack, Badge, Text, ActionIcon } from '@mantine/core';
+import { IconFileTypePdf, IconDownload, IconRefresh, IconCheck, IconX } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import api from '../../services/api';
@@ -227,6 +227,39 @@ export function DocumentGenerator({ objectId, templateCodes, onDocumentsChange }
     }
   };
 
+  const deleteDocument = async (templateCode: string) => {
+    const doc = documents[templateCode];
+    if (!doc) return;
+
+    try {
+      await api.delete(`/api/documents/${doc.job_id}`);
+
+      setDocuments(prev => {
+        const updated = { ...prev };
+        delete updated[templateCode];
+        
+        if (onDocumentsChange) {
+          onDocumentsChange(updated);
+        }
+        
+        return updated;
+      });
+
+      notifications.show({
+        title: t('Success'),
+        message: t('Document deleted'),
+        color: 'green'
+      });
+    } catch (error: any) {
+      console.error('Failed to delete document:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to delete document'),
+        color: 'red'
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       done: 'green',
@@ -256,64 +289,68 @@ export function DocumentGenerator({ objectId, templateCodes, onDocumentsChange }
         }
 
         return (
-          <Group key={templateCode} gap="xs" wrap="nowrap">
-            {/* Generate/Status Button */}
-            {!doc ? (
-              <Button
-                size="xs"
-                variant="light"
-                leftSection={<IconFileTypePdf size={14} />}
-                onClick={() => generateDocument(templateCode)}
-                loading={isGenerating}
-                style={{ flex: 1 }}
-              >
-                {template.name}
-              </Button>
-            ) : (
-              <Group gap="xs" style={{ flex: 1 }} wrap="nowrap">
-                <Text size="xs" style={{ flex: 1 }}>
-                  {template.name}
-                </Text>
-                {getStatusBadge(doc.status)}
-              </Group>
-            )}
+          <Stack key={templateCode} gap={4}>
+            {/* Generate Button - Always visible */}
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconFileTypePdf size={14} />}
+              onClick={() => generateDocument(templateCode)}
+              loading={isGenerating}
+              fullWidth
+            >
+              {template.name}
+            </Button>
 
-            {/* Action Buttons */}
+            {/* Document Status and Actions - Only when document exists */}
             {doc && (
-              <Group gap={4} wrap="nowrap">
-                {/* Check Status Button */}
-                {doc.status !== 'done' && doc.status !== 'completed' && doc.status !== 'failed' && (
-                  <Button
-                    size="xs"
+              <Group gap="xs" wrap="nowrap">
+                <Group gap="xs" style={{ flex: 1 }} wrap="nowrap">
+                  <Text size="xs" c="dimmed">Status:</Text>
+                  {getStatusBadge(doc.status)}
+                </Group>
+
+                <Group gap={4} wrap="nowrap">
+                  {/* Check Status Button */}
+                  {doc.status !== 'done' && doc.status !== 'completed' && doc.status !== 'failed' && (
+                    <ActionIcon
+                      size="sm"
+                      variant="subtle"
+                      onClick={() => checkStatus(templateCode, doc.job_id)}
+                      loading={isChecking}
+                      title={t('Check status')}
+                    >
+                      <IconRefresh size={14} />
+                    </ActionIcon>
+                  )}
+
+                  {/* Download Button */}
+                  {(doc.status === 'done' || doc.status === 'completed') && (
+                    <ActionIcon
+                      size="sm"
+                      variant="filled"
+                      color="green"
+                      onClick={() => downloadDocument(templateCode)}
+                      title={t('Download')}
+                    >
+                      <IconDownload size={14} />
+                    </ActionIcon>
+                  )}
+
+                  {/* Delete Button */}
+                  <ActionIcon
+                    size="sm"
                     variant="subtle"
-                    onClick={() => checkStatus(templateCode, doc.job_id)}
-                    loading={isChecking}
-                    px={8}
+                    color="red"
+                    onClick={() => deleteDocument(templateCode)}
+                    title={t('Delete')}
                   >
-                    <IconRefresh size={14} />
-                  </Button>
-                )}
-
-                {/* Download Button */}
-                {(doc.status === 'done' || doc.status === 'completed') && (
-                  <Button
-                    size="xs"
-                    variant="filled"
-                    color="green"
-                    onClick={() => downloadDocument(templateCode)}
-                    px={8}
-                  >
-                    <IconDownload size={14} />
-                  </Button>
-                )}
-
-                {/* Success Indicator */}
-                {(doc.status === 'done' || doc.status === 'completed') && (
-                  <IconCheck size={14} color="green" />
-                )}
+                    <IconX size={14} />
+                  </ActionIcon>
+                </Group>
               </Group>
             )}
-          </Group>
+          </Stack>
         );
       })}
     </Stack>
