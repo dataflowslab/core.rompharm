@@ -320,8 +320,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           <TextInput
             label={t('Reference')}
             value={request.reference}
-            readOnly
-            styles={editing ? { input: { backgroundColor: '#f1f3f5', color: '#868e96' } } : undefined}
+            disabled
           />
         </Grid.Col>
 
@@ -329,8 +328,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           <TextInput
             label={t('Status')}
             value={request.status}
-            readOnly
-            styles={editing ? { input: { backgroundColor: '#f1f3f5', color: '#868e96' } } : undefined}
+            disabled
           />
         </Grid.Col>
 
@@ -348,7 +346,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             <TextInput
               label={t('Source Location')}
               value={request.source_detail?.name || String(request.source)}
-              readOnly
+              disabled
             />
           )}
         </Grid.Col>
@@ -369,7 +367,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             <TextInput
               label={t('Destination Location')}
               value={request.destination_detail?.name || String(request.destination)}
-              readOnly
+              disabled
             />
           )}
         </Grid.Col>
@@ -387,7 +385,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             <TextInput
               label={t('Issue Date')}
               value={formatDate(request.issue_date)}
-              readOnly
+              disabled
             />
           )}
         </Grid.Col>
@@ -396,7 +394,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           <TextInput
             label={t('Created By')}
             value={request.created_by}
-            readOnly
+            disabled
           />
         </Grid.Col>
 
@@ -412,7 +410,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             <Textarea
               label={t('Notes')}
               value={request.notes || ''}
-              readOnly
+              disabled
               minRows={3}
             />
           )}
@@ -430,61 +428,8 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             <TagsInput
               label={t('Batch Codes')}
               value={request.batch_codes || []}
-              readOnly
+              disabled
             />
-          )}
-        </Grid.Col>
-
-        <Grid.Col span={12}>
-          <Group justify="space-between" mb="md">
-            <Title order={4}>{t('Items')}</Title>
-            {editing && (
-              <Button
-                leftSection={<IconPlus size={16} />}
-                size="sm"
-                onClick={() => setAddItemModalOpened(true)}
-              >
-                {t('Add Item')}
-              </Button>
-            )}
-          </Group>
-
-          {formData.items && formData.items.length > 0 ? (
-            <Table striped withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('Part')}</Table.Th>
-                  <Table.Th>{t('IPN')}</Table.Th>
-                  <Table.Th>{t('Quantity')}</Table.Th>
-                  <Table.Th>{t('Notes')}</Table.Th>
-                  {editing && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {formData.items.map((item, index) => (
-                  <Table.Tr key={index}>
-                    <Table.Td>{item.part_detail?.name || item.part}</Table.Td>
-                    <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
-                    <Table.Td>{item.quantity}</Table.Td>
-                    <Table.Td>{item.notes || '-'}</Table.Td>
-                    {editing && (
-                      <Table.Td>
-                        <ActionIcon
-                          color="red"
-                          variant="subtle"
-                          onClick={() => handleRemoveItem(index)}
-                          title={t('Remove')}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Table.Td>
-                    )}
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          ) : (
-            <Text size="sm" c="dimmed">{t('No items')}</Text>
           )}
         </Grid.Col>
         </Grid>
