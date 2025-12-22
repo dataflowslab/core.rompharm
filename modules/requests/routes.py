@@ -1036,7 +1036,8 @@ async def remove_request_signature(
     
     return {"message": "Signature removed successfully"}
 
-@router.get("/parts/{part_id}/recipe")
+
+#
 async def get_part_recipe(
     part_id: int,
     current_user: dict = Depends(verify_admin),
