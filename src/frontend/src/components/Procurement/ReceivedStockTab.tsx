@@ -226,6 +226,10 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
         temperature_conditions_met: formData.temperature_control ? formData.temperature_conditions_met : false,
       };
 
+      console.log('[ReceivedStockTab] Sending payload:', receivePayload);
+      console.log('[ReceivedStockTab] Payload keys:', Object.keys(receivePayload));
+      console.log('[ReceivedStockTab] URL:', procurementApi.receiveStock(orderId));
+
       await api.post(procurementApi.receiveStock(orderId), receivePayload);
 
       notifications.show({
