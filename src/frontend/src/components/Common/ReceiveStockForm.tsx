@@ -38,7 +38,7 @@ export interface ReceiveStockFormData {
   supplier_batch_code: string;
   serial_numbers: string;
   packaging: string;
-  status: string;
+  transferable: boolean;  // Replaces status - determines if stock is transferable while in quarantine
   supplier_id: string;
   supplier_um_id: string;
   notes: string;
@@ -255,8 +255,8 @@ export function ReceiveStockForm({
         />
       </Grid.Col>
 
-      {/* Row 2: Location, Status (2 columns) */}
-      <Grid.Col span={6}>
+      {/* Row 2: Location, Transferable checkbox */}
+      <Grid.Col span={9}>
         <Select
           label={t('Location')}
           placeholder={t('Select location')}
@@ -268,13 +268,13 @@ export function ReceiveStockForm({
         />
       </Grid.Col>
 
-      <Grid.Col span={6}>
-        <Select
-          label={t('Status')}
-          placeholder={t('Select status')}
-          data={stockStatuses}
-          value={formData.status}
-          onChange={(value) => updateField('status', value || '65')}
+      <Grid.Col span={3}>
+        <Checkbox
+          label={t('Transferable')}
+          description={t('Stock can be transferred while in quarantine')}
+          checked={formData.transferable}
+          onChange={(e) => updateField('transferable', e.currentTarget.checked)}
+          mt="md"
         />
       </Grid.Col>
 

@@ -74,7 +74,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
     supplier_batch_code: '',
     serial_numbers: '',
     packaging: '',
-    status: '65', // Quarantine status (implicit)
+    transferable: false, // Stock can be transferred while in quarantine
     supplier_id: supplierId || '',
     supplier_um_id: '694813b6297c9dde6d7065b7', // Default supplier UM
     notes: '',
@@ -108,14 +108,6 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
         value: String(s.value),
         label: s.name || s.label
       })));
-      
-      // Set default status to Quarantined if available
-      const quarantinedStatus = statuses.find((s: any) => 
-        s.name?.toLowerCase().includes('quarantin')
-      );
-      if (quarantinedStatus) {
-        setFormData(prev => ({ ...prev, status: String(quarantinedStatus.value) }));
-      }
     } catch (error) {
       console.error('Failed to load stock statuses:', error);
     }
@@ -207,7 +199,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
         supplier_batch_code: formData.supplier_batch_code || '',
         serial_numbers: formData.serial_numbers || '',
         packaging: formData.packaging || '',
-        status: parseInt(formData.status),
+        transferable: formData.transferable, // Backend will determine actual status based on part.regulated and this flag
         supplier_id: formData.supplier_id || supplierId || '',
         supplier_um_id: formData.supplier_um_id || '694813b6297c9dde6d7065b7',
         notes: formData.notes || '',
@@ -247,7 +239,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
         supplier_batch_code: '',
         serial_numbers: '',
         packaging: '',
-        status: '65',
+        transferable: false,
         supplier_id: supplierId || '',
         supplier_um_id: '694813b6297c9dde6d7065b7',
         notes: '',
