@@ -49,6 +49,8 @@ class RequestCreate(BaseModel):
     notes: Optional[str] = None
     product_id: Optional[int] = None  # Main product ID if recipe-based
     product_quantity: Optional[float] = None  # Quantity of main product
+    recipe_id: Optional[str] = None  # Recipe ObjectId if recipe-based
+    recipe_part_id: Optional[str] = None  # Recipe part ObjectId if recipe-based
 
 
 class RequestUpdate(BaseModel):
@@ -486,6 +488,18 @@ async def create_request(
         'updated_at': datetime.utcnow(),
         'created_by': current_user.get('username')
     }
+    
+    # Add recipe information if provided
+    if request_data.recipe_id:
+        from bson import ObjectId
+        request_doc['recipe_id'] = ObjectId(request_data.recipe_id)
+    if request_data.recipe_part_id:
+        from bson import ObjectId
+        request_doc['recipe_part_id'] = ObjectId(request_data.recipe_part_id)
+    if request_data.product_id:
+        request_doc['product_id'] = request_data.product_id
+    if request_data.product_quantity:
+        request_doc['product_quantity'] = request_data.product_quantity
     
     result = requests_collection.insert_one(request_doc)
     request_id = str(result.inserted_id)
@@ -1030,29 +1044,43 @@ async def get_part_recipe(
 ):
     """
     Get recipe for a part (with fallback to BOM if no recipe exists)
+    Uses part_id (ObjectId) from depo_parts
     """
+    from bson import ObjectId
+    
+    # Get the part from depo_parts to get its _id (ObjectId)
+    part = db.depo_parts.find_one({"id": part_id})
+    
+    if not part:
+        raise HTTPException(status_code=404, detail="Part not found")
+    
+    part_oid = part.get("_id")  # This is the ObjectId
 
-    # Try to get recipe from depo_recipes
-    recipe = db.depo_recipes.find_one({"id": part_id})
+    # Try to get recipe from depo_recipes using part_id (ObjectId)
+    recipe = db.depo_recipes.find_one({"part_id": part_oid})
 
     if recipe:
         current_date = datetime.utcnow()
 
-        # Collect all part IDs recursively
+        # Collect all part_ids (ObjectIds) recursively
         def collect_part_ids(items):
             ids = []
             for item in items:
-                if item.get("type") == 1 and item.get("id"):
-                    ids.append(item["id"])
+                if item.get("type") == 1 and item.get("part_id"):
+                    part_id_val = item["part_id"]
+                    if isinstance(part_id_val, ObjectId):
+                        ids.append(part_id_val)
+                    else:
+                        ids.append(ObjectId(part_id_val))
                 if item.get("items"):
                     ids.extend(collect_part_ids(item["items"]))
             return ids
 
         part_ids = collect_part_ids(recipe.get("items", []))
         parts = list(
-            db.depo_parts.find({"id": {"$in": part_ids}})
+            db.depo_parts.find({"_id": {"$in": part_ids}})
         )
-        parts_map = {p["id"]: p for p in parts}
+        parts_map = {p["_id"]: p for p in parts}
 
         # Process recipe items
         def process_items(items):
@@ -1078,11 +1106,17 @@ async def get_part_recipe(
                 }
 
                 if item.get("type") == 1:
-                    part = parts_map.get(item["id"], {})
+                    item_part_id = item.get("part_id")
+                    if isinstance(item_part_id, ObjectId):
+                        part_oid_key = item_part_id
+                    else:
+                        part_oid_key = ObjectId(item_part_id)
+                    
+                    part_data = parts_map.get(part_oid_key, {})
                     processed_item.update({
-                        "part": item["id"],
-                        "name": part.get("name", f"Part {item['id']}"),
-                        "IPN": part.get("IPN", ""),
+                        "part": part_data.get("id"),  # Return integer id for frontend
+                        "name": part_data.get("name", f"Part {str(part_oid_key)}"),
+                        "IPN": part_data.get("ipn", ""),
                         "quantity": item.get("q", 1),
                     })
                 else:
@@ -1098,6 +1132,8 @@ async def get_part_recipe(
 
         return {
             "source": "recipe",
+            "recipe_id": str(recipe["_id"]),
+            "recipe_part_id": str(part_oid),
             "items": processed_items,
         }
 
