@@ -366,6 +366,8 @@ export function ProcurementDetailPage() {
             items={items} 
             stockLocations={stockLocations}
             onReload={loadItems}
+            supplierName={order.supplier_detail?.name}
+            supplierId={order.supplier_id}
           />
         </Tabs.Panel>
 
