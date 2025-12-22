@@ -198,48 +198,35 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
 
     setSubmitting(true);
     try {
-      // First, receive stock in InvenTree
+      // Prepare complete payload with all form data
       const receivePayload = {
-        line_item: parseInt(formData.line_item),
+        line_item_index: parseInt(formData.line_item),
         quantity: formData.quantity,
-        location: parseInt(formData.location),
-        batch_code: formData.batch_code || undefined,
-        serial_numbers: formData.serial_numbers || undefined,
-        packaging: formData.packaging || undefined,
+        location_id: formData.location,
+        batch_code: formData.batch_code || '',
+        supplier_batch_code: formData.supplier_batch_code || '',
+        serial_numbers: formData.serial_numbers || '',
+        packaging: formData.packaging || '',
         status: parseInt(formData.status),
-        notes: formData.notes || undefined
+        supplier_id: formData.supplier_id || supplierId || '',
+        supplier_um_id: formData.supplier_um_id || '694813b6297c9dde6d7065b7',
+        notes: formData.notes || '',
+        manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : null,
+        expected_quantity: formData.expected_quantity || 0,
+        expiry_date: formData.use_expiry && formData.expiry_date ? formData.expiry_date.toISOString().split('T')[0] : null,
+        reset_date: !formData.use_expiry && formData.reset_date ? formData.reset_date.toISOString().split('T')[0] : null,
+        containers: formData.containers.length > 0 ? formData.containers : [],
+        containers_cleaned: formData.containers_cleaned,
+        supplier_ba_no: formData.supplier_ba_no || '',
+        supplier_ba_date: formData.supplier_ba_date ? formData.supplier_ba_date.toISOString().split('T')[0] : null,
+        accord_ba: formData.accord_ba,
+        is_list_supplier: formData.is_list_supplier,
+        clean_transport: formData.clean_transport,
+        temperature_control: formData.temperature_control,
+        temperature_conditions_met: formData.temperature_control ? formData.temperature_conditions_met : false,
       };
 
-      const receiveResponse = await api.post(procurementApi.receiveStock(orderId), receivePayload);
-      
-      // Get the stock item ID from response
-      const stockItemId = receiveResponse.data?.stock_item_id || receiveResponse.data?.id;
-
-      if (stockItemId) {
-        // Save extra data via plugin and MongoDB
-        const extraDataPayload = {
-          stock_item_id: stockItemId,
-          order_id: orderId,
-          supplier_batch_code: formData.supplier_batch_code || null,
-          supplier_um_id: formData.supplier_um_id || null,
-          manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : null,
-          expected_quantity: formData.expected_quantity || null,
-          expiry_date: formData.use_expiry && formData.expiry_date ? formData.expiry_date.toISOString().split('T')[0] : null,
-          reset_date: !formData.use_expiry && formData.reset_date ? formData.reset_date.toISOString().split('T')[0] : null,
-          containers: formData.containers.length > 0 ? formData.containers : null,
-          containers_cleaned: formData.containers_cleaned,
-          supplier_ba_no: formData.supplier_ba_no || null,
-          supplier_ba_date: formData.supplier_ba_date ? formData.supplier_ba_date.toISOString().split('T')[0] : null,
-          accord_ba: formData.accord_ba,
-          is_list_supplier: formData.is_list_supplier,
-          clean_transport: formData.clean_transport,
-          temperature_control: formData.temperature_control,
-          temperature_conditions_met: formData.temperature_control ? formData.temperature_conditions_met : null,
-        };
-
-        // Save extra data
-        await api.post(`/modules/depo_procurement/api/stock-extra-data`, extraDataPayload);
-      }
+      await api.post(procurementApi.receiveStock(orderId), receivePayload);
 
       notifications.show({
         title: t('Success'),
