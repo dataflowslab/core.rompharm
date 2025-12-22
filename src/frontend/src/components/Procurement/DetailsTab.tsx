@@ -8,25 +8,23 @@ import { DocumentGenerator } from '../Common/DocumentGenerator';
 import api from '../../services/api';
 
 interface Supplier {
-  pk: number;
+  _id: string;
   name: string;
 }
 
 interface StockLocation {
-  _id?: string;
-  pk?: number;
+  _id: string;
   name: string;
 }
 
 interface PurchaseOrder {
-  pk?: number;
-  _id?: string;
+  _id: string;
   reference: string;
   description: string;
-  supplier: number;
+  supplier_id: string;
   supplier_detail?: {
     name: string;
-    pk: number;
+    _id: string;
   };
   supplier_reference: string;
   order_currency: string;
@@ -38,7 +36,6 @@ interface PurchaseOrder {
   };
   notes: string;
   status: string;  // Status name from state
-  status_text?: string;
 }
 
 interface DetailsTabProps {
@@ -144,13 +141,13 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
         <Paper p="md" withBorder>
           <Title order={5} mb="md">{t('Documents')}</Title>
           <DocumentGenerator
-            objectId={String(order._id || order.pk)}
+            objectId={order._id}
             templateCodes={templateCodes}
             templateNames={templateNames}
             onDocumentsChange={async (docs) => {
               // Save documents to purchase order
               try {
-                await api.patch(`/modules/depo_procurement/api/purchase-orders/${order._id || order.pk}/documents`, {
+                await api.patch(`/modules/depo_procurement/api/purchase-orders/${order._id}/documents`, {
                   documents: docs
                 });
                 console.log('Documents saved to order:', docs);
@@ -188,7 +185,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
             <Grid.Col span={6}>
               <TextInput
                 label={t('Supplier')}
-                value={order.supplier_detail?.name || `Supplier ${order.supplier}`}
+                value={order.supplier_detail?.name || `Supplier ${order.supplier_id}`}
                 readOnly
                 disabled
               />
@@ -231,7 +228,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
                 value={formData.destination_id}
                 onChange={(value) => setFormData({ ...formData, destination_id: value || '' })}
                 data={stockLocations.map(loc => ({ 
-                  value: String(loc._id || loc.pk), 
+                  value: loc._id, 
                   label: loc.name 
                 }))}
                 disabled={!canEdit}

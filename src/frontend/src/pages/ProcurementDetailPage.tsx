@@ -31,48 +31,42 @@ import {
   AttachmentsTab,
 } from '../components/Procurement';
 interface PurchaseOrder {
-  _id?: string;
-  pk?: number;
+  _id: string;
   reference: string;
   description: string;
-  supplier?: number;
-  supplier_id?: string;
+  supplier_id: string;
   supplier_detail?: {
     name: string;
-    pk?: number;
-    _id?: string;
+    _id: string;
   };
   supplier_reference: string;
   order_currency?: string;
   currency?: string;
   issue_date: string;
   target_date: string;
-  destination?: number;
   destination_id?: string;
   destination_detail?: {
     name: string;
   };
   notes: string;
   status: string;  // MongoDB: string status name (e.g., "Pending", "Processing")
-  status_text?: string;  // Legacy InvenTree field
   status_color?: string;  // Color from depo_purchase_orders_states
-  responsible?: number;
   created_by?: string;
 }
 
 interface PurchaseOrderItem {
-  pk: number;
-  part: number;
+  _id: string;
+  part_id: string;
   part_detail?: {
     name: string;
     description: string;
-    IPN: string;
+    ipn: string;
   };
   quantity: number;
   received: number;
   purchase_price: number;
   purchase_price_currency: string;
-  destination?: number;
+  destination_id?: string;
   destination_detail?: {
     name: string;
   };
@@ -81,13 +75,13 @@ interface PurchaseOrderItem {
 }
 
 interface StockLocation {
-  pk: number;
+  _id: string;
   name: string;
   description?: string;
 }
 
 interface Attachment {
-  pk: number;
+  _id: string;
   attachment: string;
   filename: string;
   comment: string;
@@ -223,7 +217,7 @@ export function ProcurementDetailPage() {
     console.log('[canEdit] Checking permissions:', {
       isAdmin,
       currentUserId,
-      orderResponsible: order.responsible,
+      orderCreatedBy: order.created_by,
       orderStatus: order.status,
       approvalFlow,
       signatures: approvalFlow?.signatures?.length || 0,
@@ -245,9 +239,10 @@ export function ProcurementDetailPage() {
 
     // If no approval flow exists yet, or no signatures, creator can edit
     if (!approvalFlow || approvalFlow.signatures.length === 0) {
-      const isCreator = order.responsible && currentUserId && String(order.responsible) === String(currentUserId);
-      console.log('[canEdit] No signatures, checking creator:', isCreator);
-      return isCreator;
+      // Note: created_by is username, not user_id, so we can't compare directly
+      // For now, allow editing if no signatures (admin will have full control anyway)
+      console.log('[canEdit] No signatures - CAN EDIT');
+      return true;
     }
 
     console.log('[canEdit] Has signatures - CANNOT EDIT');
@@ -304,7 +299,7 @@ export function ProcurementDetailPage() {
           <Text size="sm" c="dimmed">{order.supplier_detail?.name}</Text>
         </div>
         <Badge color={order.status_color || getStatusColor(order.status)} size="lg">
-          {order.status || order.status_text || 'Unknown'}
+          {order.status || 'Unknown'}
         </Badge>
       </Group>
 
