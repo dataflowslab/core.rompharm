@@ -1,5 +1,40 @@
 # Changelog - Requests Module
 
+## Version 1.0.6 - Recipe Integration and UX Improvements
+
+### Added
+- **Recipe Integration**: Requests now save recipe information when created from a recipe
+  - Added `recipe_id` (ObjectId) field to store which recipe was used
+  - Added `recipe_part_id` (ObjectId) field to store the product part reference
+  - Added `product_id` (integer) and `product_quantity` (float) fields
+  - Backend endpoint `/parts/{part_id}/recipe` now uses part_id (ObjectId) from depo_parts
+  - Recipe endpoint returns `recipe_id` and `recipe_part_id` for saving in requests
+
+- **Operations Flow Endpoints**: Complete backend support for operations flow
+  - `GET /{request_id}/operations-flow` - Retrieve operations flow
+  - `POST /{request_id}/operations-sign` - Sign operations flow
+  - `DELETE /{request_id}/operations-signatures/{user_id}` - Remove signature (admin)
+  - `PATCH /{request_id}/operations-status` - Update final status (Finished/Refused)
+
+### Fixed
+- **Operations Tab Visibility**: Operations tab now correctly displays after request approval
+  - Operations flow is auto-created when request is approved
+  - Tab shows operations form instead of "will be created" message
+  - All operations flow functionality now works correctly
+
+### Changed
+- **Details Tab UX Improvements**:
+  - All readonly fields now use `disabled` attribute for better visual clarity
+  - Removed Items list from Details tab (already available in Items tab)
+  - Cleaner, less redundant interface
+  - Fields clearly show they cannot be edited when disabled
+
+### Technical Details
+- Recipe items now use `part_id` (ObjectId) internally instead of integer `id`
+- Frontend sends recipe information when creating requests with recipes
+- Operations flow follows same pattern as approval flow
+- All endpoints properly handle ObjectId conversions
+
 ## Version 1.0.5 - Complete API Path Migration
 
 ### Fixed
