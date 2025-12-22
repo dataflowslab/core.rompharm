@@ -198,12 +198,22 @@ export function RequestsPage() {
         }];
       }
 
-      await api.post(requestsApi.createRequest(), {
+      const requestPayload: any = {
         source: parseInt(formData.source),
         destination: parseInt(formData.destination),
         items: itemsToSend,
         notes: formData.notes || undefined
-      });
+      };
+
+      // Add recipe information if available
+      if (recipeData && recipeData.recipe_id) {
+        requestPayload.recipe_id = recipeData.recipe_id;
+        requestPayload.recipe_part_id = recipeData.recipe_part_id;
+        requestPayload.product_id = parseInt(formData.part);
+        requestPayload.product_quantity = formData.quantity;
+      }
+
+      await api.post(requestsApi.createRequest(), requestPayload);
 
       notifications.show({
         title: t('Success'),
