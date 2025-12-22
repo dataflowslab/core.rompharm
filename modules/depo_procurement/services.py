@@ -509,10 +509,18 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
             raise HTTPException(status_code=404, detail="Purchase order not found")
         
         items = order.get('items', [])
-        if stock_data.line_item_index < 0 or stock_data.line_item_index >= len(items):
-            raise HTTPException(status_code=404, detail="Line item not found")
         
-        item = items[stock_data.line_item_index]
+        # Find item by part_id instead of index (more reliable)
+        item = None
+        item_index = -1
+        for idx, order_item in enumerate(items):
+            if order_item.get('part_id') == stock_data.part_id:
+                item = order_item
+                item_index = idx
+                break
+        
+        if not item:
+            raise HTTPException(status_code=404, detail=f"Item with part_id {stock_data.part_id} not found in order")
         
         # Find state_id from depo_stocks_states based on status value
         status_value = getattr(stock_data, 'status', 65)
@@ -570,7 +578,7 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         
         # Add stock_id to item's stocks array
         item['stocks'].append(stock_id)
-        items[stock_data.line_item_index] = item
+        items[item_index] = item
         
         # Calculate received quantity from stocks array
         received_qty = 0

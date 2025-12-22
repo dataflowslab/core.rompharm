@@ -50,7 +50,7 @@ class PurchaseOrderItemUpdateRequest(BaseModel):
 
 
 class ReceiveStockRequest(BaseModel):
-    line_item_index: int
+    part_id: str  # Article ID to receive stock for
     quantity: float
     location_id: str
     batch_code: Optional[str] = None

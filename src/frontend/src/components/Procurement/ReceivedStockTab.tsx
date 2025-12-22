@@ -190,9 +190,21 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
 
     setSubmitting(true);
     try {
+      // Find selected item to get part_id
+      const selectedItem = items.find(i => i._id === formData.line_item);
+      if (!selectedItem) {
+        notifications.show({
+          title: t('Error'),
+          message: t('Selected item not found'),
+          color: 'red'
+        });
+        setSubmitting(false);
+        return;
+      }
+
       // Prepare complete payload with all form data
       const receivePayload = {
-        line_item_index: parseInt(formData.line_item),
+        part_id: selectedItem.part_id,  // Send part_id instead of line_item_index
         quantity: formData.quantity,
         location_id: formData.location,
         batch_code: formData.batch_code || '',
