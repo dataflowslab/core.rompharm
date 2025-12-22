@@ -57,7 +57,9 @@ class ReceiveStockRequest(BaseModel):
     supplier_batch_code: Optional[str] = None
     serial_numbers: Optional[str] = None
     packaging: Optional[str] = None
-    status: Optional[str] = "OK"
+    transferable: Optional[bool] = False  # Stock can be transferred while in quarantine
+    supplier_id: Optional[str] = None
+    supplier_um_id: Optional[str] = None
     notes: Optional[str] = None
     manufacturing_date: Optional[str] = None
     expected_quantity: Optional[float] = None
