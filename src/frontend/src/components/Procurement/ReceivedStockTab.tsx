@@ -33,19 +33,18 @@ interface ReceivedItem {
 }
 
 interface PurchaseOrderItem {
-  pk: number;
-  part: number;
+  _id: string;
+  part_id: string;
   part_detail?: {
     name: string;
-    IPN: string;
+    ipn: string;
   };
   quantity: number;
   received: number;
 }
 
 interface StockLocation {
-  _id?: string;
-  pk?: number;
+  _id: string;
   name: string;
 }
 
@@ -296,7 +295,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
     
     // Auto-set max quantity based on selected item
     if (value) {
-      const item = items.find(i => String(i.pk) === value);
+      const item = items.find(i => i._id === value);
       if (item) {
         const remaining = item.quantity - (item.received || 0);
         setFormData(prev => ({ ...prev, quantity: remaining, expected_quantity: remaining }));
@@ -308,28 +307,26 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
   const availableItems = items.filter(item => (item.received || 0) < item.quantity);
 
   // Get max quantity for selected item
-  const selectedItem = items.find(i => String(i.pk) === formData.line_item);
+  const selectedItem = items.find(i => i._id === formData.line_item);
   const maxQuantity = selectedItem ? selectedItem.quantity - (selectedItem.received || 0) : 0;
 
   // Prepare line items for ReceiveStockForm
   const lineItemsData = availableItems.map(item => {
-    const partName = item.part_detail?.name || `Part ${item.part}`;
-    const ipn = item.part_detail?.IPN || '';
+    const partName = item.part_detail?.name || `Part ${item.part_id}`;
+    const ipn = item.part_detail?.ipn || '';
     const received = item.received || 0;
     const total = item.quantity;
     return {
-      value: String(item.pk),
+      value: item._id,
       label: `${partName} - ${ipn} (${received}/${total})`
     };
   });
 
   // Prepare locations for ReceiveStockForm
-  const locationsData = stockLocations
-    .filter(loc => (loc._id || loc.pk))  // Has either _id or pk
-    .map(loc => ({ 
-      value: String(loc._id || loc.pk), 
-      label: loc.name 
-    }));
+  const locationsData = stockLocations.map(loc => ({ 
+    value: loc._id, 
+    label: loc.name 
+  }));
 
   return (
     <Paper p="md" withBorder>
