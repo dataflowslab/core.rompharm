@@ -19,7 +19,7 @@ from modules.depo_procurement.models import (
     ReceiveStockRequest,
     UpdateOrderStatusRequest
 )
-from modules.depo_procurement.utils import serialize_doc, is_manager
+from modules.depo_procurement.utils import serialize_doc
 
 router = APIRouter(prefix="/modules/depo_procurement/api", tags=["depo_procurement"])
 

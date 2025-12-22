@@ -1,0 +1,12 @@
+async def get_order_attachments(order_id: str):
+    """Get attachments for a purchase order"""
+    db = get_db()
+    collection = db['depo_purchase_order_attachments']
+    
+    try:
+        cursor = collection.find({'order_id': ObjectId(order_id)}).sort('created_at', -1)
+        attachments = list(cursor)
+        return serialize_doc(attachments)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch attachments: {str(e)}")
+

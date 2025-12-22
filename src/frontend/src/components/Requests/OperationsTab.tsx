@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea, TextInput, Grid } from '@mantine/core';
+import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea, TextInput, Grid, NumberInput } from '@mantine/core';
 import { IconSignature, IconTrash, IconDeviceFloppy, IconFileText } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
+import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
 
@@ -129,7 +130,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
   const loadOperationsFlow = async () => {
     try {
-      const response = await api.get(`/api/requests/${requestId}/operations-flow`);
+      const response = await api.get(requestsApi.getOperationsFlow(requestId));
       setFlow(response.data.flow);
     } catch (error) {
       console.error('Failed to load operations flow:', error);
@@ -140,7 +141,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
   const loadRequestItems = async () => {
     try {
-      const response = await api.get(`/api/requests/${requestId}`);
+      const response = await api.get(requestsApi.getRequest(requestId));
       setRequest(response.data); // Save request data
       const items = response.data.items || [];
       const sourceLocation = response.data.source;
@@ -160,7 +161,14 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         })
       );
       
-      setItemsWithBatch(itemsData);
+      // Sort items: non-zero quantities first, then zero quantities (grayed out)
+      const sortedItems = itemsData.sort((a, b) => {
+        if (a.quantity === 0 && b.quantity !== 0) return 1;
+        if (a.quantity !== 0 && b.quantity === 0) return -1;
+        return 0;
+      });
+      
+      setItemsWithBatch(sortedItems);
     } catch (error) {
       console.error('Failed to load request items:', error);
     }
@@ -168,8 +176,9 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
   const loadBatchCodes = async (partId: number, locationId?: number): Promise<BatchOption[]> => {
     try {
+      const url = requestsApi.getPartBatchCodes(partId);
       const params = locationId ? `?location_id=${locationId}` : '';
-      const response = await api.get(`/api/requests/parts/${partId}/batch-codes${params}`);
+      const response = await api.get(`${url}${params}`);
       const batchCodes = response.data.batch_codes || [];
       
       return batchCodes.map((batch: any) => ({
@@ -197,10 +206,16 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     setItemsWithBatch(newItems);
   };
 
+  const handleQuantityChange = (index: number, value: number) => {
+    const newItems = [...itemsWithBatch];
+    newItems[index].quantity = value;
+    setItemsWithBatch(newItems);
+  };
+
   const handleSaveBatchData = async () => {
     setSavingBatch(true);
     try {
-      await api.patch(`/api/requests/${requestId}`, {
+      await api.patch(requestsApi.updateRequest(requestId), {
         items: itemsWithBatch.map(item => ({
           part: item.part,
           quantity: item.quantity,
@@ -214,6 +229,9 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         message: t('Series and batch data saved successfully'),
         color: 'green'
       });
+
+      // Reload items to apply sorting
+      await loadRequestItems();
     } catch (error: any) {
       console.error('Failed to save batch data:', error);
       notifications.show({
@@ -227,12 +245,13 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   };
 
   const handleSign = async () => {
-    // Validate that all items have series and batch
-    const allItemsComplete = itemsWithBatch.every(item => item.series && item.batch_code);
+    // Validate that all items with quantity > 0 have series and batch
+    const itemsWithQuantity = itemsWithBatch.filter(item => item.quantity > 0);
+    const allItemsComplete = itemsWithQuantity.every(item => item.series && item.batch_code);
     if (!allItemsComplete) {
       notifications.show({
         title: t('Error'),
-        message: t('Please fill in series and batch code for all items before signing'),
+        message: t('Please fill in series and batch code for all items with quantity > 0 before signing'),
         color: 'red'
       });
       return;
@@ -244,7 +263,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
       await handleSaveBatchData();
       
       // Then sign
-      await api.post(`/api/requests/${requestId}/operations-sign`);
+      await api.post(requestsApi.signOperations(requestId));
       notifications.show({
         title: t('Success'),
         message: t('Operations signed successfully'),
@@ -279,7 +298,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/api/requests/${requestId}/operations-signatures/${userId}`);
+          await api.delete(requestsApi.removeOperationsSignature(requestId, userId));
           notifications.show({
             title: t('Success'),
             message: t('Signature removed successfully'),
@@ -323,7 +342,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
     setSubmitting(true);
     try {
-      await api.patch(`/api/requests/${requestId}/operations-status`, {
+      await api.patch(requestsApi.updateOperationsStatus(requestId), {
         status: finalStatus,
         reason: finalStatus === 'Refused' ? refusalReason : undefined
       });
@@ -582,42 +601,52 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>{t('Part')}</Table.Th>
-                  <Table.Th>{t('Qty')}</Table.Th>
+                  <Table.Th style={{ width: '120px' }}>{t('Qty')}</Table.Th>
                   <Table.Th>{t('Series')}</Table.Th>
-                  <Table.Th>{t('Batch Code')}</Table.Th>
+                  <Table.Th style={{ width: '300px' }}>{t('Batch Code')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {itemsWithBatch.map((item, index) => (
-                  <Table.Tr key={index}>
-                    <Table.Td>{item.part_name}</Table.Td>
-                    <Table.Td>{item.quantity}</Table.Td>
-                    <Table.Td>
-                      <TextInput
-                        value={item.series}
-                        onChange={(e) => handleSeriesChange(index, e.target.value)}
-                        disabled={isFormReadonly}
-                        placeholder={t('Enter series')}
-                        size="xs"
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      <TextInput
-                        value={item.batch_code}
-                        onChange={(e) => handleBatchChange(index, e.target.value)}
-                        disabled={isFormReadonly}
-                        placeholder={t('Enter or select batch')}
-                        list={`batch-options-${index}`}
-                        size="xs"
-                      />
-                      <datalist id={`batch-options-${index}`}>
-                        {item.batch_options.map((option, i) => (
-                          <option key={i} value={option.value} label={option.label} />
-                        ))}
-                      </datalist>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
+                {itemsWithBatch.map((item, index) => {
+                  const isZeroQuantity = item.quantity === 0;
+                  return (
+                    <Table.Tr key={index} style={{ opacity: isZeroQuantity ? 0.5 : 1 }}>
+                      <Table.Td style={{ color: isZeroQuantity ? '#868e96' : 'inherit' }}>
+                        {item.part_name}
+                      </Table.Td>
+                      <Table.Td>
+                        <NumberInput
+                          value={item.quantity}
+                          onChange={(value) => handleQuantityChange(index, Number(value) || 0)}
+                          disabled={isFormReadonly}
+                          min={0}
+                          size="xs"
+                        />
+                      </Table.Td>
+                      <Table.Td>
+                        <TextInput
+                          value={item.series}
+                          onChange={(e) => handleSeriesChange(index, e.target.value)}
+                          disabled={isFormReadonly || isZeroQuantity}
+                          placeholder={t('Enter series')}
+                          size="xs"
+                        />
+                      </Table.Td>
+                      <Table.Td>
+                        <Select
+                          value={item.batch_code}
+                          onChange={(value) => handleBatchChange(index, value)}
+                          disabled={isFormReadonly || isZeroQuantity}
+                          placeholder={t('Select batch code')}
+                          data={item.batch_options}
+                          searchable
+                          clearable
+                          size="xs"
+                        />
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
               </Table.Tbody>
             </Table>
 

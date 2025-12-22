@@ -1,5 +1,5 @@
 """
-Utility functions for DEPO Procurement Module
+DEPO Procurement Module - Utility Functions
 """
 from datetime import datetime
 from bson import ObjectId
@@ -14,34 +14,22 @@ def serialize_doc(doc):
     if isinstance(doc, dict):
         result = {}
         for key, value in doc.items():
-            if key == '_id':
-                # Convert _id to string and also add as 'pk' for frontend compatibility
-                result[key] = str(value) if value else None
-                result['pk'] = str(value) if value else None
-            elif key.endswith('_id'):
+            if key == '_id' or key.endswith('_id'):
                 result[key] = str(value) if value else None
             elif isinstance(value, ObjectId):
                 result[key] = str(value)
             elif isinstance(value, dict):
                 result[key] = serialize_doc(value)
             elif isinstance(value, list):
-                result[key] = [serialize_doc(item) if isinstance(item, dict) else item for item in value]
+                result[key] = [
+                    serialize_doc(item) if isinstance(item, dict) 
+                    else str(item) if isinstance(item, ObjectId)
+                    else item 
+                    for item in value
+                ]
             elif isinstance(value, datetime):
                 result[key] = value.isoformat()
             else:
                 result[key] = value
         return result
     return doc
-
-
-def is_manager(user: dict) -> bool:
-    """Check if user is in Managers group"""
-    groups = user.get('groups', [])
-    for group in groups:
-        if isinstance(group, dict):
-            if group.get('name', '').lower() == 'managers':
-                return True
-        elif isinstance(group, str):
-            if group.lower() == 'managers':
-                return True
-    return False

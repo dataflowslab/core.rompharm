@@ -151,8 +151,9 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None):
                     # Find the matching item in the purchase order
                     for item in purchase_order['items']:
                         if str(item.get('part_id')) == str(stock.get('part_id')):
-                            purchase_price = item.get('purchase_price', 0)
-                            stock_value = stock.get('quantity', 0) * purchase_price
+                            purchase_price = item.get('purchase_price', 0) or 0
+                            quantity = stock.get('quantity', 0) or 0
+                            stock_value = quantity * purchase_price
                             break
             
             stock['stock_value'] = stock_value
@@ -259,8 +260,9 @@ async def get_stock_by_id(stock_id: str):
             if purchase_order and purchase_order.get('items'):
                 for item in purchase_order['items']:
                     if str(item.get('part_id')) == str(stock.get('part_id')):
-                        purchase_price = item.get('purchase_price', 0)
-                        stock_value = stock.get('quantity', 0) * purchase_price
+                        purchase_price = item.get('purchase_price', 0) or 0
+                        quantity = stock.get('quantity', 0) or 0
+                        stock_value = quantity * purchase_price
                         break
         
         stock['stock_value'] = stock_value

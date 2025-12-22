@@ -4,6 +4,7 @@ import { IconSignature, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
+import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
 
@@ -57,7 +58,7 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
 
   const loadApprovalFlow = async () => {
     try {
-      const response = await api.get(`/api/requests/${requestId}/approval-flow`);
+      const response = await api.get(requestsApi.getApprovalFlow(requestId));
       setFlow(response.data.flow);
     } catch (error) {
       console.error('Failed to load approval flow:', error);
@@ -68,7 +69,7 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
 
   const handleCreateFlow = async () => {
     try {
-      await api.post(`/api/requests/${requestId}/approval-flow`);
+      await api.post(requestsApi.createApprovalFlow(requestId));
       notifications.show({
         title: t('Success'),
         message: t('Approval flow created successfully'),
@@ -89,7 +90,7 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
   const handleSign = async () => {
     setSigning(true);
     try {
-      await api.post(`/api/requests/${requestId}/sign`);
+      await api.post(requestsApi.signRequest(requestId));
       notifications.show({
         title: t('Success'),
         message: t('Request signed successfully'),
@@ -125,7 +126,7 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/api/requests/${requestId}/signatures/${userId}`);
+          await api.delete(requestsApi.removeSignature(requestId, userId));
           notifications.show({
             title: t('Success'),
             message: t('Signature removed successfully'),

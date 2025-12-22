@@ -1,0 +1,41 @@
+async def check_and_auto_finish_order(order_id: str):
+    """Check if all items are received and auto-finish the order"""
+    db = get_db()
+    po_collection = db['depo_purchase_orders']
+    
+    try:
+        order = po_collection.find_one({'_id': ObjectId(order_id)})
+        if not order:
+            return
+        
+        items = order.get('items', [])
+        if not items:
+            return
+        
+        # Check if all items are fully received
+        all_received = all(
+            item.get('received', 0) >= item.get('quantity', 0)
+            for item in items
+        )
+        
+        if all_received:
+            # Auto-finish the order
+            states_collection = db['depo_purchase_orders_states']
+            finished_state = states_collection.find_one({'name': 'Finished'})
+            
+            if finished_state:
+                po_collection.update_one(
+                    {'_id': ObjectId(order_id)},
+                    {
+                        '$set': {
+                            'state_id': finished_state['_id'],
+                            'status': 'Finished',
+                            'finished_at': datetime.utcnow(),
+                            'finished_by': 'system',
+                            'updated_at': datetime.utcnow()
+                        }
+                    }
+                )
+    except Exception as e:
+        # Don't raise exception, just log
+        print(f"Failed to auto-finish order: {str(e)}")

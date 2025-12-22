@@ -1,0 +1,37 @@
+async def get_purchase_order_by_id(order_id: str):
+    """Get a specific purchase order with enriched data"""
+    db = get_db()
+    collection = db['depo_purchase_orders']
+    
+    try:
+        order = collection.find_one({'_id': ObjectId(order_id)})
+        if not order:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+        # Enrich with supplier details
+        if order.get('supplier_id'):
+            supplier = db['depo_companies'].find_one({'_id': ObjectId(order['supplier_id'])})
+            if supplier:
+                order['supplier_detail'] = serialize_doc(supplier)
+        
+        # Enrich with status from depo_purchase_orders_states
+        if order.get('state_id'):
+            state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId(order['state_id'])})
+            if state:
+                order['status'] = state.get('name')  # Override hardcoded status with state name
+                order['status_color'] = state.get('color', 'gray')
+        
+        # Enrich with destination details
+        if order.get('destination_id'):
+            location = db['depo_locations'].find_one({'_id': ObjectId(order['destination_id'])})
+            if location:
+                order['destination_detail'] = {
+                    'name': location.get('name')
+                }
+        
+        return serialize_doc(order)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch purchase order: {str(e)}")
+

@@ -1,0 +1,49 @@
+async def get_order_items(order_id: str):
+    """Get items for a purchase order with part and destination details"""
+    db = get_db()
+    collection = db['depo_purchase_orders']
+    
+    try:
+        order = collection.find_one({'_id': ObjectId(order_id)})
+        if not order:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+        items = order.get('items', [])
+        
+        # Enrich items with part and destination details
+        for idx, item in enumerate(items):
+            # Add _id if missing (for backward compatibility with old items)
+            if '_id' not in item:
+                item['_id'] = str(ObjectId())
+            
+            # Enrich with part details
+            if item.get('part_id'):
+                part = db['depo_parts'].find_one({'_id': ObjectId(item['part_id'])})
+                if part:
+                    item['part_detail'] = {
+                        'name': part.get('name'),
+                        'ipn': part.get('ipn'),
+                        'um': part.get('um')
+                    }
+            
+            # Enrich with destination details
+            if item.get('destination_id'):
+                location = db['depo_locations'].find_one({'_id': ObjectId(item['destination_id'])})
+                if location:
+                    item['destination_detail'] = {
+                        'name': location.get('name')
+                    }
+        
+        # Update items in database if any _id was added
+        if any('_id' not in item for item in order.get('items', [])):
+            collection.update_one(
+                {'_id': ObjectId(order_id)},
+                {'$set': {'items': items}}
+            )
+        
+        return {'results': serialize_doc(items)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch purchase order items: {str(e)}")
+

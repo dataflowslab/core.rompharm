@@ -1,0 +1,42 @@
+async def delete_order_item_by_id(order_id: str, item_id: str):
+    """Delete an item from a purchase order by item _id"""
+    db = get_db()
+    collection = db['depo_purchase_orders']
+    
+    try:
+        order = collection.find_one({'_id': ObjectId(order_id)})
+        if not order:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+        items = order.get('items', [])
+        
+        # Find item by _id
+        item_index = -1
+        for idx, item in enumerate(items):
+            if item.get('_id') == item_id:
+                item_index = idx
+                break
+        
+        if item_index == -1:
+            raise HTTPException(status_code=404, detail="Item not found")
+        
+        # Remove item
+        items.pop(item_index)
+        
+        collection.update_one(
+            {'_id': ObjectId(order_id)},
+            {
+                '$set': {
+                    'items': items,
+                    'lines': len(items),
+                    'updated_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete item: {str(e)}")
+

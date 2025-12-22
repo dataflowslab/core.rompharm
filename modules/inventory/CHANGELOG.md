@@ -1,5 +1,29 @@
 # Changelog - Inventory Module
 
+## Version 1.0.2 - Stocks Table Update
+
+### Changed
+- **Stocks Table**: Removed "Stock Value" column from stocks listing table
+- Updated table column count from 9 to 8 columns
+- Remaining columns: Batch Code, Batch Date, Product, IPN, Status, Location, Quantity, Supplier
+
+### Technical Details
+- Updated `StocksPage.tsx` to remove Stock Value column
+- Updated empty state colspan from 9 to 8
+- Removed `formatCurrency` usage from table rows (function still exists but unused)
+
+## Version 1.0.1 - Stock Value Calculation Fix
+
+### Fixed
+- **Stock Value Calculation**: Fixed TypeError when calculating stock value with None purchase_price
+- Added null coalescing (`or 0`) for both `purchase_price` and `quantity` to prevent multiplication errors
+- Applied fix to both `get_stocks_list` and `get_stock_by_id` functions
+
+### Technical Details
+- Error was: "unsupported operand type(s) for *: 'float' and 'NoneType'"
+- Occurred when purchase order items had `purchase_price` set to None
+- Now defaults to 0 for both price and quantity if None is encountered
+
 ## Version 1.4.0 - Stocks Frontend Implementation
 
 ### Added

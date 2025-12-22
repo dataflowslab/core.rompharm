@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Table, Select, NumberInput, Text, Badge, Group, Paper, Title, Loader } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
+import { requestsApi } from '../../services/requests';
 
 interface Batch {
   batch_code: string;
@@ -112,7 +113,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
 
   const loadBatches = async (partId: number): Promise<Batch[]> => {
     try {
-      const response = await api.get(`/api/requests/parts/${partId}/stock-info`);
+      const response = await api.get(requestsApi.getPartStockInfo(partId));
       return response.data.batches || [];
     } catch (error) {
       console.error(`Failed to load batches for part ${partId}:`, error);
@@ -263,12 +264,12 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
                           placeholder={t('Add batch')}
                           data={getAvailableBatches(selectedAlt).map(b => ({
                             value: b.batch_code,
-                            label: `${b.batch_code} (${b.quantity})`
+                            label: `${b.batch_code} (${b.quantity} available)`
                           }))}
                           onChange={(value) => value && handleBatchAdd(compIndex, component.selected_alternative || 0, value)}
                           size="xs"
                           clearable
-                          style={{ width: '150px' }}
+                          style={{ width: '200px' }}
                         />
                       )}
                     </Group>
@@ -321,12 +322,12 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
                           placeholder={t('Add batch')}
                           data={getAvailableBatches(component).map(b => ({
                             value: b.batch_code,
-                            label: `${b.batch_code} (${b.quantity})`
+                            label: `${b.batch_code} (${b.quantity} available)`
                           }))}
                           onChange={(value) => value && handleBatchAdd(compIndex, null, value)}
                           size="xs"
                           clearable
-                          style={{ width: '150px' }}
+                          style={{ width: '200px' }}
                         />
                       )}
                     </Group>

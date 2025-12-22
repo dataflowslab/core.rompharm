@@ -47,6 +47,8 @@ class RequestCreate(BaseModel):
     destination: int  # Stock location ID
     items: List[RequestItemCreate]
     notes: Optional[str] = None
+    product_id: Optional[int] = None  # Main product ID if recipe-based
+    product_quantity: Optional[float] = None  # Quantity of main product
 
 
 class RequestUpdate(BaseModel):
@@ -153,6 +155,7 @@ async def get_part_stock_info(
 ):
     """Get stock information for a part from MongoDB depo_stocks with batches
     
+    Only shows transferable stock (state_id = 694322878728e4d75ae72790)
     Link: depo_parts._id (ObjectId) <-> depo_stocks.part_id (ObjectId)
     """
     from bson import ObjectId
@@ -175,19 +178,26 @@ async def get_part_stock_info(
         
         part_oid = part.get("_id")  # This is the ObjectId
         
-        # Query depo_stocks using part_id = depo_parts._id (ObjectId)
-        stock_records = list(db.depo_stocks.find({"part_id": part_oid}))
+        # Transferable state_id (quarantined and transferable)
+        transferable_state_id = ObjectId('694322878728e4d75ae72790')
+        
+        # Query depo_stocks using part_id = depo_parts._id (ObjectId) and transferable state
+        stock_records = list(db.depo_stocks.find({
+            "part_id": part_oid,
+            "state_id": transferable_state_id
+        }))
         
         if stock_records:
             # Calculate totals
-            total = sum(s.get("q", 0) for s in stock_records)
+            total = sum(s.get("quantity", 0) for s in stock_records)
             
             # Get batches with stock > 0
             batches = []
             for stock in stock_records:
-                if stock.get("q", 0) > 0:
+                quantity = stock.get("quantity", 0)
+                if quantity > 0:
                     # Extract location_id (handle both ObjectId and string formats)
-                    location = stock.get("location")
+                    location = stock.get("location_id")
                     if isinstance(location, ObjectId):
                         location_id = str(location)
                     elif isinstance(location, dict) and "$oid" in location:
@@ -198,7 +208,7 @@ async def get_part_stock_info(
                     batches.append({
                         "batch_code": stock.get("batch_code", ""),
                         "supplier_batch_code": stock.get("supplier_batch_code", ""),
-                        "quantity": stock.get("q", 0),
+                        "quantity": quantity,
                         "location_id": location_id
                     })
             

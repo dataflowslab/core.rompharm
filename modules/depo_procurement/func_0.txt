@@ -1,0 +1,28 @@
+async def get_purchase_orders_list(search=None):
+    """Get list of purchase orders with supplier details"""
+    db = get_db()
+    collection = db['depo_purchase_orders']
+    
+    query = {}
+    if search:
+        query['$or'] = [
+            {'reference': {'$regex': search, '$options': 'i'}},
+            {'description': {'$regex': search, '$options': 'i'}},
+            {'supplier_reference': {'$regex': search, '$options': 'i'}}
+        ]
+    
+    try:
+        cursor = collection.find(query).sort('created_at', -1)
+        orders = list(cursor)
+        
+        # Enrich with supplier details
+        for order in orders:
+            if order.get('supplier_id'):
+                supplier = db['depo_companies'].find_one({'_id': ObjectId(order['supplier_id'])})
+                if supplier:
+                    order['supplier_detail'] = serialize_doc(supplier)
+        
+        return serialize_doc(orders)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch purchase orders: {str(e)}")
+

@@ -6,6 +6,7 @@ import { notifications } from '@mantine/notifications';
 import { IconDeviceFloppy, IconTrash, IconPlus } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
+import { requestsApi } from '../../services/requests';
 import { DocumentManager } from '../Common/DocumentManager';
 
 interface StockLocation {
@@ -92,7 +93,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
 
   const checkApprovalSignatures = async () => {
     try {
-      const response = await api.get(`/api/requests/${request._id}/approval-flow`);
+      const response = await api.get(requestsApi.getApprovalFlow(request._id));
       const flow = response.data.flow;
       setHasSignatures(flow && flow.signatures && flow.signatures.length > 0);
     } catch (error) {
@@ -105,7 +106,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
 
   const loadStockLocations = async () => {
     try {
-      const response = await api.get('/api/requests/stock-locations');
+      const response = await api.get(requestsApi.getStockLocations());
       const locations = response.data.results || response.data || [];
       setStockLocations(locations);
     } catch (error) {
@@ -120,7 +121,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
     }
     
     try {
-      const response = await api.get('/api/requests/parts', {
+      const response = await api.get(requestsApi.getParts(), {
         params: { search: query }
       });
       const results = response.data.results || response.data || [];
@@ -208,7 +209,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
 
     setSaving(true);
     try {
-      await api.patch(`/api/requests/${request._id}`, {
+      await api.patch(requestsApi.updateRequest(request._id), {
         source: parseInt(formData.source),
         destination: parseInt(formData.destination),
         issue_date: formData.issue_date.toISOString().split('T')[0],

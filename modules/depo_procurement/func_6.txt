@@ -1,0 +1,52 @@
+async def update_order_item_by_id(order_id: str, item_id: str, item_data):
+    """Update an item in a purchase order by item _id"""
+    db = get_db()
+    collection = db['depo_purchase_orders']
+    
+    try:
+        order = collection.find_one({'_id': ObjectId(order_id)})
+        if not order:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+        items = order.get('items', [])
+        
+        # Find item by _id
+        item_index = -1
+        for idx, item in enumerate(items):
+            if item.get('_id') == item_id:
+                item_index = idx
+                break
+        
+        if item_index == -1:
+            raise HTTPException(status_code=404, detail="Item not found")
+        
+        # Update item fields
+        if item_data.quantity is not None:
+            items[item_index]['quantity'] = item_data.quantity
+        if item_data.purchase_price is not None:
+            items[item_index]['purchase_price'] = item_data.purchase_price
+        if item_data.reference is not None:
+            items[item_index]['reference'] = item_data.reference
+        if item_data.destination_id is not None:
+            items[item_index]['destination_id'] = item_data.destination_id
+        if item_data.purchase_price_currency is not None:
+            items[item_index]['purchase_price_currency'] = item_data.purchase_price_currency
+        if item_data.notes is not None:
+            items[item_index]['notes'] = item_data.notes
+        
+        collection.update_one(
+            {'_id': ObjectId(order_id)},
+            {
+                '$set': {
+                    'items': items,
+                    'updated_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        return serialize_doc(items[item_index])
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update item: {str(e)}")
+

@@ -4,6 +4,7 @@ import { IconPlus, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
+import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 
 interface BatchOption {
@@ -40,6 +41,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
     batch_code: '',
     notes: ''
   });
+  const [newItemBatchOptions, setNewItemBatchOptions] = useState<BatchOption[]>([]);
 
   // Check if editable (no signatures in approval flow)
   const [isEditable, setIsEditable] = useState(true);
@@ -51,7 +53,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
 
   const loadItems = async () => {
     try {
-      const response = await api.get(`/api/requests/${requestId}`);
+      const response = await api.get(requestsApi.getRequest(requestId));
       const itemsData = response.data.items || [];
       const sourceLocation = response.data.source;
       
@@ -80,7 +82,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
 
   const checkEditability = async () => {
     try {
-      const response = await api.get(`/api/requests/${requestId}/approval-flow`);
+      const response = await api.get(requestsApi.getApprovalFlow(requestId));
       const flow = response.data.flow;
       const hasSignatures = flow && flow.signatures && flow.signatures.length > 0;
       setIsEditable(!hasSignatures);
@@ -91,8 +93,9 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
 
   const loadBatchCodes = async (partId: number, locationId?: number): Promise<BatchOption[]> => {
     try {
+      const url = requestsApi.getPartBatchCodes(partId);
       const params = locationId ? `?location_id=${locationId}` : '';
-      const response = await api.get(`/api/requests/parts/${partId}/batch-codes${params}`);
+      const response = await api.get(`${url}${params}`);
       const batchCodes = response.data.batch_codes || [];
       
       return batchCodes.map((batch: any) => ({
@@ -111,12 +114,23 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
     }
     
     try {
-      const response = await api.get('/api/requests/parts', {
+      const response = await api.get(requestsApi.getParts(), {
         params: { search: query }
       });
       setParts(response.data.results || []);
     } catch (error) {
       console.error('Failed to search parts:', error);
+    }
+  };
+
+  const handlePartSelect = async (value: string | null) => {
+    setNewItem({ ...newItem, part: value || '', batch_code: '' });
+    
+    if (value) {
+      const batchOptions = await loadBatchCodes(parseInt(value), request.source);
+      setNewItemBatchOptions(batchOptions);
+    } else {
+      setNewItemBatchOptions([]);
     }
   };
 
@@ -148,6 +162,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
     await saveItems(updatedItems);
     setModalOpened(false);
     setNewItem({ part: '', quantity: 1, batch_code: '', notes: '' });
+    setNewItemBatchOptions([]);
     setPartSearch('');
     setParts([]);
   };
@@ -165,12 +180,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
     });
   };
 
-  const handleBatchChange = (index: number, value: string) => {
-    const updatedItems = [...items];
-    updatedItems[index].batch_code = value;
-    setItems(updatedItems);
-  };
-
+  
   const handleQuantityChange = (index: number, value: number) => {
     const updatedItems = [...items];
     updatedItems[index].quantity = value;
@@ -180,7 +190,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
   const saveItems = async (updatedItems: ItemWithBatch[]) => {
     setSaving(true);
     try {
-      await api.patch(`/api/requests/${requestId}`, {
+      await api.patch(requestsApi.updateRequest(requestId), {
         items: updatedItems.map(item => ({
           part: item.part,
           quantity: item.quantity,
@@ -275,24 +285,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
                   )}
                 </Table.Td>
                 <Table.Td>
-                  {isEditable ? (
-                    <TextInput
-                      value={item.batch_code}
-                      onChange={(e) => handleBatchChange(index, e.target.value)}
-                      placeholder={t('Enter or select batch')}
-                      list={`batch-options-${index}`}
-                      size="xs"
-                    />
-                  ) : (
-                    item.batch_code || '-'
-                  )}
-                  {isEditable && (
-                    <datalist id={`batch-options-${index}`}>
-                      {item.batch_options.map((option, i) => (
-                        <option key={i} value={option.value} label={option.label} />
-                      ))}
-                    </datalist>
-                  )}
+                  {item.batch_code || '-'}
                 </Table.Td>
                 {isEditable && (
                   <Table.Td>
@@ -332,7 +325,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
                 label: `${part.name} (${part.IPN})`
               }))}
               value={newItem.part}
-              onChange={(value) => setNewItem({ ...newItem, part: value || '' })}
+              onChange={handlePartSelect}
               onSearchChange={(query) => {
                 setPartSearch(query);
                 searchParts(query);
@@ -355,12 +348,26 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
               required
             />
           </Grid.Col>
+
+          <Grid.Col span={12}>
+            <Select
+              label={t('Batch Code')}
+              placeholder={t('Select batch code (optional)')}
+              data={newItemBatchOptions}
+              value={newItem.batch_code}
+              onChange={(value) => setNewItem({ ...newItem, batch_code: value || '' })}
+              searchable
+              clearable
+              disabled={!newItem.part}
+            />
+          </Grid.Col>
         </Grid>
 
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={() => {
             setModalOpened(false);
             setNewItem({ part: '', quantity: 1, batch_code: '', notes: '' });
+            setNewItemBatchOptions([]);
             setPartSearch('');
             setParts([]);
           }}>

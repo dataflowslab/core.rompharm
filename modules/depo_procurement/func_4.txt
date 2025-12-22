@@ -1,0 +1,54 @@
+async def add_order_item(order_id: str, item_data):
+    """Add an item to a purchase order"""
+    db = get_db()
+    collection = db['depo_purchase_orders']
+    
+    try:
+        order = collection.find_one({'_id': ObjectId(order_id)})
+        if not order:
+            raise HTTPException(status_code=404, detail="Purchase order not found")
+        
+        # Get part details
+        part = db['depo_parts'].find_one({'_id': ObjectId(item_data.part_id)})
+        if not part:
+            raise HTTPException(status_code=404, detail="Part not found")
+        
+        # Create item with unique _id
+        item = {
+            '_id': str(ObjectId()),  # Generate unique ID for the item
+            'part_id': item_data.part_id,
+            'quantity': item_data.quantity,
+            'received': 0,
+            'purchase_price': item_data.purchase_price,
+            'reference': item_data.reference or '',
+            'destination_id': item_data.destination_id,
+            'purchase_price_currency': item_data.purchase_price_currency or order.get('currency', 'EUR'),
+            'notes': item_data.notes or '',
+            'part_detail': {
+                'name': part.get('name'),
+                'ipn': part.get('ipn'),
+                'um': part.get('um')
+            }
+        }
+        
+        # Add to order
+        items = order.get('items', [])
+        items.append(item)
+        
+        collection.update_one(
+            {'_id': ObjectId(order_id)},
+            {
+                '$set': {
+                    'items': items,
+                    'lines': len(items),
+                    'updated_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        return serialize_doc(item)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add item to purchase order: {str(e)}")
+

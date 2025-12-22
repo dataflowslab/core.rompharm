@@ -179,14 +179,13 @@ export function StocksPage() {
               <Table.Th>Status</Table.Th>
               <Table.Th>Location</Table.Th>
               <Table.Th>Quantity</Table.Th>
-              <Table.Th>Stock Value</Table.Th>
               <Table.Th>Supplier</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {stocks.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={9}>
+                <Table.Td colSpan={8}>
                   <Text ta="center" c="dimmed">
                     No stocks found
                   </Text>
@@ -208,7 +207,6 @@ export function StocksPage() {
                   <Table.Td>
                     {stock.quantity} {stock.part_detail?.um || 'buc'}
                   </Table.Td>
-                  <Table.Td>{formatCurrency(stock.stock_value)}</Table.Td>
                   <Table.Td>{stock.supplier_name || '-'}</Table.Td>
                 </Table.Tr>
               ))

@@ -28,4 +28,16 @@ export const requestsApi = {
   createApprovalFlow: (requestId: string) => `${API_PREFIX}/${requestId}/approval-flow`,
   signRequest: (requestId: string) => `${API_PREFIX}/${requestId}/sign`,
   removeSignature: (requestId: string, userId: string) => `${API_PREFIX}/${requestId}/signatures/${userId}`,
+  
+  // Operations Flow
+  getOperationsFlow: (requestId: string) => `${API_PREFIX}/${requestId}/operations-flow`,
+  signOperations: (requestId: string) => `${API_PREFIX}/${requestId}/operations-sign`,
+  removeOperationsSignature: (requestId: string, userId: string) => `${API_PREFIX}/${requestId}/operations-signatures/${userId}`,
+  updateOperationsStatus: (requestId: string) => `${API_PREFIX}/${requestId}/operations-status`,
+  
+  // Reception Flow
+  getReceptionFlow: (requestId: string) => `${API_PREFIX}/${requestId}/reception-flow`,
+  signReception: (requestId: string) => `${API_PREFIX}/${requestId}/reception-sign`,
+  removeReceptionSignature: (requestId: string, userId: string) => `${API_PREFIX}/${requestId}/reception-signatures/${userId}`,
+  updateReceptionStatus: (requestId: string) => `${API_PREFIX}/${requestId}/reception-status`,
 };

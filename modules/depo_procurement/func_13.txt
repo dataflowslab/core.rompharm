@@ -1,0 +1,25 @@
+async def delete_order_attachment(attachment_id: str):
+    """Delete an attachment from a purchase order"""
+    db = get_db()
+    collection = db['depo_purchase_order_attachments']
+    
+    try:
+        # Get attachment to delete file
+        attachment = collection.find_one({'_id': ObjectId(attachment_id)})
+        if attachment and attachment.get('file_path'):
+            try:
+                os.remove(attachment['file_path'])
+            except:
+                pass
+        
+        result = collection.delete_one({'_id': ObjectId(attachment_id)})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Attachment not found")
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete attachment: {str(e)}")
+
