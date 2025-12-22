@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2024-12-22
+
+### Changed
+- **Receive Stock Logic**: Replaced status dropdown with transferable checkbox
+  - Backend now determines stock status automatically based on:
+    - `part.regulated == true` → OK status (694321db8728e4d75ae72789)
+    - `transferable == true` → Quarantine (transactionable) (694322878728e4d75ae72790)
+    - Default → Quarantined (694322758728e4d75ae7278f)
+  - Frontend sends `transferable` boolean instead of `status` value
+  - More intuitive UX: users select if stock can be transferred, system decides status
+
+- **Receive Stock Identification**: Changed from `line_item_index` to `part_id`
+  - More reliable identification of order items
+  - Prevents errors when items are reordered or deleted
+  - Backend searches items by `part_id` instead of array index
+
+### Technical
+- Updated `ReceiveStockRequest` model: replaced `status` with `transferable` field
+- Modified `receive_stock_item()` to implement new status determination logic
+- Frontend payload now includes `part_id` from selected item
+- Backend finds item by matching `part_id` instead of using index
+
 ## [1.18.24] - 2024-12-21
 
 ### Added
