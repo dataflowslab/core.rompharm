@@ -272,14 +272,18 @@ async def get_request(
     # Get state level from depo_requests_states using state_id
     if req.get('state_id'):
         states_collection = db['depo_requests_states']
-        state_id_obj = req['state_id'] if isinstance(req['state_id'], ObjectId) else ObjectId(req['state_id'])
-        state = states_collection.find_one({'_id': state_id_obj})
-        if state:
-            req['state_level'] = state.get('level', 0)
-            # Also set status from state if not present
-            if not req.get('status'):
-                req['status'] = state.get('name', 'Unknown')
-        else:
+        try:
+            state_id_obj = req['state_id'] if isinstance(req['state_id'], ObjectId) else ObjectId(req['state_id'])
+            state = states_collection.find_one({'_id': state_id_obj})
+            if state:
+                req['state_level'] = state.get('workflow_level', 0)  # Use workflow_level not level
+                # Also set status from state if not present
+                if not req.get('status'):
+                    req['status'] = state.get('name', 'Unknown')
+            else:
+                req['state_level'] = 0
+        except Exception as e:
+            print(f"[ERROR] Failed to lookup state: {e}")
             req['state_level'] = 0
     else:
         req['state_level'] = 0
