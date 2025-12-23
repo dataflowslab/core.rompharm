@@ -11,6 +11,7 @@ import { ApprovalsTab } from '../components/Requests/ApprovalsTab';
 import { ItemsTab } from '../components/Requests/ItemsTab';
 import { OperationsTab } from '../components/Requests/OperationsTab';
 import { ReceptieTab } from '../components/Requests/ReceptieTab';
+import { ProductionTab } from '../components/Requests/ProductionTab';
 
 interface StockLocation {
   pk: number;
@@ -166,12 +167,7 @@ export function RequestDetailPage() {
 
         {request.status === 'Stock Received' && (
           <Tabs.Panel value="production" pt="md">
-            <Paper p="md">
-              <Title order={4}>{t('Production')}</Title>
-              <Text c="dimmed" mt="md">
-                {t('Production workflow will be implemented here')}
-              </Text>
-            </Paper>
+            {id && <ProductionTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
         )}
       </Tabs>

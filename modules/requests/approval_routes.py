@@ -11,12 +11,14 @@ from src.backend.models.approval_flow_model import ApprovalFlowModel
 
 from .approval_helpers import get_state_by_slug, update_request_state, check_flow_completion, get_flow_config, build_officers_lists
 from .reception_flow_routes import router as reception_router
+from .production_routes import router as production_router
 
 
 router = APIRouter()
 
-# Include reception flow routes
+# Include reception and production flow routes
 router.include_router(reception_router)
+router.include_router(production_router)
 
 
 # ==================== APPROVAL FLOW ====================
