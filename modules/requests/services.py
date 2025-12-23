@@ -110,11 +110,13 @@ async def get_part_stock_info(db, part_id: int) -> Dict[str, Any]:
             # Calculate totals
             total = sum(s.get("quantity", 0) for s in stock_records)
             
-            # Get batches with stock > 0
-            batches = []
+            # Group batches by batch_code and location_id
+            batch_map = {}
             for stock in stock_records:
                 quantity = stock.get("quantity", 0)
                 if quantity > 0:
+                    batch_code = stock.get("batch_code", "")
+                    
                     # Extract location_id (handle both ObjectId and string formats)
                     location = stock.get("location_id")
                     if isinstance(location, ObjectId):
@@ -124,12 +126,20 @@ async def get_part_stock_info(db, part_id: int) -> Dict[str, Any]:
                     else:
                         location_id = str(location) if location else ""
                     
-                    batches.append({
-                        "batch_code": stock.get("batch_code", ""),
-                        "supplier_batch_code": stock.get("supplier_batch_code", ""),
-                        "quantity": quantity,
-                        "location_id": location_id
-                    })
+                    # Create unique key for batch + location
+                    key = f"{batch_code}_{location_id}"
+                    
+                    if key not in batch_map:
+                        batch_map[key] = {
+                            "batch_code": batch_code,
+                            "supplier_batch_code": stock.get("supplier_batch_code", ""),
+                            "quantity": 0,
+                            "location_id": location_id
+                        }
+                    
+                    batch_map[key]["quantity"] += quantity
+            
+            batches = list(batch_map.values())
             
             return {
                 "part_id": part_id,
