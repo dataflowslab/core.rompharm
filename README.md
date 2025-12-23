@@ -863,6 +863,8 @@ Or using UI Schema:
 
 ## Workflow States
 
+### Form Submissions
+
 Submissions can have the following states:
 - **Nou** (New): Initial state after submission
 - **În analiză** (In Review): Under review by administrator
@@ -871,6 +873,52 @@ Submissions can have the following states:
 - **Anulat** (Cancelled): Cancelled
 
 State changes are logged with timestamp, user, and notes.
+
+### Stock Requests
+
+Stock requests use a centralized state system with workflow levels:
+
+| State | Workflow Level | Description |
+|-------|----------------|-------------|
+| **New** | 50 | Request created, pending approval |
+| **Approved** | 100 | Approved, ready for warehouse operations |
+| **Warehouse Approved** | 250 | Operations completed, ready for transfer |
+| **Warehouse Rejected** | -1 | Operations rejected (insufficient stock) |
+| **Stock Received** | 350 | Stock received at destination |
+| **Warehouse Transfer Refused** | -2 | Destination refused transfer |
+| **Produced** | 400 | Production completed successfully |
+| **Failed** | -3 | Production failed |
+| **Canceled** | -4 | Request canceled |
+
+**Workflow Levels**:
+- Positive levels (50-400): Active workflow progression
+- Negative levels (-1 to -4): Terminal/error states
+- Gaps between levels allow future state insertions
+
+**State Transitions**:
+```
+New → Approved → Warehouse Approved → Stock Received → Produced
+                      ↓                      ↓
+              Warehouse Rejected    Warehouse Transfer Refused
+                                           ↓
+                                        Failed
+```
+
+**Database Structure**:
+- States stored in `depo_requests_states` collection
+- Each request has `state_id`, `workflow_level`, and `status` fields
+- State transitions validated against `allowed_transitions`
+- Indexed on `slug`, `workflow_level`, and `order`
+
+**Import States**:
+```bash
+python utils/import_requests_states.py
+```
+
+**Migrate Existing Requests**:
+```bash
+python utils/migrate_requests_to_states.py
+```
 
 ## Job Scheduler
 
