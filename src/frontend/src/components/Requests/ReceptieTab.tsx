@@ -4,6 +4,7 @@ import { IconSignature, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
+import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
 
@@ -67,7 +68,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
 
   const loadReceptionFlow = async () => {
     try {
-      const response = await api.get(`/api/requests/${requestId}/reception-flow`);
+      const response = await api.get(requestsApi.getReceptionFlow(requestId));
       setFlow(response.data.flow);
     } catch (error) {
       console.error('Failed to load reception flow:', error);
@@ -77,8 +78,8 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   };
 
   const loadRequestItems = async () => {
-    try {
-      const response = await api.get(`/api/requests/${requestId}`);
+    try:
+      const response = await api.get(requestsApi.getRequest(requestId));
       const requestItems = response.data.items || [];
       // Initialize received_quantity with requested quantity
       const itemsWithReceived = requestItems.map((item: RequestItem) => ({
