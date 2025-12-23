@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Paper, Title, Tabs, Button, Group, Badge, Text } from '@mantine/core';
-import { IconArrowLeft, IconFileText, IconSignature, IconTruck, IconPackage, IconList } from '@tabler/icons-react';
+import { IconArrowLeft, IconFileText, IconSignature, IconTruck, IconPackage, IconList, IconTool } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { requestsApi } from '../services/requests';
@@ -133,6 +133,11 @@ export function RequestDetailPage() {
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
+          {request.status === 'Stock Received' && (
+            <Tabs.Tab value="production" leftSection={<IconTool size={16} />}>
+              {t('Production')}
+            </Tabs.Tab>
+          )}
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">
@@ -156,6 +161,17 @@ export function RequestDetailPage() {
         {(request.status === 'Finished' || request.status === 'Warehouse Approved' || request.status === 'Stock Received') && (
           <Tabs.Panel value="reception" pt="md">
             {id && <ReceptieTab requestId={id} onReload={loadRequest} />}
+          </Tabs.Panel>
+        )}
+
+        {request.status === 'Stock Received' && (
+          <Tabs.Panel value="production" pt="md">
+            <Paper p="md">
+              <Title order={4}>{t('Production')}</Title>
+              <Text c="dimmed" mt="md">
+                {t('Production workflow will be implemented here')}
+              </Text>
+            </Paper>
           </Tabs.Panel>
         )}
       </Tabs>
