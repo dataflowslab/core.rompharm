@@ -123,12 +123,12 @@ export function RequestDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconList size={16} />}>
             {t('Items')}
           </Tabs.Tab>
-          {(request.status === 'Approved' || request.status === 'In Operations' || request.status === 'Finished') && (
+          {(request.status === 'Approved' || request.status === 'In Operations' || request.status === 'Finished' || request.status === 'Warehouse Approved') && (
             <Tabs.Tab value="operations" leftSection={<IconTruck size={16} />}>
               {t('Operations')}
             </Tabs.Tab>
           )}
-          {request.status === 'Finished' && (
+          {(request.status === 'Finished' || request.status === 'Warehouse Approved') && (
             <Tabs.Tab value="reception" leftSection={<IconPackage size={16} />}>
               {t('Receive Stock')}
             </Tabs.Tab>
@@ -147,13 +147,13 @@ export function RequestDetailPage() {
           {id && request && <ItemsTab requestId={id} request={request} onReload={loadRequest} />}
         </Tabs.Panel>
 
-        {(request.status === 'Approved' || request.status === 'In Operations' || request.status === 'Finished') && (
+        {(request.status === 'Approved' || request.status === 'In Operations' || request.status === 'Finished' || request.status === 'Warehouse Approved') && (
           <Tabs.Panel value="operations" pt="md">
             {id && <OperationsTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
         )}
 
-        {request.status === 'Finished' && (
+        {(request.status === 'Finished' || request.status === 'Warehouse Approved') && (
           <Tabs.Panel value="reception" pt="md">
             {id && <ReceptieTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
