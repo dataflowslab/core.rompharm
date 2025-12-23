@@ -189,17 +189,17 @@ export function RequestsPage() {
           }
         }
       } else {
-        // No recipe/BOM, use the selected part directly
+        // No recipe/BOM, use the selected part directly (part is now ObjectId string)
         itemsToSend = [{
-          part: parseInt(formData.part),
+          part: formData.part,  // Already ObjectId string
           quantity: formData.quantity,
           notes: formData.notes || undefined
         }];
       }
 
       const requestPayload: any = {
-        source: parseInt(formData.source),
-        destination: parseInt(formData.destination),
+        source: formData.source,  // Already ObjectId string
+        destination: formData.destination,  // Already ObjectId string
         items: itemsToSend,
         notes: formData.notes || undefined
       };
@@ -208,7 +208,7 @@ export function RequestsPage() {
       if (recipeData && recipeData.recipe_id) {
         requestPayload.recipe_id = recipeData.recipe_id;
         requestPayload.recipe_part_id = recipeData.recipe_part_id;
-        requestPayload.product_id = parseInt(formData.part);
+        requestPayload.product_id = formData.part;  // Already ObjectId string
         requestPayload.product_quantity = formData.quantity;
       }
 
