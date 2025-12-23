@@ -13,6 +13,13 @@ def generate_company_code(company_data):
     Generate auto-increment code for company based on type
     Format: MA-XXXX for manufacturers/suppliers, CL-XXXX for clients
     Priority: If is_manufacturer or is_supplier -> MA, else CL
+    
+    Algorithm:
+    1. Determine prefix (MA or CL) based on company type
+    2. Find ALL codes with this prefix
+    3. Extract numeric part from each code
+    4. Find the maximum number
+    5. Increment and format as PREFIX-XXXX
     """
     db = get_db()
     companies_collection = db['depo_companies']
@@ -24,26 +31,29 @@ def generate_company_code(company_data):
     else:
         prefix = 'CL'
     
-    # Find the highest number for this prefix
-    # Query for codes starting with this prefix
+    # Find ALL codes with this prefix to extract the highest number
     regex_pattern = f"^{prefix}-"
     existing_codes = companies_collection.find(
         {'code': {'$regex': regex_pattern}},
         {'code': 1}
-    ).sort('code', -1).limit(1)
+    )
     
-    existing_codes_list = list(existing_codes)
-    
-    if existing_codes_list:
-        # Extract number from last code (e.g., "MA-0005" -> 5)
-        last_code = existing_codes_list[0].get('code', f'{prefix}-0000')
+    # Extract all numbers and find the maximum
+    max_number = 0
+    for doc in existing_codes:
+        code = doc.get('code', '')
         try:
-            last_number = int(last_code.split('-')[1])
+            # Extract number part after prefix (e.g., "MA-0005" -> "0005" -> 5)
+            number_part = code.split('-')[1]
+            number = int(number_part)
+            if number > max_number:
+                max_number = number
         except (IndexError, ValueError):
-            last_number = 0
-        next_number = last_number + 1
-    else:
-        next_number = 1
+            # Skip invalid codes
+            continue
+    
+    # Next number is max + 1
+    next_number = max_number + 1
     
     # Format as PREFIX-XXXX (4 digits with leading zeros)
     return f"{prefix}-{next_number:04d}"
