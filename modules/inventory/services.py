@@ -8,6 +8,47 @@ from bson import ObjectId
 from src.backend.utils.db import get_db
 
 
+def generate_company_code(company_data):
+    """
+    Generate auto-increment code for company based on type
+    Format: MA-XXXX for manufacturers/suppliers, CL-XXXX for clients
+    Priority: If is_manufacturer or is_supplier -> MA, else CL
+    """
+    db = get_db()
+    companies_collection = db['depo_companies']
+    
+    # Determine prefix based on company type
+    # Priority: MA (manufacturer/supplier) > CL (client)
+    if company_data.get('is_manufacturer') or company_data.get('is_supplier'):
+        prefix = 'MA'
+    else:
+        prefix = 'CL'
+    
+    # Find the highest number for this prefix
+    # Query for codes starting with this prefix
+    regex_pattern = f"^{prefix}-"
+    existing_codes = companies_collection.find(
+        {'code': {'$regex': regex_pattern}},
+        {'code': 1}
+    ).sort('code', -1).limit(1)
+    
+    existing_codes_list = list(existing_codes)
+    
+    if existing_codes_list:
+        # Extract number from last code (e.g., "MA-0005" -> 5)
+        last_code = existing_codes_list[0].get('code', f'{prefix}-0000')
+        try:
+            last_number = int(last_code.split('-')[1])
+        except (IndexError, ValueError):
+            last_number = 0
+        next_number = last_number + 1
+    else:
+        next_number = 1
+    
+    # Format as PREFIX-XXXX (4 digits with leading zeros)
+    return f"{prefix}-{next_number:04d}"
+
+
 def serialize_doc(doc):
     """Convert MongoDB document to JSON-serializable format"""
     if doc is None:
@@ -325,7 +366,7 @@ async def get_supplier_by_id(supplier_id: str):
 
 
 async def create_supplier(supplier_data, current_user):
-    """Create a new supplier"""
+    """Create a new supplier with auto-generated code"""
     db = get_db()
     companies_collection = db['depo_companies']
     
@@ -333,9 +374,12 @@ async def create_supplier(supplier_data, current_user):
     if not (supplier_data.get('is_supplier') or supplier_data.get('is_client') or supplier_data.get('is_manufacturer')):
         raise HTTPException(status_code=400, detail="At least one of is_supplier, is_client, or is_manufacturer must be selected")
     
+    # Generate auto-increment code based on company type
+    auto_code = generate_company_code(supplier_data)
+    
     doc = {
         'name': supplier_data.get('name'),
-        'code': supplier_data.get('code', ''),
+        'code': auto_code,  # Auto-generated, readonly
         'is_supplier': supplier_data.get('is_supplier', False),
         'is_manufacturer': supplier_data.get('is_manufacturer', False),
         'is_client': supplier_data.get('is_client', False),
@@ -380,8 +424,7 @@ async def update_supplier(supplier_id: str, supplier_data, current_user):
     # Update fields if provided
     if 'name' in supplier_data:
         update_doc['name'] = supplier_data['name']
-    if 'code' in supplier_data:
-        update_doc['code'] = supplier_data['code']
+    # Note: 'code' is auto-generated and readonly, cannot be updated
     if 'is_supplier' in supplier_data:
         update_doc['is_supplier'] = supplier_data['is_supplier']
     if 'is_manufacturer' in supplier_data:
