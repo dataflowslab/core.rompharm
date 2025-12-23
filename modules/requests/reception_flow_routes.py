@@ -213,16 +213,26 @@ async def remove_reception_signature(
             {"$set": {"status": "pending"}}
         )
         
-        # Update request status back to Warehouse Approved
+        # Update request state_id back to Warehouse Approved
         try:
             req_obj_id = ObjectId(request_id)
-            requests_collection.update_one(
-                {"_id": req_obj_id},
-                {"$set": {"status": "Warehouse Approved", "updated_at": datetime.utcnow()}}
-            )
-            print(f"[REQUESTS] Request {request_id} status updated to Warehouse Approved after signature removal")
+            # Get Warehouse Approved state_id from depo_requests_states
+            states_collection = db['depo_requests_states']
+            warehouse_approved_state = states_collection.find_one({"name": "Warehouse Approved"})
+            
+            if warehouse_approved_state:
+                requests_collection.update_one(
+                    {"_id": req_obj_id},
+                    {"$set": {
+                        "state_id": warehouse_approved_state["_id"],
+                        "updated_at": datetime.utcnow()
+                    }}
+                )
+                print(f"[REQUESTS] Set state_id to Warehouse Approved ({warehouse_approved_state['_id']}) for request {request_id}")
+            else:
+                print(f"[REQUESTS] Warning: Warehouse Approved state not found in depo_requests_states")
         except Exception as e:
-            print(f"[REQUESTS] Warning: Failed to update request status: {e}")
+            print(f"[REQUESTS] Warning: Failed to update request state_id: {e}")
         
         # Delete production flow if exists
         try:
