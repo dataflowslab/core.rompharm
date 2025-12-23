@@ -32,6 +32,23 @@ router.include_router(approval_router)
 
 # ==================== STOCK LOCATIONS ====================
 
+@router.get("/states")
+async def get_request_states(
+    current_user: dict = Depends(verify_admin)
+):
+    """Get list of request states from MongoDB depo_requests_states"""
+    db = get_db()
+    states_collection = db['depo_requests_states']
+    
+    states = list(states_collection.find().sort('level', 1))
+    
+    # Convert ObjectIds to strings
+    for state in states:
+        state['_id'] = str(state['_id'])
+    
+    return {"results": states}
+
+
 @router.get("/stock-locations")
 async def get_stock_locations(
     request: Request,
@@ -251,6 +268,15 @@ async def get_request(
     
     # Convert all ObjectIds to strings
     req['_id'] = str(req['_id'])
+    
+    # Get state level from depo_requests_states
+    if req.get('status'):
+        states_collection = db['depo_requests_states']
+        state = states_collection.find_one({'name': req['status']})
+        if state:
+            req['state_level'] = state.get('level', 0)
+        else:
+            req['state_level'] = 0
     
     # Convert state_id if present
     if 'state_id' in req and isinstance(req['state_id'], ObjectId):

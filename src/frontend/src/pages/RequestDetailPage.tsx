@@ -39,6 +39,7 @@ interface Request {
   items: RequestItem[];
   line_items: number;
   status: string;
+  state_level?: number;
   notes: string;
   issue_date: string;
   created_at: string;
@@ -124,17 +125,17 @@ export function RequestDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconList size={16} />}>
             {t('Items')}
           </Tabs.Tab>
-          {(request.status === 'Approved' || request.status === 'In Operations' || request.status === 'Finished' || request.status === 'Warehouse Approved' || request.status === 'Stock Received') && (
+          {(request.state_level && request.state_level >= 100) && (
             <Tabs.Tab value="operations" leftSection={<IconTruck size={16} />}>
               {t('Operations')}
             </Tabs.Tab>
           )}
-          {(request.status === 'Finished' || request.status === 'Warehouse Approved' || request.status === 'Stock Received') && (
+          {(request.state_level && request.state_level >= 250) && (
             <Tabs.Tab value="reception" leftSection={<IconPackage size={16} />}>
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
-          {(request.status === 'Stock Received' || request.status === 'Produced') && (
+          {(request.state_level && request.state_level >= 350) && (
             <Tabs.Tab value="production" leftSection={<IconTool size={16} />}>
               {t('Production')}
             </Tabs.Tab>
@@ -153,19 +154,19 @@ export function RequestDetailPage() {
           {id && request && <ItemsTab requestId={id} request={request} onReload={loadRequest} />}
         </Tabs.Panel>
 
-        {(request.status === 'Approved' || request.status === 'In Operations' || request.status === 'Finished' || request.status === 'Warehouse Approved' || request.status === 'Stock Received') && (
+        {(request.state_level && request.state_level >= 100) && (
           <Tabs.Panel value="operations" pt="md">
             {id && <OperationsTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
         )}
 
-        {(request.status === 'Finished' || request.status === 'Warehouse Approved' || request.status === 'Stock Received') && (
+        {(request.state_level && request.state_level >= 250) && (
           <Tabs.Panel value="reception" pt="md">
             {id && <ReceptieTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
         )}
 
-        {(request.status === 'Stock Received' || request.status === 'Produced') && (
+        {(request.state_level && request.state_level >= 350) && (
           <Tabs.Panel value="production" pt="md">
             {id && <ProductionTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
