@@ -86,7 +86,15 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
         ...item,
         received_quantity: item.received_quantity || item.quantity
       }));
-      setItems(itemsWithReceived);
+      
+      // Sort alphabetically by part name
+      const sortedItems = itemsWithReceived.sort((a, b) => {
+        const nameA = a.part_detail?.name || String(a.part);
+        const nameB = b.part_detail?.name || String(b.part);
+        return nameA.localeCompare(nameB);
+      });
+      
+      setItems(sortedItems);
     } catch (error) {
       console.error('Failed to load request items:', error);
     }
@@ -102,7 +110,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     setSigning(true);
     try {
       // Save received quantities first
-      await api.patch(`/api/requests/${requestId}`, {
+      await api.patch(requestsApi.updateRequest(requestId), {
         items: items.map(item => ({
           part: item.part,
           quantity: item.quantity,
@@ -112,7 +120,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
       });
 
       // Then sign
-      await api.post(`/api/requests/${requestId}/reception-sign`);
+      await api.post(requestsApi.signReception(requestId));
       
       notifications.show({
         title: t('Success'),
@@ -148,7 +156,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/api/requests/${requestId}/reception-signatures/${userId}`);
+          await api.delete(requestsApi.removeReceptionSignature(requestId, userId));
           notifications.show({
             title: t('Success'),
             message: t('Signature removed successfully'),
@@ -189,7 +197,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
 
     setSubmitting(true);
     try {
-      await api.patch(`/api/requests/${requestId}/reception-status`, {
+      await api.patch(requestsApi.updateReceptionStatus(requestId), {
         status: finalStatus,
         reason: finalStatus === 'Refused' ? refusalReason : undefined
       });
