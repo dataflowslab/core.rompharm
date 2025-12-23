@@ -9,40 +9,14 @@ from src.backend.utils.db import get_db
 from src.backend.routes.auth import verify_admin
 from src.backend.models.approval_flow_model import ApprovalFlowModel
 
+from .approval_helpers import get_state_by_slug, update_request_state, check_flow_completion, get_flow_config, build_officers_lists
+from .reception_flow_routes import router as reception_router
+
 
 router = APIRouter()
 
-
-# Helper function to get state by slug
-def get_state_by_slug(db, slug: str):
-    """Get state from depo_requests_states by slug"""
-    state = db.depo_requests_states.find_one({'slug': slug})
-    if not state:
-        raise HTTPException(status_code=500, detail=f"State '{slug}' not found in database")
-    return state
-
-
-# Helper function to update request state
-def update_request_state(db, request_id: str, state_slug: str, additional_data: dict = None):
-    """Update request state using state_id system"""
-    state = get_state_by_slug(db, state_slug)
-    
-    update_data = {
-        'state_id': state['_id'],
-        'workflow_level': state['workflow_level'],
-        'status': state['name'],
-        'updated_at': datetime.utcnow()
-    }
-    
-    if additional_data:
-        update_data.update(additional_data)
-    
-    db.depo_requests.update_one(
-        {'_id': ObjectId(request_id)},
-        {'$set': update_data}
-    )
-    
-    return state
+# Include reception flow routes
+router.include_router(reception_router)
 
 
 # ==================== APPROVAL FLOW ====================
@@ -770,32 +744,3 @@ async def update_operations_status(
 
 
 #
-
-# ==================== RECEPTION FLOW ====================
-
-@router.get("/{request_id}/reception-flow")
-async def get_request_reception_flow(
-    request_id: str,
-    current_user: dict = Depends(verify_admin)
-):
-    """Get reception flow for a request"""
-    db = get_db()
-    
-    # Find reception flow for this request
-    flow = db.approval_flows.find_one({
-        "object_type": "stock_request_reception",
-        "object_id": request_id
-    })
-    
-    if not flow:
-        return {"flow": None}
-    
-    flow["_id"] = str(flow["_id"])
-    
-    # Get user details for signatures
-    for signature in flow.get("signatures", []):
-        user = db.users.find_one({"_id": ObjectId(signature["user_id"])})
-        if user:
-            signature["user_name"] = user.get("name") or user.get("username")
-    
-    return {"flow": flow}
