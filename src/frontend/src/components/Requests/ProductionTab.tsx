@@ -111,7 +111,23 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
       try {
         const productionResponse = await api.get(`/modules/requests/api/${requestId}/production`);
         if (productionResponse.data) {
-          setProductionData(productionResponse.data);
+          const existingData = productionResponse.data;
+          // Merge with request items to ensure unused is populated
+          const unused = requestItems.map(item => {
+            // Find existing unused data for this part
+            const existingUnused = existingData.unused?.find((u: any) => u.part === item.part);
+            return {
+              part: item.part,
+              part_name: item.part_detail?.name || String(item.part),
+              received_qty: item.received_quantity || item.quantity,
+              unused_qty: existingUnused?.unused_qty || 0
+            };
+          });
+          
+          setProductionData({
+            ...existingData,
+            unused
+          });
         } else {
           // Initialize production data
           initializeProductionData(codes, requestItems);
