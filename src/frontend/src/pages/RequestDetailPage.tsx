@@ -65,6 +65,8 @@ export function RequestDetailPage() {
   const loadRequest = async () => {
     try {
       const response = await api.get(requestsApi.getRequest(id!));
+      console.log('Request data:', response.data);
+      console.log('State level:', response.data.state_level);
       setRequest(response.data);
     } catch (error) {
       console.error('Failed to load request:', error);

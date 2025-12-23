@@ -269,14 +269,20 @@ async def get_request(
     # Convert all ObjectIds to strings
     req['_id'] = str(req['_id'])
     
-    # Get state level from depo_requests_states
-    if req.get('status'):
+    # Get state level from depo_requests_states using state_id
+    if req.get('state_id'):
         states_collection = db['depo_requests_states']
-        state = states_collection.find_one({'name': req['status']})
+        state_id_obj = req['state_id'] if isinstance(req['state_id'], ObjectId) else ObjectId(req['state_id'])
+        state = states_collection.find_one({'_id': state_id_obj})
         if state:
             req['state_level'] = state.get('level', 0)
+            # Also set status from state if not present
+            if not req.get('status'):
+                req['status'] = state.get('name', 'Unknown')
         else:
             req['state_level'] = 0
+    else:
+        req['state_level'] = 0
     
     # Convert state_id if present
     if 'state_id' in req and isinstance(req['state_id'], ObjectId):

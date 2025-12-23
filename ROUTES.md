@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-23 09:15:17
+**Last Updated:** 2025-12-23 09:23:02
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -242,6 +242,9 @@
 - `GET /modules/requests/api/parts/{part_id}/stock-info` - Get stock information for a part from MongoDB depo_stocks with batches
 - `GET /modules/requests/api/` - List all requests with location names from depo_locations
 - `POST /modules/requests/api/` - Create a new request
+
+**States**
+- `GET /modules/requests/api/states` - Get list of request states from MongoDB depo_requests_states
 
 **Stock Locations**
 - `GET /modules/requests/api/stock-locations` - Get list of stock locations from MongoDB depo_locations
