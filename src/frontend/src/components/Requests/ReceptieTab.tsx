@@ -78,7 +78,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   };
 
   const loadRequestItems = async () => {
-    try:
+    try {
       const response = await api.get(requestsApi.getRequest(requestId));
       const requestItems = response.data.items || [];
       // Initialize received_quantity with requested quantity
