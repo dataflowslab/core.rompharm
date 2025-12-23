@@ -10,7 +10,7 @@ import { notifications } from '@mantine/notifications';
 import { ComponentsTable } from '../components/Requests/ComponentsTable';
 
 interface StockLocation {
-  pk: number;
+  _id: string;
   name: string;
 }
 
@@ -383,7 +383,7 @@ export function RequestsPage() {
             <Select
               label={t('Source Location')}
               placeholder={t('Select source location')}
-              data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              data={stockLocations.map(loc => ({ value: loc._id, label: loc.name }))}
               value={formData.source}
               onChange={(value) => setFormData({ ...formData, source: value || '' })}
               searchable
@@ -396,8 +396,8 @@ export function RequestsPage() {
               label={t('Destination Location')}
               placeholder={t('Select destination location')}
               data={stockLocations
-                .filter(loc => String(loc.pk) !== formData.source)
-                .map(loc => ({ value: String(loc.pk), label: loc.name }))}
+                .filter(loc => loc._id !== formData.source)
+                .map(loc => ({ value: loc._id, label: loc.name }))}
               value={formData.destination}
               onChange={(value) => setFormData({ ...formData, destination: value || '' })}
               searchable

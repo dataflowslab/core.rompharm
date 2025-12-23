@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-23 10:08:37
+**Last Updated:** 2025-12-23 22:25:14
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -239,7 +239,7 @@
 - `GET /modules/requests/api/parts/{part_id}/batch-codes` - Get available batch codes for a part from MongoDB depo_stocks
 - `GET /modules/requests/api/parts/{part_id}/bom` - Get BOM (Bill of Materials) for a part from MongoDB depo_bom
 - `GET /modules/requests/api/parts/{part_id}/recipe` - Get recipe for a part (with fallback to BOM if no recipe exists)
-- `GET /modules/requests/api/parts/{part_id}/stock-info` - Get stock information for a part from MongoDB depo_stocks with batches
+- `GET /modules/requests/api/parts/{part_id}/stock-info` - Get stock information for a part from MongoDB depo_stocks with batches using ObjectId
 - `GET /modules/requests/api/` - List all requests with location names from depo_locations
 - `POST /modules/requests/api/` - Create a new request
 
