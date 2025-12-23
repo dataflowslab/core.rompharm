@@ -385,7 +385,10 @@ async def remove_request_signature(
         # Update request status back to Pending
         try:
             req_obj_id = ObjectId(request_id)
-            update_request_state(db, request_id, "new")
+            requests_collection.update_one(
+                {"_id": req_obj_id},
+                {"$set": {"status": "Pending", "updated_at": datetime.utcnow()}}
+            )
             print(f"[REQUESTS] Request {request_id} status updated to Pending after signature removal")
         except Exception as e:
             print(f"[REQUESTS] Warning: Failed to update request status: {e}")
@@ -394,7 +397,10 @@ async def remove_request_signature(
         # Update request status to In Progress
         try:
             req_obj_id = ObjectId(request_id)
-            update_request_state(db, request_id, "approved")
+            requests_collection.update_one(
+                {"_id": req_obj_id},
+                {"$set": {"status": "In Progress", "updated_at": datetime.utcnow()}}
+            )
             print(f"[REQUESTS] Request {request_id} status updated to In Progress after signature removal")
         except Exception as e:
             print(f"[REQUESTS] Warning: Failed to update request status: {e}")
@@ -558,20 +564,10 @@ async def sign_operations(
                 status_update = {'status': decision_status, 'updated_at': timestamp}
                 
                 if decision_status == 'Finished':
-                    # Use state system
-                    update_request_state(db, request_id, 'warehouse_approved', {'finished_at': timestamp})
-                    print(f"[REQUESTS] Request {request_id} status updated to Warehouse Approved")
-                    # Skip the manual update below
-                    status_update = None
+                    status_update['finished_at'] = timestamp
                 elif decision_status == 'Refused':
-                    # Use state system
-                    update_request_state(db, request_id, 'warehouse_rejected', {
-                        'refused_at': timestamp,
-                        'refused_by': req_doc.get('operations_result_updated_by', 'system')
-                    })
-                    print(f"[REQUESTS] Request {request_id} status updated to Warehouse Rejected")
-                    # Skip the manual update below
-                    status_update = None
+                    status_update['refused_at'] = timestamp
+                    status_update['refused_by'] = req_doc.get('operations_result_updated_by', 'system')
                 
                 requests_collection.update_one(
                     {"_id": req_obj_id},
@@ -580,7 +576,10 @@ async def sign_operations(
                 print(f"[REQUESTS] Request {request_id} status updated to {decision_status} (from operations decision)")
             else:
                 # No decision set yet - keep as "In Operations"
-                update_request_state(db, request_id, "approved")
+                requests_collection.update_one(
+                    {"_id": req_obj_id},
+                    {"$set": {"status": "In Operations", "updated_at": timestamp}}
+                )
                 print(f"[REQUESTS] Request {request_id} operations flow approved, status: In Operations")
         except Exception as e:
             print(f"[REQUESTS] Warning: Failed to update request status: {e}")
@@ -693,11 +692,10 @@ async def update_operations_status(
             elif status == 'Finished':
                 status_update['finished_at'] = datetime.utcnow()
             
-            if status_update:
-                    requests_collection.update_one(
-                        {'_id': req_obj_id},
-                        {'$set': status_update}
-                    )
+            requests_collection.update_one(
+                {'_id': req_obj_id},
+                {'$set': status_update}
+            )
             print(f"[REQUESTS] Request {request_id} main status updated to {status}")
         
         return {

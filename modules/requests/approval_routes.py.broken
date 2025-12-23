@@ -1,0 +1,743 @@
+"""
+Approval flow routes for requests module
+"""
+from fastapi import APIRouter, HTTPException, Depends, Request
+from datetime import datetime
+from bson import ObjectId
+
+from src.backend.utils.db import get_db
+from src.backend.routes.auth import verify_admin
+from src.backend.models.approval_flow_model import ApprovalFlowModel
+
+
+router = APIRouter()
+
+
+# Helper function to get state by slug
+def get_state_by_slug(db, slug: str):
+    """Get state from depo_requests_states by slug"""
+    state = db.depo_requests_states.find_one({'slug': slug})
+    if not state:
+        raise HTTPException(status_code=500, detail=f"State '{slug}' not found in database")
+    return state
+
+
+# Helper function to update request state
+def update_request_state(db, request_id: str, state_slug: str, additional_data: dict = None):
+    """Update request state using state_id system"""
+    state = get_state_by_slug(db, state_slug)
+    
+    update_data = {
+        'state_id': state['_id'],
+        'workflow_level': state['workflow_level'],
+        'status': state['name'],
+        'updated_at': datetime.utcnow()
+    }
+    
+    if additional_data:
+        update_data.update(additional_data)
+    
+    db.depo_requests.update_one(
+        {'_id': ObjectId(request_id)},
+        {'$set': update_data}
+    )
+    
+    return state
+
+
+# ==================== APPROVAL FLOW ====================
+
+@router.get("/{request_id}/approval-flow")
+async def get_request_approval_flow(
+    request_id: str,
+    current_user: dict = Depends(verify_admin)
+):
+    """Get approval flow for a request"""
+    db = get_db()
+    
+    # Find approval flow for this request
+    flow = db.approval_flows.find_one({
+        "object_type": "stock_request",
+        "object_id": request_id
+    })
+    
+    if not flow:
+        return {"flow": None}
+    
+    flow["_id"] = str(flow["_id"])
+    
+    # Get user details for signatures
+    for signature in flow.get("signatures", []):
+        user = db.users.find_one({"_id": ObjectId(signature["user_id"])})
+        if user:
+            signature["user_name"] = user.get("name") or user.get("username")
+    
+    return {"flow": flow}
+
+
+@router.post("/{request_id}/approval-flow")
+async def create_request_approval_flow(
+    request_id: str,
+    current_user: dict = Depends(verify_admin)
+):
+    """Create approval flow for a request using config from MongoDB"""
+    db = get_db()
+    
+    # Check if flow already exists
+    existing = db.approval_flows.find_one({
+        "object_type": "stock_request",
+        "object_id": request_id
+    })
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Approval flow already exists for this request")
+    
+    # Get request approval config from MongoDB (use operations flow config)
+    config_collection = db['config']
+    approval_config = config_collection.find_one({'slug': 'requests_operations_flow'})
+    
+    if not approval_config or 'items' not in approval_config:
+        raise HTTPException(status_code=404, detail="No request operations flow configuration found")
+    
+    # Get the operations flow config (first item with slug='operations')
+    flow_config = None
+    for item in approval_config.get('items', []):
+        if item.get('slug') == 'operations' and item.get('enabled', True):
+            flow_config = item
+            break
+    
+    if not flow_config:
+        raise HTTPException(status_code=404, detail="No enabled approval flow found")
+    
+    # Build can_sign list
+    can_sign_officers = []
+    for user in flow_config.get('can_sign', []):
+        can_sign_officers.append({
+            "type": "person",
+            "reference": user.get('user_id'),
+            "username": user.get('username'),
+            "action": "can_sign"
+        })
+    
+    # Build must_sign list
+    must_sign_officers = []
+    for user in flow_config.get('must_sign', []):
+        must_sign_officers.append({
+            "type": "person",
+            "reference": user.get('user_id'),
+            "username": user.get('username'),
+            "action": "must_sign"
+        })
+    
+    flow_data = {
+        "object_type": "stock_request",
+        "object_source": "depo_request",
+        "object_id": request_id,
+        "config_slug": flow_config.get('slug'),
+        "min_signatures": flow_config.get('min_signatures', 1),
+        "can_sign_officers": can_sign_officers,
+        "must_sign_officers": must_sign_officers,
+        "signatures": [],
+        "status": "pending",
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    result = db.approval_flows.insert_one(flow_data)
+    
+    flow_data["_id"] = str(result.inserted_id)
+    
+    return flow_data
+
+
+@router.post("/{request_id}/sign")
+async def sign_request(
+    request_id: str,
+    request: Request,
+    current_user: dict = Depends(verify_admin)
+):
+    """Sign a request approval flow"""
+    db = get_db()
+    requests_collection = db['depo_requests']
+    
+    # Get approval flow
+    flow = db.approval_flows.find_one({
+        "object_type": "stock_request",
+        "object_id": request_id
+    })
+    
+    if not flow:
+        raise HTTPException(status_code=404, detail="No approval flow found for this request")
+    
+    # Check if already signed
+    user_id = str(current_user["_id"])
+    existing_signature = next(
+        (s for s in flow.get("signatures", []) if s["user_id"] == user_id),
+        None
+    )
+    
+    if existing_signature:
+        raise HTTPException(status_code=400, detail="You have already signed this request")
+    
+    # Check if user is authorized to sign
+    username = current_user["username"]
+    can_sign = False
+    
+    # Check can_sign officers
+    for officer in flow.get("can_sign_officers", []):
+        if officer["reference"] == user_id:
+            can_sign = True
+            break
+    
+    # Check must_sign officers
+    if not can_sign:
+        for officer in flow.get("must_sign_officers", []):
+            if officer["reference"] == user_id:
+                can_sign = True
+                break
+    
+    if not can_sign:
+        raise HTTPException(status_code=403, detail="You are not authorized to sign this request")
+    
+    # Generate signature
+    timestamp = datetime.utcnow()
+    signature_hash = ApprovalFlowModel.generate_signature_hash(
+        user_id=user_id,
+        object_type="stock_request",
+        object_id=request_id,
+        timestamp=timestamp
+    )
+    
+    signature = {
+        "user_id": user_id,
+        "username": username,
+        "signed_at": timestamp,
+        "signature_hash": signature_hash,
+        "ip_address": request.client.host,
+        "user_agent": request.headers.get("user-agent")
+    }
+    
+    # Add signature to flow
+    db.approval_flows.update_one(
+        {"_id": ObjectId(flow["_id"])},
+        {
+            "$push": {"signatures": signature},
+            "$set": {
+                "status": "in_progress",
+                "updated_at": timestamp
+            }
+        }
+    )
+    
+    # Check if approval conditions are met
+    updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    signatures = updated_flow.get("signatures", [])
+    signature_user_ids = [s["user_id"] for s in signatures]
+    
+    # Check must_sign: all must have signed
+    must_sign_officers = updated_flow.get("must_sign_officers", [])
+    all_must_signed = True
+    for officer in must_sign_officers:
+        if officer["reference"] not in signature_user_ids:
+            all_must_signed = False
+            break
+    
+    # Check can_sign: at least min_signatures have signed
+    can_sign_officers = updated_flow.get("can_sign_officers", [])
+    min_signatures = updated_flow.get("min_signatures", 1)
+    can_sign_count = 0
+    for officer in can_sign_officers:
+        if officer["reference"] in signature_user_ids:
+            can_sign_count += 1
+    
+    has_min_signatures = can_sign_count >= min_signatures
+    
+    # If all conditions met, mark as approved and update request status
+    if all_must_signed and has_min_signatures:
+        db.approval_flows.update_one(
+            {"_id": ObjectId(flow["_id"])},
+            {
+                "$set": {
+                    "status": "approved",
+                    "completed_at": timestamp,
+                    "updated_at": timestamp
+                }
+            }
+        )
+        
+        # Update request status to "Approved"
+        try:
+            req_obj_id = ObjectId(request_id)
+        except:
+            req_obj_id = None
+        
+        if req_obj_id:
+            requests_collection.update_one(
+                {"_id": req_obj_id},
+                {"$set": {"status": "Approved", "updated_at": timestamp}}
+            )
+            print(f"[REQUESTS] Request {request_id} status updated to Approved")
+            
+            # Auto-create operations flow when request is approved
+            try:
+                # Check if operations flow already exists
+                existing_ops_flow = db.approval_flows.find_one({
+                    "object_type": "stock_request_operations",
+                    "object_id": request_id
+                })
+                
+                if not existing_ops_flow:
+                    # Get operations config
+                    config_collection = db['config']
+                    ops_config = config_collection.find_one({'slug': 'requests_operations_flow'})
+                    
+                    if ops_config and 'items' in ops_config:
+                        # Find operations flow config
+                        ops_flow_config = None
+                        for item in ops_config.get('items', []):
+                            if item.get('slug') == 'operations' and item.get('enabled', True):
+                                ops_flow_config = item
+                                break
+                        
+                        if ops_flow_config:
+                            # Build officers lists
+                            can_sign_officers = []
+                            for user in ops_flow_config.get('can_sign', []):
+                                can_sign_officers.append({
+                                    "type": "person",
+                                    "reference": user.get('user_id'),
+                                    "username": user.get('username'),
+                                    "action": "can_sign"
+                                })
+                            
+                            must_sign_officers = []
+                            for user in ops_flow_config.get('must_sign', []):
+                                must_sign_officers.append({
+                                    "type": "person",
+                                    "reference": user.get('user_id'),
+                                    "username": user.get('username'),
+                                    "action": "must_sign"
+                                })
+                            
+                            ops_flow_data = {
+                                "object_type": "stock_request_operations",
+                                "object_source": "depo_request",
+                                "object_id": request_id,
+                                "flow_type": "operations",
+                                "config_slug": ops_flow_config.get('slug'),
+                                "min_signatures": ops_flow_config.get('min_signatures', 1),
+                                "can_sign_officers": can_sign_officers,
+                                "must_sign_officers": must_sign_officers,
+                                "signatures": [],
+                                "status": "pending",
+                                "created_at": timestamp,
+                                "updated_at": timestamp
+                            }
+                            
+                            db.approval_flows.insert_one(ops_flow_data)
+                            print(f"[REQUESTS] Auto-created operations flow for request {request_id}")
+            except Exception as e:
+                print(f"[REQUESTS] Warning: Failed to auto-create operations flow: {e}")
+    
+    # Get updated flow
+    flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    flow["_id"] = str(flow["_id"])
+    
+    return flow
+
+
+@router.delete("/{request_id}/signatures/{user_id}")
+async def remove_request_signature(
+    request_id: str,
+    user_id: str,
+    current_user: dict = Depends(verify_admin)
+):
+    """Remove signature from request approval flow (admin only)"""
+    db = get_db()
+    requests_collection = db['depo_requests']
+    
+    # Get flow
+    flow = db.approval_flows.find_one({
+        "object_type": "stock_request",
+        "object_id": request_id
+    })
+    
+    if not flow:
+        raise HTTPException(status_code=404, detail="No approval flow found for this request")
+    
+    # Remove signature
+    result = db.approval_flows.update_one(
+        {"_id": ObjectId(flow["_id"])},
+        {
+            "$pull": {"signatures": {"user_id": user_id}},
+            "$set": {"updated_at": datetime.utcnow(), "status": "in_progress"}
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Signature not found")
+    
+    # Update status back to pending if no signatures left
+    updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    if len(updated_flow.get("signatures", [])) == 0:
+        db.approval_flows.update_one(
+            {"_id": ObjectId(flow["_id"])},
+            {"$set": {"status": "pending"}}
+        )
+        
+        # Update request status back to Pending
+        try:
+            req_obj_id = ObjectId(request_id)
+            requests_collection.update_one(
+                {"_id": req_obj_id},
+                {"$set": {"status": "Pending", "updated_at": datetime.utcnow()}}
+            )
+            print(f"[REQUESTS] Request {request_id} status updated to Pending after signature removal")
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to update request status: {e}")
+    else:
+        # Still has signatures but not approved anymore
+        # Update request status to In Progress
+        try:
+            req_obj_id = ObjectId(request_id)
+            requests_collection.update_one(
+                {"_id": req_obj_id},
+                {"$set": {"status": "In Progress", "updated_at": datetime.utcnow()}}
+            )
+            print(f"[REQUESTS] Request {request_id} status updated to In Progress after signature removal")
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to update request status: {e}")
+    
+    return {"message": "Signature removed successfully"}
+
+
+# ==================== OPERATIONS FLOW ====================
+
+@router.get("/{request_id}/operations-flow")
+async def get_request_operations_flow(
+    request_id: str,
+    current_user: dict = Depends(verify_admin)
+):
+    """Get operations flow for a request"""
+    db = get_db()
+    
+    # Find operations flow for this request
+    flow = db.approval_flows.find_one({
+        "object_type": "stock_request_operations",
+        "object_id": request_id
+    })
+    
+    if not flow:
+        return {"flow": None}
+    
+    flow["_id"] = str(flow["_id"])
+    
+    # Get user details for signatures
+    for signature in flow.get("signatures", []):
+        user = db.users.find_one({"_id": ObjectId(signature["user_id"])})
+        if user:
+            signature["user_name"] = user.get("name") or user.get("username")
+    
+    return {"flow": flow}
+
+
+@router.post("/{request_id}/operations-sign")
+async def sign_operations(
+    request_id: str,
+    request: Request,
+    current_user: dict = Depends(verify_admin)
+):
+    """Sign operations flow for a request"""
+    db = get_db()
+    requests_collection = db['depo_requests']
+    
+    # Get operations flow
+    flow = db.approval_flows.find_one({
+        "object_type": "stock_request_operations",
+        "object_id": request_id
+    })
+    
+    if not flow:
+        raise HTTPException(status_code=404, detail="No operations flow found for this request")
+    
+    # Check if already signed
+    user_id = str(current_user["_id"])
+    existing_signature = next(
+        (s for s in flow.get("signatures", []) if s["user_id"] == user_id),
+        None
+    )
+    
+    if existing_signature:
+        raise HTTPException(status_code=400, detail="You have already signed this operations flow")
+    
+    # Check if user is authorized to sign
+    username = current_user["username"]
+    can_sign = False
+    
+    # Check can_sign officers
+    for officer in flow.get("can_sign_officers", []):
+        if officer["reference"] == user_id:
+            can_sign = True
+            break
+    
+    # Check must_sign officers
+    if not can_sign:
+        for officer in flow.get("must_sign_officers", []):
+            if officer["reference"] == user_id:
+                can_sign = True
+                break
+    
+    if not can_sign:
+        raise HTTPException(status_code=403, detail="You are not authorized to sign this operations flow")
+    
+    # Generate signature
+    timestamp = datetime.utcnow()
+    signature_hash = ApprovalFlowModel.generate_signature_hash(
+        user_id=user_id,
+        object_type="stock_request_operations",
+        object_id=request_id,
+        timestamp=timestamp
+    )
+    
+    signature = {
+        "user_id": user_id,
+        "username": username,
+        "signed_at": timestamp,
+        "signature_hash": signature_hash,
+        "ip_address": request.client.host,
+        "user_agent": request.headers.get("user-agent")
+    }
+    
+    # Add signature to flow
+    db.approval_flows.update_one(
+        {"_id": ObjectId(flow["_id"])},
+        {
+            "$push": {"signatures": signature},
+            "$set": {
+                "status": "in_progress",
+                "updated_at": timestamp
+            }
+        }
+    )
+    
+    # Check if approval conditions are met
+    updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    signatures = updated_flow.get("signatures", [])
+    signature_user_ids = [s["user_id"] for s in signatures]
+    
+    # Check must_sign: all must have signed
+    must_sign_officers = updated_flow.get("must_sign_officers", [])
+    all_must_signed = True
+    for officer in must_sign_officers:
+        if officer["reference"] not in signature_user_ids:
+            all_must_signed = False
+            break
+    
+    # Check can_sign: at least min_signatures have signed
+    can_sign_officers = updated_flow.get("can_sign_officers", [])
+    min_signatures = updated_flow.get("min_signatures", 1)
+    can_sign_count = 0
+    for officer in can_sign_officers:
+        if officer["reference"] in signature_user_ids:
+            can_sign_count += 1
+    
+    has_min_signatures = can_sign_count >= min_signatures
+    
+    # If all conditions met, mark as approved
+    if all_must_signed and has_min_signatures:
+        db.approval_flows.update_one(
+            {"_id": ObjectId(flow["_id"])},
+            {
+                "$set": {
+                    "status": "approved",
+                    "completed_at": timestamp,
+                    "updated_at": timestamp
+                }
+            }
+        )
+        
+        # Check if operations decision is set and update main status accordingly
+        try:
+            req_obj_id = ObjectId(request_id)
+            req_doc = requests_collection.find_one({"_id": req_obj_id})
+            
+            if req_doc and req_doc.get('operations_result'):
+                # Decision already set - update main status to decision value
+                decision_status = req_doc['operations_result']
+                status_update = {'status': decision_status, 'updated_at': timestamp}
+                
+                if decision_status == 'Finished':
+                    status_update['finished_at'] = timestamp
+                elif decision_status == 'Refused':
+                    status_update['refused_at'] = timestamp
+                    status_update['refused_by'] = req_doc.get('operations_result_updated_by', 'system')
+                
+                requests_collection.update_one(
+                    {"_id": req_obj_id},
+                    {"$set": status_update}
+                )
+                print(f"[REQUESTS] Request {request_id} status updated to {decision_status} (from operations decision)")
+            else:
+                # No decision set yet - keep as "In Operations"
+                requests_collection.update_one(
+                    {"_id": req_obj_id},
+                    {"$set": {"status": "In Operations", "updated_at": timestamp}}
+                )
+                print(f"[REQUESTS] Request {request_id} operations flow approved, status: In Operations")
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to update request status: {e}")
+    
+    # Get updated flow
+    flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    flow["_id"] = str(flow["_id"])
+    
+    return flow
+
+
+@router.delete("/{request_id}/operations-signatures/{user_id}")
+async def remove_operations_signature(
+    request_id: str,
+    user_id: str,
+    current_user: dict = Depends(verify_admin)
+):
+    """Remove signature from operations flow (admin only)"""
+    db = get_db()
+    
+    # Get flow
+    flow = db.approval_flows.find_one({
+        "object_type": "stock_request_operations",
+        "object_id": request_id
+    })
+    
+    if not flow:
+        raise HTTPException(status_code=404, detail="No operations flow found for this request")
+    
+    # Remove signature
+    result = db.approval_flows.update_one(
+        {"_id": ObjectId(flow["_id"])},
+        {
+            "$pull": {"signatures": {"user_id": user_id}},
+            "$set": {"updated_at": datetime.utcnow(), "status": "in_progress"}
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Signature not found")
+    
+    # Update status back to pending if no signatures left
+    updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+    if len(updated_flow.get("signatures", [])) == 0:
+        db.approval_flows.update_one(
+            {"_id": ObjectId(flow["_id"])},
+            {"$set": {"status": "pending"}}
+        )
+    
+    return {"message": "Signature removed successfully"}
+
+
+@router.patch("/{request_id}/operations-status")
+async def update_operations_status(
+    request_id: str,
+    request: Request,
+    current_user: dict = Depends(verify_admin)
+):
+    """Update operations decision (can be set before all signatures)"""
+    db = get_db()
+    requests_collection = db['depo_requests']
+    
+    # Get request body
+    body = await request.json()
+    status = body.get('status')
+    reason = body.get('reason', '')
+    
+    if not status:
+        raise HTTPException(status_code=400, detail="Status is required")
+    
+    if status not in ['Finished', 'Refused']:
+        raise HTTPException(status_code=400, detail="Status must be 'Finished' or 'Refused'")
+    
+    # Update request with operations decision
+    try:
+        req_obj_id = ObjectId(request_id)
+        update_data = {
+            'operations_result': status,
+            'operations_result_updated_at': datetime.utcnow(),
+            'operations_result_updated_by': current_user.get('username'),
+            'updated_at': datetime.utcnow()
+        }
+        
+        if status == 'Refused':
+            update_data['operations_result_reason'] = reason
+        else:
+            # Clear reason if changing to Finished
+            update_data['operations_result_reason'] = ''
+        
+        requests_collection.update_one(
+            {'_id': req_obj_id},
+            {'$set': update_data}
+        )
+        
+        print(f"[REQUESTS] Request {request_id} operations decision set to {status}")
+        
+        # Check if flow is approved - if yes, also update main status
+        flow = db.approval_flows.find_one({
+            "object_type": "stock_request_operations",
+            "object_id": request_id
+        })
+        
+        if flow and flow.get('status') == 'approved':
+            # All signatures collected - update main status
+            status_update = {'status': status}
+            
+            if status == 'Refused':
+                status_update['refused_at'] = datetime.utcnow()
+                status_update['refused_by'] = current_user.get('username')
+            elif status == 'Finished':
+                status_update['finished_at'] = datetime.utcnow()
+            
+            requests_collection.update_one(
+                {'_id': req_obj_id},
+                {'$set': status_update}
+            )
+            print(f"[REQUESTS] Request {request_id} main status updated to {status}")
+        
+        return {
+            "message": f"Operations decision set to {status}",
+            "status": status,
+            "operations_result": status
+        }
+    except Exception as e:
+        print(f"[REQUESTS] Error updating operations decision: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update operations decision: {str(e)}")
+
+
+#
+
+# ==================== RECEPTION FLOW ====================
+
+@router.get("/{request_id}/reception-flow")
+async def get_request_reception_flow(
+    request_id: str,
+    current_user: dict = Depends(verify_admin)
+):
+    """Get reception flow for a request"""
+    db = get_db()
+    
+    # Find reception flow for this request
+    flow = db.approval_flows.find_one({
+        "object_type": "stock_request_reception",
+        "object_id": request_id
+    })
+    
+    if not flow:
+        return {"flow": None}
+    
+    flow["_id"] = str(flow["_id"])
+    
+    # Get user details for signatures
+    for signature in flow.get("signatures", []):
+        user = db.users.find_one({"_id": ObjectId(signature["user_id"])})
+        if user:
+            signature["user_name"] = user.get("name") or user.get("username")
+    
+    return {"flow": flow}

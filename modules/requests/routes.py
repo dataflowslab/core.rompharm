@@ -138,6 +138,10 @@ async def list_requests(
     for req in requests_list:
         req['_id'] = str(req['_id'])
         
+        # Convert state_id if present
+        if 'state_id' in req and isinstance(req['state_id'], ObjectId):
+            req['state_id'] = str(req['state_id'])
+        
         # Convert source and destination ObjectIds to strings
         if req.get('source'):
             if isinstance(req['source'], ObjectId):
