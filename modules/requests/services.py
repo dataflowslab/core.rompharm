@@ -73,20 +73,19 @@ async def search_parts(db, search: Optional[str] = None) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to fetch parts: {str(e)}")
 
 
-async def get_part_stock_info(db, part_id: int) -> Dict[str, Any]:
+async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
     """Get stock information for a part from MongoDB depo_stocks with batches
     
     Only shows transferable stock (state_id = 694322878728e4d75ae72790)
-    Link: depo_parts._id (ObjectId) <-> depo_stocks.part_id (ObjectId)
+    Uses part_id as ObjectId string directly
     """
     try:
-        # Get the part from depo_parts to get its _id (ObjectId)
-        part = db.depo_parts.find_one({"id": part_id})
-        
-        if not part:
-            # Part not found in depo_parts
+        # Convert part_id string to ObjectId
+        try:
+            part_oid = ObjectId(part_id)
+        except:
             return {
-                "part_id": part_id,
+                "_id": part_id,
                 "total": 0,
                 "in_sales": 0,
                 "in_builds": 0,
@@ -94,8 +93,6 @@ async def get_part_stock_info(db, part_id: int) -> Dict[str, Any]:
                 "available": 0,
                 "batches": []
             }
-        
-        part_oid = part.get("_id")  # This is the ObjectId
         
         # Transferable state_id (quarantined and transferable)
         transferable_state_id = ObjectId('694322878728e4d75ae72790')

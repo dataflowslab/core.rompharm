@@ -74,11 +74,11 @@ async def get_parts(
 
 @router.get("/parts/{part_id}/stock-info")
 async def get_part_stock_info_route(
-    part_id: int,
+    part_id: str,
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
-    """Get stock information for a part from MongoDB depo_stocks with batches"""
+    """Get stock information for a part from MongoDB depo_stocks with batches using ObjectId"""
     return await get_part_stock_info(db, part_id)
 
 
