@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, NumberInput, Select, Textarea } from '@mantine/core';
+import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, NumberInput, Select, Textarea, Grid, Stack } from '@mantine/core';
 import { IconSignature, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
@@ -107,9 +107,28 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   };
 
   const handleSign = async () => {
+    // Validate status is selected
+    if (!finalStatus) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please select a status before signing'),
+        color: 'red'
+      });
+      return;
+    }
+
+    if (finalStatus === 'Refused' && !refusalReason.trim()) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please provide a reason for refusal'),
+        color: 'red'
+      });
+      return;
+    }
+
     setSigning(true);
     try {
-      // Save received quantities first
+      // 1. Save received quantities
       await api.patch(requestsApi.updateRequest(requestId), {
         items: items.map(item => ({
           part: item.part,
@@ -119,7 +138,13 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
         }))
       });
 
-      // Then sign
+      // 2. Save reception status/decision
+      await api.patch(requestsApi.updateReceptionStatus(requestId), {
+        status: finalStatus,
+        reason: finalStatus === 'Refused' ? refusalReason : undefined
+      });
+
+      // 3. Sign the reception
       await api.post(requestsApi.signReception(requestId));
       
       notifications.show({
@@ -288,21 +313,10 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   return (
     <Paper p="md">
       <Group justify="space-between" mb="md">
-        <Group>
-          <Title order={4}>{t('Reception Flow')}</Title>
-          <Badge color={getStatusColor(flow.status)} size="lg">
-            {flow.status.toUpperCase()}
-          </Badge>
-        </Group>
-        {canUserSign() && !isFlowCompleted() && (
-          <Button
-            leftSection={<IconSignature size={16} />}
-            onClick={handleSign}
-            loading={signing}
-          >
-            {t('Sign')}
-          </Button>
-        )}
+        <Title order={4}>{t('Reception Flow')}</Title>
+        <Badge color={getStatusColor(flow.status)} size="lg">
+          {flow.status.toUpperCase()}
+        </Badge>
       </Group>
 
       {/* Received Quantities Table */}
@@ -337,129 +351,107 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
         </Table.Tbody>
       </Table>
 
-      {/* Optional Approvers */}
-      {flow.can_sign_officers.length > 0 && (
-        <>
-          <Title order={5} mt="md" mb="sm">
-            {t('Optional Approvers')} ({t('Minimum')}: {flow.min_signatures})
-          </Title>
-          <Table striped withTableBorder withColumnBorders mb="md">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('User')}</Table.Th>
-                <Table.Th>{t('Status')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {flow.can_sign_officers.map((officer, index) => {
-                const hasSigned = flow.signatures.some(s => s.user_id === officer.reference);
-                return (
-                  <Table.Tr key={index}>
-                    <Table.Td>{officer.username}</Table.Td>
-                    <Table.Td>
-                      <Badge color={hasSigned ? 'green' : 'gray'}>
-                        {hasSigned ? t('Signed') : t('Pending')}
-                      </Badge>
-                    </Table.Td>
+      {/* Grid Layout: 1/3 Decision - 2/3 Signatures */}
+      <Grid mt="md">
+        {/* Left Column: Decision (1/3) */}
+        <Grid.Col span={4}>
+          <Paper withBorder p="md">
+            <Title order={5} mb="md">{t('Final Decision')}</Title>
+            
+            <Stack>
+              <Select
+                label={t('Status')}
+                placeholder={t('Select status')}
+                data={[
+                  { value: 'Approved', label: t('Approved') },
+                  { value: 'Refused', label: t('Refused') }
+                ]}
+                value={finalStatus}
+                onChange={(value) => setFinalStatus(value || '')}
+                disabled={isFlowCompleted()}
+                required
+              />
+
+              {finalStatus === 'Refused' && (
+                <Textarea
+                  label={t('Reason for Refusal')}
+                  placeholder={t('Enter reason for refusal')}
+                  value={refusalReason}
+                  onChange={(e) => setRefusalReason(e.target.value)}
+                  disabled={isFlowCompleted()}
+                  required
+                  minRows={3}
+                />
+              )}
+            </Stack>
+          </Paper>
+        </Grid.Col>
+
+        {/* Right Column: Signatures (2/3) */}
+        <Grid.Col span={8}>
+          <Paper withBorder p="md">
+            <Group justify="space-between" mb="md">
+              <Title order={5}>{t('Signatures')}</Title>
+              {canUserSign() && !isFlowCompleted() && finalStatus && (
+                <Button
+                  leftSection={<IconSignature size={16} />}
+                  onClick={handleSign}
+                  loading={signing}
+                  color={finalStatus === 'Approved' ? 'green' : 'red'}
+                >
+                  {t('Sign')}
+                </Button>
+              )}
+            </Group>
+
+            {flow.signatures.length > 0 ? (
+              <Table striped withTableBorder withColumnBorders>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('User')}</Table.Th>
+                    <Table.Th>{t('Date')}</Table.Th>
+                    <Table.Th>{t('Signature Hash')}</Table.Th>
+                    {isStaff && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
                   </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
-        </>
-      )}
+                </Table.Thead>
+                <Table.Tbody>
+                  {flow.signatures.map((signature, index) => (
+                    <Table.Tr key={index}>
+                      <Table.Td>{signature.user_name || signature.username}</Table.Td>
+                      <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
+                      <Table.Td>
+                        <Text size="xs" style={{ fontFamily: 'monospace' }}>
+                          {signature.signature_hash.substring(0, 16)}...
+                        </Text>
+                      </Table.Td>
+                      {isStaff && (
+                        <Table.Td>
+                          <ActionIcon
+                            color="red"
+                            variant="subtle"
+                            onClick={() => handleRemoveSignature(signature.user_id, signature.username)}
+                            title={t('Remove')}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Table.Td>
+                      )}
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            ) : (
+              <Text c="dimmed" size="sm">{t('No signatures yet')}</Text>
+            )}
 
-      {/* Signatures */}
-      {flow.signatures.length > 0 && (
-        <>
-          <Title order={5} mt="md" mb="sm">{t('Signatures')}</Title>
-          <Table striped withTableBorder withColumnBorders mb="md">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('User')}</Table.Th>
-                <Table.Th>{t('Date')}</Table.Th>
-                <Table.Th>{t('Signature Hash')}</Table.Th>
-                {isStaff && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {flow.signatures.map((signature, index) => (
-                <Table.Tr key={index}>
-                  <Table.Td>{signature.user_name || signature.username}</Table.Td>
-                  <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
-                  <Table.Td>
-                    <Text size="xs" style={{ fontFamily: 'monospace' }}>
-                      {signature.signature_hash.substring(0, 16)}...
-                    </Text>
-                  </Table.Td>
-                  {isStaff && (
-                    <Table.Td>
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        onClick={() => handleRemoveSignature(signature.user_id, signature.username)}
-                        title={t('Remove')}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Table.Td>
-                  )}
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </>
-      )}
-
-      {/* Final Decision Section - Always visible */}
-      <Paper withBorder p="md" mt="md">
-        <Title order={5} mb="md">{t('Final Decision')}</Title>
-        
-        <Select
-          label={t('Status')}
-          placeholder={t('Select status')}
-          data={[
-            { value: 'Approved', label: t('Approved') },
-            { value: 'Refused', label: t('Refused') }
-          ]}
-          value={finalStatus}
-          onChange={(value) => setFinalStatus(value || '')}
-          disabled={isFlowCompleted()}
-          required
-          mb="md"
-        />
-
-        {finalStatus === 'Refused' && (
-          <Textarea
-            label={t('Reason for Refusal')}
-            placeholder={t('Enter reason for refusal')}
-            value={refusalReason}
-            onChange={(e) => setRefusalReason(e.target.value)}
-            disabled={isFlowCompleted()}
-            required
-            minRows={3}
-            mb="md"
-          />
-        )}
-
-        {finalStatus && !isFlowCompleted() && (
-          <Group justify="flex-end">
-            <Button
-              onClick={handleSubmitStatus}
-              loading={submitting}
-              color={finalStatus === 'Approved' ? 'green' : 'red'}
-            >
-              {t('Save Decision')}
-            </Button>
-          </Group>
-        )}
-      </Paper>
-
-      {isFlowCompleted() && (
-        <Text size="sm" c="orange" mt="md">
-          {t('Reception flow completed. Decision has been saved.')}
-        </Text>
-      )}
+            {isFlowCompleted() && (
+              <Text size="sm" c="green" mt="md">
+                {t('Reception flow completed successfully')}
+              </Text>
+            )}
+          </Paper>
+        </Grid.Col>
+      </Grid>
     </Paper>
   );
 }
