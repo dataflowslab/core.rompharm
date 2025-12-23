@@ -305,17 +305,21 @@ async def execute_production_stock_operations(db, request_id: str, current_user:
     if not production:
         raise Exception("Production data not found")
     
-    # Get product from recipe
-    product_id = request.get('product_id')
-    if not product_id:
-        raise Exception("No product_id in request")
+    # Get product from recipe (recipe_part_id is the final product ObjectId)
+    recipe_part_id = request.get('recipe_part_id')
+    if not recipe_part_id:
+        raise Exception("No recipe_part_id in request")
+    
+    # Ensure recipe_part_id is ObjectId
+    if isinstance(recipe_part_id, str):
+        recipe_part_id = ObjectId(recipe_part_id)
     
     destination_location = request.get('destination')
     if not destination_location:
         raise Exception("No destination location")
     
     # Constants
-    supplier_id = ObjectId("694a1b9f297c9dde6d70661c")  # depo_companies
+    supplier_id = ObjectId("694a1b9f297c9dde6d70661c")  # depo_companies (Rompharm)
     status_ok_id = ObjectId("694321db8728e4d75ae72789")  # OK status
     
     # A. Create stock entries for produced batches
@@ -326,7 +330,7 @@ async def execute_production_stock_operations(db, request_id: str, current_user:
         
         if resulted_qty > 0:
             stock_entry = {
-                'part': product_id,
+                'part': recipe_part_id,  # ObjectId of the final product
                 'location_id': ObjectId(destination_location),
                 'quantity': resulted_qty,
                 'batch': batch_code,
@@ -338,7 +342,7 @@ async def execute_production_stock_operations(db, request_id: str, current_user:
             }
             
             db.depo_stocks.insert_one(stock_entry)
-            print(f"[PRODUCTION] Created stock entry for batch {batch_code}: {resulted_qty} units")
+            print(f"[PRODUCTION] Created stock entry for batch {batch_code}: {resulted_qty} units (part: {recipe_part_id})")
     
     # B. Decrease stock for used materials
     unused = production.get('unused', [])
