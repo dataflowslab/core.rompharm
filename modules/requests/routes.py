@@ -269,7 +269,7 @@ async def get_request(
     # Convert all ObjectIds to strings
     req['_id'] = str(req['_id'])
     
-    # Get state level from depo_requests_states using state_id
+    # Get state level and order from depo_requests_states using state_id
     if req.get('state_id'):
         states_collection = db['depo_requests_states']
         try:
@@ -277,16 +277,20 @@ async def get_request(
             state = states_collection.find_one({'_id': state_id_obj})
             if state:
                 req['state_level'] = state.get('workflow_level', 0)  # Use workflow_level not level
+                req['state_order'] = state.get('order', 0)  # Add order field
                 # Also set status from state if not present
                 if not req.get('status'):
                     req['status'] = state.get('name', 'Unknown')
             else:
                 req['state_level'] = 0
+                req['state_order'] = 0
         except Exception as e:
             print(f"[ERROR] Failed to lookup state: {e}")
             req['state_level'] = 0
+            req['state_order'] = 0
     else:
         req['state_level'] = 0
+        req['state_order'] = 0
     
     # Convert state_id if present
     if 'state_id' in req and isinstance(req['state_id'], ObjectId):

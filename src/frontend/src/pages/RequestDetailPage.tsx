@@ -40,6 +40,7 @@ interface Request {
   line_items: number;
   status: string;
   state_level?: number;
+  state_order?: number;
   notes: string;
   issue_date: string;
   created_at: string;
@@ -137,7 +138,7 @@ export function RequestDetailPage() {
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
-          {(request.state_level && request.state_level >= 350) && (
+          {(request.state_order && request.state_order > 40 && request.state_order !== 41) && (
             <Tabs.Tab value="production" leftSection={<IconTool size={16} />}>
               {t('Production')}
             </Tabs.Tab>
@@ -168,7 +169,7 @@ export function RequestDetailPage() {
           </Tabs.Panel>
         )}
 
-        {(request.state_level && request.state_level >= 350) && (
+        {(request.state_order && request.state_order > 40 && request.state_order !== 41) && (
           <Tabs.Panel value="production" pt="md">
             {id && <ProductionTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
