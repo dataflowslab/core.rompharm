@@ -330,7 +330,7 @@ async def execute_production_stock_operations(db, request_id: str, current_user:
         
         if resulted_qty > 0:
             stock_entry = {
-                'part': recipe_part_id,  # ObjectId of the final product
+                'part_id': recipe_part_id,  # ObjectId of the final product
                 'location_id': ObjectId(destination_location),
                 'quantity': resulted_qty,
                 'batch': batch_code,
@@ -342,7 +342,7 @@ async def execute_production_stock_operations(db, request_id: str, current_user:
             }
             
             db.depo_stocks.insert_one(stock_entry)
-            print(f"[PRODUCTION] Created stock entry for batch {batch_code}: {resulted_qty} units (part: {recipe_part_id})")
+            print(f"[PRODUCTION] Created stock entry for batch {batch_code}: {resulted_qty} units (part_id: {recipe_part_id})")
     
     # B. Decrease stock for used materials
     unused = production.get('unused', [])
