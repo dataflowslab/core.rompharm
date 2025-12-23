@@ -448,6 +448,10 @@ async def update_request(
     updated = requests_collection.find_one({'_id': req_obj_id})
     updated['_id'] = str(updated['_id'])
     
+    # Convert state_id if present
+    if 'state_id' in updated and isinstance(updated['state_id'], ObjectId):
+        updated['state_id'] = str(updated['state_id'])
+    
     # Convert source and destination ObjectIds to strings
     if updated.get('source') and isinstance(updated['source'], ObjectId):
         updated['source'] = str(updated['source'])
