@@ -184,6 +184,7 @@ async def remove_reception_signature(
 ):
     """Remove signature from reception flow (admin only)"""
     db = get_db()
+    requests_collection = db['depo_requests']
     
     flow = db.approval_flows.find_one({
         "object_type": "stock_request_reception",
@@ -211,6 +212,33 @@ async def remove_reception_signature(
             {"_id": ObjectId(flow["_id"])},
             {"$set": {"status": "pending"}}
         )
+        
+        # Update request status back to Warehouse Approved
+        try:
+            req_obj_id = ObjectId(request_id)
+            requests_collection.update_one(
+                {"_id": req_obj_id},
+                {"$set": {"status": "Warehouse Approved", "updated_at": datetime.utcnow()}}
+            )
+            print(f"[REQUESTS] Request {request_id} status updated to Warehouse Approved after signature removal")
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to update request status: {e}")
+        
+        # Delete production flow if exists
+        try:
+            production_flow = db.approval_flows.find_one({
+                "object_type": "stock_request_production",
+                "object_id": request_id
+            })
+            if production_flow:
+                db.approval_flows.delete_one({"_id": production_flow["_id"]})
+                print(f"[REQUESTS] Deleted production flow for request {request_id}")
+                
+                # Also delete production data
+                db.depo_production.delete_one({"request_id": req_obj_id})
+                print(f"[REQUESTS] Deleted production data for request {request_id}")
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to delete production flow: {e}")
     
     return {"message": "Signature removed successfully"}
 

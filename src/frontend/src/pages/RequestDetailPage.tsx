@@ -134,7 +134,7 @@ export function RequestDetailPage() {
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
-          {request.status === 'Stock Received' && (
+          {(request.status === 'Stock Received' || request.status === 'Produced') && (
             <Tabs.Tab value="production" leftSection={<IconTool size={16} />}>
               {t('Production')}
             </Tabs.Tab>
@@ -165,7 +165,7 @@ export function RequestDetailPage() {
           </Tabs.Panel>
         )}
 
-        {request.status === 'Stock Received' && (
+        {(request.status === 'Stock Received' || request.status === 'Produced') && (
           <Tabs.Panel value="production" pt="md">
             {id && <ProductionTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
