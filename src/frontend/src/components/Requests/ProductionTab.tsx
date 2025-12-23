@@ -222,6 +222,92 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
     }
   };
 
+  const handleSign = async () => {
+    setSigning(true);
+    try {
+      await api.post(`/modules/requests/api/${requestId}/production-sign`);
+      
+      notifications.show({
+        title: t('Success'),
+        message: t('Production signed successfully'),
+        color: 'green'
+      });
+      
+      setTimeout(() => {
+        loadProductionFlow();
+        onReload();
+      }, 500);
+    } catch (error: any) {
+      console.error('Failed to sign production:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to sign production'),
+        color: 'red'
+      });
+    } finally {
+      setSigning(false);
+    }
+  };
+
+  const handleRemoveSignature = (userId: string, username: string) => {
+    modals.openConfirmModal({
+      title: t('Remove Signature'),
+      children: (
+        <Text size="sm">
+          {t('Are you sure you want to remove the signature from')} <strong>{username}</strong>?
+        </Text>
+      ),
+      labels: { confirm: t('Remove'), cancel: t('Cancel') },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          await api.delete(`/modules/requests/api/${requestId}/production-signatures/${userId}`);
+          notifications.show({
+            title: t('Success'),
+            message: t('Signature removed successfully'),
+            color: 'green'
+          });
+          loadProductionFlow();
+          onReload();
+        } catch (error: any) {
+          console.error('Failed to remove signature:', error);
+          notifications.show({
+            title: t('Error'),
+            message: error.response?.data?.detail || t('Failed to remove signature'),
+            color: 'red'
+          });
+        }
+      }
+    });
+  };
+
+  const canUserSign = () => {
+    if (!flow || !username) return false;
+    const alreadySigned = flow.signatures.some(s => s.username === username);
+    if (alreadySigned) return false;
+    const canSign = flow.can_sign_officers.some(o => o.username === username);
+    const mustSign = flow.must_sign_officers.some(o => o.username === username);
+    return canSign || mustSign;
+  };
+
+  const isFlowCompleted = () => {
+    if (!flow) return false;
+    const allMustSigned = flow.must_sign_officers.every(officer =>
+      flow.signatures.some(s => s.user_id === officer.reference)
+    );
+    const signatureCount = flow.signatures.filter(s =>
+      flow.can_sign_officers.some(o => o.reference === s.user_id)
+    ).length;
+    const hasMinSignatures = signatureCount >= flow.min_signatures;
+    return allMustSigned && hasMinSignatures;
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
+
   if (loading) {
     return <Paper p="md"><Text>{t('Loading...')}</Text></Paper>;
   }
@@ -326,11 +412,81 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
         )}
       </Paper>
 
-      {/* Production Flow - Placeholder for approval flow */}
-      <Paper withBorder p="md" mt="md">
-        <Title order={5} mb="md">{t('Production Approval')}</Title>
-        <Text c="dimmed">{t('Production approval flow will be implemented here')}</Text>
-      </Paper>
+      {/* Production Approval Flow */}
+      {flow ? (
+        <Paper withBorder p="md" mt="md">
+          <Group justify="space-between" mb="md">
+            <Group>
+              <Title order={5}>{t('Production Approval')}</Title>
+              <Badge color={flow.status === 'approved' ? 'green' : flow.status === 'pending' ? 'gray' : 'blue'} size="lg">
+                {flow.status.toUpperCase()}
+              </Badge>
+            </Group>
+            {canUserSign() && !isFlowCompleted() && (
+              <Button
+                leftSection={<IconSignature size={16} />}
+                onClick={handleSign}
+                loading={signing}
+                color="green"
+              >
+                {t('Sign Production')}
+              </Button>
+            )}
+          </Group>
+
+          {/* Signatures Table */}
+          {flow.signatures.length > 0 && (
+            <>
+              <Title order={6} mb="sm">{t('Signatures')}</Title>
+              <Table striped withTableBorder withColumnBorders mb="md">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('User')}</Table.Th>
+                    <Table.Th>{t('Date')}</Table.Th>
+                    <Table.Th>{t('Signature Hash')}</Table.Th>
+                    {isStaff && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {flow.signatures.map((signature, index) => (
+                    <Table.Tr key={index}>
+                      <Table.Td>{signature.user_name || signature.username}</Table.Td>
+                      <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
+                      <Table.Td>
+                        <Text size="xs" style={{ fontFamily: 'monospace' }}>
+                          {signature.signature_hash.substring(0, 16)}...
+                        </Text>
+                      </Table.Td>
+                      {isStaff && (
+                        <Table.Td>
+                          <ActionIcon
+                            color="red"
+                            variant="subtle"
+                            onClick={() => handleRemoveSignature(signature.user_id, signature.username)}
+                            title={t('Remove')}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Table.Td>
+                      )}
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </>
+          )}
+
+          {isFlowCompleted() && (
+            <Text size="sm" c="green" mt="md">
+              {t('Production completed successfully. Stock operations have been executed.')}
+            </Text>
+          )}
+        </Paper>
+      ) : (
+        <Paper withBorder p="md" mt="md">
+          <Text c="dimmed">{t('Production approval flow will be created automatically')}</Text>
+        </Paper>
+      )}
     </Paper>
   );
 }
