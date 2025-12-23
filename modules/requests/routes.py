@@ -248,6 +248,10 @@ async def get_request(
     # Convert all ObjectIds to strings
     req['_id'] = str(req['_id'])
     
+    # Convert state_id if present
+    if 'state_id' in req and isinstance(req['state_id'], ObjectId):
+        req['state_id'] = str(req['state_id'])
+    
     # Convert recipe ObjectIds if present
     if 'recipe_id' in req and isinstance(req['recipe_id'], ObjectId):
         req['recipe_id'] = str(req['recipe_id'])
