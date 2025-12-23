@@ -411,55 +411,53 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
         </>
       )}
 
-      {/* Final Status Selection - appears after all signatures */}
-      {isFlowCompleted() && (
-        <Paper withBorder p="md" mt="md">
-          <Title order={5} mb="md">{t('Final Decision')}</Title>
-          
-          <Select
-            label={t('Status')}
-            placeholder={t('Select status')}
-            data={[
-              { value: 'Approved', label: t('Approved') },
-              { value: 'Refused', label: t('Refused') }
-            ]}
-            value={finalStatus}
-            onChange={(value) => setFinalStatus(value || '')}
-            disabled={isFormReadonly}
+      {/* Final Decision Section - Always visible */}
+      <Paper withBorder p="md" mt="md">
+        <Title order={5} mb="md">{t('Final Decision')}</Title>
+        
+        <Select
+          label={t('Status')}
+          placeholder={t('Select status')}
+          data={[
+            { value: 'Approved', label: t('Approved') },
+            { value: 'Refused', label: t('Refused') }
+          ]}
+          value={finalStatus}
+          onChange={(value) => setFinalStatus(value || '')}
+          disabled={isFlowCompleted()}
+          required
+          mb="md"
+        />
+
+        {finalStatus === 'Refused' && (
+          <Textarea
+            label={t('Reason for Refusal')}
+            placeholder={t('Enter reason for refusal')}
+            value={refusalReason}
+            onChange={(e) => setRefusalReason(e.target.value)}
+            disabled={isFlowCompleted()}
             required
+            minRows={3}
             mb="md"
           />
+        )}
 
-          {finalStatus === 'Refused' && (
-            <Textarea
-              label={t('Reason for Refusal')}
-              placeholder={t('Enter reason for refusal')}
-              value={refusalReason}
-              onChange={(e) => setRefusalReason(e.target.value)}
-              disabled={isFormReadonly}
-              required
-              minRows={3}
-              mb="md"
-            />
-          )}
+        {finalStatus && !isFlowCompleted() && (
+          <Group justify="flex-end">
+            <Button
+              onClick={handleSubmitStatus}
+              loading={submitting}
+              color={finalStatus === 'Approved' ? 'green' : 'red'}
+            >
+              {t('Save Decision')}
+            </Button>
+          </Group>
+        )}
+      </Paper>
 
-          {finalStatus && (!isFormReadonly || finalStatus === '') && (
-            <Group justify="flex-end">
-              <Button
-                onClick={handleSubmitStatus}
-                loading={submitting}
-                color={finalStatus === 'Approved' ? 'green' : 'red'}
-              >
-                {t('Submit')}
-              </Button>
-            </Group>
-          )}
-        </Paper>
-      )}
-
-      {isFormReadonly && (
+      {isFlowCompleted() && (
         <Text size="sm" c="orange" mt="md">
-          {t('This form is read-only because it has been signed.')}
+          {t('Reception flow completed. Decision has been saved.')}
         </Text>
       )}
     </Paper>
