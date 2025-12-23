@@ -27,12 +27,10 @@ async def fetch_stock_locations(current_user: dict, db=None) -> Dict[str, Any]:
         results = []
         for loc in locations:
             results.append({
-                'pk': str(loc['_id']),  # Use ObjectId as pk
-                'id': str(loc['_id']),
+                '_id': str(loc['_id']),
                 'name': loc.get('code', str(loc['_id'])),  # Use code as name
                 'code': loc.get('code', ''),
-                'description': loc.get('description', ''),
-                '_id': str(loc['_id'])
+                'description': loc.get('description', '')
             })
         
         return {"results": results}
