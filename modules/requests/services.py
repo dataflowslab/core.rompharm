@@ -60,7 +60,7 @@ async def search_parts(db, search: Optional[str] = None) -> Dict[str, Any]:
         results = []
         for part in parts:
             results.append({
-                "pk": part.get("id"),  # Use 'id' field as pk
+                "_id": str(part.get("_id")),  # Use ObjectId as _id
                 "name": part.get("name", ""),
                 "IPN": part.get("ipn", "")  # Map 'ipn' to 'IPN'
             })

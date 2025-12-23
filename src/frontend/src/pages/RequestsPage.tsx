@@ -15,7 +15,7 @@ interface StockLocation {
 }
 
 interface Part {
-  pk: number;
+  _id: string;
   name: string;
   IPN: string;
 }
@@ -130,12 +130,11 @@ export function RequestsPage() {
     setFormData({ ...formData, part: value || '' });
     
     if (value) {
-      const partId = parseInt(value);
       // Find and save selected part data
-      const selected = parts.find(p => String(p.pk) === value);
+      const selected = parts.find(p => p._id === value);
       setSelectedPartData(selected || null);
-      loadStockInfo(partId);
-      loadRecipe(partId);
+      loadStockInfo(value);  // Pass _id directly
+      loadRecipe(value);  // Pass _id directly
     } else {
       setSelectedPartData(null);
       setStockInfo(null);
@@ -414,14 +413,14 @@ export function RequestsPage() {
           data={[
             // Include selected part if exists
             ...(selectedPartData ? [{
-              value: String(selectedPartData.pk),
+              value: selectedPartData._id,
               label: `${selectedPartData.name} (${selectedPartData.IPN})`
             }] : []),
             // Add search results (filter out selected to avoid duplicates)
             ...parts
-              .filter(p => !selectedPartData || p.pk !== selectedPartData.pk)
+              .filter(p => !selectedPartData || p._id !== selectedPartData._id)
               .map(part => ({
-                value: String(part.pk),
+                value: part._id,
                 label: `${part.name} (${part.IPN})`
               }))
           ]}

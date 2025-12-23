@@ -18,10 +18,10 @@ export const requestsApi = {
   
   // Parts
   getParts: () => `${API_PREFIX}/parts`,
-  getPartStockInfo: (partId: number) => `${API_PREFIX}/parts/${partId}/stock-info`,
-  getPartRecipe: (partId: number) => `${API_PREFIX}/parts/${partId}/recipe`,
-  getPartBatchCodes: (partId: number) => `${API_PREFIX}/parts/${partId}/batch-codes`,
-  getPartBom: (partId: number) => `${API_PREFIX}/parts/${partId}/bom`,
+  getPartStockInfo: (partId: string) => `${API_PREFIX}/parts/${partId}/stock-info`,
+  getPartRecipe: (partId: string) => `${API_PREFIX}/parts/${partId}/recipe`,
+  getPartBatchCodes: (partId: string) => `${API_PREFIX}/parts/${partId}/batch-codes`,
+  getPartBom: (partId: string) => `${API_PREFIX}/parts/${partId}/bom`,
   
   // Approval Flow
   getApprovalFlow: (requestId: string) => `${API_PREFIX}/${requestId}/approval-flow`,
