@@ -128,6 +128,27 @@ async def sign_reception(
         )
         print(f"[REQUESTS] Reception flow approved for request {request_id}")
         
+        # Update request state_id to Stock Received
+        try:
+            req_obj_id = ObjectId(request_id)
+            requests_collection = db['depo_requests']
+            states_collection = db['depo_requests_states']
+            stock_received_state = states_collection.find_one({"name": "Stock Received"})
+            
+            if stock_received_state:
+                requests_collection.update_one(
+                    {"_id": req_obj_id},
+                    {"$set": {
+                        "state_id": stock_received_state["_id"],
+                        "updated_at": timestamp
+                    }}
+                )
+                print(f"[REQUESTS] Set state_id to Stock Received ({stock_received_state['_id']}) for request {request_id}")
+            else:
+                print(f"[REQUESTS] Warning: Stock Received state not found in depo_requests_states")
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to update request state_id: {e}")
+        
         # Auto-create production flow when reception is approved
         try:
             existing_production_flow = db.approval_flows.find_one({
