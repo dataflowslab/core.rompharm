@@ -124,37 +124,42 @@ async def get_production_flow(
         "object_id": request_id
     })
     
-    # Auto-create if not exists and request is in Stock Received status
+    # Auto-create if not exists and request is in Stock Received state (order >= 40)
     if not flow:
         try:
             request = db.depo_requests.find_one({"_id": ObjectId(request_id)})
-            if request and request.get('status') == 'Stock Received':
-                # Use existing production flow template
-                production_flow_id = ObjectId("694a1ae3297c9dde6d70661a")
-                existing_flow = db.approval_flows.find_one({"_id": production_flow_id})
+            if request and request.get('state_id'):
+                # Check if state is Stock Received or higher
+                states_collection = db['depo_requests_states']
+                state = states_collection.find_one({'_id': request['state_id']})
                 
-                if existing_flow:
-                    can_sign_officers = existing_flow.get('can_sign_officers', [])
-                    must_sign_officers = existing_flow.get('must_sign_officers', [])
+                if state and state.get('order', 0) >= 40 and state.get('order', 0) != 41:
+                    # Use existing production flow template
+                    production_flow_id = ObjectId("694a1ae3297c9dde6d70661a")
+                    existing_flow = db.approval_flows.find_one({"_id": production_flow_id})
                     
-                    production_flow_data = {
-                        "object_type": "stock_request_production",
-                        "object_source": "depo_request",
-                        "object_id": request_id,
-                        "flow_type": "production",
-                        "config_slug": existing_flow.get('config_slug', 'production'),
-                        "min_signatures": existing_flow.get('min_signatures', 1),
-                        "can_sign_officers": can_sign_officers,
-                        "must_sign_officers": must_sign_officers,
-                        "signatures": [],
-                        "status": "pending",
-                        "created_at": datetime.utcnow(),
-                        "updated_at": datetime.utcnow()
-                    }
-                    
-                    result = db.approval_flows.insert_one(production_flow_data)
-                    flow = db.approval_flows.find_one({"_id": result.inserted_id})
-                    print(f"[PRODUCTION] Auto-created production flow for request {request_id}")
+                    if existing_flow:
+                        can_sign_officers = existing_flow.get('can_sign_officers', [])
+                        must_sign_officers = existing_flow.get('must_sign_officers', [])
+                        
+                        production_flow_data = {
+                            "object_type": "stock_request_production",
+                            "object_source": "depo_request",
+                            "object_id": request_id,
+                            "flow_type": "production",
+                            "config_slug": existing_flow.get('config_slug', 'production'),
+                            "min_signatures": existing_flow.get('min_signatures', 1),
+                            "can_sign_officers": can_sign_officers,
+                            "must_sign_officers": must_sign_officers,
+                            "signatures": [],
+                            "status": "pending",
+                            "created_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow()
+                        }
+                        
+                        result = db.approval_flows.insert_one(production_flow_data)
+                        flow = db.approval_flows.find_one({"_id": result.inserted_id})
+                        print(f"[PRODUCTION] Auto-created production flow for request {request_id}")
         except Exception as e:
             print(f"[PRODUCTION] Failed to auto-create production flow: {e}")
     
