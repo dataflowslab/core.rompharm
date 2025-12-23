@@ -155,9 +155,20 @@ async def list_requests(
     for req in requests_list:
         req['_id'] = str(req['_id'])
         
-        # Convert state_id if present
-        if 'state_id' in req and isinstance(req['state_id'], ObjectId):
-            req['state_id'] = str(req['state_id'])
+        # Get state info from state_id and set status
+        if req.get('state_id'):
+            states_collection = db['depo_requests_states']
+            try:
+                state_id_obj = req['state_id'] if isinstance(req['state_id'], ObjectId) else ObjectId(req['state_id'])
+                state = states_collection.find_one({'_id': state_id_obj})
+                if state:
+                    # Set status from state name
+                    req['status'] = state.get('name', 'Unknown')
+                req['state_id'] = str(state_id_obj)
+            except Exception as e:
+                print(f"[ERROR] Failed to lookup state for request {req['_id']}: {e}")
+                if isinstance(req.get('state_id'), ObjectId):
+                    req['state_id'] = str(req['state_id'])
         
         # Convert source and destination ObjectIds to strings
         if req.get('source'):
@@ -171,6 +182,12 @@ async def list_requests(
                 req['destination'] = str(req['destination'])
             dest_id = req['destination']
             req['destination_name'] = location_map.get(dest_id, dest_id)
+        
+        # Convert recipe ObjectIds if present
+        if 'recipe_id' in req and isinstance(req['recipe_id'], ObjectId):
+            req['recipe_id'] = str(req['recipe_id'])
+        if 'recipe_part_id' in req and isinstance(req['recipe_part_id'], ObjectId):
+            req['recipe_part_id'] = str(req['recipe_part_id'])
         
         if 'created_at' in req and isinstance(req['created_at'], datetime):
             req['created_at'] = req['created_at'].isoformat()
