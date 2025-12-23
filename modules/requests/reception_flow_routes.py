@@ -127,6 +127,47 @@ async def sign_reception(
             }
         )
         print(f"[REQUESTS] Reception flow approved for request {request_id}")
+        
+        # Auto-create production flow when reception is approved
+        try:
+            existing_production_flow = db.approval_flows.find_one({
+                "object_type": "stock_request_production",
+                "object_id": request_id
+            })
+            
+            if not existing_production_flow:
+                # Use existing production flow ID from config
+                production_flow_id = ObjectId("694a1ae3297c9dde6d70661a")
+                
+                # Get the existing flow to copy its configuration
+                existing_flow = db.approval_flows.find_one({"_id": production_flow_id})
+                
+                if existing_flow:
+                    # Build officers lists from existing flow
+                    can_sign_officers = existing_flow.get('can_sign_officers', [])
+                    must_sign_officers = existing_flow.get('must_sign_officers', [])
+                    
+                    production_flow_data = {
+                        "object_type": "stock_request_production",
+                        "object_source": "depo_request",
+                        "object_id": request_id,
+                        "flow_type": "production",
+                        "config_slug": existing_flow.get('config_slug', 'production'),
+                        "min_signatures": existing_flow.get('min_signatures', 1),
+                        "can_sign_officers": can_sign_officers,
+                        "must_sign_officers": must_sign_officers,
+                        "signatures": [],
+                        "status": "pending",
+                        "created_at": timestamp,
+                        "updated_at": timestamp
+                    }
+                    
+                    db.approval_flows.insert_one(production_flow_data)
+                    print(f"[REQUESTS] Auto-created production flow for request {request_id}")
+                else:
+                    print(f"[REQUESTS] Warning: Production flow template {production_flow_id} not found")
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to auto-create production flow: {e}")
     
     # Get updated flow
     flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})

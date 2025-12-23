@@ -1,11 +1,37 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, NumberInput, Stack, Grid } from '@mantine/core';
-import { IconDeviceFloppy, IconSignature } from '@tabler/icons-react';
+import { Paper, Title, Text, Button, Group, Badge, Table, NumberInput, Stack, Grid, ActionIcon } from '@mantine/core';
+import { IconDeviceFloppy, IconSignature, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
+
+interface ApprovalOfficer {
+  type: string;
+  reference: string;
+  username: string;
+  action: string;
+}
+
+interface ApprovalSignature {
+  user_id: string;
+  username: string;
+  user_name?: string;
+  signed_at: string;
+  signature_hash: string;
+}
+
+interface ProductionFlow {
+  _id: string;
+  flow_type: string;
+  signatures: ApprovalSignature[];
+  status: string;
+  can_sign_officers: ApprovalOfficer[];
+  must_sign_officers: ApprovalOfficer[];
+  min_signatures: number;
+}
 
 interface ProductionData {
   _id?: string;
@@ -40,11 +66,13 @@ interface ProductionTabProps {
 
 export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
   const { t } = useTranslation();
-  const { username } = useAuth();
+  const { username, isStaff } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [signing, setSigning] = useState(false);
   const [batchCodes, setBatchCodes] = useState<string[]>([]);
   const [items, setItems] = useState<RequestItem[]>([]);
+  const [flow, setFlow] = useState<ProductionFlow | null>(null);
   const [productionData, setProductionData] = useState<ProductionData>({
     request_id: requestId,
     resulted: [],
@@ -53,7 +81,17 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
 
   useEffect(() => {
     loadData();
+    loadProductionFlow();
   }, [requestId]);
+
+  const loadProductionFlow = async () => {
+    try {
+      const response = await api.get(`/modules/requests/api/${requestId}/production-flow`);
+      setFlow(response.data.flow);
+    } catch (error) {
+      console.error('Failed to load production flow:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
