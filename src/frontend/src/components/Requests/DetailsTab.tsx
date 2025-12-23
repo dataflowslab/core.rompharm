@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal, TagsInput } from '@mantine/core';
+import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal, TagsInput, Paper } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
@@ -7,7 +7,7 @@ import { IconDeviceFloppy, IconTrash, IconPlus } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
-import { DocumentManager } from '../Common/DocumentManager';
+import { DocumentGenerator } from '../Common/DocumentGenerator';
 
 interface StockLocation {
   pk: number;
@@ -262,28 +262,21 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
 
   const canEdit = !hasSignatures && !checkingSignatures;
 
-  // Document templates configuration
-  const documentTemplates = [
-    {
-      code: '6LL5WVTR8BTY',
-      name: 'P-Distrib-102_F1',
-      label: t('P-Distrib-102_F1'),
-      disabled: request.status !== 'Approved',
-      disabledMessage: request.status !== 'Approved' ? t('Document can only be generated after approval') : undefined
-    }
-  ];
-
   return (
     <>
       <Grid gutter="md">
         {/* Left side - Documents (1/4 width) */}
         <Grid.Col span={3}>
-          <DocumentManager
-            entityId={request._id}
-            entityType="stock-request"
-            templates={documentTemplates}
-            onDocumentGenerated={onUpdate}
-          />
+          <Title order={5} mb="md">{t('Documents')}</Title>
+          <Paper withBorder p="sm" style={{ border: '1px solid #e9ecef' }}>
+            <DocumentGenerator
+              objectId={request._id}
+              templateCodes={['6LL5WVTR8BTY']}
+              templateNames={{
+                '6LL5WVTR8BTY': 'P-Distrib-102_F1'
+              }}
+            />
+          </Paper>
         </Grid.Col>
 
       {/* Right side - Form (3/4 width) */}

@@ -638,6 +638,339 @@ def can_edit_object(order, current_user, approval_flow):
 
 ---
 
+## 3. Workflow Level System
+
+### Overview
+The workflow level system provides incremental numeric levels (0, 50, 100, 150...) to track object lifecycle stages. Gaps between levels allow future insertions without breaking existing logic. This system is **global and reusable** across all modules.
+
+### Architecture
+
+```
+Object Created → workflow_level: 0 (Draft)
+    ↓ (save)
+workflow_level: 50 (Pending)
+    ↓ (approve)
+workflow_level: 100 (Approved)
+    ↓ (sign operations)
+workflow_level: 200 (Operations Signed)
+    ↓ (complete)
+workflow_level: 400 (Completed)
+```
+
+### Core Concept
+
+**Incremental Levels with Gaps:**
+- Levels: 0, 50, 100, 150, 200, 250, 300, 350, 400...
+- Gaps allow inserting new stages without renumbering
+- Example: Need stage between 100 and 150? Use 125
+
+**Negative Levels for Special States:**
+- `-1`: Refused
+- `-2`: Canceled
+
+### Database Schema
+
+Add `workflow_level` field to your collection:
+
+```javascript
+{
+  _id: ObjectId,
+  reference: "REQ-0001",
+  workflow_level: 100,        // Current workflow stage
+  status: "Approved",         // Human-readable status (derived from level)
+  // ... other fields
+}
+```
+
+### Backend Implementation
+
+#### Import WorkflowManager
+
+```python
+from src.backend.utils.workflow import WorkflowManager, REQUESTS_WORKFLOW
+```
+
+#### Define Custom Workflow
+
+```python
+# For a new module
+MY_WORKFLOW = WorkflowManager(
+    levels={
+        'DRAFT': 0,
+        'PENDING': 50,
+        'APPROVED': 100,
+        'COMPLETED': 200,
+        'REFUSED': -1
+    },
+    status_names={
+        0: 'Draft',
+        50: 'Pending',
+        100: 'Approved',
+        200: 'Completed',
+        -1: 'Refused'
+    }
+)
+```
+
+#### Use in Routes
+
+```python
+@router.post("/")
+async def create_object(data: ObjectCreate, current_user: dict = Depends(verify_token)):
+    db = get_db()
+    
+    # Create object with initial workflow level
+    obj_doc = {
+        'reference': generate_reference(db),
+        'workflow_level': MY_WORKFLOW.get_level('PENDING'),  # 50
+        'status': MY_WORKFLOW.get_status_name(50),           # 'Pending'
+        'created_at': datetime.utcnow()
+    }
+    
+    result = collection.insert_one(obj_doc)
+    return obj_doc
+
+@router.post("/{object_id}/approve")
+async def approve_object(object_id: str, current_user: dict = Depends(verify_token)):
+    db = get_db()
+    
+    # Get current object
+    obj = collection.find_one({'_id': ObjectId(object_id)})
+    current_level = obj.get('workflow_level', 0)
+    
+    # Move to next level
+    next_level = MY_WORKFLOW.get_next_level(current_level)
+    
+    collection.update_one(
+        {'_id': ObjectId(object_id)},
+        {
+            '$set': {
+                'workflow_level': next_level,
+                'status': MY_WORKFLOW.get_status_name(next_level),
+                'updated_at': datetime.utcnow()
+            }
+        }
+    )
+    
+    return {"workflow_level": next_level}
+
+@router.delete("/{object_id}/signatures/{user_id}")
+async def remove_signature(object_id: str, user_id: str, current_user: dict = Depends(verify_token)):
+    """When signature removed, rollback to previous level"""
+    db = get_db()
+    
+    obj = collection.find_one({'_id': ObjectId(object_id)})
+    current_level = obj.get('workflow_level', 0)
+    
+    # Rollback to previous level
+    previous_level = MY_WORKFLOW.get_previous_level(current_level)
+    
+    collection.update_one(
+        {'_id': ObjectId(object_id)},
+        {
+            '$set': {
+                'workflow_level': previous_level,
+                'status': MY_WORKFLOW.get_status_name(previous_level)
+            }
+        }
+    )
+    
+    return {"workflow_level": previous_level}
+```
+
+#### Check Permissions
+
+```python
+def can_edit_items(obj: dict) -> bool:
+    """Check if items can be edited"""
+    level = obj.get('workflow_level', 0)
+    return MY_WORKFLOW.is_at_or_before(level, 'PENDING')
+
+def can_edit_operations(obj: dict) -> bool:
+    """Check if operations can be edited"""
+    level = obj.get('workflow_level', 0)
+    return MY_WORKFLOW.is_between(level, 'APPROVED', 'OPERATIONS_SIGNED')
+```
+
+### Frontend Implementation
+
+#### Get Tab Visibility
+
+```typescript
+// In RequestDetailPage.tsx or similar
+const getTabVisibility = (workflowLevel: number) => {
+  return {
+    details: true,
+    approval: workflowLevel >= 50,      // PENDING
+    items: true,
+    operations: workflowLevel >= 100,   // APPROVED
+    reception: workflowLevel >= 250     // FINISHED
+  };
+};
+
+// Use in render
+const tabs = getTabVisibility(request.workflow_level);
+
+{tabs.operations && (
+  <Tabs.Tab value="operations">Operations</Tabs.Tab>
+)}
+```
+
+#### Check Edit Permissions
+
+```typescript
+const canEditItems = request.workflow_level < 100;  // Before APPROVED
+const canEditOperations = request.workflow_level >= 100 && request.workflow_level < 200;
+
+<Button disabled={!canEditItems}>Edit Items</Button>
+```
+
+### Pre-configured Workflows
+
+#### Requests Module Workflow
+
+```python
+from src.backend.utils.workflow import REQUESTS_WORKFLOW
+
+# Levels:
+# 0   - Draft
+# 50  - Pending
+# 100 - Approved
+# 150 - In Operations
+# 200 - Operations Signed
+# 250 - Finished
+# 300 - In Reception
+# 350 - Reception Signed
+# 400 - Completed
+# -1  - Refused
+# -2  - Canceled
+```
+
+#### Helper Functions
+
+```python
+from src.backend.utils.workflow import (
+    get_requests_tab_visibility,
+    get_requests_edit_permissions
+)
+
+# Get tab visibility
+tabs = get_requests_tab_visibility(workflow_level)
+# Returns: {'details': True, 'approval': True, 'items': True, ...}
+
+# Get edit permissions
+perms = get_requests_edit_permissions(workflow_level)
+# Returns: {'items': False, 'operations': True, 'reception': False}
+```
+
+### WorkflowManager API
+
+#### Core Methods
+
+```python
+wf = WorkflowManager(levels, status_names)
+
+# Get level from status string
+level = wf.get_level('Pending')  # Returns 50
+
+# Get status name from level
+name = wf.get_status_name(50)  # Returns 'Pending'
+
+# Navigate workflow
+next_level = wf.get_next_level(50)      # Returns 100
+prev_level = wf.get_previous_level(100)  # Returns 50
+
+# Check position
+is_before = wf.is_at_or_before(50, 'APPROVED')   # True (50 <= 100)
+is_after = wf.is_at_or_after(100, 'PENDING')     # True (100 >= 50)
+is_between = wf.is_between(100, 'PENDING', 'COMPLETED')  # True
+
+# Get all levels
+levels = wf.get_all_levels()  # [(0, 'Draft'), (50, 'Pending'), ...]
+```
+
+### Migration Strategy
+
+#### Add workflow_level to Existing Objects
+
+```python
+# Migration script
+from src.backend.utils.workflow import REQUESTS_WORKFLOW
+
+db = get_db()
+collection = db['depo_requests']
+
+# Update all objects based on current status
+for obj in collection.find():
+    status = obj.get('status', 'Pending')
+    workflow_level = REQUESTS_WORKFLOW.get_level(status)
+    
+    collection.update_one(
+        {'_id': obj['_id']},
+        {'$set': {'workflow_level': workflow_level}}
+    )
+```
+
+### Best Practices
+
+1. **Always use workflow_level for logic** - Don't rely on status strings
+2. **Status is derived from level** - Update both together
+3. **Use gaps (50, 100, 150)** - Allows future insertions
+4. **Negative for special states** - Refused (-1), Canceled (-2)
+5. **Rollback on signature removal** - Use `get_previous_level()`
+6. **Check permissions with levels** - `is_at_or_before()`, `is_between()`
+7. **Store level in database** - Don't calculate on-the-fly
+8. **Update level on state changes** - Approval, signing, completion
+
+### Example: Complete Flow
+
+```python
+# 1. Create object
+obj = {
+    'workflow_level': REQUESTS_WORKFLOW.get_level('PENDING'),  # 50
+    'status': 'Pending'
+}
+
+# 2. Approve
+current = obj['workflow_level']  # 50
+next_level = REQUESTS_WORKFLOW.get_next_level(current)  # 100
+obj['workflow_level'] = next_level
+obj['status'] = REQUESTS_WORKFLOW.get_status_name(next_level)  # 'Approved'
+
+# 3. Sign operations
+current = obj['workflow_level']  # 100
+next_level = REQUESTS_WORKFLOW.get_next_level(current)  # 150
+obj['workflow_level'] = next_level
+obj['status'] = 'In Operations'
+
+# 4. Remove signature (rollback)
+current = obj['workflow_level']  # 150
+prev_level = REQUESTS_WORKFLOW.get_previous_level(current)  # 100
+obj['workflow_level'] = prev_level
+obj['status'] = 'Approved'
+```
+
+### Adding New Stages
+
+Need a stage between Approved (100) and In Operations (150)?
+
+```python
+# Add new level at 125
+MY_WORKFLOW = WorkflowManager(
+    levels={
+        'PENDING': 50,
+        'APPROVED': 100,
+        'QUALITY_CHECK': 125,  # New stage!
+        'IN_OPERATIONS': 150,
+        'COMPLETED': 200
+    }
+)
+```
+
+No need to renumber existing levels!
+
+---
+
 ## Summary
 
 ### Document Generation

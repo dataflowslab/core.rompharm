@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-22 12:17:22
+**Last Updated:** 2025-12-23 07:19:47
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -236,24 +236,20 @@
 
 **Parts**
 - `GET /modules/requests/api/parts` - Get list of parts from MongoDB depo_parts with search
-- `GET /modules/requests/api/parts/{part_id}/batch-codes` - Get available batch codes for a part from InvenTree stock items
-- `GET /modules/requests/api/parts/{part_id}/bom` - Get BOM (Bill of Materials) for a part - returns sub-components
+- `GET /modules/requests/api/parts/{part_id}/batch-codes` - Get available batch codes for a part from MongoDB depo_stocks
+- `GET /modules/requests/api/parts/{part_id}/bom` - Get BOM (Bill of Materials) for a part from MongoDB depo_bom
 - `GET /modules/requests/api/parts/{part_id}/recipe` - Get recipe for a part (with fallback to BOM if no recipe exists)
 - `GET /modules/requests/api/parts/{part_id}/stock-info` - Get stock information for a part from MongoDB depo_stocks with batches
-- `GET /modules/requests/api/` - List all requests with location names
+- `GET /modules/requests/api/` - List all requests with location names from depo_locations
 - `POST /modules/requests/api/` - Create a new request
 
 **Stock Locations**
-- `GET /modules/requests/api/stock-locations` - Get list of stock locations from InvenTree
+- `GET /modules/requests/api/stock-locations` - Get list of stock locations from MongoDB depo_locations
 
 **{Request_Id}**
 - `DELETE /modules/requests/api/{request_id}` - Delete a request
-- `GET /modules/requests/api/{request_id}` - Get a specific request by ID with location and part details
+- `GET /modules/requests/api/{request_id}` - Get a specific request by ID with location and part details from MongoDB
 - `PATCH /modules/requests/api/{request_id}` - Update a request
-- `GET /modules/requests/api/{request_id}/approval-flow` - Get approval flow for a request
-- `POST /modules/requests/api/{request_id}/approval-flow` - Create approval flow for a request using config from MongoDB
-- `POST /modules/requests/api/{request_id}/sign` - Sign a request approval flow
-- `DELETE /modules/requests/api/{request_id}/signatures/{user_id}` - Remove signature from request approval flow (admin only)
 
 ---
 

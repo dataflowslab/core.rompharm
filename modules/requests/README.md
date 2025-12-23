@@ -1,6 +1,6 @@
 # Requests Module
 
-Version: 1.0.0
+Version: 1.0.7
 
 ## Description
 
@@ -17,6 +17,17 @@ Internal stock transfer request management system for DataFlows Core. Manages st
 - Document generation (Fisa de solicitare, Nota de transfer)
 - Batch code management
 - Status tracking (Pending, Approved, Finished, Completed, Refused)
+
+## Code Structure
+
+The module is organized into separate files for better maintainability:
+
+- `models.py` - Pydantic models for request validation
+- `utils.py` - Utility functions (headers, reference generation)
+- `services.py` - Business logic and external API calls
+- `approval_routes.py` - Approval flow endpoints
+- `routes.py` - Main API routes orchestrator
+- `tests/` - Unit tests
 
 ## API Endpoints
 
@@ -45,6 +56,36 @@ Internal stock transfer request management system for DataFlows Core. Manages st
 
 Approval flows configured in MongoDB `config` collection with slug `requests_operations_flow`.
 
+## Testing
+
+The module includes comprehensive unit tests using pytest.
+
+### Running Tests
+
+```bash
+# Run all tests for the requests module
+python -m pytest modules/requests/tests/ -v
+
+# Run specific test file
+python -m pytest modules/requests/tests/test_utils.py -v
+python -m pytest modules/requests/tests/test_models.py -v
+
+# Run with coverage
+python -m pytest modules/requests/tests/ --cov=modules.requests
+```
+
+### Test Coverage
+
+- **28 unit tests** covering models, utilities, and business logic
+- Tests for validation, error handling, and edge cases
+- Mock-based testing for database and external API calls
+
+### Test Files
+
+- `test_models.py` - Tests for Pydantic models (RequestItemCreate, RequestCreate, RequestUpdate)
+- `test_utils.py` - Tests for utility functions (get_inventree_headers, generate_request_reference)
+- `conftest.py` - Shared fixtures and test configuration
+
 ## Installation
 
 Module is automatically loaded when enabled in `config.yaml`:
@@ -53,4 +94,10 @@ Module is automatically loaded when enabled in `config.yaml`:
 modules:
   active:
     - requests
+```
+
+Install dependencies including testing tools:
+
+```bash
+pip install -r src/backend/requirements.txt
 ```

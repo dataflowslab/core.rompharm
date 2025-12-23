@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea, TextInput, Grid, NumberInput } from '@mantine/core';
-import { IconSignature, IconTrash, IconDeviceFloppy, IconFileText } from '@tabler/icons-react';
+import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea, Grid, NumberInput, Modal } from '@mantine/core';
+import { IconSignature, IconTrash, IconDeviceFloppy, IconPlus, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
+import { DocumentGenerator } from '../Common/DocumentGenerator';
 
 interface ApprovalOfficer {
   type: string;
@@ -38,16 +39,21 @@ interface BatchOption {
   label: string;
   expiry_date?: string;
   quantity?: number;
-  location?: string;
+}
+
+interface Part {
+  pk: number;
+  name: string;
+  IPN: string;
 }
 
 interface ItemWithBatch {
   part: number;
   part_name?: string;
   quantity: number;
-  series: string;
+  init_q: number;  // Initial requested quantity
   batch_code: string;
-  batch_options: BatchOption[];
+  added_in_operations?: boolean;  // Flag to identify items added in Operations
 }
 
 interface OperationsTabProps {
@@ -67,66 +73,22 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const [refusalReason, setRefusalReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [request, setRequest] = useState<any>(null);
+  
+  // Add Item Modal state
+  const [addItemModalOpened, setAddItemModalOpened] = useState(false);
+  const [parts, setParts] = useState<Part[]>([]);
+  const [partSearch, setPartSearch] = useState('');
+  const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
+  const [newItem, setNewItem] = useState({
+    part: '',
+    batch_code: '',
+    quantity: 1
+  });
 
   useEffect(() => {
     loadOperationsFlow();
     loadRequestItems();
   }, [requestId]);
-
-  // Generate Document Component
-  const GenerateDocumentButton = ({ requestId, reference }: { requestId: string; reference: string }) => {
-    const [generating, setGenerating] = useState(false);
-
-    const handleGenerate = async () => {
-      setGenerating(true);
-      try {
-        const response = await api.post(
-          '/api/documents/stock-request/generate',
-          {
-            request_id: requestId,
-            template_code: 'RC45WVTRBDGT',
-            template_name: 'P-Distrib-102_F2'
-          },
-          { responseType: 'blob' }
-        );
-
-        // Download PDF
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `Nota_Transfer_${reference}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-
-        notifications.show({
-          title: t('Success'),
-          message: t('Document generated successfully'),
-          color: 'green'
-        });
-      } catch (error: any) {
-        console.error('Failed to generate document:', error);
-        notifications.show({
-          title: t('Error'),
-          message: error.response?.data?.detail || t('Failed to generate document'),
-          color: 'red'
-        });
-      } finally {
-        setGenerating(false);
-      }
-    };
-
-    return (
-      <Button
-        leftSection={<IconFileText size={16} />}
-        onClick={handleGenerate}
-        loading={generating}
-      >
-        {t('Generate P-Distrib-102_F2')}
-      </Button>
-    );
-  };
 
   const loadOperationsFlow = async () => {
     try {
@@ -142,24 +104,25 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const loadRequestItems = async () => {
     try {
       const response = await api.get(requestsApi.getRequest(requestId));
-      setRequest(response.data); // Save request data
-      const items = response.data.items || [];
-      const sourceLocation = response.data.source;
+      setRequest(response.data);
       
-      // Initialize items with batch data
-      const itemsData: ItemWithBatch[] = await Promise.all(
-        items.map(async (item: any) => {
-          const batchOptions = await loadBatchCodes(item.part, sourceLocation);
-          return {
-            part: item.part,
-            part_name: item.part_detail?.name || String(item.part),
-            quantity: item.quantity,
-            series: item.series || '',
-            batch_code: item.batch_code || '',
-            batch_options: batchOptions
-          };
-        })
-      );
+      // Load saved operations decision
+      if (response.data.operations_result) {
+        setFinalStatus(response.data.operations_result);
+        setRefusalReason(response.data.operations_result_reason || '');
+      }
+      
+      const items = response.data.items || [];
+      
+      // Initialize items - save init_q if not already saved
+      const itemsData: ItemWithBatch[] = items.map((item: any) => ({
+        part: item.part,
+        part_name: item.part_detail?.name || String(item.part),
+        quantity: item.quantity,
+        init_q: item.init_q !== undefined ? item.init_q : item.quantity,
+        batch_code: item.batch_code || '',
+        added_in_operations: item.added_in_operations || false
+      }));
       
       // Sort items: non-zero quantities first, then zero quantities (grayed out)
       const sortedItems = itemsData.sort((a, b) => {
@@ -174,36 +137,126 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     }
   };
 
-  const loadBatchCodes = async (partId: number, locationId?: number): Promise<BatchOption[]> => {
+  const searchParts = async (query: string) => {
+    if (!query || query.length < 2) {
+      setParts([]);
+      return;
+    }
+    
     try {
-      const url = requestsApi.getPartBatchCodes(partId);
-      const params = locationId ? `?location_id=${locationId}` : '';
-      const response = await api.get(`${url}${params}`);
-      const batchCodes = response.data.batch_codes || [];
-      
-      return batchCodes.map((batch: any) => ({
-        value: batch.batch_code,
-        label: `${batch.batch_code} - ${batch.expiry_date || 'N/A'} - ${batch.quantity} buc`,
-        expiry_date: batch.expiry_date,
-        quantity: batch.quantity,
-        location: batch.location
-      }));
+      const response = await api.get(requestsApi.getParts(), {
+        params: { search: query }
+      });
+      const results = response.data.results || response.data || [];
+      setParts(results);
     } catch (error) {
-      console.error(`Failed to load batch codes for part ${partId}:`, error);
-      return [];
+      console.error('Failed to search parts:', error);
     }
   };
 
-  const handleSeriesChange = (index: number, value: string) => {
-    const newItems = [...itemsWithBatch];
-    newItems[index].series = value;
-    setItemsWithBatch(newItems);
+  const loadBatchCodes = async (partId: number) => {
+    if (!request || !request.source) {
+      setBatchOptions([]);
+      return;
+    }
+
+    try {
+      const url = requestsApi.getPartBatchCodes(partId);
+      const params = `?location_id=${request.source}`;
+      const response = await api.get(`${url}${params}`);
+      const batchCodes = response.data.batch_codes || [];
+      
+      const options = batchCodes.map((batch: any) => ({
+        value: batch.batch_code,
+        label: `${batch.batch_code} - ${batch.expiry_date || 'N/A'} - ${batch.quantity} buc`,
+        expiry_date: batch.expiry_date,
+        quantity: batch.quantity
+      }));
+      
+      setBatchOptions(options);
+    } catch (error) {
+      console.error(`Failed to load batch codes for part ${partId}:`, error);
+      setBatchOptions([]);
+    }
   };
 
-  const handleBatchChange = (index: number, value: string | null) => {
-    const newItems = [...itemsWithBatch];
-    newItems[index].batch_code = value || '';
-    setItemsWithBatch(newItems);
+  const handlePartSelect = (partId: string | null) => {
+    setNewItem({ ...newItem, part: partId || '', batch_code: '' });
+    setBatchOptions([]);
+    
+    if (partId) {
+      loadBatchCodes(parseInt(partId));
+    }
+  };
+
+  const handleAddItem = () => {
+    if (!newItem.part || !newItem.batch_code || !newItem.quantity) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please fill in all fields'),
+        color: 'red'
+      });
+      return;
+    }
+
+    const partDetail = parts.find(p => String(p.pk) === newItem.part);
+    const newItemData: ItemWithBatch = {
+      part: parseInt(newItem.part),
+      part_name: partDetail?.name || String(newItem.part),
+      quantity: newItem.quantity,
+      init_q: newItem.quantity,  // For new items, init_q = quantity
+      batch_code: newItem.batch_code,
+      added_in_operations: true  // Mark as added in Operations
+    };
+
+    setItemsWithBatch([...itemsWithBatch, newItemData]);
+    
+    // Reset form
+    setNewItem({ part: '', batch_code: '', quantity: 1 });
+    setPartSearch('');
+    setParts([]);
+    setBatchOptions([]);
+    setAddItemModalOpened(false);
+
+    notifications.show({
+      title: t('Success'),
+      message: t('Item added successfully'),
+      color: 'green'
+    });
+  };
+
+  const handleDeleteItem = (index: number) => {
+    const item = itemsWithBatch[index];
+    
+    if (!item.added_in_operations) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Cannot delete items not added in Operations'),
+        color: 'red'
+      });
+      return;
+    }
+
+    modals.openConfirmModal({
+      title: t('Delete Item'),
+      children: (
+        <Text size="sm">
+          {t('Are you sure you want to delete this item?')}
+        </Text>
+      ),
+      labels: { confirm: t('Delete'), cancel: t('Cancel') },
+      confirmProps: { color: 'red' },
+      onConfirm: () => {
+        const newItems = itemsWithBatch.filter((_, i) => i !== index);
+        setItemsWithBatch(newItems);
+        
+        notifications.show({
+          title: t('Success'),
+          message: t('Item deleted successfully'),
+          color: 'green'
+        });
+      }
+    });
   };
 
   const handleQuantityChange = (index: number, value: number) => {
@@ -219,24 +272,25 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         items: itemsWithBatch.map(item => ({
           part: item.part,
           quantity: item.quantity,
-          series: item.series,
-          batch_code: item.batch_code
+          init_q: item.init_q,
+          batch_code: item.batch_code,
+          added_in_operations: item.added_in_operations || false
         }))
       });
       
       notifications.show({
         title: t('Success'),
-        message: t('Series and batch data saved successfully'),
+        message: t('Items saved successfully'),
         color: 'green'
       });
 
       // Reload items to apply sorting
       await loadRequestItems();
     } catch (error: any) {
-      console.error('Failed to save batch data:', error);
+      console.error('Failed to save items:', error);
       notifications.show({
         title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to save batch data'),
+        message: error.response?.data?.detail || t('Failed to save items'),
         color: 'red'
       });
     } finally {
@@ -245,13 +299,11 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   };
 
   const handleSign = async () => {
-    // Validate that all items with quantity > 0 have series and batch
-    const itemsWithQuantity = itemsWithBatch.filter(item => item.quantity > 0);
-    const allItemsComplete = itemsWithQuantity.every(item => item.series && item.batch_code);
-    if (!allItemsComplete) {
+    // Check if decision is set
+    if (!finalStatus) {
       notifications.show({
         title: t('Error'),
-        message: t('Please fill in series and batch code for all items with quantity > 0 before signing'),
+        message: t('Please select a decision status before signing'),
         color: 'red'
       });
       return;
@@ -259,7 +311,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
     setSigning(true);
     try {
-      // Save batch data first
+      // Save items first
       await handleSaveBatchData();
       
       // Then sign
@@ -305,7 +357,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
             color: 'green'
           });
           
-          // Auto-refresh page to show/hide tabs
           setTimeout(() => {
             window.location.reload();
           }, 1000);
@@ -349,12 +400,13 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
       notifications.show({
         title: t('Success'),
-        message: t('Status updated successfully'),
+        message: t('Decision saved successfully'),
         color: 'green'
       });
 
-      setFinalStatus('');
-      setRefusalReason('');
+      // Don't clear the status - keep it visible
+      // Reload to get updated data
+      await loadRequestItems();
       onReload();
     } catch (error: any) {
       console.error('Failed to update status:', error);
@@ -397,12 +449,10 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const isFlowCompleted = () => {
     if (!flow) return false;
     
-    // Check if all must_sign have signed
     const allMustSigned = flow.must_sign_officers.every(officer =>
       flow.signatures.some(s => s.user_id === officer.reference)
     );
     
-    // Check if minimum signatures reached
     const signatureCount = flow.signatures.filter(s =>
       flow.can_sign_officers.some(o => o.reference === s.user_id)
     ).length;
@@ -417,6 +467,63 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   };
 
   const isFormReadonly = hasAnySignature();
+
+  // Group items by part and calculate totals
+  const getGroupedItems = () => {
+    // Group items by part_name
+    const grouped = itemsWithBatch.reduce((acc, item) => {
+      const key = item.part_name || String(item.part);
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(item);
+      return acc;
+    }, {} as Record<string, ItemWithBatch[]>);
+
+    // Sort groups alphabetically
+    const sortedKeys = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
+
+    // Separate zero and non-zero items
+    const nonZeroGroups: Array<{ key: string; items: ItemWithBatch[] }> = [];
+    const zeroGroups: Array<{ key: string; items: ItemWithBatch[] }> = [];
+
+    sortedKeys.forEach(key => {
+      const items = grouped[key];
+      const hasNonZero = items.some(item => item.quantity > 0);
+      
+      if (hasNonZero) {
+        nonZeroGroups.push({ key, items });
+      } else {
+        zeroGroups.push({ key, items });
+      }
+    });
+
+    return [...nonZeroGroups, ...zeroGroups];
+  };
+
+  // Check if a material group is complete (all requested quantities are fulfilled)
+  const isGroupComplete = (items: ItemWithBatch[]) => {
+    // Find the original item (not added in operations)
+    const originalItem = items.find(item => !item.added_in_operations);
+    if (!originalItem) return false;
+
+    // Sum quantities of all items with batch codes
+    const totalWithBatch = items
+      .filter(item => item.batch_code && item.batch_code.trim() !== '')
+      .reduce((sum, item) => sum + item.quantity, 0);
+
+    return totalWithBatch === originalItem.init_q;
+  };
+
+  // Check if all groups are complete
+  const areAllGroupsComplete = () => {
+    const groups = getGroupedItems();
+    const nonZeroGroups = groups.filter(group => 
+      group.items.some(item => item.quantity > 0)
+    );
+    
+    return nonZeroGroups.every(group => isGroupComplete(group.items));
+  };
 
   if (loading) {
     return <Paper p="md"><Text>{t('Loading...')}</Text></Paper>;
@@ -439,10 +546,277 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         </Badge>
       </Group>
 
+      {/* Warehouse Operations Table - First */}
+      <Paper withBorder p="md" mb="md">
+        <Group justify="space-between" mb="md">
+          <Group>
+            <Title order={5}>{t('Warehouse Operations')}</Title>
+            {areAllGroupsComplete() ? (
+              <IconCheck size={20} color="green" />
+            ) : (
+              <IconAlertTriangle size={20} color="orange" />
+            )}
+          </Group>
+          <Group>
+            {!isFormReadonly && (
+              <>
+                <Button
+                  leftSection={<IconPlus size={16} />}
+                  onClick={() => setAddItemModalOpened(true)}
+                  size="sm"
+                  variant="outline"
+                >
+                  {t('Add Item')}
+                </Button>
+                <Button
+                  leftSection={<IconDeviceFloppy size={16} />}
+                  onClick={handleSaveBatchData}
+                  loading={savingBatch}
+                  size="sm"
+                  variant="light"
+                >
+                  {t('Save')}
+                </Button>
+              </>
+            )}
+          </Group>
+        </Group>
+
+        <Table striped withTableBorder withColumnBorders>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>{t('Part')}</Table.Th>
+              <Table.Th style={{ width: '120px' }}>{t('Requested')}</Table.Th>
+              <Table.Th style={{ width: '120px' }}>{t('Qty')}</Table.Th>
+              <Table.Th>{t('Batch Code')}</Table.Th>
+              {!isFormReadonly && <Table.Th style={{ width: '60px' }}></Table.Th>}
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {getGroupedItems().map((group, groupIndex) => {
+              const isGroupZero = group.items.every(item => item.quantity === 0);
+              const groupComplete = isGroupComplete(group.items);
+              
+              return group.items.map((item, itemIndex) => {
+                const isZeroQuantity = item.quantity === 0;
+                const isOriginalItem = !item.added_in_operations;
+                const flatIndex = itemsWithBatch.findIndex(i => 
+                  i.part === item.part && 
+                  i.batch_code === item.batch_code && 
+                  i.added_in_operations === item.added_in_operations
+                );
+                
+                return (
+                  <Table.Tr key={`${groupIndex}-${itemIndex}`} style={{ opacity: isZeroQuantity ? 0.5 : 1 }}>
+                    <Table.Td style={{ color: isZeroQuantity ? '#868e96' : 'inherit' }}>
+                      {item.part_name}
+                    </Table.Td>
+                    <Table.Td>
+                      {isOriginalItem ? (
+                        <Text 
+                          size="sm" 
+                          fw={groupComplete ? 700 : 400}
+                          c={groupComplete ? 'green' : 'dimmed'}
+                        >
+                          {item.init_q}
+                        </Text>
+                      ) : (
+                        <Text size="sm" c="dimmed">-</Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      <NumberInput
+                        value={item.quantity}
+                        onChange={(value) => handleQuantityChange(flatIndex, Number(value) || 0)}
+                        disabled={isFormReadonly}
+                        min={0}
+                        size="xs"
+                      />
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" style={{ color: isZeroQuantity ? '#868e96' : 'inherit' }}>
+                        {item.batch_code || '-'}
+                      </Text>
+                    </Table.Td>
+                    {!isFormReadonly && (
+                      <Table.Td>
+                        {item.added_in_operations && (
+                          <ActionIcon
+                            color="red"
+                            variant="subtle"
+                            size="sm"
+                            onClick={() => handleDeleteItem(flatIndex)}
+                            title={t('Delete')}
+                          >
+                            <IconTrash size={14} />
+                          </ActionIcon>
+                        )}
+                      </Table.Td>
+                    )}
+                  </Table.Tr>
+                );
+              });
+            })}
+          </Table.Tbody>
+        </Table>
+
+        {isFormReadonly && (
+          <Text size="sm" c="orange" mt="md">
+            {t('This form is read-only because it has been signed.')}
+          </Text>
+        )}
+
+        {!isFormReadonly && (
+          <Text size="sm" c="dimmed" mt="md">
+            {t('Note: Set quantity to 0 for items not available. Use Add Item to add materials with batch codes from source location.')}
+          </Text>
+        )}
+      </Paper>
+
+      {/* Add Item Modal */}
+      <Modal
+        opened={addItemModalOpened}
+        onClose={() => {
+          setAddItemModalOpened(false);
+          setNewItem({ part: '', batch_code: '', quantity: 1 });
+          setPartSearch('');
+          setParts([]);
+          setBatchOptions([]);
+        }}
+        title={t('Add Item')}
+        size="md"
+      >
+        <Grid>
+          <Grid.Col span={12}>
+            <Select
+              label={t('Article')}
+              placeholder={t('Search for article...')}
+              data={parts.map(part => ({
+                value: String(part.pk),
+                label: `${part.name} (${part.IPN})`
+              }))}
+              value={newItem.part}
+              onChange={(value) => {
+                handlePartSelect(value);
+                setPartSearch(''); // Clear search to keep selected value visible
+              }}
+              onSearchChange={(query) => {
+                setPartSearch(query);
+                searchParts(query);
+              }}
+              searchValue={partSearch}
+              searchable
+              clearable
+              required
+            />
+          </Grid.Col>
+
+          <Grid.Col span={12}>
+            <Select
+              label={t('Batch Code')}
+              placeholder={t('Select batch code...')}
+              data={batchOptions}
+              value={newItem.batch_code}
+              onChange={(value) => setNewItem({ ...newItem, batch_code: value || '' })}
+              disabled={!newItem.part}
+              searchable
+              required
+            />
+          </Grid.Col>
+
+          <Grid.Col span={12}>
+            <NumberInput
+              label={t('Quantity')}
+              placeholder="1"
+              value={newItem.quantity}
+              onChange={(value) => setNewItem({ ...newItem, quantity: Number(value) || 1 })}
+              min={1}
+              step={1}
+              required
+            />
+          </Grid.Col>
+        </Grid>
+
+        <Group justify="flex-end" mt="md">
+          <Button variant="default" onClick={() => {
+            setAddItemModalOpened(false);
+            setNewItem({ part: '', batch_code: '', quantity: 1 });
+            setPartSearch('');
+            setParts([]);
+            setBatchOptions([]);
+          }}>
+            {t('Cancel')}
+          </Button>
+          <Button onClick={handleAddItem}>
+            {t('Add')}
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* Bottom Section: 1/3 Documents + 2/3 Signatures */}
       <Grid gutter="md">
-        {/* Top Left - Signatures */}
-        <Grid.Col span={6}>
+        {/* Left - Documents (1/3) */}
+        <Grid.Col span={4}>
+          <Paper withBorder p="md" style={{ border: '1px solid #dee2e6' }}>
+            <Title order={5} mb="md">{t('Documents')}</Title>
+            <Paper withBorder p="sm" style={{ border: '1px solid #e9ecef' }}>
+              <DocumentGenerator
+                objectId={requestId}
+                templateCodes={['RC45WVTRBDGT']}
+                templateNames={{
+                  'RC45WVTRBDGT': 'P-Distrib-102_F2'
+                }}
+              />
+            </Paper>
+          </Paper>
+        </Grid.Col>
+
+        {/* Right - Decision & Signatures (2/3) */}
+        <Grid.Col span={8}>
           <Paper withBorder p="md">
+            {/* Decision Section - ALWAYS VISIBLE */}
+            <Title order={5} mb="md">{t('Decision')}</Title>
+            
+            <Select
+              label={t('Status')}
+              placeholder={t('Select status')}
+              data={[
+                { value: 'Finished', label: t('Finished') },
+                { value: 'Refused', label: t('Refused') }
+              ]}
+              value={finalStatus}
+              onChange={(value) => setFinalStatus(value || '')}
+              required
+              mb="md"
+              disabled={isFlowCompleted()}
+            />
+
+            {finalStatus === 'Refused' && (
+              <Textarea
+                label={t('Reason for Refusal')}
+                placeholder={t('Enter reason for refusal')}
+                value={refusalReason}
+                onChange={(e) => setRefusalReason(e.target.value)}
+                required
+                minRows={3}
+                mb="md"
+                disabled={isFlowCompleted()}
+              />
+            )}
+
+            {finalStatus && !isFlowCompleted() && (
+              <Group justify="flex-end" mb="xl">
+                <Button
+                  onClick={handleSubmitStatus}
+                  loading={submitting}
+                  color={finalStatus === 'Finished' ? 'green' : 'red'}
+                >
+                  {t('Save Decision')}
+                </Button>
+              </Group>
+            )}
+
+            {/* Signatures Section */}
             <Group justify="space-between" mb="md">
               <Title order={5}>{t('Signatures')}</Title>
               {canUserSign() && !isFlowCompleted() && (
@@ -532,143 +906,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
             )}
           </Paper>
         </Grid.Col>
-
-        {/* Top Right - Decision */}
-        <Grid.Col span={6}>
-          {isFlowCompleted() && (
-            <Paper withBorder p="md">
-              <Title order={5} mb="md">{t('Decision')}</Title>
-              
-              <Select
-                label={t('Status')}
-                placeholder={t('Select status')}
-                data={[
-                  { value: 'Finished', label: t('Finished') },
-                  { value: 'Refused', label: t('Refused') }
-                ]}
-                value={finalStatus}
-                onChange={(value) => setFinalStatus(value || '')}
-                required
-                mb="md"
-              />
-
-              {finalStatus === 'Refused' && (
-                <Textarea
-                  label={t('Reason for Refusal')}
-                  placeholder={t('Enter reason for refusal')}
-                  value={refusalReason}
-                  onChange={(e) => setRefusalReason(e.target.value)}
-                  required
-                  minRows={3}
-                  mb="md"
-                />
-              )}
-
-              {finalStatus && (
-                <Group justify="flex-end">
-                  <Button
-                    onClick={handleSubmitStatus}
-                    loading={submitting}
-                    color={finalStatus === 'Finished' ? 'green' : 'red'}
-                  >
-                    {t('Submit')}
-                  </Button>
-                </Group>
-              )}
-            </Paper>
-          )}
-        </Grid.Col>
-
-        {/* Bottom - Series and Batch Information Table (Full Width) */}
-        <Grid.Col span={12}>
-          <Paper withBorder p="md">
-            <Group justify="space-between" mb="md">
-              <Title order={5}>{t('Series and Batch Information')}</Title>
-              {!isFormReadonly && (
-                <Button
-                  leftSection={<IconDeviceFloppy size={16} />}
-                  onClick={handleSaveBatchData}
-                  loading={savingBatch}
-                  size="sm"
-                  variant="light"
-                >
-                  {t('Save')}
-                </Button>
-              )}
-            </Group>
-
-            <Table striped withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('Part')}</Table.Th>
-                  <Table.Th style={{ width: '120px' }}>{t('Qty')}</Table.Th>
-                  <Table.Th>{t('Series')}</Table.Th>
-                  <Table.Th style={{ width: '300px' }}>{t('Batch Code')}</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {itemsWithBatch.map((item, index) => {
-                  const isZeroQuantity = item.quantity === 0;
-                  return (
-                    <Table.Tr key={index} style={{ opacity: isZeroQuantity ? 0.5 : 1 }}>
-                      <Table.Td style={{ color: isZeroQuantity ? '#868e96' : 'inherit' }}>
-                        {item.part_name}
-                      </Table.Td>
-                      <Table.Td>
-                        <NumberInput
-                          value={item.quantity}
-                          onChange={(value) => handleQuantityChange(index, Number(value) || 0)}
-                          disabled={isFormReadonly}
-                          min={0}
-                          size="xs"
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <TextInput
-                          value={item.series}
-                          onChange={(e) => handleSeriesChange(index, e.target.value)}
-                          disabled={isFormReadonly || isZeroQuantity}
-                          placeholder={t('Enter series')}
-                          size="xs"
-                        />
-                      </Table.Td>
-                      <Table.Td>
-                        <Select
-                          value={item.batch_code}
-                          onChange={(value) => handleBatchChange(index, value)}
-                          disabled={isFormReadonly || isZeroQuantity}
-                          placeholder={t('Select batch code')}
-                          data={item.batch_options}
-                          searchable
-                          clearable
-                          size="xs"
-                        />
-                      </Table.Td>
-                    </Table.Tr>
-                  );
-                })}
-              </Table.Tbody>
-            </Table>
-
-            {isFormReadonly && (
-              <Text size="sm" c="orange" mt="md">
-                {t('This form is read-only because it has been signed.')}
-              </Text>
-            )}
-          </Paper>
-        </Grid.Col>
       </Grid>
-
-      {/* Document Generation Section */}
-      {!isFormReadonly && (
-        <Paper withBorder p="md" mt="md">
-          <Group justify="space-between" mb="md">
-            <Title order={5}>{t('Documents')}</Title>
-          </Group>
-          
-          <GenerateDocumentButton requestId={requestId} reference={request?.reference || requestId} />
-        </Paper>
-      )}
     </Paper>
   );
 }

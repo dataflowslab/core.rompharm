@@ -1,5 +1,309 @@
 # Changelog - Requests Module
 
+## Version 1.0.19 - Complete InvenTree Decoupling
+
+### Changed
+- **Removed All InvenTree Dependencies**: Completely eliminated InvenTree API calls from requests module
+  - BOM data now loaded from MongoDB `depo_bom` collection
+  - Recipe fallback now uses MongoDB BOM instead of InvenTree BOM
+  - All data sources are now MongoDB only
+
+### Technical Details
+- `fetch_part_bom()` - Now queries `depo_bom` collection with `part_id` (ObjectId)
+- `fetch_part_recipe()` - Fallback changed from InvenTree BOM to MongoDB `depo_bom`
+- Returns `source: "none"` when neither recipe nor BOM found
+- No more HTTP requests to InvenTree API
+
+### MongoDB Collections Used
+- `depo_locations` - Stock locations
+- `depo_parts` - Parts catalog
+- `depo_stocks` - Stock levels and batch codes
+- `depo_bom` - Bill of Materials
+- `depo_recipes` - Production recipes
+- `depo_requests` - Stock transfer requests
+- `approval_flows` - Approval workflows
+
+### Removed
+- All InvenTree API calls (`/api/stock/location/`, `/api/part/`, `/api/bom/`)
+- InvenTree BOM fallback in `fetch_part_recipe()`
+- Dependency on InvenTree for any request operations
+
+## Version 1.0.18 - Part Details from MongoDB
+
+### Changed
+- **Part Details Source**: `get_request()` now loads part details from MongoDB `depo_parts` instead of InvenTree
+  - Eliminates HTTP requests to InvenTree for part information
+  - Faster response times
+  - Consistent with other MongoDB-based data
+
+### Technical Details
+- Part details loaded from `depo_parts` collection using integer `id` field
+- Returns: pk, name, IPN, description, active, assembly, component, purchaseable, salable, trackable, virtual
+- No more `/api/part/{id}/` calls to InvenTree for request details
+
+### InvenTree Usage Remaining
+- **BOM Endpoint** (`/parts/{part_id}/bom`) - Still uses InvenTree (BOM data not in MongoDB)
+- **Recipe Fallback** (`/parts/{part_id}/recipe`) - Uses MongoDB recipes with InvenTree BOM fallback
+- These are intentional and necessary for BOM functionality
+
+## Version 1.0.17 - ObjectId Serialization Fix
+
+### Fixed
+- **ObjectId Serialization Error**: Fixed `ValueError: 'ObjectId' object is not iterable` when loading requests
+  - Convert `source` and `destination` ObjectIds to strings in `list_requests()`
+  - Convert `source` and `destination` ObjectIds to strings in `get_request()`
+  - Convert `source` and `destination` ObjectIds to strings in `update_request()`
+  - Convert `recipe_id` and `recipe_part_id` ObjectIds to strings
+
+- **Location Details from MongoDB**: Updated `get_request()` to use `depo_locations` instead of InvenTree
+  - Fetch location details from MongoDB `depo_locations` collection
+  - Return location `code` as `name` for consistency
+
+### Technical Details
+- All ObjectIds converted to strings before JSON serialization
+- Location lookups now use MongoDB instead of InvenTree API
+- Handles both ObjectId and string formats for backward compatibility
+
+## Version 1.0.16 - Operations Add Item Modal Fixes
+
+### Fixed
+- **Article Select Disappearing**: Fixed issue where selected article disappeared when clicking on Batch Code field
+  - Clear search value after selection to keep selected value visible
+  - Added `clearable` prop to Article Select
+
+- **Batch Codes Not Loading**: Fixed batch codes not loading from source location
+  - Updated `fetch_part_batch_codes` to query MongoDB `depo_stocks` instead of InvenTree
+  - Changed `location_id` parameter from `int` to `str` (ObjectId)
+  - Query now uses ObjectId for location filtering
+  - Only returns transferable stock (state_id = 694322878728e4d75ae72790)
+
+### Changed
+- **Batch Codes Source**: Now loads from MongoDB depo_stocks
+  - Filters by part_id (ObjectId), location_id (ObjectId), and transferable state
+  - Groups by batch_code and aggregates quantities
+  - Returns batch_code, expiry_date, quantity, location_id
+
+### Technical Details
+- `fetch_part_batch_codes` signature: `location_id: Optional[int]` → `Optional[str]`
+- Query: `depo_stocks.find({part_id: ObjectId, location_id: ObjectId, state_id: ObjectId, quantity: {$gt: 0}})`
+- Article Select: Added `setPartSearch('')` on selection to prevent value disappearing
+
+## Version 1.0.15 - DocumentGenerator Performance Optimization
+
+### Fixed
+- **Multiple API Requests**: Fixed DocumentGenerator making excessive requests to `/api/documents/for/{objectId}`
+  - Added `useRef` to track last loaded objectId
+  - Only reloads when objectId actually changes
+  - Prevents duplicate loads on component re-renders
+
+### Changed
+- **useEffect Dependencies**: Optimized to only depend on `objectId`, not `templateCodes`
+  - Reduces unnecessary re-renders
+  - Template codes are static per component instance
+
+### Technical Details
+- Added `loadedRef` to cache last loaded objectId
+- Console log added for debugging: `[DocumentGenerator] Loading for objectId: {id}`
+- No functional changes - only performance optimization
+
+## Version 1.0.14 - Location ObjectIds from depo_locations
+
+### Changed
+- **Source and Destination**: Now use ObjectIds from `depo_locations` instead of integers from InvenTree
+  - Changed from `int` to `str` (ObjectId) in models
+  - Location names use `code` field from `depo_locations`
+  - All location lookups now query MongoDB instead of InvenTree API
+
+### Fixed
+- **Stock Location Loading**: Fixed to use `depo_locations` collection
+  - `fetch_stock_locations()` now queries MongoDB
+  - Returns ObjectId as `pk` and `code` as `name`
+  - Consistent with other MongoDB collections
+
+### Migration
+- **Update Script**: Created `update_requests_locations.py` to migrate existing requests
+  - Updates all `source` and `destination` fields to ObjectIds
+  - Default values: 
+    - source: `693fb21371d731f72ad6544a`
+    - destination: `69418ede71d731f72ad65483`
+
+### Technical Details
+- `RequestCreate.source`: `int` → `str` (ObjectId)
+- `RequestCreate.destination`: `int` → `str` (ObjectId)
+- `RequestUpdate.source`: `Optional[int]` → `Optional[str]`
+- `RequestUpdate.destination`: `Optional[int]` → `Optional[str]`
+- Location lookups use `depo_locations._id` (ObjectId)
+- Location display uses `depo_locations.code` field
+
+## Version 1.0.13 - Operations Tab Add/Delete Items
+
+### Added
+- **Add Item in Operations**: New functionality to add items directly in Operations tab
+  - Button "Add Item" visible when not signed
+  - Modal with fields: Article (searchable), Batch Code (from source location), Quantity
+  - Batch codes filtered by selected article and source location
+  - Items marked with `added_in_operations: true` flag
+
+- **Delete Item in Operations**: Delete button for items added in Operations
+  - Only items with `added_in_operations: true` can be deleted
+  - Items from original request or Items tab cannot be deleted
+  - Confirmation modal before deletion
+
+### Changed
+- **Table Columns**: Added Delete column (visible only when not signed)
+- **Batch Code Source**: Add Item loads batch codes from **source location** (not destination)
+- **Item Tracking**: New `added_in_operations` field to distinguish item origin
+
+### Technical Details
+- `added_in_operations` field added to RequestItemCreate model
+- Default value: `false`
+- Set to `true` only for items added via Operations tab
+- Preserved during updates
+- Delete button only shown for items with `added_in_operations: true`
+
+### Workflow
+1. **Add Item**: Article → Batch Code (from source) → Quantity → Add
+2. **Edit Quantity**: All items can have quantity edited
+3. **Delete**: Only items added in Operations can be deleted
+4. **Save**: Saves all changes (quantities + new items)
+5. **Sign**: Locks the form (no more add/delete/edit)
+
+## Version 1.0.12 - UI Consistency and Document Generator
+
+### Fixed
+- **Details Tab Documents Border**: Added subtle border around DocumentGenerator
+  - Consistent with Operations tab styling
+  - Better visual separation with Paper component
+
+### Verified
+- **Operations Tab**: Confirmed using global DocumentGenerator component
+  - Not custom implementation
+  - Consistent across all tabs
+
+### Technical Details
+- DocumentGenerator does not auto-poll continuously
+- Only checks status after generation (2s initial, then 3s intervals if processing)
+- Manual refresh button available for user-initiated status checks
+- Single request per document on page load
+
+## Version 1.0.11 - Operations Tab Redesign
+
+### Changed
+- **Operations Tab - No Batch Selection**: Removed batch code selector from Operations
+  - Operators can only edit quantities
+  - Batch codes are displayed as read-only text
+  - If materials are not available, operator sets quantity to 0
+  - Materials can be re-added with batch codes in Items tab
+
+### Added
+- **Initial Quantity Tracking**: New `init_q` field in items
+  - Saves the originally requested quantity
+  - Displayed in "Requested" column in Operations tab
+  - Allows comparison between requested vs actual quantities
+  - Auto-populated on request creation
+
+### Fixed
+- **Document Generator Border**: Added subtle border around document generator section
+  - Nested Paper component with thin border
+  - Better visual separation
+
+### Layout Changes
+- **Operations Table Columns**:
+  - Part (Material name)
+  - Requested (init_q - read-only)
+  - Qty (editable quantity)
+  - Batch Code (read-only text)
+
+### Technical Details
+- `init_q` field added to RequestItemCreate model
+- Auto-populated with `quantity` value on request creation
+- Preserved during updates
+- No validation required for signing (quantities can be 0)
+- Simplified workflow: adjust quantities only, batch codes managed in Items tab
+
+## Version 1.0.10 - Operations Tab Improvements
+
+### Changed
+- **Warehouse Operations Table**: Renamed from "Series and Batch Information" and moved to top
+  - Now appears first in the Operations tab
+  - Removed "Series" column completely
+  - Only "Part", "Qty", and "Batch Code" columns remain
+  - Batch codes now load from **destination location** (not source)
+
+### Fixed
+- **Batch Codes Loading**: Fixed issue where batch codes weren't loading for some materials
+  - Changed from source location to destination location
+  - Now correctly shows all available batch codes at destination
+
+### Removed
+- **Series Column**: Completely removed from Operations tab
+  - Removed from interface
+  - Removed from validation logic
+  - Removed from save operations
+  - Only batch code validation remains
+
+### Layout Changes
+- **New Layout Structure**:
+  - Top: Warehouse Operations table (full width)
+  - Bottom Left (1/3): Document Generator
+  - Bottom Right (2/3): Signatures and Decision
+
+### Technical Details
+- Validation now only checks for batch_code (not series)
+- Batch codes fetched using `destination` location ID
+- DocumentGenerator component integrated for P-Distrib-102_F2
+- Cleaner, more focused interface
+
+## Version 1.0.9 - Document Generator Integration
+
+### Changed
+- **Document Component**: Replaced `DocumentManager` with global `DocumentGenerator` component
+  - Now uses the standard document generation system from MUST_KNOW.md
+  - Consistent with other modules (procurement, etc.)
+  - Template code: `6LL5WVTR8BTY` for "P-Distrib-102_F1"
+
+### Technical Details
+- `DocumentGenerator` uses `/api/documents/*` endpoints
+- Auto-polling for document status
+- Supports download, delete, and regenerate actions
+- Template names loaded from backend configuration
+
+## Version 1.0.8 - Operations Flow Endpoints Fix
+
+### Fixed
+- **Operations Flow 404 Error**: Added missing operations flow endpoints
+  - `GET /{request_id}/operations-flow` - Get operations flow
+  - `POST /{request_id}/operations-sign` - Sign operations flow
+  - `DELETE /{request_id}/operations-signatures/{user_id}` - Remove operations signature
+  - Endpoints were being called by frontend but were not defined in backend
+
+### Technical Details
+- Operations flow endpoints follow same pattern as approval flow
+- Use `object_type: "stock_request_operations"` to differentiate from approval flow
+- Auto-created when request is approved
+- Updates request status to "In Operations" when operations flow is approved
+
+## Version 1.0.7 - Code Refactoring
+
+### Changed
+- **Code Organization**: Refactored monolithic `routes.py` into modular structure
+  - Created `models.py` for Pydantic models (RequestItemCreate, RequestCreate, RequestUpdate)
+  - Created `utils.py` for utility functions (get_inventree_headers, generate_request_reference)
+  - Created `services.py` for business logic and external API calls
+  - Created `approval_routes.py` for approval flow endpoints
+  - Main `routes.py` now acts as orchestrator with cleaner structure
+
+### Fixed
+- **Missing Route**: Added `@router.get("/parts/{part_id}/recipe")` decorator for `get_part_recipe` function
+  - Function was defined but not exposed as an endpoint
+  - Now properly accessible at `/modules/requests/api/parts/{part_id}/recipe`
+
+### Technical Details
+- Separated concerns: models, utilities, services, and routes
+- Improved maintainability and testability
+- Reduced file size from 800+ lines to ~300 lines per file
+- All functionality preserved, no breaking changes
+
 ## Version 1.0.6 - Recipe Integration and UX Improvements
 
 ### Added

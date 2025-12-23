@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Group, Stack, Badge, Text, ActionIcon } from '@mantine/core';
 import { IconFileTypePdf, IconDownload, IconRefresh, IconCheck, IconX } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -28,13 +28,18 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
   const [templates, setTemplates] = useState<Record<string, { code: string; name: string }>>({});
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   const [checking, setChecking] = useState<Record<string, boolean>>({});
+  const loadedRef = useRef<string | null>(null); // Track last loaded objectId
 
   useEffect(() => {
-    if (templateCodes.length > 0) {
+    // Only load if objectId changed and we have template codes
+    if (templateCodes.length > 0 && loadedRef.current !== objectId) {
+      console.log('[DocumentGenerator] Loading for objectId:', objectId);
+      loadedRef.current = objectId;
       loadTemplates();
       loadDocuments();
     }
-  }, [objectId, templateCodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objectId]); // Only reload when objectId changes, not templateCodes
 
   const loadTemplates = async () => {
     // If templateNames provided, use them directly

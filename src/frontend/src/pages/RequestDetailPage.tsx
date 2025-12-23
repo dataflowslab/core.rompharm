@@ -123,7 +123,7 @@ export function RequestDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconList size={16} />}>
             {t('Items')}
           </Tabs.Tab>
-          {request.status === 'Approved' && (
+          {(request.status === 'Approved' || request.status === 'In Operations' || request.status === 'Finished') && (
             <Tabs.Tab value="operations" leftSection={<IconTruck size={16} />}>
               {t('Operations')}
             </Tabs.Tab>
@@ -147,7 +147,7 @@ export function RequestDetailPage() {
           {id && request && <ItemsTab requestId={id} request={request} onReload={loadRequest} />}
         </Tabs.Panel>
 
-        {request.status === 'Approved' && (
+        {(request.status === 'Approved' || request.status === 'In Operations' || request.status === 'Finished') && (
           <Tabs.Panel value="operations" pt="md">
             {id && <OperationsTab requestId={id} onReload={loadRequest} />}
           </Tabs.Panel>
