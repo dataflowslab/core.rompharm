@@ -62,7 +62,7 @@ async def save_production_data(
     timestamp = datetime.utcnow()
     
     if existing:
-        # Update existing
+        # Update existing - preserve other fields
         update_data = {
             'updated_at': timestamp,
             'updated_by': current_user.get('username')
@@ -70,9 +70,17 @@ async def save_production_data(
         
         if 'resulted' in body:
             update_data['resulted'] = body['resulted']
+        else:
+            # Preserve existing resulted if not in body
+            if 'resulted' in existing:
+                update_data['resulted'] = existing['resulted']
         
         if 'unused' in body:
             update_data['unused'] = body['unused']
+        else:
+            # Preserve existing unused if not in body
+            if 'unused' in existing:
+                update_data['unused'] = existing['unused']
         
         db.depo_production.update_one(
             {'_id': existing['_id']},
