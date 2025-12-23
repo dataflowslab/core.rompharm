@@ -84,32 +84,32 @@ async def get_part_stock_info_route(
 
 @router.get("/parts/{part_id}/bom")
 async def get_part_bom(
-    part_id: int,
+    part_id: str,
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
-    """Get BOM (Bill of Materials) for a part from MongoDB depo_bom"""
+    """Get BOM (Bill of Materials) for a part from MongoDB depo_bom using ObjectId"""
     return await fetch_part_bom(current_user, part_id, db)
 
 
 @router.get("/parts/{part_id}/batch-codes")
 async def get_part_batch_codes(
-    part_id: int,
+    part_id: str,
     location_id: Optional[str] = None,
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
-    """Get available batch codes for a part from MongoDB depo_stocks"""
+    """Get available batch codes for a part from MongoDB depo_stocks using ObjectId"""
     return await fetch_part_batch_codes(current_user, part_id, location_id, db)
 
 
 @router.get("/parts/{part_id}/recipe")
 async def get_part_recipe(
-    part_id: int,
+    part_id: str,
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
-    """Get recipe for a part (with fallback to BOM if no recipe exists)"""
+    """Get recipe for a part (with fallback to BOM if no recipe exists) using ObjectId"""
     return await fetch_part_recipe(db, current_user, part_id)
 
 

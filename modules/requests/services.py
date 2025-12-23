@@ -165,21 +165,19 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock info: {str(e)}")
 
 
-async def fetch_part_bom(current_user: dict, part_id: int, db=None) -> Dict[str, Any]:
-    """Get BOM (Bill of Materials) for a part from MongoDB depo_bom"""
+async def fetch_part_bom(current_user: dict, part_id: str, db=None) -> Dict[str, Any]:
+    """Get BOM (Bill of Materials) for a part from MongoDB depo_bom using ObjectId"""
     from src.backend.utils.db import get_db
     
     if db is None:
         db = get_db()
     
     try:
-        # Get the part from depo_parts to get its _id (ObjectId)
-        part = db.depo_parts.find_one({"id": part_id})
-        
-        if not part:
+        # Convert part_id string to ObjectId
+        try:
+            part_oid = ObjectId(part_id)
+        except:
             return {"results": []}
-        
-        part_oid = part.get("_id")
         
         # Get BOM items from depo_bom collection
         bom_items = list(db.depo_bom.find({"part_id": part_oid}))
@@ -214,21 +212,19 @@ async def fetch_part_bom(current_user: dict, part_id: int, db=None) -> Dict[str,
         raise HTTPException(status_code=500, detail=f"Failed to fetch BOM: {str(e)}")
 
 
-async def fetch_part_batch_codes(current_user: dict, part_id: int, location_id: Optional[str] = None, db=None) -> Dict[str, Any]:
-    """Get available batch codes for a part from MongoDB depo_stocks"""
+async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: Optional[str] = None, db=None) -> Dict[str, Any]:
+    """Get available batch codes for a part from MongoDB depo_stocks using ObjectId"""
     from src.backend.utils.db import get_db
     
     if db is None:
         db = get_db()
     
     try:
-        # Get the part from depo_parts to get its _id (ObjectId)
-        part = db.depo_parts.find_one({"id": part_id})
-        
-        if not part:
+        # Convert part_id string to ObjectId
+        try:
+            part_oid = ObjectId(part_id)
+        except:
             return {"batch_codes": []}
-        
-        part_oid = part.get("_id")  # This is the ObjectId
         
         # Transferable state_id (quarantined and transferable)
         transferable_state_id = ObjectId('694322878728e4d75ae72790')
@@ -275,18 +271,16 @@ async def fetch_part_batch_codes(current_user: dict, part_id: int, location_id: 
         raise HTTPException(status_code=500, detail=f"Failed to fetch batch codes: {str(e)}")
 
 
-async def fetch_part_recipe(db, current_user: dict, part_id: int) -> Dict[str, Any]:
+async def fetch_part_recipe(db, current_user: dict, part_id: str) -> Dict[str, Any]:
     """
     Get recipe for a part (with fallback to BOM if no recipe exists)
-    Uses part_id (ObjectId) from depo_parts
+    Uses part_id as ObjectId string
     """
-    # Get the part from depo_parts to get its _id (ObjectId)
-    part = db.depo_parts.find_one({"id": part_id})
-    
-    if not part:
-        raise HTTPException(status_code=404, detail="Part not found")
-    
-    part_oid = part.get("_id")  # This is the ObjectId
+    # Convert part_id string to ObjectId
+    try:
+        part_oid = ObjectId(part_id)
+    except:
+        raise HTTPException(status_code=404, detail="Invalid part ID")
 
     # Try to get recipe from depo_recipes using part_id (ObjectId)
     recipe = db.depo_recipes.find_one({"part_id": part_oid})
