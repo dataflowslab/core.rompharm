@@ -17,7 +17,7 @@ interface ComponentBatchSelection {
 }
 
 interface Component {
-  part: number;
+  part_id: string;  // ObjectId string
   name: string;
   IPN: string;
   quantity: number;
@@ -57,9 +57,9 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
           // Alternative group
           const alternativesWithBatches = await Promise.all(
             item.alternatives.map(async (alt: any) => {
-              const batches = await loadBatches(alt.part);
+              const batches = await loadBatches(alt.part_id);
               return {
-                part: alt.part,
+                part_id: alt.part_id,
                 name: alt.name,
                 IPN: alt.IPN,
                 quantity: alt.quantity,
@@ -73,7 +73,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
           );
 
           processedComponents.push({
-            part: 0,
+            part_id: '',  // Alternative group doesn't have a part_id
             name: t('Alternative Group'),
             IPN: '',
             quantity: 0,
@@ -85,11 +85,11 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
             batches: [],
             batch_selections: []
           });
-        } else if (item.type === 1 && item.part) {
+        } else if (item.type === 1 && item.part_id) {
           // Regular component
-          const batches = await loadBatches(item.part);
+          const batches = await loadBatches(item.part_id);
           processedComponents.push({
-            part: item.part,
+            part_id: item.part_id,
             name: item.name,
             IPN: item.IPN,
             quantity: item.quantity,
@@ -111,7 +111,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     }
   };
 
-  const loadBatches = async (partId: number): Promise<Batch[]> => {
+  const loadBatches = async (partId: string): Promise<Batch[]> => {
     try {
       const response = await api.get(requestsApi.getPartStockInfo(partId));
       return response.data.batches || [];
