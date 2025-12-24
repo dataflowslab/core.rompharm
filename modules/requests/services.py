@@ -341,12 +341,13 @@ async def fetch_part_recipe(db, current_user: dict, part_id: str) -> Dict[str, A
                     part_data = parts_map.get(part_oid_key, {})
                     
                     # Skip items where part doesn't exist in depo_parts
-                    if not part_data or not part_data.get("id"):
+                    if not part_data:
                         print(f"[WARNING] Recipe item references non-existent part: {str(part_oid_key)}")
                         continue
                     
                     processed_item.update({
-                        "part": part_data.get("id"),  # Return integer id for frontend
+                        "part": part_data.get("id"),  # Return integer id for backwards compatibility
+                        "part_id": str(part_data.get("_id")),  # Return ObjectId string for new system
                         "name": part_data.get("name", ""),
                         "IPN": part_data.get("ipn", ""),
                         "quantity": item.get("q", 1),
