@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Table, Select, NumberInput, Text, Badge, Group, Paper, Title, Loader } from '@mantine/core';
+import { Table, Select, NumberInput, Text, Badge, Group, Paper, Title, Loader, Stack, Collapse, Button } from '@mantine/core';
+import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
@@ -9,6 +10,10 @@ interface Batch {
   supplier_batch_code: string;
   quantity: number;
   location_id: string;
+  state_id?: string;
+  state_name?: string;
+  expiry_date?: string;
+  batch_date?: string;
 }
 
 interface ComponentBatchSelection {
@@ -180,6 +185,33 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     return component.batches?.filter(b => !selectedBatches.includes(b.batch_code)) || [];
   };
 
+  const getStateColor = (stateName?: string): string => {
+    if (!stateName) return 'gray';
+    const lower = stateName.toLowerCase();
+    if (lower.includes('quarantined') && lower.includes('transactionable')) return 'blue';
+    if (lower.includes('quarantined')) return 'violet';
+    if (lower.includes('ok')) return 'green';
+    return 'gray';
+  };
+
+  const formatDate = (dateStr?: string): string => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString();
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatBatchLabel = (batch: Batch): string => {
+    const parts = [batch.batch_code];
+    if (batch.state_name) parts.push(`[${batch.state_name}]`);
+    parts.push(`${batch.quantity} available`);
+    if (batch.expiry_date) parts.push(`Exp: ${formatDate(batch.expiry_date)}`);
+    return parts.join(' - ');
+  };
+
   if (loading) {
     return (
       <Paper p="md" withBorder>
@@ -264,12 +296,12 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
                           placeholder={t('Add batch')}
                           data={getAvailableBatches(selectedAlt).map(b => ({
                             value: b.batch_code,
-                            label: `${b.batch_code} (${b.quantity} available)`
+                            label: formatBatchLabel(b)
                           }))}
                           onChange={(value) => value && handleBatchAdd(compIndex, component.selected_alternative || 0, value)}
                           size="xs"
                           clearable
-                          style={{ width: '200px' }}
+                          style={{ width: '400px' }}
                         />
                       )}
                     </Group>
@@ -322,12 +354,12 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
                           placeholder={t('Add batch')}
                           data={getAvailableBatches(component).map(b => ({
                             value: b.batch_code,
-                            label: `${b.batch_code} (${b.quantity} available)`
+                            label: formatBatchLabel(b)
                           }))}
                           onChange={(value) => value && handleBatchAdd(compIndex, null, value)}
                           size="xs"
                           clearable
-                          style={{ width: '200px' }}
+                          style={{ width: '400px' }}
                         />
                       )}
                     </Group>
