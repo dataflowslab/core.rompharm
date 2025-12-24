@@ -76,7 +76,7 @@ async def search_parts(db, search: Optional[str] = None) -> Dict[str, Any]:
 async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
     """Get stock information for a part from MongoDB depo_stocks with batches
     
-    Only shows transferable stock (state_id = 694322878728e4d75ae72790)
+    Shows stock with states: QUARANTINED, QUARANTINED TRANSACTIONABLE, and OK
     Uses part_id as ObjectId string directly
     """
     try:
@@ -94,27 +94,34 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
                 "batches": []
             }
         
-        # Transferable state_id (quarantined and transferable)
-        transferable_state_id = ObjectId('694322878728e4d75ae72790')
+        # State IDs to include:
+        # - QUARANTINED (not transferable): 694322758728e4d75ae7278f
+        # - QUARANTINED TRANSACTIONABLE: 694322878728e4d75ae72790
+        # - OK: 694321db8728e4d75ae72789
+        allowed_state_ids = [
+            ObjectId('694322758728e4d75ae7278f'),  # QUARANTINED
+            ObjectId('694322878728e4d75ae72790'),  # QUARANTINED TRANSACTIONABLE
+            ObjectId('694321db8728e4d75ae72789')   # OK
+        ]
         
-        # Query depo_stocks using part_id = depo_parts._id (ObjectId) and transferable state
+        # Query depo_stocks using part_id and allowed states
         stock_records = list(db.depo_stocks.find({
             "part_id": part_oid,
-            "state_id": transferable_state_id
+            "state_id": {"$in": allowed_state_ids}
         }))
         
         if stock_records:
             # Calculate totals
             total = sum(s.get("quantity", 0) for s in stock_records)
             
-            # Group batches by batch_code and location_id
-            batch_map = {}
+            # Group batches by batch_code (don't group by location - show all entries)
+            batches = []
             for stock in stock_records:
                 quantity = stock.get("quantity", 0)
                 if quantity > 0:
                     batch_code = stock.get("batch_code", "")
                     
-                    # Extract location_id (handle both ObjectId and string formats)
+                    # Extract location_id
                     location = stock.get("location_id")
                     if isinstance(location, ObjectId):
                         location_id = str(location)
@@ -123,20 +130,30 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
                     else:
                         location_id = str(location) if location else ""
                     
-                    # Create unique key for batch + location
-                    key = f"{batch_code}_{location_id}"
+                    # Extract state_id
+                    state_id = stock.get("state_id")
+                    if isinstance(state_id, ObjectId):
+                        state_id_str = str(state_id)
+                    else:
+                        state_id_str = str(state_id) if state_id else ""
                     
-                    if key not in batch_map:
-                        batch_map[key] = {
-                            "batch_code": batch_code,
-                            "supplier_batch_code": stock.get("supplier_batch_code", ""),
-                            "quantity": 0,
-                            "location_id": location_id
-                        }
+                    # Get state name
+                    state_name = ""
+                    if state_id:
+                        state = db.depo_stocks_states.find_one({"_id": state_id if isinstance(state_id, ObjectId) else ObjectId(state_id)})
+                        if state:
+                            state_name = state.get("name", "")
                     
-                    batch_map[key]["quantity"] += quantity
-            
-            batches = list(batch_map.values())
+                    batches.append({
+                        "batch_code": batch_code,
+                        "supplier_batch_code": stock.get("supplier_batch_code", ""),
+                        "quantity": quantity,
+                        "location_id": location_id,
+                        "state_id": state_id_str,
+                        "state_name": state_name,
+                        "expiry_date": stock.get("expiry_date", ""),
+                        "batch_date": stock.get("batch_date", "")
+                    })
             
             return {
                 "part_id": part_id,
