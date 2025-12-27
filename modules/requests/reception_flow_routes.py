@@ -66,20 +66,36 @@ async def sign_reception(
     
     # Check if user is authorized to sign
     username = current_user["username"]
+    is_staff = current_user.get("is_staff", False)
     can_sign = False
     
+    # Check can_sign_officers
     for officer in flow.get("can_sign_officers", []):
-        if officer["reference"] == user_id:
+        # Direct user_id match
+        if officer.get("reference") == user_id:
             can_sign = True
             break
-    
-    if not can_sign:
-        for officer in flow.get("must_sign_officers", []):
-            if officer["reference"] == user_id:
+        # Role-based match
+        if officer.get("type") == "role" and officer.get("reference"):
+            if officer["reference"] == "admin" and is_staff:
                 can_sign = True
                 break
     
+    # Check must_sign_officers if not already authorized
     if not can_sign:
+        for officer in flow.get("must_sign_officers", []):
+            # Direct user_id match
+            if officer.get("reference") == user_id:
+                can_sign = True
+                break
+            # Role-based match
+            if officer.get("type") == "role" and officer.get("reference"):
+                if officer["reference"] == "admin" and is_staff:
+                    can_sign = True
+                    break
+    
+    if not can_sign:
+        print(f"[REQUESTS] User {username} (staff={is_staff}) not authorized to sign. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
         raise HTTPException(status_code=403, detail="You are not authorized to sign this reception flow")
     
     # Generate signature
@@ -128,24 +144,44 @@ async def sign_reception(
         )
         print(f"[REQUESTS] Reception flow approved for request {request_id}")
         
-        # Update request state_id to Stock Received
+        # Update request state_id to Stock received&signed (694df205297c9dde6d70664d)
         try:
             req_obj_id = ObjectId(request_id)
             requests_collection = db['depo_requests']
-            states_collection = db['depo_requests_states']
-            stock_received_state = states_collection.find_one({"name": "Stock Received"})
+            stock_received_signed_state_id = ObjectId("694df205297c9dde6d70664d")
             
-            if stock_received_state:
-                requests_collection.update_one(
-                    {"_id": req_obj_id},
-                    {"$set": {
-                        "state_id": stock_received_state["_id"],
+            # Create status log entry for signing
+            status_log_entry = {
+                'status_id': stock_received_signed_state_id,
+                'scene': 'receive_stock',
+                'created_at': timestamp,
+                'created_by': username,
+                'reason': None
+            }
+            
+            requests_collection.update_one(
+                {"_id": req_obj_id},
+                {
+                    "$set": {
+                        "state_id": stock_received_signed_state_id,
                         "updated_at": timestamp
-                    }}
-                )
-                print(f"[REQUESTS] Set state_id to Stock Received ({stock_received_state['_id']}) for request {request_id}")
-            else:
-                print(f"[REQUESTS] Warning: Stock Received state not found in depo_requests_states")
+                    },
+                    "$push": {"status_log": status_log_entry}
+                }
+            )
+            
+            # Log the state change
+            db.logs.insert_one({
+                'collection': 'depo_requests',
+                'object_id': request_id,
+                'action': 'reception_signed',
+                'state_id': str(stock_received_signed_state_id),
+                'state_name': 'Stock received&signed',
+                'user': username,
+                'timestamp': timestamp
+            })
+            
+            print(f"[REQUESTS] Set state_id to Stock received&signed ({stock_received_signed_state_id}) for request {request_id}")
         except Exception as e:
             print(f"[REQUESTS] Warning: Failed to update request state_id: {e}")
         
@@ -291,36 +327,69 @@ async def update_reception_status(
     if not status:
         raise HTTPException(status_code=400, detail="Status is required")
     
-    if status not in ['Approved', 'Refused']:
-        raise HTTPException(status_code=400, detail="Status must be 'Approved' or 'Refused'")
+    # Validate that status is a valid state ID with 'receive_stock' scene
+    try:
+        state_id = ObjectId(status)
+        state = db.depo_requests_states.find_one({"_id": state_id})
+        
+        if not state:
+            raise HTTPException(status_code=400, detail="Invalid state ID")
+        
+        # Check if state has 'receive_stock' in scenes
+        if not state.get('scenes') or 'receive_stock' not in state.get('scenes', []):
+            raise HTTPException(status_code=400, detail="State must have 'receive_stock' in scenes")
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=400, detail="Invalid state ID format")
     
     try:
         req_obj_id = ObjectId(request_id)
-        update_data = {
-            'reception_result': status,
-            'reception_result_updated_at': datetime.utcnow(),
-            'reception_result_updated_by': current_user.get('username'),
-            'updated_at': datetime.utcnow()
+        timestamp = datetime.utcnow()
+        
+        # Create status log entry
+        status_log_entry = {
+            'status_id': state_id,
+            'scene': 'receive_stock',
+            'created_at': timestamp,
+            'created_by': current_user.get('username'),
+            'reason': reason if reason else None
         }
         
-        if status == 'Refused':
-            update_data['reception_result_reason'] = reason
-            update_data['status'] = 'Warehouse Transfer Refused'
-        else:
-            update_data['reception_result_reason'] = ''
-            update_data['status'] = 'Stock Received'
+        # Update state_id and add to status_log
+        update_data = {
+            'state_id': state_id,
+            'updated_at': timestamp
+        }
         
         requests_collection.update_one(
             {'_id': req_obj_id},
-            {'$set': update_data}
+            {
+                '$set': update_data,
+                '$push': {'status_log': status_log_entry}
+            }
         )
         
-        print(f"[REQUESTS] Request {request_id} reception decision set to {status}")
+        # Log to audit logs
+        is_rejected = 'reject' in state.get('slug', '').lower() or 'refuse' in state.get('slug', '').lower()
+        db.logs.insert_one({
+            'collection': 'depo_requests',
+            'object_id': request_id,
+            'action': 'reception_decision',
+            'state_id': str(state_id),
+            'state_name': state.get('name'),
+            'is_rejected': is_rejected,
+            'reason': reason if is_rejected else '',
+            'user': current_user.get('username'),
+            'timestamp': timestamp
+        })
+        
+        print(f"[REQUESTS] Request {request_id} state_id updated to {state.get('name')} ({status})")
         
         return {
-            "message": f"Reception decision set to {status}",
-            "status": status,
-            "reception_result": status
+            "message": f"State updated to {state.get('name')}",
+            "state_id": str(state_id),
+            "state_name": state.get('name')
         }
     except Exception as e:
         print(f"[REQUESTS] Error updating reception decision: {e}")

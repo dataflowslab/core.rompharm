@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from typing import List, Dict, Any
 
 from ..utils.db import get_db
-from ..models.user_model import UserModel
+# UserModel removed - using direct DB access
 from ..routes.auth import verify_admin
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -18,7 +18,7 @@ async def list_users(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
     Requires administrator access
     """
     db = get_db()
-    users_collection = db[UserModel.collection_name]
+    users_collection = db['users']
     
     users = list(users_collection.find(
         {},

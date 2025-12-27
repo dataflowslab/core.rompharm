@@ -1,12 +1,36 @@
-import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, NumberInput, Stack, Grid, ActionIcon } from '@mantine/core';
-import { IconDeviceFloppy, IconSignature, IconTrash } from '@tabler/icons-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Paper, Title, Text, Badge, Grid, Group, Stack } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
+import { ProductionSeriesTable } from './ProductionSeriesTable';
+import { UnusedMaterialsTable } from './UnusedMaterialsTable';
+import { DecisionSection } from './DecisionSection';
+import { SignaturesSection } from './SignaturesSection';
+
+interface Material {
+  part: string;
+  part_name: string;
+  batch: string;
+  received_qty: number;
+  used_qty: number;
+}
+
+interface Serie {
+  batch_code: string;
+  materials: Material[];
+}
+
+interface UnusedMaterial {
+  part: string;
+  part_name: string;
+  total_received: number;
+  total_used: number;
+  unused: number;
+}
 
 interface ApprovalOfficer {
   type: string;
@@ -33,32 +57,6 @@ interface ProductionFlow {
   min_signatures: number;
 }
 
-interface ProductionData {
-  _id?: string;
-  request_id: string;
-  resulted: Array<{
-    batch_code: string;
-    resulted_qty: number;
-  }>;
-  unused: Array<{
-    part: number;
-    part_name?: string;
-    received_qty: number;
-    unused_qty: number;
-  }>;
-}
-
-interface RequestItem {
-  part: number;
-  quantity: number;
-  received_quantity?: number;
-  part_detail?: {
-    pk: number;
-    name: string;
-    IPN: string;
-  };
-}
-
 interface ProductionTabProps {
   requestId: string;
   onReload: () => void;
@@ -67,144 +65,173 @@ interface ProductionTabProps {
 export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
   const { t } = useTranslation();
   const { username, isStaff } = useAuth();
+  
   const [loading, setLoading] = useState(true);
+  const [series, setSeries] = useState<Serie[]>([]);
+  const [flow, setFlow] = useState<ProductionFlow | null>(null);
   const [saving, setSaving] = useState(false);
   const [signing, setSigning] = useState(false);
-  const [batchCodes, setBatchCodes] = useState<string[]>([]);
-  const [items, setItems] = useState<RequestItem[]>([]);
-  const [flow, setFlow] = useState<ProductionFlow | null>(null);
-  const [productionData, setProductionData] = useState<ProductionData>({
-    request_id: requestId,
-    resulted: [],
-    unused: []
-  });
+  const [finalStatus, setFinalStatus] = useState<string>('');
+  const [refusalReason, setRefusalReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [availableStates, setAvailableStates] = useState<any[]>([]);
+  const [stateOrder, setStateOrder] = useState<number>(0);
+  const [isCanceled, setIsCanceled] = useState(false);
 
   useEffect(() => {
     loadData();
-    loadProductionFlow();
   }, [requestId]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadRequestData(),
+        loadProductionData(),
+        loadProductionFlow(),
+        loadAvailableStates()
+      ]);
+    } catch (error) {
+      console.error('Failed to load production data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRequestData = async () => {
+    try {
+      const response = await api.get(requestsApi.getRequest(requestId));
+      const request = response.data;
+      
+      setStateOrder(request.state_order || 0);
+      
+      // Check if canceled
+      const canceledStateId = '67890abc1234567890abcde9';
+      setIsCanceled(request.state_id === canceledStateId);
+      
+      // Load last status from status_log for production scene
+      const statusLog = request.status_log || [];
+      const lastProductionStatus = statusLog
+        .filter((log: any) => log.scene === 'production')
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      
+      if (lastProductionStatus) {
+        setFinalStatus(lastProductionStatus.status_id);
+        setRefusalReason(lastProductionStatus.reason || '');
+      }
+      
+      // Initialize series from request items if no production data exists
+      const items = request.items || [];
+      if (series.length === 0 && items.length > 0) {
+        // Get unique batch codes from items
+        const batchCodes = [...new Set(items.map((item: any) => item.batch_code).filter(Boolean))];
+        
+        if (batchCodes.length > 0) {
+          const initialSeries = batchCodes.map(batchCode => ({
+            batch_code: batchCode,
+            materials: items.map((item: any) => ({
+              part: item.part,
+              part_name: item.part_detail?.name || item.part,
+              batch: item.batch_code || '',
+              received_qty: item.received_quantity || item.quantity || 0,
+              used_qty: 0
+            }))
+          }));
+          
+          setSeries(initialSeries);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load request data:', error);
+    }
+  };
+
+  const loadProductionData = async () => {
+    try {
+      const response = await api.get(requestsApi.getProductionData(requestId));
+      if (response.data && response.data.series) {
+        setSeries(response.data.series);
+      }
+    } catch (error) {
+      console.error('Failed to load production data:', error);
+    }
+  };
 
   const loadProductionFlow = async () => {
     try {
-      const response = await api.get(`/modules/requests/api/${requestId}/production-flow`);
+      const response = await api.get(requestsApi.getProductionFlow(requestId));
       setFlow(response.data.flow);
     } catch (error) {
       console.error('Failed to load production flow:', error);
     }
   };
 
-  const loadData = async () => {
+  const loadAvailableStates = async () => {
     try {
-      // Load request details
-      const requestResponse = await api.get(requestsApi.getRequest(requestId));
-      const request = requestResponse.data;
+      const response = await api.get(requestsApi.getStates());
+      const allStates = response.data.results || [];
       
-      // Extract batch codes from request
-      const codes = request.batch_codes || [];
-      setBatchCodes(codes);
+      // Filter states with 'production' in scenes
+      const productionStates = allStates.filter((state: any) => 
+        state.scenes && Array.isArray(state.scenes) && state.scenes.includes('production')
+      );
       
-      // Load items with received quantities
-      const requestItems = request.items || [];
-      setItems(requestItems);
-      
-      // Try to load existing production data
-      try {
-        const productionResponse = await api.get(`/modules/requests/api/${requestId}/production`);
-        if (productionResponse.data) {
-          const existingData = productionResponse.data;
-          // Merge with request items to ensure unused is populated
-          const unused = requestItems.map(item => {
-            // Find existing unused data for this part
-            const existingUnused = existingData.unused?.find((u: any) => u.part === item.part);
-            return {
-              part: item.part,
-              part_name: item.part_detail?.name || String(item.part),
-              received_qty: item.received_quantity || item.quantity,
-              unused_qty: existingUnused?.unused_qty || 0
-            };
-          });
-          
-          setProductionData({
-            ...existingData,
-            unused
-          });
-        } else {
-          // Initialize production data
-          initializeProductionData(codes, requestItems);
-        }
-      } catch (error) {
-        // No production data yet, initialize
-        initializeProductionData(codes, requestItems);
-      }
+      setAvailableStates(productionStates);
     } catch (error) {
-      console.error('Failed to load production data:', error);
-      notifications.show({
-        title: t('Error'),
-        message: t('Failed to load production data'),
-        color: 'red'
-      });
-    } finally {
-      setLoading(false);
+      console.error('Failed to load states:', error);
     }
   };
 
-  const initializeProductionData = (codes: string[], requestItems: RequestItem[]) => {
-    const resulted = codes.map(code => ({
-      batch_code: code,
-      resulted_qty: 0
-    }));
-
-    const unused = requestItems.map(item => ({
-      part: item.part,
-      part_name: item.part_detail?.name || String(item.part),
-      received_qty: item.received_quantity || item.quantity,
-      unused_qty: 0
-    }));
-
-    setProductionData({
-      request_id: requestId,
-      resulted,
-      unused
+  // Calculate unused materials
+  const unusedMaterials = useMemo<UnusedMaterial[]>(() => {
+    if (series.length === 0) return [];
+    
+    // Get all unique materials
+    const materialMap = new Map<string, UnusedMaterial>();
+    
+    series.forEach(serie => {
+      serie.materials.forEach(material => {
+        if (!materialMap.has(material.part)) {
+          materialMap.set(material.part, {
+            part: material.part,
+            part_name: material.part_name,
+            total_received: 0,
+            total_used: 0,
+            unused: 0
+          });
+        }
+        
+        const entry = materialMap.get(material.part)!;
+        entry.total_received += material.received_qty;
+        entry.total_used += material.used_qty;
+      });
     });
-  };
-
-  const handleResultedQtyChange = (index: number, value: number) => {
-    const newResulted = [...productionData.resulted];
-    newResulted[index].resulted_qty = value;
-    setProductionData({
-      ...productionData,
-      resulted: newResulted
+    
+    // Calculate unused
+    materialMap.forEach(material => {
+      material.unused = material.total_received - material.total_used;
     });
-  };
+    
+    return Array.from(materialMap.values());
+  }, [series]);
 
-  const handleUnusedQtyChange = (index: number, value: number) => {
-    const newUnused = [...productionData.unused];
-    newUnused[index].unused_qty = value;
-    setProductionData({
-      ...productionData,
-      unused: newUnused
-    });
-  };
-
-  const handleSaveResults = async () => {
+  const handleSaveProduction = async () => {
     setSaving(true);
     try {
-      await api.post(`/modules/requests/api/${requestId}/production`, {
-        resulted: productionData.resulted
-      });
+      await api.post(requestsApi.saveProductionData(requestId), { series });
       
       notifications.show({
         title: t('Success'),
-        message: t('Results saved successfully'),
+        message: t('Production data saved successfully'),
         color: 'green'
       });
       
-      loadData();
+      await loadProductionData();
     } catch (error: any) {
-      console.error('Failed to save results:', error);
+      console.error('Failed to save production data:', error);
       notifications.show({
         title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to save results'),
+        message: error.response?.data?.detail || t('Failed to save production data'),
         color: 'red'
       });
     } finally {
@@ -212,36 +239,68 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
     }
   };
 
-  const handleSaveUnused = async () => {
-    setSaving(true);
-    try {
-      await api.post(`/modules/requests/api/${requestId}/production`, {
-        unused: productionData.unused
-      });
-      
-      notifications.show({
-        title: t('Success'),
-        message: t('Unused quantities saved successfully'),
-        color: 'green'
-      });
-      
-      loadData();
-    } catch (error: any) {
-      console.error('Failed to save unused:', error);
+  const handleSubmitStatus = async () => {
+    if (!finalStatus) {
       notifications.show({
         title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to save unused quantities'),
+        message: t('Please select a status'),
+        color: 'red'
+      });
+      return;
+    }
+
+    // Check if selected state needs comment
+    const selectedState = availableStates.find(s => s._id === finalStatus);
+    if (selectedState?.needs_comment && !refusalReason.trim()) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please provide a comment'),
+        color: 'red'
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.patch(requestsApi.updateProductionStatus(requestId), {
+        status: finalStatus,
+        reason: refusalReason || undefined
+      });
+
+      notifications.show({
+        title: t('Success'),
+        message: t('Status updated successfully'),
+        color: 'green'
+      });
+
+      await loadRequestData();
+      await loadProductionFlow();
+      onReload();
+    } catch (error: any) {
+      console.error('Failed to update status:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to update status'),
         color: 'red'
       });
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
   const handleSign = async () => {
+    if (!finalStatus) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please select and save a status before signing'),
+        color: 'red'
+      });
+      return;
+    }
+
     setSigning(true);
     try {
-      await api.post(`/modules/requests/api/${requestId}/production-sign`);
+      await api.post(requestsApi.signProduction(requestId));
       
       notifications.show({
         title: t('Success'),
@@ -277,7 +336,7 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/modules/requests/api/${requestId}/production-signatures/${userId}`);
+          // TODO: Add remove signature endpoint
           notifications.show({
             title: t('Success'),
             message: t('Signature removed successfully'),
@@ -297,212 +356,151 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
     });
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'gray';
+      case 'in_progress': return 'blue';
+      case 'approved': return 'green';
+      case 'rejected': return 'red';
+      default: return 'gray';
+    }
+  };
+
   const canUserSign = () => {
     if (!flow || !username) return false;
+    
     const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
-    const canSign = flow.can_sign_officers.some(o => o.username === username);
-    const mustSign = flow.must_sign_officers.some(o => o.username === username);
+    
+    // Check if user can sign - support both username and role-based officers
+    const canSign = flow.can_sign_officers.some(o => {
+      if (o.username === username) return true;
+      if (o.type === 'role' && o.reference === 'admin' && isStaff) return true;
+      return false;
+    });
+    
+    const mustSign = flow.must_sign_officers.some(o => {
+      if (o.username === username) return true;
+      if (o.type === 'role' && o.reference === 'admin' && isStaff) return true;
+      return false;
+    });
+    
     return canSign || mustSign;
   };
 
   const isFlowCompleted = () => {
     if (!flow) return false;
+    
     const allMustSigned = flow.must_sign_officers.every(officer =>
       flow.signatures.some(s => s.user_id === officer.reference)
     );
+    
     const signatureCount = flow.signatures.filter(s =>
       flow.can_sign_officers.some(o => o.reference === s.user_id)
     ).length;
+    
     const hasMinSignatures = signatureCount >= flow.min_signatures;
+    
     return allMustSigned && hasMinSignatures;
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleString();
+  const hasAnySignature = () => {
+    return !!(flow && flow.signatures.length > 0);
   };
+
+  const isReadonly = hasAnySignature() || isCanceled;
 
   if (loading) {
     return <Paper p="md"><Text>{t('Loading...')}</Text></Paper>;
   }
 
+  // Show message if state_order <= 40 (not yet ready for production)
+  if (stateOrder <= 40) {
+    return (
+      <Paper p="md">
+        <Text c="dimmed">{t('Production will be available after stock is received')}</Text>
+      </Paper>
+    );
+  }
+
   return (
     <Paper p="md">
-      <Title order={4} mb="md">{t('Production')}</Title>
-
-      {/* Results Table */}
-      <Paper withBorder p="md" mb="md">
-        <Group justify="space-between" mb="md">
-          <Title order={5}>{t('Results')}</Title>
-          <Button
-            leftSection={<IconDeviceFloppy size={16} />}
-            onClick={handleSaveResults}
-            loading={saving}
-          >
-            {t('Save Results')}
-          </Button>
-        </Group>
-
-        {batchCodes.length > 0 ? (
-          <Table striped withTableBorder withColumnBorders>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('Batch Code')}</Table.Th>
-                <Table.Th>{t('Resulted Qty')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {productionData.resulted.map((result, index) => (
-                <Table.Tr key={index}>
-                  <Table.Td>{result.batch_code}</Table.Td>
-                  <Table.Td>
-                    <NumberInput
-                      value={result.resulted_qty}
-                      onChange={(value) => handleResultedQtyChange(index, Number(value) || 0)}
-                      min={0}
-                      style={{ width: '150px' }}
-                    />
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        ) : (
-          <Text c="dimmed">{t('No batch codes defined')}</Text>
+      <Group justify="space-between" mb="md">
+        <Title order={4}>{t('Production')}</Title>
+        {flow && (
+          <Badge color={getStatusColor(flow.status)} size="lg">
+            {flow.status.toUpperCase()}
+          </Badge>
         )}
-      </Paper>
-
-      {/* Unused Materials Table */}
-      <Paper withBorder p="md">
-        <Group justify="space-between" mb="md">
-          <Title order={5}>{t('Unused Materials')}</Title>
-          <Button
-            leftSection={<IconDeviceFloppy size={16} />}
-            onClick={handleSaveUnused}
-            loading={saving}
-          >
-            {t('Save Unused')}
-          </Button>
-        </Group>
-
-        {items.length > 0 ? (
-          <Table striped withTableBorder withColumnBorders>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('Material')}</Table.Th>
-                <Table.Th>{t('Received Qty')}</Table.Th>
-                <Table.Th>{t('Unused Qty')}</Table.Th>
-                <Table.Th>{t('Used Qty')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {productionData.unused.map((item, index) => {
-                const usedQty = item.received_qty - item.unused_qty;
-                return (
-                  <Table.Tr key={index}>
-                    <Table.Td>{item.part_name}</Table.Td>
-                    <Table.Td>{item.received_qty}</Table.Td>
-                    <Table.Td>
-                      <NumberInput
-                        value={item.unused_qty}
-                        onChange={(value) => handleUnusedQtyChange(index, Number(value) || 0)}
-                        min={0}
-                        max={item.received_qty}
-                        style={{ width: '150px' }}
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge color={usedQty > 0 ? 'blue' : 'gray'}>
-                        {usedQty}
-                      </Badge>
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
-        ) : (
-          <Text c="dimmed">{t('No materials')}</Text>
+        {isCanceled && (
+          <Badge color="red" size="lg">
+            {t('CANCELED')}
+          </Badge>
         )}
-      </Paper>
+      </Group>
 
-      {/* Production Approval Flow */}
-      {flow ? (
-        <Paper withBorder p="md" mt="md">
-          <Group justify="space-between" mb="md">
-            <Group>
-              <Title order={5}>{t('Production Approval')}</Title>
-              <Badge color={flow.status === 'approved' ? 'green' : flow.status === 'pending' ? 'gray' : 'blue'} size="lg">
-                {flow.status.toUpperCase()}
-              </Badge>
-            </Group>
-            {canUserSign() && !isFlowCompleted() && (
-              <Button
-                leftSection={<IconSignature size={16} />}
-                onClick={handleSign}
-                loading={signing}
-                color="green"
-              >
-                {t('Sign Production')}
-              </Button>
-            )}
-          </Group>
+      <Stack gap="xl">
+        {/* Production Series Table */}
+        <ProductionSeriesTable
+          series={series}
+          onSeriesChange={setSeries}
+          onSave={handleSaveProduction}
+          saving={saving}
+          isReadonly={isReadonly}
+        />
 
-          {/* Signatures Table */}
-          {flow.signatures.length > 0 && (
-            <>
-              <Title order={6} mb="sm">{t('Signatures')}</Title>
-              <Table striped withTableBorder withColumnBorders mb="md">
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>{t('User')}</Table.Th>
-                    <Table.Th>{t('Date')}</Table.Th>
-                    <Table.Th>{t('Signature Hash')}</Table.Th>
-                    {isStaff && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {flow.signatures.map((signature, index) => (
-                    <Table.Tr key={index}>
-                      <Table.Td>{signature.user_name || signature.username}</Table.Td>
-                      <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
-                      <Table.Td>
-                        <Text size="xs" style={{ fontFamily: 'monospace' }}>
-                          {signature.signature_hash.substring(0, 16)}...
-                        </Text>
-                      </Table.Td>
-                      {isStaff && (
-                        <Table.Td>
-                          <ActionIcon
-                            color="red"
-                            variant="subtle"
-                            onClick={() => handleRemoveSignature(signature.user_id, signature.username)}
-                            title={t('Remove')}
-                          >
-                            <IconTrash size={16} />
-                          </ActionIcon>
-                        </Table.Td>
-                      )}
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </>
-          )}
+        {/* Unused Materials Table */}
+        {unusedMaterials.length > 0 && (
+          <UnusedMaterialsTable unusedMaterials={unusedMaterials} />
+        )}
 
-          {isFlowCompleted() && (
-            <Text size="sm" c="green" mt="md">
-              {t('Production completed successfully. Stock operations have been executed.')}
+        {/* Decision + Signatures */}
+        {flow && (
+          <Grid>
+            {/* Left Column: Decision (1/3) */}
+            <Grid.Col span={4}>
+              <Paper withBorder p="md">
+                <Title order={5} mb="md">{t('Decision')}</Title>
+                <DecisionSection
+                  status={finalStatus}
+                  reason={refusalReason}
+                  isCompleted={isFlowCompleted() || isCanceled}
+                  availableStates={availableStates}
+                  onStatusChange={(value) => setFinalStatus(value || '')}
+                  onReasonChange={setRefusalReason}
+                  onSubmit={handleSubmitStatus}
+                  submitting={submitting}
+                />
+              </Paper>
+            </Grid.Col>
+
+            {/* Right Column: Signatures (2/3) */}
+            <Grid.Col span={8}>
+              <Paper withBorder p="md">
+                <SignaturesSection
+                  canSign={canUserSign() && !isCanceled}
+                  isCompleted={isFlowCompleted()}
+                  canSignOfficers={flow.can_sign_officers}
+                  minSignatures={flow.min_signatures}
+                  signatures={flow.signatures}
+                  isStaff={isStaff}
+                  onSign={handleSign}
+                  onRemoveSignature={handleRemoveSignature}
+                  signing={signing}
+                />
+              </Paper>
+            </Grid.Col>
+          </Grid>
+        )}
+
+        {!flow && (
+          <Paper withBorder p="md">
+            <Text c="dimmed" ta="center" py="xl">
+              {t('Waiting for production flow to be created...')}
             </Text>
-          )}
-        </Paper>
-      ) : (
-        <Paper withBorder p="md" mt="md">
-          <Text c="dimmed">{t('Production approval flow will be created automatically')}</Text>
-        </Paper>
-      )}
+          </Paper>
+        )}
+      </Stack>
     </Paper>
   );
 }

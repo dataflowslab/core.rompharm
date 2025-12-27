@@ -181,7 +181,7 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
     }
   };
 
-  const checkStatus = async (templateCode: string, jobId: string) => {
+  const checkStatus = async (templateCode: string, jobId: string): Promise<string | null> => {
     setChecking(prev => ({ ...prev, [templateCode]: true }));
     
     try {
@@ -210,15 +210,18 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
       if (status.status === 'processing' || status.status === 'queued') {
         setTimeout(() => checkStatus(templateCode, jobId), 3000);
       }
+      
+      return status.status;
     } catch (error) {
       console.error('Failed to check status:', error);
+      return null;
     } finally {
       setChecking(prev => ({ ...prev, [templateCode]: false }));
     }
   };
 
   const downloadDocument = async (templateCode: string) => {
-    const doc = documents[templateCode];
+    let doc = documents[templateCode];
     if (!doc) return;
 
     console.log('[DocumentGenerator] Attempting download:', {
@@ -231,14 +234,22 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
     // Check status before download
     if (doc.status !== 'done' && doc.status !== 'completed') {
       console.warn('[DocumentGenerator] Document not ready for download:', doc.status);
-      notifications.show({
-        title: t('Warning'),
-        message: `Document not ready. Status: ${doc.status}`,
-        color: 'orange'
-      });
-      // Try to refresh status
-      await checkStatus(templateCode, doc.job_id);
-      return;
+      
+      // Try to refresh status first
+      const newStatus = await checkStatus(templateCode, doc.job_id);
+      
+      // If still not ready after refresh, show warning and return
+      if (!newStatus || (newStatus !== 'done' && newStatus !== 'completed')) {
+        notifications.show({
+          title: t('Warning'),
+          message: `Document not ready. Status: ${newStatus || 'unknown'}`,
+          color: 'orange'
+        });
+        return;
+      }
+      
+      // Status is now ready, continue with download
+      console.log('[DocumentGenerator] Status refreshed, document is ready');
     }
 
     try {

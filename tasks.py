@@ -225,7 +225,7 @@ def test_config(c):
     import sys
     
     # Test 1: Load config file
-    print("\n[1/3] Testing config.yaml...")
+    print("\n[1/2] Testing config.yaml...")
     try:
         with open('config.yaml', 'r') as f:
             config = yaml.safe_load(f)
@@ -285,31 +285,6 @@ def test_config(c):
         print("  3. Check if IP is whitelisted in MongoDB Atlas")
         print("  4. Install certifi: pip install certifi")
         return
-    
-    # Test 3: InvenTree connection
-    print("\n[3/3] Testing InvenTree connection...")
-    try:
-        import requests
-        
-        inventree_url = config.get('inventree', {}).get('url')
-        
-        if not inventree_url:
-            print("✗ InvenTree URL not found in config!")
-            return
-        
-        print(f"  Connecting to {inventree_url}...")
-        response = requests.get(f"{inventree_url}/api/", timeout=5)
-        
-        if response.status_code == 200:
-            print(f"✓ InvenTree API accessible")
-        else:
-            print(f"⚠ InvenTree returned status {response.status_code}")
-        
-    except requests.exceptions.ConnectionError:
-        print(f"✗ Cannot connect to InvenTree at {inventree_url}")
-        print("  Check if InvenTree is running and URL is correct")
-    except Exception as e:
-        print(f"✗ InvenTree connection error: {e}")
     
     print("\n" + "=" * 50)
     print("Configuration Test Complete")

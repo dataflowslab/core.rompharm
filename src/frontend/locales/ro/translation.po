@@ -1,4 +1,38 @@
+# Translation file
+# Generated automatically
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: ro\n"
+
+msgid "${procurementApi.getPurchaseOrder(id!)}/approval-flow"
+msgstr ""
+
+msgid "${procurementApi.getPurchaseOrder(order.pk)}/approval-flow"
+msgstr ""
+
+msgid "${procurementApi.getPurchaseOrder(order.pk)}/sign"
+msgstr ""
+
+msgid "${url}${params}"
+msgstr ""
+
+msgid ","
+msgstr ""
+
+msgid "."
+msgstr ""
+
+msgid "/"
+msgstr ""
+
 msgid "/api/audit/?limit=${limit}&skip=${skip}"
+msgstr ""
+
+msgid "/api/auth/me"
+msgstr ""
+
+msgid "/api/auth/verify"
 msgstr ""
 
 msgid "/api/config/"
@@ -31,13 +65,67 @@ msgstr ""
 msgid "/api/data/submissions/all"
 msgstr ""
 
+msgid "/api/data/submissions/stats"
+msgstr ""
+
+msgid "/api/documents/for/${entityId}"
+msgstr ""
+
+msgid "/api/documents/for/${objectId}"
+msgstr ""
+
 msgid "/api/documents/form/${formId}/templates"
+msgstr ""
+
+msgid "/api/documents/job/${jobId}/status"
+msgstr ""
+
+msgid "/api/documents/job/${submissionId}/${jobId}/status"
+msgstr ""
+
+msgid "/api/documents/stock-request/${requestId}"
+msgstr ""
+
+msgid "/api/documents/templates"
 msgstr ""
 
 msgid "/api/forms/"
 msgstr ""
 
 msgid "/api/forms/${slug}"
+msgstr ""
+
+msgid "/api/forms/mail-templates/list"
+msgstr ""
+
+msgid "/api/recipes/${id}"
+msgstr ""
+
+msgid "/api/recipes/${id}/increment-version"
+msgstr ""
+
+msgid "/api/recipes/${id}/logs"
+msgstr ""
+
+msgid "/api/recipes/${id}/revisions"
+msgstr ""
+
+msgid "/api/sales/order-statuses"
+msgstr ""
+
+msgid "/api/sales/sales-orders"
+msgstr ""
+
+msgid "/api/sales/sales-orders/${orderId}"
+msgstr ""
+
+msgid "/api/sales/sales-orders/${orderId}/attachments"
+msgstr ""
+
+msgid "/api/sales/sales-orders/${orderId}/items"
+msgstr ""
+
+msgid "/api/sales/sales-orders/${orderId}/shipments"
 msgstr ""
 
 msgid "/api/system/notifications"
@@ -52,7 +140,67 @@ msgstr ""
 msgid "/api/users/"
 msgstr ""
 
+msgid "/modules/depo_procurement/api/document-templates"
+msgstr ""
+
+msgid "/modules/depo_procurement/api/stock-statuses"
+msgstr ""
+
+msgid "/modules/inventory/api/articles/${article._id}/suppliers"
+msgstr ""
+
+msgid "/modules/inventory/api/articles/${articleId}/suppliers"
+msgstr ""
+
+msgid "/modules/inventory/api/articles/${id}"
+msgstr ""
+
+msgid "/modules/inventory/api/articles/${id}/recipes"
+msgstr ""
+
+msgid "/modules/inventory/api/articles?${params.toString()}"
+msgstr ""
+
+msgid "/modules/inventory/api/categories"
+msgstr ""
+
+msgid "/modules/inventory/api/companies?is_supplier=true"
+msgstr ""
+
+msgid "/modules/inventory/api/locations"
+msgstr ""
+
+msgid "/modules/inventory/api/manufacturers"
+msgstr ""
+
+msgid "/modules/inventory/api/stocks/${id}"
+msgstr ""
+
+msgid "/modules/inventory/api/stocks?part_id=${article._id}"
+msgstr ""
+
+msgid "/modules/inventory/api/suppliers"
+msgstr ""
+
+msgid "/modules/inventory/api/system-ums"
+msgstr ""
+
+msgid "/modules/requests/api/${requestId}/production"
+msgstr ""
+
+msgid "/modules/requests/api/${requestId}/production-flow"
+msgstr ""
+
+msgid "/modules/requests/api/${requestId}/production-sign"
+msgstr ""
+
 msgid "<html>\n<body>\n  <h1>{{title}}</h1>\n  <p>{{content}}</p>\n</body>\n</html>"
+msgstr ""
+
+msgid "A category cannot be its own parent"
+msgstr ""
+
+msgid "A location cannot be its own parent"
 msgstr ""
 
 msgid "Access Denied"
@@ -70,8 +218,26 @@ msgstr "Activ"
 msgid "Activity Log"
 msgstr "Jurnal activitate"
 
+msgid "Add"
+msgstr "Adaugă"
+
+msgid "Add Alternative"
+msgstr ""
+
+msgid "Add Alternative Product"
+msgstr ""
+
 msgid "Add Campaign"
 msgstr "Adaugă campanie"
+
+msgid "Add Container Row"
+msgstr ""
+
+msgid "Add Ingredient"
+msgstr ""
+
+msgid "Add Item"
+msgstr "Adaugă articol"
 
 msgid "Add Segment"
 msgstr "Adaugă segment"
@@ -79,8 +245,20 @@ msgstr "Adaugă segment"
 msgid "Add Subscriber"
 msgstr "Adaugă abonat"
 
+msgid "Add batch codes"
+msgstr ""
+
 msgid "Add notes..."
 msgstr "Adaugă notițe..."
+
+msgid "Additional comments"
+msgstr ""
+
+msgid "Additional notes"
+msgstr "Notițe adiționale"
+
+msgid "Address"
+msgstr "Adresă"
 
 msgid "Admin"
 msgstr "Administrator"
@@ -94,26 +272,89 @@ msgstr "Ai nevoie de acces de administrator ca să vezi răspunsurile."
 msgid "Administrator access required to view this page."
 msgstr "Ai nevoie de acces de administrator ca să vezi această pagină."
 
+msgid "After creating the group, you can add alternative products to it."
+msgstr ""
+
+msgid "All Forms"
+msgstr ""
+
 msgid "All Submissions"
 msgstr "Toate răspunsurile"
 
 msgid "All systems operational"
 msgstr "Toate sistemele funcționează"
 
+msgid "Allocated"
+msgstr "Alocat"
+
+msgid "Alternative"
+msgstr ""
+
+msgid "Alternative Group"
+msgstr ""
+
+msgid "Alternative added successfully"
+msgstr ""
+
+msgid "Alternative deleted successfully"
+msgstr ""
+
+msgid "Alternatives"
+msgstr ""
+
 msgid "Anonymous"
 msgstr "Anonim"
+
+msgid "Approval"
+msgstr ""
+
+msgid "Approval Flow"
+msgstr ""
+
+msgid "Approval flow created successfully"
+msgstr ""
+
+msgid "Approvals"
+msgstr "Aprobări"
+
+msgid "Approved"
+msgstr ""
+
+msgid "Are you sure you want to delete this alternative?"
+msgstr ""
+
+msgid "Are you sure you want to delete this attachment?"
+msgstr "Sigur vrei să ștergi acest atașament?"
 
 msgid "Are you sure you want to delete this campaign?"
 msgstr "Sigur vrei să ștergi această campanie?"
 
+msgid "Are you sure you want to delete this category? This action cannot be undone."
+msgstr ""
+
 msgid "Are you sure you want to delete this form? This action cannot be undone."
 msgstr "Sigur vrei să ștergi acest formular? Acțiunea nu poate fi anulată."
+
+msgid "Are you sure you want to delete this ingredient?"
+msgstr ""
+
+msgid "Are you sure you want to delete this item?"
+msgstr "Sigur vrei să ștergi acest articol?"
+
+msgid "Are you sure you want to delete this location? This action cannot be undone."
+msgstr ""
 
 msgid "Are you sure you want to delete this part?"
 msgstr "Sigur vrei să ștergi această parte?"
 
+msgid "Are you sure you want to delete this request?"
+msgstr ""
+
 msgid "Are you sure you want to delete this segment?"
 msgstr "Sigur vrei să ștergi acest segment?"
+
+msgid "Are you sure you want to delete this stock item?"
+msgstr ""
 
 msgid "Are you sure you want to delete this submission? This action cannot be undone."
 msgstr "Sigur vrei să ștergi acest răspuns? Acțiunea nu poate fi anulată."
@@ -121,8 +362,44 @@ msgstr "Sigur vrei să ștergi acest răspuns? Acțiunea nu poate fi anulată."
 msgid "Are you sure you want to delete this subscriber?"
 msgstr "Sigur vrei să ștergi acest abonat?"
 
+msgid "Are you sure you want to increment the version? This will update the revision number and date."
+msgstr ""
+
+msgid "Are you sure you want to remove the signature from"
+msgstr ""
+
+msgid "Are you sure you want to remove this item?"
+msgstr ""
+
+msgid "Are you sure you want to remove this signature?"
+msgstr ""
+
 msgid "Are you sure you want to send this campaign? It will be processed by the cron job."
 msgstr "Sigur vrei să trimiți campania? Va fi procesată automat de cron."
+
+msgid "Are you sure you want to sign this order? This action will be recorded with a digital signature."
+msgstr ""
+
+msgid "Article"
+msgstr ""
+
+msgid "Article Information"
+msgstr ""
+
+msgid "Article Name"
+msgstr ""
+
+msgid "Article No"
+msgstr ""
+
+msgid "Articles"
+msgstr ""
+
+msgid "Attachment deleted successfully"
+msgstr "Atașament șters cu succes"
+
+msgid "Attachments"
+msgstr "Atașamente"
 
 msgid "Audit Log"
 msgstr "Jurnal activitate"
@@ -139,11 +416,35 @@ msgstr "Trebuie să te autentifici ca să trimiți acest formular."
 msgid "Author"
 msgstr "Autor"
 
+msgid "Available"
+msgstr ""
+
+msgid "BA Rompharm"
+msgstr ""
+
 msgid "Back"
 msgstr "Înapoi"
 
 msgid "Back to Dashboard"
 msgstr "Înapoi la panou"
+
+msgid "Back to Sales Orders"
+msgstr ""
+
+msgid "Batch"
+msgstr "Lot"
+
+msgid "Batch Code"
+msgstr ""
+
+msgid "Batch Codes"
+msgstr ""
+
+msgid "Build orders"
+msgstr ""
+
+msgid "Build simulation"
+msgstr ""
 
 msgid "By"
 msgstr "De"
@@ -160,6 +461,9 @@ msgstr "Campania a fost marcată pentru trimitere. Va fi procesată automat de c
 msgid "Campaign updated successfully"
 msgstr "Campania a fost actualizată cu succes"
 
+msgid "Campaign will be sent automatically at this date/time if active"
+msgstr ""
+
 msgid "Campaigns"
 msgstr "Campanii"
 
@@ -169,14 +473,89 @@ msgstr "Anulează"
 msgid "Cannot connect to server. Please check if the backend is running."
 msgstr "Nu mă pot conecta la server. Verifică dacă backend-ul rulează."
 
+msgid "Cannot delete items not added in Operations"
+msgstr ""
+
+msgid "Cannot set a descendant as parent (circular reference)"
+msgstr ""
+
+msgid "Categories"
+msgstr ""
+
+msgid "Category created successfully"
+msgstr ""
+
+msgid "Category deleted successfully"
+msgstr ""
+
+msgid "Category description"
+msgstr ""
+
+msgid "Category name"
+msgstr ""
+
+msgid "Category updated successfully"
+msgstr ""
+
 msgid "Cererea a fost înregistrată"
 msgstr "Cererea ta a fost înregistrată"
+
+msgid "Change History"
+msgstr ""
 
 msgid "Change State"
 msgstr "Schimbă starea"
 
+msgid "Change status"
+msgstr ""
+
+msgid "Check status"
+msgstr ""
+
+msgid "City"
+msgstr "Oraș"
+
+msgid "Clean Transport"
+msgstr ""
+
+msgid "Click refresh icon to check status"
+msgstr ""
+
+msgid "Clients"
+msgstr ""
+
+msgid "Cod"
+msgstr "Cod"
+
+msgid "Code"
+msgstr ""
+
+msgid "Code (IPN)"
+msgstr ""
+
+msgid "Coming soon..."
+msgstr ""
+
+msgid "Comma-separated email addresses to notify when a new submission is received"
+msgstr ""
+
+msgid "Comment"
+msgstr ""
+
+msgid "Company Name"
+msgstr "Nume companie"
+
+msgid "Company name is required"
+msgstr "Numele companiei este obligatoriu"
+
+msgid "Components & Batch Selection"
+msgstr ""
+
 msgid "Confirm"
 msgstr "Confirmă"
+
+msgid "Confirm Signature"
+msgstr ""
 
 msgid "Confirm Submission"
 msgstr "Confirmă trimiterea"
@@ -184,11 +563,20 @@ msgstr "Confirmă trimiterea"
 msgid "Confirmi trimiterea formularului în forma actuală?"
 msgstr "Confirmi că vrei să trimiți formularul așa cum este acum?"
 
+msgid "Conform"
+msgstr ""
+
 msgid "Consents"
 msgstr "Consimțăminte"
 
 msgid "Contact Form"
 msgstr "Formular Contact"
+
+msgid "Containers"
+msgstr ""
+
+msgid "Containers Cleaned"
+msgstr ""
 
 msgid "Content"
 msgstr "Conținut"
@@ -196,8 +584,14 @@ msgstr "Conținut"
 msgid "Content is required"
 msgstr "Conținutul este obligatoriu"
 
+msgid "Country"
+msgstr "Țară"
+
 msgid "Create"
 msgstr "Creează"
+
+msgid "Create Approval Flow"
+msgstr ""
 
 msgid "Create Form"
 msgstr "Creează Formular"
@@ -208,11 +602,38 @@ msgstr "Creează Formular Nou"
 msgid "Create New Template"
 msgstr "Creează Șablon Nou"
 
+msgid "Create Recipe"
+msgstr ""
+
 msgid "Create Template"
 msgstr "Creează Șablon"
 
 msgid "Create your first form to get started."
 msgstr "Creează primul tău formular ca să începi."
+
+msgid "Created"
+msgstr ""
+
+msgid "Created At"
+msgstr ""
+
+msgid "Created By"
+msgstr ""
+
+msgid "Creation Date"
+msgstr ""
+
+msgid "Currency"
+msgstr "Monedă"
+
+msgid "Current"
+msgstr ""
+
+msgid "Customer"
+msgstr ""
+
+msgid "Damaged"
+msgstr ""
 
 msgid "Data"
 msgstr "Date"
@@ -223,17 +644,50 @@ msgstr "DataFlows Docu nu este configurat"
 msgid "DataFlows Docu is not configured. Please configure it in config.yaml to use document templates."
 msgstr "DataFlows Docu nu este configurat. Te rog configurează-l în config.yaml ca să poți folosi șabloanele de documente."
 
+msgid "Date"
+msgstr ""
+
+msgid "Date BA Rompharm"
+msgstr ""
+
+msgid "Dates"
+msgstr ""
+
+msgid "Decision"
+msgstr ""
+
+msgid "Decision saved successfully"
+msgstr ""
+
 msgid "Delete"
 msgstr "Șterge"
+
+msgid "Delete Alternative"
+msgstr ""
 
 msgid "Delete Campaign"
 msgstr "Șterge Campanie"
 
+msgid "Delete Category"
+msgstr ""
+
 msgid "Delete Form"
 msgstr "Șterge Formular"
 
+msgid "Delete Item"
+msgstr ""
+
+msgid "Delete Location"
+msgstr ""
+
 msgid "Delete Part"
 msgstr "Șterge Parte"
+
+msgid "Delete Received Stock"
+msgstr ""
+
+msgid "Delete Request"
+msgstr ""
 
 msgid "Delete Segment"
 msgstr "Șterge Segment"
@@ -250,26 +704,86 @@ msgstr "Șterge formular"
 msgid "Delete submission"
 msgstr "Șterge răspuns"
 
+msgid "Deliveries"
+msgstr ""
+
+msgid "Delivery Date"
+msgstr ""
+
 msgid "Description"
 msgstr "Descriere"
+
+msgid "Destination"
+msgstr "Destinație"
+
+msgid "Destination Location"
+msgstr ""
+
+msgid "Details"
+msgstr "Detalii"
 
 msgid "Document Templates"
 msgstr "Șabloane Documente"
 
+msgid "Document deleted"
+msgstr ""
+
+msgid "Document downloaded"
+msgstr ""
+
+msgid "Document downloaded successfully"
+msgstr ""
+
 msgid "Document generated successfully!"
 msgstr "Document generat cu succes!"
+
+msgid "Document generation started"
+msgstr ""
+
+msgid "Documents"
+msgstr ""
+
+msgid "Download"
+msgstr ""
+
+msgid "Drag files here or click to select"
+msgstr "Trage fișierele aici sau dă click ca să alegi"
 
 msgid "Drag image here or click to select"
 msgstr "Trage imaginea aici sau dă click ca să alegi"
 
+msgid "Duplicate"
+msgstr ""
+
+msgid "Duplicate Recipe"
+msgstr ""
+
 msgid "Edit"
 msgstr "Editează"
+
+msgid "Edit Alternative"
+msgstr ""
 
 msgid "Edit Campaign"
 msgstr "Editează Campanie"
 
+msgid "Edit Category"
+msgstr ""
+
 msgid "Edit Form"
 msgstr "Editează Formular"
+
+msgid "Edit Ingredient"
+msgstr ""
+
+msgid "Edit Item"
+msgstr "Editează articol"
+
+msgid "Edit Location"
+msgstr ""
+
+msgid "Edit QC Record"
+msgstr ""
 
 msgid "Edit Segment"
 msgstr "Editează Segment"
@@ -286,11 +800,29 @@ msgstr "Email"
 msgid "Email marketing consent"
 msgstr "Consimțământ pentru email marketing"
 
+msgid "Email template to use for notifications"
+msgstr ""
+
+msgid "End Date"
+msgstr ""
+
 msgid "English"
 msgstr "English"
 
+msgid "Enter BA number"
+msgstr ""
+
+msgid "Enter Rompharm BA number"
+msgstr ""
+
+msgid "Enter batch code"
+msgstr ""
+
 msgid "Enter campaign title"
 msgstr "Introdu titlul campaniei"
+
+msgid "Enter company name"
+msgstr "Introdu numele companiei"
 
 msgid "Enter description"
 msgstr "Introdu descrierea"
@@ -307,8 +839,20 @@ msgstr "Introdu numele"
 msgid "Enter phone"
 msgstr "Introdu numărul de telefon"
 
+msgid "Enter product code"
+msgstr ""
+
+msgid "Enter product name"
+msgstr ""
+
+msgid "Enter reason for refusal"
+msgstr ""
+
 msgid "Enter segment name"
 msgstr "Introdu numele segmentului"
+
+msgid "Enter supplier batch code"
+msgstr ""
 
 msgid "Enter tax ID"
 msgstr "Introdu codul fiscal"
@@ -322,20 +866,89 @@ msgstr "Introdu numele de utilizator"
 msgid "Error"
 msgstr "Eroare"
 
+msgid "Expected Quantity"
+msgstr ""
+
+msgid "Expiry Date"
+msgstr ""
+
+msgid "Expiry date"
+msgstr ""
+
+msgid "F001"
+msgstr "F001"
+
+msgid "Failed"
+msgstr ""
+
+msgid "Failed to add alternative"
+msgstr ""
+
+msgid "Failed to add ingredient"
+msgstr ""
+
+msgid "Failed to add item"
+msgstr "Nu am putut adăuga articolul"
+
+msgid "Failed to confirm QC record"
+msgstr ""
+
+msgid "Failed to create approval flow"
+msgstr ""
+
+msgid "Failed to create purchase order"
+msgstr "Nu am putut crea comanda de achiziție"
+
+msgid "Failed to create recipe"
+msgstr ""
+
+msgid "Failed to create request"
+msgstr ""
+
+msgid "Failed to create supplier"
+msgstr "Nu am putut crea furnizorul"
+
 msgid "Failed to create template"
 msgstr "Nu am putut crea șablonul"
+
+msgid "Failed to delete alternative"
+msgstr ""
+
+msgid "Failed to delete attachment"
+msgstr "Nu am putut șterge atașamentul"
 
 msgid "Failed to delete campaign"
 msgstr "Nu am putut șterge campania"
 
+msgid "Failed to delete category"
+msgstr ""
+
+msgid "Failed to delete document"
+msgstr ""
+
 msgid "Failed to delete form"
 msgstr "Nu am putut șterge formularul"
+
+msgid "Failed to delete ingredient"
+msgstr ""
+
+msgid "Failed to delete item"
+msgstr "Nu am putut șterge articolul"
+
+msgid "Failed to delete location"
+msgstr ""
 
 msgid "Failed to delete part"
 msgstr "Nu am putut șterge partea"
 
+msgid "Failed to delete request"
+msgstr ""
+
 msgid "Failed to delete segment"
 msgstr "Nu am putut șterge segmentul"
+
+msgid "Failed to delete stock item"
+msgstr ""
 
 msgid "Failed to delete submission"
 msgstr "Nu am putut șterge răspunsul"
@@ -343,14 +956,26 @@ msgstr "Nu am putut șterge răspunsul"
 msgid "Failed to delete subscriber"
 msgstr "Nu am putut șterge abonatul"
 
+msgid "Failed to download document"
+msgstr ""
+
+msgid "Failed to duplicate recipe"
+msgstr ""
+
 msgid "Failed to generate document"
 msgstr "Nu am putut genera documentul"
 
 msgid "Failed to import from InvenTree"
 msgstr "Nu am putut importa din InvenTree"
 
+msgid "Failed to increment version"
+msgstr ""
+
 msgid "Failed to load campaigns"
 msgstr "Nu am putut încărca campaniile"
+
+msgid "Failed to load categories"
+msgstr ""
 
 msgid "Failed to load form"
 msgstr "Nu am putut încărca formularul"
@@ -358,11 +983,38 @@ msgstr "Nu am putut încărca formularul"
 msgid "Failed to load forms"
 msgstr "Nu am putut încărca formularele"
 
+msgid "Failed to load locations"
+msgstr ""
+
 msgid "Failed to load part content"
 msgstr "Nu am putut încărca conținutul părții"
 
+msgid "Failed to load production data"
+msgstr ""
+
+msgid "Failed to load purchase order"
+msgstr ""
+
+msgid "Failed to load purchase orders"
+msgstr "Nu am putut încărca comenzile de achiziție"
+
+msgid "Failed to load recipe"
+msgstr ""
+
+msgid "Failed to load recipes"
+msgstr ""
+
+msgid "Failed to load request"
+msgstr ""
+
+msgid "Failed to load requests"
+msgstr ""
+
 msgid "Failed to load segments"
 msgstr "Nu am putut încărca segmentele"
+
+msgid "Failed to load stock statuses"
+msgstr ""
 
 msgid "Failed to load submission"
 msgstr "Nu am putut încărca răspunsul"
@@ -379,11 +1031,32 @@ msgstr "Nu am putut încărca conținutul șablonului"
 msgid "Failed to load templates"
 msgstr "Nu am putut încărca șabloanele"
 
+msgid "Failed to receive stock"
+msgstr ""
+
+msgid "Failed to remove signature"
+msgstr ""
+
+msgid "Failed to save QC record"
+msgstr ""
+
 msgid "Failed to save campaign"
 msgstr "Nu am putut salva campania"
 
+msgid "Failed to save category"
+msgstr ""
+
+msgid "Failed to save items"
+msgstr ""
+
+msgid "Failed to save location"
+msgstr ""
+
 msgid "Failed to save part"
 msgstr "Nu am putut salva partea"
+
+msgid "Failed to save results"
+msgstr ""
 
 msgid "Failed to save segment"
 msgstr "Nu am putut salva segmentul"
@@ -391,17 +1064,74 @@ msgstr "Nu am putut salva segmentul"
 msgid "Failed to save subscriber"
 msgstr "Nu am putut salva abonatul"
 
+msgid "Failed to save unused quantities"
+msgstr ""
+
 msgid "Failed to send campaign"
 msgstr "Nu am putut trimite campania"
+
+msgid "Failed to sign operations"
+msgstr ""
+
+msgid "Failed to sign order"
+msgstr ""
+
+msgid "Failed to sign production"
+msgstr ""
+
+msgid "Failed to sign reception"
+msgstr ""
+
+msgid "Failed to sign request"
+msgstr ""
 
 msgid "Failed to submit form. Please try again."
 msgstr "Nu am putut trimite formularul. Încearcă din nou."
 
+msgid "Failed to update QC information"
+msgstr ""
+
+msgid "Failed to update QC record"
+msgstr ""
+
+msgid "Failed to update ingredient"
+msgstr ""
+
+msgid "Failed to update item"
+msgstr "Nu am putut actualiza articolul"
+
+msgid "Failed to update order"
+msgstr ""
+
+msgid "Failed to update request"
+msgstr ""
+
 msgid "Failed to update state"
 msgstr "Nu am putut actualiza starea"
 
+msgid "Failed to update status"
+msgstr ""
+
+msgid "Failed to upload file"
+msgstr "Nu am putut încărca fișierul"
+
 msgid "Failed to upload image"
 msgstr "Nu am putut încărca imaginea"
+
+msgid "File"
+msgstr ""
+
+msgid "File uploaded successfully"
+msgstr "Fișier încărcat cu succes"
+
+msgid "Filter by form"
+msgstr ""
+
+msgid "Final Decision"
+msgstr ""
+
+msgid "Finished"
+msgstr ""
 
 msgid "Form"
 msgstr "Formular"
@@ -436,20 +1166,23 @@ msgstr "Formular trimis cu succes!"
 msgid "Form updated successfully"
 msgstr "Formular actualizat cu succes"
 
-msgid "Forms"
-msgstr "Formulare"
-
 msgid "Forms Management"
 msgstr "Management Formulare"
 
 msgid "Generate Document"
 msgstr "Generează Document"
 
+msgid "Generate Documents"
+msgstr ""
+
 msgid "History"
 msgstr "Istoric"
 
 msgid "IP Address"
 msgstr "Adresă IP"
+
+msgid "IPN"
+msgstr ""
 
 msgid "Image"
 msgstr "Imagine"
@@ -466,14 +1199,80 @@ msgstr "Importă din InvenTree"
 msgid "Imported"
 msgstr "Importat"
 
+msgid "In Accordance with Supplier BA"
+msgstr ""
+
+msgid "In Progress"
+msgstr ""
+
+msgid "In builds"
+msgstr ""
+
+msgid "In procurement"
+msgstr ""
+
+msgid "In sales"
+msgstr ""
+
 msgid "Inactive"
 msgstr "Inactiv"
+
+msgid "Increment Version"
+msgstr ""
+
+msgid "Ingredient added successfully"
+msgstr ""
+
+msgid "Ingredient deleted successfully"
+msgstr ""
+
+msgid "Ingredient updated successfully"
+msgstr ""
+
+msgid "Ingredients"
+msgstr ""
 
 msgid "Invalid InvenTree credentials. Please check your username and password."
 msgstr "Datele de autentificare InvenTree sunt invalide. Verifică numele de utilizator și parola."
 
 msgid "Invalid file type. Please upload an image."
 msgstr "Tip de fișier invalid. Te rog încarcă o imagine."
+
+msgid "Inventory"
+msgstr ""
+
+msgid "Is Manufacturer"
+msgstr "Este producător"
+
+msgid "Is Supplier"
+msgstr "Este furnizor"
+
+msgid "Issue Date"
+msgstr "Data emiterii"
+
+msgid "Item added successfully"
+msgstr "Articol adăugat cu succes"
+
+msgid "Item deleted successfully"
+msgstr "Articol șters cu succes"
+
+msgid "Item not found"
+msgstr ""
+
+msgid "Item reference"
+msgstr "Referință articol"
+
+msgid "Item updated successfully"
+msgstr "Articol actualizat cu succes"
+
+msgid "Items"
+msgstr "Articole"
+
+msgid "Items saved successfully"
+msgstr ""
+
+msgid "J40/12345/2020"
+msgstr "J40/12345/2020"
 
 msgid "JSON Forms Documentation"
 msgstr "Documentație JSON Forms"
@@ -484,11 +1283,23 @@ msgstr "Schema JSON"
 msgid "JavaScript code"
 msgstr "Cod JavaScript"
 
+msgid "Journal"
+msgstr ""
+
+msgid "LOTALLEXP - Auto-received Items"
+msgstr ""
+
 msgid "Last Login"
 msgstr "Ultima autentificare"
 
 msgid "Last updated"
 msgstr "Ultima actualizare"
+
+msgid "Line Item"
+msgstr ""
+
+msgid "Line Items"
+msgstr ""
 
 msgid "Link"
 msgstr "Link"
@@ -501,6 +1312,9 @@ msgstr "Se încarcă jurnalul..."
 
 msgid "Loading campaigns..."
 msgstr "Se încarcă campaniile..."
+
+msgid "Loading components..."
+msgstr ""
 
 msgid "Loading form..."
 msgstr "Se încarcă formularul..."
@@ -529,14 +1343,71 @@ msgstr "Se încarcă șabloanele..."
 msgid "Loading users..."
 msgstr "Se încarcă utilizatorii..."
 
+msgid "Loading..."
+msgstr "Se încarcă..."
+
+msgid "Location"
+msgstr "Locație"
+
+msgid "Location created successfully"
+msgstr ""
+
+msgid "Location deleted successfully"
+msgstr ""
+
+msgid "Location description"
+msgstr ""
+
+msgid "Location name"
+msgstr ""
+
+msgid "Location updated successfully"
+msgstr ""
+
+msgid "Locations"
+msgstr ""
+
 msgid "Login"
 msgstr "Autentificare"
 
 msgid "Logout"
 msgstr "Deconectare"
 
+msgid "Lot"
+msgstr ""
+
+msgid "MU"
+msgstr ""
+
+msgid "Mandatory"
+msgstr ""
+
+msgid "Manufacturers"
+msgstr ""
+
+msgid "Manufacturing Date"
+msgstr ""
+
+msgid "Material"
+msgstr "Material"
+
+msgid "Max"
+msgstr ""
+
+msgid "Max file size: 10MB"
+msgstr "Dimensiune maximă: 10MB"
+
 msgid "Message"
 msgstr "Mesaj"
+
+msgid "Metadata"
+msgstr ""
+
+msgid "Minimum"
+msgstr ""
+
+msgid "Mislabeled"
+msgstr ""
 
 msgid "My Template"
 msgstr "Șablonul Meu"
@@ -544,14 +1415,47 @@ msgstr "Șablonul Meu"
 msgid "Name"
 msgstr "Nume"
 
+msgid "Name is required"
+msgstr ""
+
+msgid "Neconform"
+msgstr ""
+
 msgid "Need help with JSON Schema or UI Schema?"
 msgstr "Ai nevoie de ajutor cu Schema JSON sau Schema UI?"
 
 msgid "Never"
 msgstr "Niciodată"
 
+msgid "New Category"
+msgstr ""
+
+msgid "New Location"
+msgstr ""
+
+msgid "New Purchase Order"
+msgstr "Comandă de achiziție nouă"
+
+msgid "New QC Record"
+msgstr ""
+
+msgid "New Recipe"
+msgstr ""
+
+msgid "New Request"
+msgstr ""
+
+msgid "New Supplier"
+msgstr "Furnizor nou"
+
 msgid "New Template"
 msgstr "Șablon Nou"
+
+msgid "New item"
+msgstr "Element nou"
+
+msgid "New supplier"
+msgstr ""
 
 msgid "Next: Add JSON Schema"
 msgstr "Următorul: Adaugă Schema JSON"
@@ -562,8 +1466,29 @@ msgstr "Următorul: Actualizează Schema JSON"
 msgid "No"
 msgstr "Nu"
 
+msgid "No Approval Flow"
+msgstr ""
+
+msgid "No BA Rompharm"
+msgstr ""
+
+msgid "No QC records"
+msgstr ""
+
+msgid "No approval flow created yet"
+msgstr ""
+
+msgid "No attachments"
+msgstr "Niciun atașament"
+
 msgid "No audit logs found"
 msgstr "Nu am găsit niciun jurnal"
+
+msgid "No batch codes available. Please receive stock with batch codes first."
+msgstr ""
+
+msgid "No batch codes defined"
+msgstr ""
 
 msgid "No campaigns"
 msgstr "Nicio campanie"
@@ -571,20 +1496,71 @@ msgstr "Nicio campanie"
 msgid "No campaigns found. Create your first campaign to send to subscribers."
 msgstr "Nu am găsit nicio campanie. Creează prima ta campanie ca să le trimiți abonaților."
 
+msgid "No categories"
+msgstr ""
+
+msgid "No changes recorded yet"
+msgstr ""
+
+msgid "No data"
+msgstr "Nicio dată"
+
+msgid "No documents generated yet"
+msgstr ""
+
 msgid "No forms yet"
 msgstr "Niciun formular încă"
 
 msgid "No history"
 msgstr "Niciun istoric"
 
+msgid "No ingredients added yet"
+msgstr ""
+
+msgid "No items"
+msgstr "Niciun articol"
+
+msgid "No locations"
+msgstr ""
+
+msgid "No materials"
+msgstr ""
+
 msgid "No notifications"
 msgstr "Nicio notificare"
+
+msgid "No products found"
+msgstr ""
+
+msgid "No received items"
+msgstr "Niciun articol recepționat"
+
+msgid "No recipes found"
+msgstr ""
+
+msgid "No requests configured"
+msgstr ""
+
+msgid "No requests found"
+msgstr ""
+
+msgid "No results found"
+msgstr ""
+
+msgid "No sales orders found"
+msgstr ""
 
 msgid "No segments"
 msgstr "Niciun segment"
 
 msgid "No segments found. Add your first segment to organize subscribers."
 msgstr "Nu am găsit niciun segment. Adaugă primul tău segment ca să organizezi abonații."
+
+msgid "No shipments"
+msgstr ""
+
+msgid "No signatures yet"
+msgstr ""
 
 msgid "No submissions"
 msgstr "Niciun răspuns"
@@ -613,17 +1589,101 @@ msgstr "Nu am găsit niciun șablon"
 msgid "No users found"
 msgstr "Nu am găsit niciun utilizator"
 
+msgid "None (Root Category)"
+msgstr ""
+
+msgid "None (Root Location)"
+msgstr ""
+
 msgid "Not Found"
 msgstr "Negăsit"
 
+msgid "Note: Set quantity to 0 for items not available. Use Add Item to add materials with batch codes from source location."
+msgstr ""
+
 msgid "Notes"
 msgstr "Notițe"
+
+msgid "Notification Emails"
+msgstr ""
+
+msgid "Notification Template"
+msgstr ""
 
 msgid "Notifications"
 msgstr "Notificări"
 
 msgid "Notify author"
 msgstr "Anunță autorul"
+
+msgid "Num"
+msgstr ""
+
+msgid "Num Containers"
+msgstr ""
+
+msgid "OK - Transactionable"
+msgstr ""
+
+msgid "Operations"
+msgstr ""
+
+msgid "Operations Flow"
+msgstr ""
+
+msgid "Operations flow will be created automatically when request is approved"
+msgstr ""
+
+msgid "Operations signed successfully"
+msgstr ""
+
+msgid "Operator"
+msgstr ""
+
+msgid "Optional"
+msgstr ""
+
+msgid "Optional Approvers"
+msgstr ""
+
+msgid "Optional notes..."
+msgstr ""
+
+msgid "Or enter manually"
+msgstr ""
+
+msgid "Order Date"
+msgstr ""
+
+msgid "Order Items"
+msgstr "Articole comandă"
+
+msgid "Order Reference"
+msgstr "Referință comandă"
+
+msgid "Order description"
+msgstr "Descriere comandă"
+
+msgid "Order signed successfully"
+msgstr ""
+
+msgid "Order updated successfully"
+msgstr ""
+
+msgid "Parent"
+msgstr ""
+
+msgid "Parent Category"
+msgstr ""
+
+msgid "Parent Location"
+msgstr ""
+
+msgid "Part"
+msgstr "Piesă"
+
+msgid "Part (Article)"
+msgstr ""
 
 msgid "Part Type"
 msgstr "Tip parte"
@@ -637,14 +1697,101 @@ msgstr "Partea a fost actualizată cu succes"
 msgid "Password"
 msgstr "Parolă"
 
+msgid "Pending"
+msgstr ""
+
+msgid "Person"
+msgstr ""
+
 msgid "Phone"
 msgstr "Telefon"
+
+msgid "Planned quant."
+msgstr ""
+
+msgid "Please complete all fields including test results"
+msgstr ""
+
+msgid "Please fill in all fields"
+msgstr ""
+
+msgid "Please fill in all required fields"
+msgstr ""
 
 msgid "Please login to submit this form"
 msgstr "Te rog autentifică-te ca să trimiți acest formular"
 
+msgid "Please provide a reason for refusal"
+msgstr ""
+
+msgid "Please select a decision status before signing"
+msgstr ""
+
+msgid "Please select a part"
+msgstr "Te rog selectează o piesă"
+
+msgid "Please select a part and enter quantity"
+msgstr ""
+
+msgid "Please select a product"
+msgstr ""
+
+msgid "Please select a status"
+msgstr ""
+
+msgid "Please select a status before signing"
+msgstr ""
+
+msgid "Please select a supplier"
+msgstr "Te rog selectează un furnizor"
+
+msgid "Prelevated Quantity"
+msgstr ""
+
+msgid "Prelevation Date"
+msgstr ""
+
 msgid "Preview"
 msgstr "Previzualizare"
+
+msgid "Price"
+msgstr ""
+
+msgid "Processing"
+msgstr ""
+
+msgid "Processing..."
+msgstr ""
+
+msgid "Procurement"
+msgstr "Achiziții"
+
+msgid "Product"
+msgstr ""
+
+msgid "Product Name"
+msgstr ""
+
+msgid "Product cannot be changed. To change product, delete this ingredient and add a new one."
+msgstr ""
+
+msgid "Production"
+msgstr ""
+
+msgid "Production Approval"
+msgstr ""
+
+msgid "Production approval flow will be created automatically"
+msgstr ""
+
+msgid "Production completed successfully. Stock operations have been executed."
+msgstr ""
+
+msgid "Production signed successfully"
+msgstr ""
+
+msgid "Products/Container"
+msgstr ""
 
 msgid "Protected"
 msgstr "Protejat"
@@ -661,11 +1808,203 @@ msgstr "Formular Public"
 msgid "Public forms can be filled by anyone. Protected forms require authentication."
 msgstr "Formularele publice pot fi completate de oricine. Formularele protejate cer autentificare."
 
+msgid "Purchase Order"
+msgstr ""
+
+msgid "Purchase Price"
+msgstr "Preț achiziție"
+
+msgid "Purchase order created successfully"
+msgstr "Comandă de achiziție creată cu succes"
+
+msgid "Purchase order not found"
+msgstr "Comanda de achiziție nu a fost găsită"
+
+msgid "QC"
+msgstr ""
+
+msgid "QC information updated successfully"
+msgstr ""
+
+msgid "QC record confirmed - Batch is transactionable"
+msgstr ""
+
+msgid "QC record confirmed - Non-conforming batch"
+msgstr ""
+
+msgid "QC record saved successfully"
+msgstr ""
+
+msgid "QC record updated successfully"
+msgstr ""
+
+msgid "Qty"
+msgstr ""
+
+msgid "Quality Control"
+msgstr ""
+
+msgid "Quality Control Records"
+msgstr ""
+
+msgid "Quantity"
+msgstr "Cantitate"
+
+msgid "Queued"
+msgstr ""
+
+msgid "Quick Actions"
+msgstr ""
+
+msgid "Reason for Refusal"
+msgstr ""
+
+msgid "Receive"
+msgstr ""
+
+msgid "Receive Stock"
+msgstr ""
+
+msgid "Received"
+msgstr "Recepționat"
+
+msgid "Received Date"
+msgstr ""
+
+msgid "Received Qty"
+msgstr ""
+
+msgid "Received Quantities"
+msgstr ""
+
+msgid "Received Quantity"
+msgstr ""
+
+msgid "Received Stock"
+msgstr ""
+
+msgid "Recent Activity"
+msgstr ""
+
 msgid "Recent Submissions"
 msgstr "Răspunsuri Recente"
 
+msgid "Reception Flow"
+msgstr ""
+
+msgid "Reception flow completed successfully"
+msgstr ""
+
+msgid "Reception flow will be created automatically when operations are finished"
+msgstr ""
+
+msgid "Reception signed successfully"
+msgstr ""
+
+msgid "Recipe"
+msgstr ""
+
+msgid "Recipe created successfully"
+msgstr ""
+
+msgid "Recipe duplicated successfully"
+msgstr ""
+
+msgid "Recipe not found"
+msgstr ""
+
+msgid "Recipes"
+msgstr ""
+
+msgid "Reference"
+msgstr "Referință"
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Refused"
+msgstr ""
+
+msgid "Registration No."
+msgstr "Nr. înregistrare"
+
+msgid "Remove"
+msgstr ""
+
+msgid "Remove Item"
+msgstr ""
+
+msgid "Remove Signature"
+msgstr ""
+
+msgid "Request created successfully"
+msgstr ""
+
+msgid "Request deleted successfully"
+msgstr ""
+
+msgid "Request must have at least one item"
+msgstr ""
+
+msgid "Request not found"
+msgstr ""
+
+msgid "Request signed successfully"
+msgstr ""
+
+msgid "Request updated successfully"
+msgstr ""
+
+msgid "Requested"
+msgstr ""
+
+msgid "Requested Qty"
+msgstr "Cant. Solicitată"
+
+msgid "Requests"
+msgstr ""
+
+msgid "Required Approvers"
+msgstr ""
+
+msgid "Required Qty"
+msgstr "Cant. Necesară"
+
+msgid "Reset Date"
+msgstr ""
+
+msgid "Result"
+msgstr ""
+
+msgid "Resulted Qty"
+msgstr ""
+
+msgid "Results"
+msgstr ""
+
+msgid "Results saved successfully"
+msgstr ""
+
+msgid "Returns"
+msgstr ""
+
+msgid "Revision"
+msgstr ""
+
+msgid "Revisions"
+msgstr ""
+
 msgid "Role"
 msgstr "Rol"
+
+msgid "Rompharm BA Date"
+msgstr ""
+
+msgid "Rompharm BA No"
+msgstr ""
+
+msgid "Rompharm QC"
+msgstr ""
 
 msgid "Română"
 msgstr "Română"
@@ -673,8 +2012,53 @@ msgstr "Română"
 msgid "SMS marketing consent"
 msgstr "Consimțământ pentru SMS marketing"
 
+msgid "Sales"
+msgstr ""
+
+msgid "Sales Orders"
+msgstr ""
+
 msgid "Save"
 msgstr "Salvează"
+
+msgid "Save Changes"
+msgstr ""
+
+msgid "Save Decision"
+msgstr ""
+
+msgid "Save Results"
+msgstr ""
+
+msgid "Save Unused"
+msgstr ""
+
+msgid "Scheduled At"
+msgstr ""
+
+msgid "Search by product name or code..."
+msgstr ""
+
+msgid "Search by reference, supplier, description, or status..."
+msgstr ""
+
+msgid "Search categories..."
+msgstr ""
+
+msgid "Search for article..."
+msgstr ""
+
+msgid "Search for part..."
+msgstr ""
+
+msgid "Search for product..."
+msgstr ""
+
+msgid "Search items..."
+msgstr ""
+
+msgid "Search locations..."
+msgstr ""
 
 msgid "Segment"
 msgstr "Segment"
@@ -691,11 +2075,80 @@ msgstr "Segment actualizat cu succes"
 msgid "Segments"
 msgstr "Segmente"
 
+msgid "Select Alternative"
+msgstr ""
+
+msgid "Select Product"
+msgstr ""
+
+msgid "Select a product for the new recipe. All ingredients will be copied."
+msgstr ""
+
+msgid "Select batch code"
+msgstr ""
+
+msgid "Select batch code (optional)"
+msgstr ""
+
+msgid "Select batch code..."
+msgstr ""
+
+msgid "Select currency"
+msgstr ""
+
+msgid "Select date"
+msgstr "Selectează data"
+
+msgid "Select date and time"
+msgstr ""
+
+msgid "Select destination location"
+msgstr ""
+
+msgid "Select email template"
+msgstr ""
+
+msgid "Select expiry date"
+msgstr ""
+
+msgid "Select item to receive"
+msgstr ""
+
+msgid "Select location"
+msgstr ""
+
+msgid "Select parent category"
+msgstr ""
+
+msgid "Select parent location"
+msgstr ""
+
+msgid "Select part"
+msgstr "Selectează piesa"
+
+msgid "Select reset date"
+msgstr ""
+
+msgid "Select result"
+msgstr ""
+
 msgid "Select segment"
 msgstr "Selectează segment"
 
 msgid "Select segments"
 msgstr "Selectează segmente"
+
+msgid "Select source location"
+msgstr ""
+
+msgid "Select status"
+msgstr ""
+
+msgid "Select stock location"
+msgstr "Selectează locație stoc"
+
+msgid "Select supplier"
+msgstr "Selectează furnizor"
 
 msgid "Select templates"
 msgstr "Selectează șabloane"
@@ -706,11 +2159,59 @@ msgstr "Selectează șabloane pentru generarea documentelor"
 msgid "Select the type of template part to create"
 msgstr "Selectează tipul părții de șablon pe care vrei să o creezi"
 
+msgid "Select unit"
+msgstr ""
+
+msgid "Selected item not found"
+msgstr ""
+
 msgid "Send Campaign"
 msgstr "Trimite Campania"
 
 msgid "Sent Count"
 msgstr "Număr Trimise"
+
+msgid "Series"
+msgstr ""
+
+msgid "Shipment Date"
+msgstr ""
+
+msgid "Shipments"
+msgstr ""
+
+msgid "Shipped"
+msgstr ""
+
+msgid "Sign"
+msgstr ""
+
+msgid "Sign Production"
+msgstr ""
+
+msgid "Signature Hash"
+msgstr ""
+
+msgid "Signature removed successfully"
+msgstr ""
+
+msgid "Signatures"
+msgstr ""
+
+msgid "Signed"
+msgstr ""
+
+msgid "Signed At"
+msgstr ""
+
+msgid "Signed by"
+msgstr ""
+
+msgid "Single"
+msgstr ""
+
+msgid "Single Product"
+msgstr ""
 
 msgid "Skipped"
 msgstr "Sărite"
@@ -718,8 +2219,20 @@ msgstr "Sărite"
 msgid "Slug"
 msgstr "Slug"
 
+msgid "Source"
+msgstr ""
+
+msgid "Source Location"
+msgstr ""
+
+msgid "Source and destination cannot be the same"
+msgstr ""
+
 msgid "Standard CSS syntax"
 msgstr "Sintaxă CSS standard"
+
+msgid "Start Date"
+msgstr "Data început"
 
 msgid "State"
 msgstr "Stare"
@@ -730,6 +2243,33 @@ msgstr "Stare actualizată cu succes"
 msgid "Status"
 msgstr "Status"
 
+msgid "Status updated successfully"
+msgstr ""
+
+msgid "Stock Details"
+msgstr ""
+
+msgid "Stock Information"
+msgstr ""
+
+msgid "Stock Value"
+msgstr ""
+
+msgid "Stock can be transferred while in quarantine"
+msgstr ""
+
+msgid "Stock item deleted successfully"
+msgstr ""
+
+msgid "Stock received successfully"
+msgstr ""
+
+msgid "Stocks"
+msgstr ""
+
+msgid "Street address"
+msgstr "Adresa străzii"
+
 msgid "Submission Details"
 msgstr "Detalii Răspuns"
 
@@ -738,6 +2278,12 @@ msgstr "Răspuns șters cu succes"
 
 msgid "Submission not found"
 msgstr "Răspunsul nu a fost găsit"
+
+msgid "Submissions (30 days)"
+msgstr ""
+
+msgid "Submissions (7 days)"
+msgstr ""
 
 msgid "Submit"
 msgstr "Trimite"
@@ -763,17 +2309,65 @@ msgstr "Abonați"
 msgid "Success"
 msgstr "Succes"
 
+msgid "Supplier"
+msgstr "Furnizor"
+
+msgid "Supplier BA Date"
+msgstr ""
+
+msgid "Supplier BA Information"
+msgstr ""
+
+msgid "Supplier BA No"
+msgstr ""
+
+msgid "Supplier Batch Code"
+msgstr ""
+
+msgid "Supplier Reference"
+msgstr "Referință furnizor"
+
+msgid "Supplier U.M."
+msgstr ""
+
+msgid "Supplier created successfully"
+msgstr "Furnizor creat cu succes"
+
+msgid "Supplier in List"
+msgstr ""
+
+msgid "Supplier order number"
+msgstr "Număr comandă furnizor"
+
+msgid "Suppliers"
+msgstr ""
+
 msgid "System Notifications"
 msgstr "Notificări Sistem"
 
 msgid "T"
 msgstr "T"
 
+msgid "Target Date"
+msgstr "Data țintă"
+
 msgid "Tax ID"
 msgstr "Cod fiscal"
 
 msgid "Tax ID (CUI/CIF)"
 msgstr "Cod fiscal (CUI/CIF)"
+
+msgid "Tax identification number"
+msgstr "Cod de identificare fiscală"
+
+msgid "Temperature Conditions Met"
+msgstr ""
+
+msgid "Temperature Control"
+msgstr ""
+
+msgid "Temperature Control Transport"
+msgstr ""
 
 msgid "Template Name"
 msgstr "Nume Șablon"
@@ -790,14 +2384,32 @@ msgstr "Numele șablonului este obligatoriu"
 msgid "Templates"
 msgstr "Șabloane"
 
+msgid "Test Result (Conform/Neconform)"
+msgstr ""
+
 msgid "The DataFlows Docu server may be experiencing issues with the /raw endpoint."
 msgstr "Serverul DataFlows Docu poate avea probleme cu endpoint-ul /raw."
+
+msgid "These items were automatically received as transactionable (OK) without quarantine."
+msgstr ""
 
 msgid "This action cannot be undone."
 msgstr "Acțiunea asta nu poate fi anulată."
 
+msgid "This form is read-only because it has been signed."
+msgstr ""
+
 msgid "This is a protected form. You need to login to access it."
 msgstr "Acesta este un formular protejat. Trebuie să te autentifici ca să-l accesezi."
+
+msgid "This part is already in the list"
+msgstr ""
+
+msgid "This purchase order does not have an approval flow. Approval flows are automatically created for new orders based on the configured approval template."
+msgstr ""
+
+msgid "This request has signatures and cannot be edited. Remove all signatures to enable editing."
+msgstr ""
 
 msgid "Timestamp"
 msgstr "Data/Ora"
@@ -805,14 +2417,71 @@ msgstr "Data/Ora"
 msgid "Title"
 msgstr "Titlu"
 
+msgid "Total"
+msgstr ""
+
+msgid "Total Price"
+msgstr ""
+
+msgid "Total Submissions"
+msgstr ""
+
+msgid "Tracking Number"
+msgstr ""
+
+msgid "Transactionable"
+msgstr ""
+
+msgid "Transactionable (În carantină tranzacționabil)"
+msgstr ""
+
+msgid "Transferable"
+msgstr ""
+
+msgid "Transport"
+msgstr ""
+
+msgid "Transport Conditions"
+msgstr ""
+
 msgid "Type"
 msgstr "Tip"
+
+msgid "Type at least 2 characters"
+msgstr ""
+
+msgid "Type at least 2 characters to search..."
+msgstr ""
 
 msgid "UI Schema (optional)"
 msgstr "Schema UI (opțional)"
 
 msgid "Unable to load template content. Please try again later or contact support."
 msgstr "Nu pot încărca conținutul șablonului. Încearcă mai târziu sau contactează suportul."
+
+msgid "Unit"
+msgstr ""
+
+msgid "Unit Price"
+msgstr "Preț unitar"
+
+msgid "Unit of Measure"
+msgstr ""
+
+msgid "Unknown error"
+msgstr ""
+
+msgid "Unsealed"
+msgstr ""
+
+msgid "Unused Materials"
+msgstr ""
+
+msgid "Unused Qty"
+msgstr ""
+
+msgid "Unused quantities saved successfully"
+msgstr ""
 
 msgid "Update"
 msgstr "Actualizează"
@@ -823,8 +2492,29 @@ msgstr "Actualizează Schema Formular"
 msgid "Update State"
 msgstr "Actualizează Starea"
 
+msgid "Updated"
+msgstr ""
+
+msgid "Updated At"
+msgstr ""
+
+msgid "Updated By"
+msgstr ""
+
+msgid "Upload Date"
+msgstr ""
+
+msgid "Upload File"
+msgstr "Încarcă fișier"
+
+msgid "Use Expiry Date (uncheck for Reset Date)"
+msgstr ""
+
 msgid "Use Jinja2 syntax: {{variable}}, {% for %}, {% if %}"
 msgstr "Folosește sintaxa Jinja2: {{variable}}, {% for %}, {% if %}"
+
+msgid "Used Qty"
+msgstr ""
 
 msgid "User"
 msgstr "Utilizator"
@@ -838,11 +2528,23 @@ msgstr "Utilizatori"
 msgid "Users List"
 msgstr "Lista Utilizatori"
 
-msgid "View All Submissions"
-msgstr "Vezi toate răspunsurile"
+msgid "Value"
+msgstr ""
+
+msgid "Version incremented to"
+msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "View Articles"
+msgstr ""
 
 msgid "View Documentation"
 msgstr "Vezi Documentația"
+
+msgid "View Stocks"
+msgstr ""
 
 msgid "View details"
 msgstr "Vezi detalii"
@@ -850,8 +2552,20 @@ msgstr "Vezi detalii"
 msgid "View submissions"
 msgstr "Vezi răspunsurile"
 
+msgid "Warehouse Operations"
+msgstr ""
+
+msgid "Warning"
+msgstr ""
+
+msgid "Welcome"
+msgstr ""
+
 msgid "Will be verified with ANAF if provided"
 msgstr "Va fi verificat automat la ANAF dacă îl introduci"
+
+msgid "Withdrawals"
+msgstr ""
 
 msgid "Yes"
 msgstr "Da"
@@ -859,269 +2573,83 @@ msgstr "Da"
 msgid "a"
 msgstr "a"
 
+msgid "by"
+msgstr ""
+
+msgid "category"
+msgstr ""
+
+msgid "code"
+msgstr ""
+
+msgid "description"
+msgstr ""
+
+msgid "destination_detail"
+msgstr ""
+
+msgid "filter"
+msgstr ""
+
+msgid "form_title"
+msgstr ""
+
+msgid "initial"
+msgstr ""
+
+msgid "ipn"
+msgstr ""
+
+msgid "issue_date"
+msgstr ""
+
+msgid "items"
+msgstr ""
+
+msgid "items_count"
+msgstr ""
+
+msgid "name"
+msgstr ""
+
 msgid "part"
 msgstr "parte"
 
-msgid "Procurement"
-msgstr "Achiziții"
+msgid "part_detail"
+msgstr ""
 
-msgid "New item"
-msgstr "Element nou"
+msgid "purchase_price"
+msgstr ""
 
-msgid "New Purchase Order"
-msgstr "Comandă de achiziție nouă"
+msgid "quantity"
+msgstr ""
 
-msgid "New Supplier"
-msgstr "Furnizor nou"
+msgid "received"
+msgstr ""
 
-msgid "Supplier"
-msgstr "Furnizor"
+msgid "reference"
+msgstr ""
 
-msgid "Select supplier"
-msgstr "Selectează furnizor"
+msgid "state"
+msgstr ""
 
-msgid "Order Reference"
-msgstr "Referință comandă"
+msgid "status_text"
+msgstr ""
 
-msgid "Supplier Reference"
-msgstr "Referință furnizor"
+msgid "submitted_at"
+msgstr ""
 
-msgid "Supplier order number"
-msgstr "Număr comandă furnizor"
+msgid "submitted_by"
+msgstr ""
 
-msgid "Order description"
-msgstr "Descriere comandă"
+msgid "supplier_detail"
+msgstr ""
 
-msgid "Currency"
-msgstr "Monedă"
+msgid "target_date"
+msgstr ""
 
-msgid "Destination"
-msgstr "Destinație"
+msgid "um"
+msgstr ""
 
-msgid "Select stock location"
-msgstr "Selectează locație stoc"
-
-msgid "Start Date"
-msgstr "Data început"
-
-msgid "Target Date"
-msgstr "Data țintă"
-
-msgid "Select date"
-msgstr "Selectează data"
-
-msgid "Additional notes"
-msgstr "Notițe adiționale"
-
-msgid "Company Name"
-msgstr "Nume companie"
-
-msgid "Enter company name"
-msgstr "Introdu numele companiei"
-
-msgid "Company name is required"
-msgstr "Numele companiei este obligatoriu"
-
-msgid "Tax identification number"
-msgstr "Cod de identificare fiscală"
-
-msgid "Cod"
-msgstr "Cod"
-
-msgid "F001"
-msgstr "F001"
-
-msgid "Registration No."
-msgstr "Nr. înregistrare"
-
-msgid "J40/12345/2020"
-msgstr "J40/12345/2020"
-
-msgid "Address"
-msgstr "Adresă"
-
-msgid "Street address"
-msgstr "Adresa străzii"
-
-msgid "Country"
-msgstr "Țară"
-
-msgid "City"
-msgstr "Oraș"
-
-msgid "Is Supplier"
-msgstr "Este furnizor"
-
-msgid "Is Manufacturer"
-msgstr "Este producător"
-
-msgid "Supplier created successfully"
-msgstr "Furnizor creat cu succes"
-
-msgid "Failed to create supplier"
-msgstr "Nu am putut crea furnizorul"
-
-msgid "Please select a supplier"
-msgstr "Te rog selectează un furnizor"
-
-msgid "Purchase order created successfully"
-msgstr "Comandă de achiziție creată cu succes"
-
-msgid "Failed to create purchase order"
-msgstr "Nu am putut crea comanda de achiziție"
-
-msgid "Failed to load purchase orders"
-msgstr "Nu am putut încărca comenzile de achiziție"
-
-msgid "Loading..."
-msgstr "Se încarcă..."
-
-msgid "No data"
-msgstr "Nicio dată"
-
-msgid "Reference"
-msgstr "Referință"
-
-msgid "Issue Date"
-msgstr "Data emiterii"
-
-msgid "Purchase order not found"
-msgstr "Comanda de achiziție nu a fost găsită"
-
-msgid "Details"
-msgstr "Detalii"
-
-msgid "Approvals"
-msgstr "Aprobări"
-
-msgid "Items"
-msgstr "Articole"
-
-msgid "Attachments"
-msgstr "Atașamente"
-
-msgid "Approval system will be implemented in the next phase"
-msgstr "Sistemul de aprobări va fi implementat în faza următoare"
-
-msgid "Order Items"
-msgstr "Articole comandă"
-
-msgid "Add Item"
-msgstr "Adaugă articol"
-
-msgid "Part"
-msgstr "Piesă"
-
-msgid "Select part"
-msgstr "Selectează piesa"
-
-msgid "Quantity"
-msgstr "Cantitate"
-
-msgid "Received"
-msgstr "Recepționat"
-
-msgid "Unit Price"
-msgstr "Preț unitar"
-
-msgid "Purchase Price"
-msgstr "Preț achiziție"
-
-msgid "Item reference"
-msgstr "Referință articol"
-
-msgid "Please select a part"
-msgstr "Te rog selectează o piesă"
-
-msgid "Item added successfully"
-msgstr "Articol adăugat cu succes"
-
-msgid "Failed to add item"
-msgstr "Nu am putut adăuga articolul"
-
-msgid "No items"
-msgstr "Niciun articol"
-
-msgid "Attachments functionality will be implemented in the next phase"
-msgstr "Funcționalitatea de atașamente va fi implementată în faza următoare"
-
-msgid "PO-001"
-msgstr "PO-001"
-
-msgid "Add"
-msgstr "Adaugă"
-
-msgid "Edit Item"
-msgstr "Editează articol"
-
-msgid "Item updated successfully"
-msgstr "Articol actualizat cu succes"
-
-msgid "Failed to update item"
-msgstr "Nu am putut actualiza articolul"
-
-msgid "Are you sure you want to delete this item?"
-msgstr "Sigur vrei să ștergi acest articol?"
-
-msgid "Item deleted successfully"
-msgstr "Articol șters cu succes"
-
-msgid "Failed to delete item"
-msgstr "Nu am putut șterge articolul"
-
-msgid "Upload File"
-msgstr "Încarcă fișier"
-
-msgid "Drag files here or click to select"
-msgstr "Trage fișierele aici sau dă click ca să alegi"
-
-msgid "Max file size: 10MB"
-msgstr "Dimensiune maximă: 10MB"
-
-msgid "File uploaded successfully"
-msgstr "Fișier încărcat cu succes"
-
-msgid "Failed to upload file"
-msgstr "Nu am putut încărca fișierul"
-
-msgid "Are you sure you want to delete this attachment?"
-msgstr "Sigur vrei să ștergi acest atașament?"
-
-msgid "Attachment deleted successfully"
-msgstr "Atașament șters cu succes"
-
-msgid "Failed to delete attachment"
-msgstr "Nu am putut șterge atașamentul"
-
-msgid "No attachments"
-msgstr "Niciun atașament"
-
-msgid "Reception"
-msgstr "Recepție"
-
-msgid "Received Items"
-msgstr "Articole recepționate"
-
-msgid "No received items"
-msgstr "Niciun articol recepționat"
-
-msgid "Location"
-msgstr "Locație"
-
-msgid "Batch"
-msgstr "Lot"
-
-msgid "Serial"
-msgstr "Serie"
-
-msgid "Edit"
-msgstr "Editează"
-m s g i d   " S e a r c h   b y   r e f e r e n c e ,   s u p p l i e r ,   d e s c r i p t i o n ,   o r   s t a t u s . . . "  
- m s g s t r   " C a u t   d u p   r e f e r i n ,   f u r n i z o r ,   d e s c r i e r e   s a u   s t a t u s . . . "  
-  
- m s g i d   " N o   r e s u l t s   f o u n d "  
- m s g s t r   " N i c i u n   r e z u l t a t   g s i t "  
-  
- m s g i d   " S e a r c h   i t e m s . . . "  
- m s g s t r   " C a u t   a r t i c o l e . . . "  
- 
+msgid "updated_at"
+msgstr ""

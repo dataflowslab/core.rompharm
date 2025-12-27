@@ -31,6 +31,14 @@ interface RequestItem {
   part_detail?: Part;
 }
 
+interface StateDetail {
+  _id: string;
+  name: string;
+  slug: string;
+  workflow_level: number;
+  order: number;
+}
+
 interface Request {
   _id: string;
   reference: string;
@@ -39,8 +47,8 @@ interface Request {
   items: RequestItem[];
   line_items: number;
   status: string;
-  state_level?: number;
   state_order?: number;
+  state_detail?: StateDetail;
   notes: string;
   issue_date: string;
   created_at: string;
@@ -112,7 +120,7 @@ export function RequestDetailPage() {
           </Button>
           <Title order={2}>{request.reference}</Title>
           <Badge color={getStatusColor(request.status)} size="lg">
-            {request.status}
+            {request.state_detail?.name || request.status}
           </Badge>
         </Group>
       </Group>
@@ -126,23 +134,23 @@ export function RequestDetailPage() {
             {t('Approval')}
           </Tabs.Tab>
           <Tabs.Tab value="items" leftSection={<IconList size={16} />}>
-            {t('Items')}
+            {t('Items')}{request.line_items > 0 ? ` (${request.line_items})` : ''}
           </Tabs.Tab>
-          {(request.state_level && request.state_level >= 100) && (
+          {(request.state_order && request.state_order > 20) ? (
             <Tabs.Tab value="operations" leftSection={<IconTruck size={16} />}>
               {t('Operations')}
             </Tabs.Tab>
-          )}
-          {(request.state_level && request.state_level >= 250) && (
+          ) : null}
+          {(request.state_order && request.state_order > 30) ? (
             <Tabs.Tab value="reception" leftSection={<IconPackage size={16} />}>
               {t('Receive Stock')}
             </Tabs.Tab>
-          )}
-          {(request.state_order && request.state_order >= 40 && request.state_order !== 41) && (
+          ) : null}
+          {(request.state_order && request.state_order > 40) ? (
             <Tabs.Tab value="production" leftSection={<IconTool size={16} />}>
               {t('Production')}
             </Tabs.Tab>
-          )}
+          ) : null}
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">
@@ -150,30 +158,30 @@ export function RequestDetailPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="approval" pt="md">
-          {id && <ApprovalsTab requestId={id} onReload={loadRequest} />}
+          {id ? <ApprovalsTab requestId={id} onReload={loadRequest} /> : null}
         </Tabs.Panel>
 
         <Tabs.Panel value="items" pt="md">
-          {id && request && <ItemsTab requestId={id} request={request} onReload={loadRequest} />}
+          {id && request ? <ItemsTab requestId={id} request={request} onReload={loadRequest} /> : null}
         </Tabs.Panel>
 
-        {(request.state_level && request.state_level >= 100) && (
+        {(request.state_order && request.state_order > 20) ? (
           <Tabs.Panel value="operations" pt="md">
-            {id && <OperationsTab requestId={id} onReload={loadRequest} />}
+            {id ? <OperationsTab requestId={id} onReload={loadRequest} /> : null}
           </Tabs.Panel>
-        )}
+        ) : null}
 
-        {(request.state_level && request.state_level >= 250) && (
+        {(request.state_order && request.state_order > 30) ? (
           <Tabs.Panel value="reception" pt="md">
-            {id && <ReceptieTab requestId={id} onReload={loadRequest} />}
+            {id ? <ReceptieTab requestId={id} onReload={loadRequest} /> : null}
           </Tabs.Panel>
-        )}
+        ) : null}
 
-        {(request.state_order && request.state_order >= 40 && request.state_order !== 41) && (
+        {(request.state_order && request.state_order > 40) ? (
           <Tabs.Panel value="production" pt="md">
-            {id && <ProductionTab requestId={id} onReload={loadRequest} />}
+            {id ? <ProductionTab requestId={id} onReload={loadRequest} /> : null}
           </Tabs.Panel>
-        )}
+        ) : null}
       </Tabs>
     </Paper>
   );

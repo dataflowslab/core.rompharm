@@ -529,97 +529,83 @@ async def sign_operations(
             }
         )
         
-        # Check if operations decision is set and update main status accordingly
+        # Update request state_id to "Warehouse signed"
         try:
             req_obj_id = ObjectId(request_id)
-            req_doc = requests_collection.find_one({"_id": req_obj_id})
+            warehouse_signed_state_id = ObjectId("694dec8e297c9dde6d706648")
             
-            if req_doc and req_doc.get('operations_result'):
-                # Decision already set - update main status to decision value
-                decision_status = req_doc['operations_result']
-                status_update = {'status': decision_status, 'updated_at': timestamp}
+            requests_collection.update_one(
+                {"_id": req_obj_id},
+                {"$set": {
+                    "state_id": warehouse_signed_state_id,
+                    "updated_at": timestamp
+                }}
+            )
+            
+            # Log the state change
+            db.logs.insert_one({
+                'collection': 'depo_requests',
+                'object_id': request_id,
+                'action': 'operations_signed',
+                'state_id': str(warehouse_signed_state_id),
+                'state_name': 'Warehouse signed',
+                'user': username,
+                'timestamp': timestamp
+            })
+            
+            print(f"[REQUESTS] Operations flow approved for request {request_id}, state updated to Warehouse signed")
+            
+            # Auto-create reception flow from approval_templates
+            try:
+                existing_reception_flow = db.approval_flows.find_one({
+                    "object_type": "stock_request_reception",
+                    "object_id": request_id
+                })
                 
-                if decision_status == 'Finished':
-                    status_update['finished_at'] = timestamp
-                elif decision_status == 'Refused':
-                    status_update['refused_at'] = timestamp
-                    status_update['refused_by'] = req_doc.get('operations_result_updated_by', 'system')
-                
-                requests_collection.update_one(
-                    {"_id": req_obj_id},
-                    {"$set": status_update}
-                )
-                print(f"[REQUESTS] Request {request_id} status updated to {decision_status} (from operations decision)")
-                
-                # Auto-create reception flow when operations finished successfully
-                if decision_status == 'Finished':
-                    try:
-                        existing_reception_flow = db.approval_flows.find_one({
-                            "object_type": "stock_request_reception",
-                            "object_id": request_id
-                        })
+                if not existing_reception_flow:
+                    # Get template from approval_templates
+                    template_id = ObjectId("694877f8ec1cdc6fda1dd7d8")
+                    template = db.approval_templates.find_one({"_id": template_id})
+                    
+                    if template:
+                        # Map officers from template to can_sign_officers format
+                        officers = template.get('officers', [])
+                        can_sign_officers = []
+                        for officer in officers:
+                            can_sign_officers.append({
+                                "type": officer.get('type', 'person'),
+                                "reference": officer.get('reference', ''),
+                                "username": officer.get('username', ''),
+                                "action": "can_sign"
+                            })
                         
-                        if not existing_reception_flow:
-                            # Get reception config
-                            config_collection = db['config']
-                            reception_config = config_collection.find_one({'slug': 'requests_reception_flow'})
-                            
-                            if reception_config and 'items' in reception_config:
-                                # Find reception flow config
-                                reception_flow_config = None
-                                for item in reception_config.get('items', []):
-                                    if item.get('slug') == 'reception' and item.get('enabled', True):
-                                        reception_flow_config = item
-                                        break
-                                
-                                if reception_flow_config:
-                                    # Build officers lists
-                                    can_sign_officers = []
-                                    for user in reception_flow_config.get('can_sign', []):
-                                        can_sign_officers.append({
-                                            "type": "person",
-                                            "reference": user.get('user_id'),
-                                            "username": user.get('username'),
-                                            "action": "can_sign"
-                                        })
-                                    
-                                    must_sign_officers = []
-                                    for user in reception_flow_config.get('must_sign', []):
-                                        must_sign_officers.append({
-                                            "type": "person",
-                                            "reference": user.get('user_id'),
-                                            "username": user.get('username'),
-                                            "action": "must_sign"
-                                        })
-                                    
-                                    reception_flow_data = {
-                                        "object_type": "stock_request_reception",
-                                        "object_source": "depo_request",
-                                        "object_id": request_id,
-                                        "flow_type": "reception",
-                                        "config_slug": reception_flow_config.get('slug'),
-                                        "min_signatures": reception_flow_config.get('min_signatures', 1),
-                                        "can_sign_officers": can_sign_officers,
-                                        "must_sign_officers": must_sign_officers,
-                                        "signatures": [],
-                                        "status": "pending",
-                                        "created_at": timestamp,
-                                        "updated_at": timestamp
-                                    }
-                                    
-                                    db.approval_flows.insert_one(reception_flow_data)
-                                    print(f"[REQUESTS] Auto-created reception flow for request {request_id}")
-                    except Exception as e:
-                        print(f"[REQUESTS] Warning: Failed to auto-create reception flow: {e}")
-            else:
-                # No decision set yet - keep as "In Operations"
-                requests_collection.update_one(
-                    {"_id": req_obj_id},
-                    {"$set": {"status": "In Operations", "updated_at": timestamp}}
-                )
-                print(f"[REQUESTS] Request {request_id} operations flow approved, status: In Operations")
+                        reception_flow_data = {
+                            "object_type": "stock_request_reception",
+                            "object_source": "requests",
+                            "object_id": request_id,
+                            "template_id": str(template_id),
+                            "name": template.get('name', 'Receiving Approval'),
+                            "description": template.get('description', ''),
+                            "can_sign_officers": can_sign_officers,
+                            "must_sign_officers": [],
+                            "min_signatures": 1,
+                            "signatures": [],
+                            "status": "pending",
+                            "active": template.get('active', True),
+                            "created_at": timestamp,
+                            "updated_at": timestamp
+                        }
+                        
+                        result = db.approval_flows.insert_one(reception_flow_data)
+                        print(f"[REQUESTS] ✓ Auto-created reception flow for request {request_id} from template {template_id}")
+                    else:
+                        print(f"[REQUESTS] ERROR: Template {template_id} not found in approval_templates")
+            except Exception as e:
+                print(f"[REQUESTS] ERROR: Failed to auto-create reception flow: {e}")
+                import traceback
+                traceback.print_exc()
         except Exception as e:
-            print(f"[REQUESTS] Warning: Failed to update request status: {e}")
+            print(f"[REQUESTS] Warning: Failed to update state_id: {e}")
     
     # Get updated flow
     flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
@@ -687,58 +673,70 @@ async def update_operations_status(
     if not status:
         raise HTTPException(status_code=400, detail="Status is required")
     
-    if status not in ['Finished', 'Refused']:
-        raise HTTPException(status_code=400, detail="Status must be 'Finished' or 'Refused'")
+    # Validate that status is a valid state ID with 'operations' scene
+    try:
+        state_id = ObjectId(status)
+        state = db.depo_requests_states.find_one({"_id": state_id})
+        
+        if not state:
+            raise HTTPException(status_code=400, detail="Invalid state ID")
+        
+        # Check if state has 'operations' in scenes
+        if not state.get('scenes') or 'operations' not in state.get('scenes', []):
+            raise HTTPException(status_code=400, detail="State must have 'operations' in scenes")
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=400, detail="Invalid state ID format")
     
-    # Update request with operations decision
+    # Update request state_id and add to status_log
     try:
         req_obj_id = ObjectId(request_id)
-        update_data = {
-            'operations_result': status,
-            'operations_result_updated_at': datetime.utcnow(),
-            'operations_result_updated_by': current_user.get('username'),
-            'updated_at': datetime.utcnow()
+        state_id = ObjectId(status)
+        timestamp = datetime.utcnow()
+        
+        # Create status log entry
+        status_log_entry = {
+            'status_id': state_id,
+            'scene': 'operations',
+            'created_at': timestamp,
+            'created_by': current_user.get('username'),
+            'reason': reason if reason else None
         }
         
-        if status == 'Refused':
-            update_data['operations_result_reason'] = reason
-        else:
-            # Clear reason if changing to Finished
-            update_data['operations_result_reason'] = ''
+        update_data = {
+            'state_id': state_id,
+            'updated_at': timestamp
+        }
         
         requests_collection.update_one(
             {'_id': req_obj_id},
-            {'$set': update_data}
+            {
+                '$set': update_data,
+                '$push': {'status_log': status_log_entry}
+            }
         )
         
-        print(f"[REQUESTS] Request {request_id} operations decision set to {status}")
-        
-        # Check if flow is approved - if yes, also update main status
-        flow = db.approval_flows.find_one({
-            "object_type": "stock_request_operations",
-            "object_id": request_id
+        # Log to audit logs
+        is_rejected = 'reject' in state.get('slug', '').lower()
+        db.logs.insert_one({
+            'collection': 'depo_requests',
+            'object_id': request_id,
+            'action': 'operations_decision',
+            'state_id': str(state_id),
+            'state_name': state.get('name'),
+            'is_rejected': is_rejected,
+            'reason': reason if is_rejected else '',
+            'user': current_user.get('username'),
+            'timestamp': timestamp
         })
         
-        if flow and flow.get('status') == 'approved':
-            # All signatures collected - update main status
-            status_update = {'status': status}
-            
-            if status == 'Refused':
-                status_update['refused_at'] = datetime.utcnow()
-                status_update['refused_by'] = current_user.get('username')
-            elif status == 'Finished':
-                status_update['finished_at'] = datetime.utcnow()
-            
-            requests_collection.update_one(
-                {'_id': req_obj_id},
-                {'$set': status_update}
-            )
-            print(f"[REQUESTS] Request {request_id} main status updated to {status}")
+        print(f"[REQUESTS] Request {request_id} state_id updated to {state.get('name')} ({status})")
         
         return {
-            "message": f"Operations decision set to {status}",
-            "status": status,
-            "operations_result": status
+            "message": f"State updated to {state.get('name')}",
+            "state_id": str(state_id),
+            "state_name": state.get('name')
         }
     except Exception as e:
         print(f"[REQUESTS] Error updating operations decision: {e}")

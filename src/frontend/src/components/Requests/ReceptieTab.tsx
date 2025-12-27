@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, NumberInput, Select, Textarea, Grid, Stack } from '@mantine/core';
-import { IconSignature, IconTrash } from '@tabler/icons-react';
+import { Paper, Title, Text, Badge, Table, Grid, Group } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
+import { DecisionSection } from './DecisionSection';
+import { SignaturesSection } from './SignaturesSection';
 
 interface ApprovalOfficer {
   type: string;
@@ -60,18 +61,50 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   const [finalStatus, setFinalStatus] = useState<string>('');
   const [refusalReason, setRefusalReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [stateOrder, setStateOrder] = useState<number>(0);
+  const [availableStates, setAvailableStates] = useState<any[]>([]);
 
   useEffect(() => {
     loadReceptionFlow();
     loadRequestItems();
+    loadAvailableStates();
   }, [requestId]);
+
+  const loadAvailableStates = async () => {
+    try {
+      const response = await api.get('/modules/requests/api/states');
+      const allStates = response.data.results || [];
+      
+      // Filter states with 'receive_stock' in scenes
+      const receiveStockStates = allStates.filter((state: any) => 
+        state.scenes && Array.isArray(state.scenes) && state.scenes.includes('receive_stock')
+      );
+      
+      setAvailableStates(receiveStockStates);
+    } catch (error) {
+      console.error('Failed to load states:', error);
+    }
+  };
 
   const loadReceptionFlow = async () => {
     try {
       const response = await api.get(requestsApi.getReceptionFlow(requestId));
+      console.log('[ReceptieTab] loadReceptionFlow response:', response.data);
       setFlow(response.data.flow);
+      
+      if (response.data.flow) {
+        console.log('[ReceptieTab] Flow loaded:', {
+          _id: response.data.flow._id,
+          status: response.data.flow.status,
+          can_sign_officers: response.data.flow.can_sign_officers,
+          must_sign_officers: response.data.flow.must_sign_officers,
+          signatures: response.data.flow.signatures
+        });
+      } else {
+        console.log('[ReceptieTab] No flow returned from API');
+      }
     } catch (error) {
-      console.error('Failed to load reception flow:', error);
+      console.error('[ReceptieTab] Failed to load reception flow:', error);
     } finally {
       setLoading(false);
     }
@@ -81,6 +114,20 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     try {
       const response = await api.get(requestsApi.getRequest(requestId));
       const requestItems = response.data.items || [];
+      setStateOrder(response.data.state_order || 0);
+      
+      // Load last status from status_log for receive_stock scene
+      const statusLog = response.data.status_log || [];
+      const lastReceiveStockStatus = statusLog
+        .filter((log: any) => log.scene === 'receive_stock')
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      
+      if (lastReceiveStockStatus) {
+        setFinalStatus(lastReceiveStockStatus.status_id);
+        setRefusalReason(lastReceiveStockStatus.reason || '');
+        console.log('[ReceptieTab] Loaded last status from log:', lastReceiveStockStatus);
+      }
+      
       // Initialize received_quantity with requested quantity
       const itemsWithReceived = requestItems.map((item: RequestItem) => ({
         ...item,
@@ -107,20 +154,11 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   };
 
   const handleSign = async () => {
-    // Validate status is selected
+    // Validate status is selected (should already be saved via handleSubmitStatus)
     if (!finalStatus) {
       notifications.show({
         title: t('Error'),
-        message: t('Please select a status before signing'),
-        color: 'red'
-      });
-      return;
-    }
-
-    if (finalStatus === 'Refused' && !refusalReason.trim()) {
-      notifications.show({
-        title: t('Error'),
-        message: t('Please provide a reason for refusal'),
+        message: t('Please select and save a status before signing'),
         color: 'red'
       });
       return;
@@ -128,23 +166,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
 
     setSigning(true);
     try {
-      // 1. Save received quantities
-      await api.patch(requestsApi.updateRequest(requestId), {
-        items: items.map(item => ({
-          part: item.part,
-          quantity: item.quantity,
-          notes: item.notes,
-          received_quantity: item.received_quantity
-        }))
-      });
-
-      // 2. Save reception status/decision
-      await api.patch(requestsApi.updateReceptionStatus(requestId), {
-        status: finalStatus,
-        reason: finalStatus === 'Refused' ? refusalReason : undefined
-      });
-
-      // 3. Sign the reception
+      // Just sign - status was already saved in handleSubmitStatus
       await api.post(requestsApi.signReception(requestId));
       
       notifications.show({
@@ -211,10 +233,12 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
       return;
     }
 
-    if (finalStatus === 'Refused' && !refusalReason.trim()) {
+    // Check if selected state needs comment
+    const selectedState = availableStates.find(s => s._id === finalStatus);
+    if (selectedState?.needs_comment && !refusalReason.trim()) {
       notifications.show({
         title: t('Error'),
-        message: t('Please provide a reason for refusal'),
+        message: t('Please provide a comment'),
         color: 'red'
       });
       return;
@@ -224,7 +248,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     try {
       await api.patch(requestsApi.updateReceptionStatus(requestId), {
         status: finalStatus,
-        reason: finalStatus === 'Refused' ? refusalReason : undefined
+        reason: refusalReason || undefined
       });
 
       notifications.show({
@@ -233,8 +257,11 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
         color: 'green'
       });
 
-      setFinalStatus('');
-      setRefusalReason('');
+      // DON'T reset status - keep it selected so user can sign
+      // setFinalStatus('');
+      // setRefusalReason('');
+      
+      await loadReceptionFlow();
       onReload();
     } catch (error: any) {
       console.error('Failed to update status:', error);
@@ -265,11 +292,47 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   };
 
   const canUserSign = () => {
-    if (!flow || !username) return false;
+    if (!flow || !username) {
+      console.log('[ReceptieTab] canUserSign: no flow or username', { flow: !!flow, username });
+      return false;
+    }
+    
     const alreadySigned = flow.signatures.some(s => s.username === username);
-    if (alreadySigned) return false;
-    const canSign = flow.can_sign_officers.some(o => o.username === username);
-    const mustSign = flow.must_sign_officers.some(o => o.username === username);
+    if (alreadySigned) {
+      console.log('[ReceptieTab] canUserSign: already signed');
+      return false;
+    }
+    
+    // Check if user can sign - support both username and role-based officers
+    const canSign = flow.can_sign_officers.some(o => {
+      // Direct username match
+      if (o.username === username) return true;
+      
+      // Role-based match: check if user has the role
+      if (o.type === 'role' && o.reference) {
+        // For admin role, check if user is staff
+        if (o.reference === 'admin' && isStaff) return true;
+        // Add other role checks here if needed
+      }
+      
+      return false;
+    });
+    
+    const mustSign = flow.must_sign_officers.some(o => {
+      if (o.username === username) return true;
+      if (o.type === 'role' && o.reference === 'admin' && isStaff) return true;
+      return false;
+    });
+    
+    console.log('[ReceptieTab] canUserSign check:', {
+      username,
+      isStaff,
+      canSign,
+      mustSign,
+      can_sign_officers: flow.can_sign_officers,
+      must_sign_officers: flow.must_sign_officers,
+      result: canSign || mustSign
+    });
     
     return canSign || mustSign;
   };
@@ -302,7 +365,8 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     return <Paper p="md"><Text>{t('Loading...')}</Text></Paper>;
   }
 
-  if (!flow) {
+  // Show message if state_order <= 30 (not yet ready for reception)
+  if (stateOrder <= 30) {
     return (
       <Paper p="md">
         <Text c="dimmed">{t('Reception flow will be created automatically when operations are finished')}</Text>
@@ -310,13 +374,16 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     );
   }
 
+  // Always show the table and form, even if flow doesn't exist yet
   return (
     <Paper p="md">
       <Group justify="space-between" mb="md">
         <Title order={4}>{t('Reception Flow')}</Title>
-        <Badge color={getStatusColor(flow.status)} size="lg">
-          {flow.status.toUpperCase()}
-        </Badge>
+        {flow && (
+          <Badge color={getStatusColor(flow.status)} size="lg">
+            {flow.status.toUpperCase()}
+          </Badge>
+        )}
       </Group>
 
       {/* Received Quantities Table */}
@@ -336,122 +403,56 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
               <Table.Td>{item.part_detail?.name || item.part}</Table.Td>
               <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
               <Table.Td>{item.quantity}</Table.Td>
-              <Table.Td>
-                <NumberInput
-                  value={item.received_quantity || item.quantity}
-                  onChange={(value) => handleReceivedQuantityChange(index, Number(value) || 0)}
-                  min={0}
-                  max={item.quantity}
-                  disabled={isFormReadonly}
-                  style={{ width: '120px' }}
-                />
-              </Table.Td>
+              <Table.Td>{/* Empty for now */}</Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>
       </Table>
 
       {/* Grid Layout: 1/3 Decision - 2/3 Signatures */}
-      <Grid mt="md">
-        {/* Left Column: Decision (1/3) */}
-        <Grid.Col span={4}>
-          <Paper withBorder p="md">
-            <Title order={5} mb="md">{t('Final Decision')}</Title>
-            
-            <Stack>
-              <Select
-                label={t('Status')}
-                placeholder={t('Select status')}
-                data={[
-                  { value: 'Approved', label: t('Approved') },
-                  { value: 'Refused', label: t('Refused') }
-                ]}
-                value={finalStatus}
-                onChange={(value) => setFinalStatus(value || '')}
-                disabled={isFlowCompleted()}
-                required
+      {flow ? (
+        <Grid mt="md">
+          {/* Left Column: Decision (1/3) */}
+          <Grid.Col span={4}>
+            <Paper withBorder p="md">
+              <Title order={5} mb="md">{t('Decision')}</Title>
+              <DecisionSection
+                status={finalStatus}
+                reason={refusalReason}
+                isCompleted={isFlowCompleted()}
+                availableStates={availableStates}
+                onStatusChange={(value) => setFinalStatus(value || '')}
+                onReasonChange={setRefusalReason}
+                onSubmit={handleSubmitStatus}
+                submitting={submitting}
               />
+            </Paper>
+          </Grid.Col>
 
-              {finalStatus === 'Refused' && (
-                <Textarea
-                  label={t('Reason for Refusal')}
-                  placeholder={t('Enter reason for refusal')}
-                  value={refusalReason}
-                  onChange={(e) => setRefusalReason(e.target.value)}
-                  disabled={isFlowCompleted()}
-                  required
-                  minRows={3}
-                />
-              )}
-            </Stack>
-          </Paper>
-        </Grid.Col>
-
-        {/* Right Column: Signatures (2/3) */}
-        <Grid.Col span={8}>
-          <Paper withBorder p="md">
-            <Group justify="space-between" mb="md">
-              <Title order={5}>{t('Signatures')}</Title>
-              {canUserSign() && !isFlowCompleted() && finalStatus && (
-                <Button
-                  leftSection={<IconSignature size={16} />}
-                  onClick={handleSign}
-                  loading={signing}
-                  color={finalStatus === 'Approved' ? 'green' : 'red'}
-                >
-                  {t('Sign')}
-                </Button>
-              )}
-            </Group>
-
-            {flow.signatures.length > 0 ? (
-              <Table striped withTableBorder withColumnBorders>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>{t('User')}</Table.Th>
-                    <Table.Th>{t('Date')}</Table.Th>
-                    <Table.Th>{t('Signature Hash')}</Table.Th>
-                    {isStaff && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {flow.signatures.map((signature, index) => (
-                    <Table.Tr key={index}>
-                      <Table.Td>{signature.user_name || signature.username}</Table.Td>
-                      <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
-                      <Table.Td>
-                        <Text size="xs" style={{ fontFamily: 'monospace' }}>
-                          {signature.signature_hash.substring(0, 16)}...
-                        </Text>
-                      </Table.Td>
-                      {isStaff && (
-                        <Table.Td>
-                          <ActionIcon
-                            color="red"
-                            variant="subtle"
-                            onClick={() => handleRemoveSignature(signature.user_id, signature.username)}
-                            title={t('Remove')}
-                          >
-                            <IconTrash size={16} />
-                          </ActionIcon>
-                        </Table.Td>
-                      )}
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            ) : (
-              <Text c="dimmed" size="sm">{t('No signatures yet')}</Text>
-            )}
-
-            {isFlowCompleted() && (
-              <Text size="sm" c="green" mt="md">
-                {t('Reception flow completed successfully')}
-              </Text>
-            )}
-          </Paper>
-        </Grid.Col>
-      </Grid>
+          {/* Right Column: Signatures (2/3) */}
+          <Grid.Col span={8}>
+            <Paper withBorder p="md">
+              <SignaturesSection
+                canSign={canUserSign()}
+                isCompleted={isFlowCompleted()}
+                canSignOfficers={flow.can_sign_officers}
+                minSignatures={flow.min_signatures}
+                signatures={flow.signatures}
+                isStaff={isStaff}
+                onSign={handleSign}
+                onRemoveSignature={handleRemoveSignature}
+                signing={signing}
+              />
+            </Paper>
+          </Grid.Col>
+        </Grid>
+      ) : (
+        <Paper withBorder p="md" mt="md">
+          <Text c="dimmed" ta="center" py="xl">
+            {t('Waiting for reception flow to be created...')}
+          </Text>
+        </Paper>
+      )}
     </Paper>
   );
 }

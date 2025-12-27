@@ -1,20 +1,6 @@
 """
 Utility functions for requests module
 """
-from typing import Dict
-from fastapi import HTTPException
-
-
-def get_inventree_headers(user: dict) -> Dict[str, str]:
-    """Get headers for InvenTree API requests"""
-    token = user.get('token')
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated with InvenTree")
-    
-    return {
-        'Authorization': f'Token {token}',
-        'Content-Type': 'application/json'
-    }
 
 
 def generate_request_reference(db) -> str:

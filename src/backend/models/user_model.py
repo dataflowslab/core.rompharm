@@ -1,66 +1,59 @@
 """
-User model for storing InvenTree tokens
+User Model
+Local authentication system
 """
-from typing import Dict, Any, Optional
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
 from datetime import datetime
 
 
-class UserModel:
-    """Model for users with InvenTree tokens"""
-    
-    collection_name = "users"
-    
-    @staticmethod
-    def create(username: str, token: str, is_staff: bool = False, 
-               firstname: Optional[str] = None, lastname: Optional[str] = None,
-               local_role: Optional[str] = None) -> Dict[Any, Any]:
-        """
-        Create a new user document
-        
-        Args:
-            username: InvenTree username
-            token: InvenTree authentication token
-            is_staff: Whether user is administrator
-            firstname: User's first name
-            lastname: User's last name
-            local_role: Local role assigned to user
-            
-        Returns:
-            User document
-        """
-        return {
-            'username': username,
-            'token': token,
-            'is_staff': is_staff,
-            'firstname': firstname,
-            'lastname': lastname,
-            'local_role': local_role,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow(),
-            'last_login': datetime.utcnow()
-        }
-    
-    @staticmethod
-    def to_dict(user_doc: Dict[Any, Any]) -> Dict[Any, Any]:
-        """
-        Convert MongoDB document to dictionary
-        
-        Args:
-            user_doc: MongoDB document
-            
-        Returns:
-            Dictionary representation
-        """
-        if user_doc and '_id' in user_doc:
-            user_doc['id'] = str(user_doc['_id'])
-            del user_doc['_id']
-        
-        # Convert datetime to ISO format
-        if 'created_at' in user_doc:
-            user_doc['created_at'] = user_doc['created_at'].isoformat()
-        if 'updated_at' in user_doc:
-            user_doc['updated_at'] = user_doc['updated_at'].isoformat()
-        if 'last_login' in user_doc:
-            user_doc['last_login'] = user_doc['last_login'].isoformat()
-            
-        return user_doc
+class UserCreate(BaseModel):
+    """Model pentru creare user"""
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=6)
+    firstname: str = Field(..., min_length=1)
+    lastname: str = Field(..., min_length=1)
+    role_id: str  # ObjectId as string
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    is_active: bool = True
+    is_staff: bool = False
+
+
+class UserUpdate(BaseModel):
+    """Model pentru update user"""
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    role_id: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_staff: Optional[bool] = None
+    password: Optional[str] = None  # Doar dacă se schimbă parola
+
+
+class UserLogin(BaseModel):
+    """Model pentru login"""
+    username: str
+    password: str
+
+
+class RoleCreate(BaseModel):
+    """Model pentru creare role"""
+    name: str = Field(..., min_length=1)
+    slug: str = Field(..., min_length=1, max_length=50)
+    description: Optional[str] = None
+
+
+class RoleUpdate(BaseModel):
+    """Model pentru update role"""
+    name: Optional[str] = None
+    slug: Optional[str] = None
+    description: Optional[str] = None
+    items: Optional[list[str]] = None  # Array de permission slugs
+
+
+class PermissionItem(BaseModel):
+    """Model pentru permission item"""
+    slug: str
+    description: Optional[str] = None

@@ -5,8 +5,35 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "${procurementApi.getPurchaseOrder(id!)}/approval-flow"
+msgstr "${procurementApi.getPurchaseOrder(id!)}/approval-flow"
+
+msgid "${procurementApi.getPurchaseOrder(order.pk)}/approval-flow"
+msgstr "${procurementApi.getPurchaseOrder(order.pk)}/approval-flow"
+
+msgid "${procurementApi.getPurchaseOrder(order.pk)}/sign"
+msgstr "${procurementApi.getPurchaseOrder(order.pk)}/sign"
+
+msgid "${url}${params}"
+msgstr "${url}${params}"
+
+msgid ","
+msgstr ","
+
+msgid "."
+msgstr "."
+
+msgid "/"
+msgstr "/"
+
 msgid "/api/audit/?limit=${limit}&skip=${skip}"
 msgstr "/api/audit/?limit=${limit}&skip=${skip}"
+
+msgid "/api/auth/me"
+msgstr "/api/auth/me"
+
+msgid "/api/auth/verify"
+msgstr "/api/auth/verify"
 
 msgid "/api/config/"
 msgstr "/api/config/"
@@ -38,14 +65,68 @@ msgstr "/api/data/submission/${submissionId}/history"
 msgid "/api/data/submissions/all"
 msgstr "/api/data/submissions/all"
 
+msgid "/api/data/submissions/stats"
+msgstr "/api/data/submissions/stats"
+
+msgid "/api/documents/for/${entityId}"
+msgstr "/api/documents/for/${entityId}"
+
+msgid "/api/documents/for/${objectId}"
+msgstr "/api/documents/for/${objectId}"
+
 msgid "/api/documents/form/${formId}/templates"
 msgstr "/api/documents/form/${formId}/templates"
+
+msgid "/api/documents/job/${jobId}/status"
+msgstr "/api/documents/job/${jobId}/status"
+
+msgid "/api/documents/job/${submissionId}/${jobId}/status"
+msgstr "/api/documents/job/${submissionId}/${jobId}/status"
+
+msgid "/api/documents/stock-request/${requestId}"
+msgstr "/api/documents/stock-request/${requestId}"
+
+msgid "/api/documents/templates"
+msgstr "/api/documents/templates"
 
 msgid "/api/forms/"
 msgstr "/api/forms/"
 
 msgid "/api/forms/${slug}"
 msgstr "/api/forms/${slug}"
+
+msgid "/api/forms/mail-templates/list"
+msgstr "/api/forms/mail-templates/list"
+
+msgid "/api/recipes/${id}"
+msgstr "/api/recipes/${id}"
+
+msgid "/api/recipes/${id}/increment-version"
+msgstr "/api/recipes/${id}/increment-version"
+
+msgid "/api/recipes/${id}/logs"
+msgstr "/api/recipes/${id}/logs"
+
+msgid "/api/recipes/${id}/revisions"
+msgstr "/api/recipes/${id}/revisions"
+
+msgid "/api/sales/order-statuses"
+msgstr "/api/sales/order-statuses"
+
+msgid "/api/sales/sales-orders"
+msgstr "/api/sales/sales-orders"
+
+msgid "/api/sales/sales-orders/${orderId}"
+msgstr "/api/sales/sales-orders/${orderId}"
+
+msgid "/api/sales/sales-orders/${orderId}/attachments"
+msgstr "/api/sales/sales-orders/${orderId}/attachments"
+
+msgid "/api/sales/sales-orders/${orderId}/items"
+msgstr "/api/sales/sales-orders/${orderId}/items"
+
+msgid "/api/sales/sales-orders/${orderId}/shipments"
+msgstr "/api/sales/sales-orders/${orderId}/shipments"
 
 msgid "/api/system/notifications"
 msgstr "/api/system/notifications"
@@ -59,8 +140,68 @@ msgstr "/api/templates"
 msgid "/api/users/"
 msgstr "/api/users/"
 
+msgid "/modules/depo_procurement/api/document-templates"
+msgstr "/modules/depo_procurement/api/document-templates"
+
+msgid "/modules/depo_procurement/api/stock-statuses"
+msgstr "/modules/depo_procurement/api/stock-statuses"
+
+msgid "/modules/inventory/api/articles/${article._id}/suppliers"
+msgstr "/modules/inventory/api/articles/${article._id}/suppliers"
+
+msgid "/modules/inventory/api/articles/${articleId}/suppliers"
+msgstr "/modules/inventory/api/articles/${articleId}/suppliers"
+
+msgid "/modules/inventory/api/articles/${id}"
+msgstr "/modules/inventory/api/articles/${id}"
+
+msgid "/modules/inventory/api/articles/${id}/recipes"
+msgstr "/modules/inventory/api/articles/${id}/recipes"
+
+msgid "/modules/inventory/api/articles?${params.toString()}"
+msgstr "/modules/inventory/api/articles?${params.toString()}"
+
+msgid "/modules/inventory/api/categories"
+msgstr "/modules/inventory/api/categories"
+
+msgid "/modules/inventory/api/companies?is_supplier=true"
+msgstr "/modules/inventory/api/companies?is_supplier=true"
+
+msgid "/modules/inventory/api/locations"
+msgstr "/modules/inventory/api/locations"
+
+msgid "/modules/inventory/api/manufacturers"
+msgstr "/modules/inventory/api/manufacturers"
+
+msgid "/modules/inventory/api/stocks/${id}"
+msgstr "/modules/inventory/api/stocks/${id}"
+
+msgid "/modules/inventory/api/stocks?part_id=${article._id}"
+msgstr "/modules/inventory/api/stocks?part_id=${article._id}"
+
+msgid "/modules/inventory/api/suppliers"
+msgstr "/modules/inventory/api/suppliers"
+
+msgid "/modules/inventory/api/system-ums"
+msgstr "/modules/inventory/api/system-ums"
+
+msgid "/modules/requests/api/${requestId}/production"
+msgstr "/modules/requests/api/${requestId}/production"
+
+msgid "/modules/requests/api/${requestId}/production-flow"
+msgstr "/modules/requests/api/${requestId}/production-flow"
+
+msgid "/modules/requests/api/${requestId}/production-sign"
+msgstr "/modules/requests/api/${requestId}/production-sign"
+
 msgid "<html>\n<body>\n  <h1>{{title}}</h1>\n  <p>{{content}}</p>\n</body>\n</html>"
 msgstr "<html>\n<body>\n  <h1>{{title}}</h1>\n  <p>{{content}}</p>\n</body>\n</html>"
+
+msgid "A category cannot be its own parent"
+msgstr "A category cannot be its own parent"
+
+msgid "A location cannot be its own parent"
+msgstr "A location cannot be its own parent"
 
 msgid "Access Denied"
 msgstr "Access Denied"
@@ -77,8 +218,26 @@ msgstr "Active"
 msgid "Activity Log"
 msgstr "Activity Log"
 
+msgid "Add"
+msgstr "Add"
+
+msgid "Add Alternative"
+msgstr "Add Alternative"
+
+msgid "Add Alternative Product"
+msgstr "Add Alternative Product"
+
 msgid "Add Campaign"
 msgstr "Add Campaign"
+
+msgid "Add Container Row"
+msgstr "Add Container Row"
+
+msgid "Add Ingredient"
+msgstr "Add Ingredient"
+
+msgid "Add Item"
+msgstr "Add Item"
 
 msgid "Add Segment"
 msgstr "Add Segment"
@@ -86,8 +245,20 @@ msgstr "Add Segment"
 msgid "Add Subscriber"
 msgstr "Add Subscriber"
 
+msgid "Add batch codes"
+msgstr "Add batch codes"
+
 msgid "Add notes..."
 msgstr "Add notes..."
+
+msgid "Additional comments"
+msgstr "Additional comments"
+
+msgid "Additional notes"
+msgstr "Additional notes"
+
+msgid "Address"
+msgstr "Address"
 
 msgid "Admin"
 msgstr "Admin"
@@ -101,26 +272,89 @@ msgstr "Administrator access required to view submissions."
 msgid "Administrator access required to view this page."
 msgstr "Administrator access required to view this page."
 
+msgid "After creating the group, you can add alternative products to it."
+msgstr "After creating the group, you can add alternative products to it."
+
+msgid "All Forms"
+msgstr "All Forms"
+
 msgid "All Submissions"
 msgstr "All Submissions"
 
 msgid "All systems operational"
 msgstr "All systems operational"
 
+msgid "Allocated"
+msgstr "Allocated"
+
+msgid "Alternative"
+msgstr "Alternative"
+
+msgid "Alternative Group"
+msgstr "Alternative Group"
+
+msgid "Alternative added successfully"
+msgstr "Alternative added successfully"
+
+msgid "Alternative deleted successfully"
+msgstr "Alternative deleted successfully"
+
+msgid "Alternatives"
+msgstr "Alternatives"
+
 msgid "Anonymous"
 msgstr "Anonymous"
+
+msgid "Approval"
+msgstr "Approval"
+
+msgid "Approval Flow"
+msgstr "Approval Flow"
+
+msgid "Approval flow created successfully"
+msgstr "Approval flow created successfully"
+
+msgid "Approvals"
+msgstr "Approvals"
+
+msgid "Approved"
+msgstr "Approved"
+
+msgid "Are you sure you want to delete this alternative?"
+msgstr "Are you sure you want to delete this alternative?"
+
+msgid "Are you sure you want to delete this attachment?"
+msgstr "Are you sure you want to delete this attachment?"
 
 msgid "Are you sure you want to delete this campaign?"
 msgstr "Are you sure you want to delete this campaign?"
 
+msgid "Are you sure you want to delete this category? This action cannot be undone."
+msgstr "Are you sure you want to delete this category? This action cannot be undone."
+
 msgid "Are you sure you want to delete this form? This action cannot be undone."
 msgstr "Are you sure you want to delete this form? This action cannot be undone."
+
+msgid "Are you sure you want to delete this ingredient?"
+msgstr "Are you sure you want to delete this ingredient?"
+
+msgid "Are you sure you want to delete this item?"
+msgstr "Are you sure you want to delete this item?"
+
+msgid "Are you sure you want to delete this location? This action cannot be undone."
+msgstr "Are you sure you want to delete this location? This action cannot be undone."
 
 msgid "Are you sure you want to delete this part?"
 msgstr "Are you sure you want to delete this part?"
 
+msgid "Are you sure you want to delete this request?"
+msgstr "Are you sure you want to delete this request?"
+
 msgid "Are you sure you want to delete this segment?"
 msgstr "Are you sure you want to delete this segment?"
+
+msgid "Are you sure you want to delete this stock item?"
+msgstr "Are you sure you want to delete this stock item?"
 
 msgid "Are you sure you want to delete this submission? This action cannot be undone."
 msgstr "Are you sure you want to delete this submission? This action cannot be undone."
@@ -128,8 +362,44 @@ msgstr "Are you sure you want to delete this submission? This action cannot be u
 msgid "Are you sure you want to delete this subscriber?"
 msgstr "Are you sure you want to delete this subscriber?"
 
+msgid "Are you sure you want to increment the version? This will update the revision number and date."
+msgstr "Are you sure you want to increment the version? This will update the revision number and date."
+
+msgid "Are you sure you want to remove the signature from"
+msgstr "Are you sure you want to remove the signature from"
+
+msgid "Are you sure you want to remove this item?"
+msgstr "Are you sure you want to remove this item?"
+
+msgid "Are you sure you want to remove this signature?"
+msgstr "Are you sure you want to remove this signature?"
+
 msgid "Are you sure you want to send this campaign? It will be processed by the cron job."
 msgstr "Are you sure you want to send this campaign? It will be processed by the cron job."
+
+msgid "Are you sure you want to sign this order? This action will be recorded with a digital signature."
+msgstr "Are you sure you want to sign this order? This action will be recorded with a digital signature."
+
+msgid "Article"
+msgstr "Article"
+
+msgid "Article Information"
+msgstr "Article Information"
+
+msgid "Article Name"
+msgstr "Article Name"
+
+msgid "Article No"
+msgstr "Article No"
+
+msgid "Articles"
+msgstr "Articles"
+
+msgid "Attachment deleted successfully"
+msgstr "Attachment deleted successfully"
+
+msgid "Attachments"
+msgstr "Attachments"
 
 msgid "Audit Log"
 msgstr "Audit Log"
@@ -146,11 +416,35 @@ msgstr "Authentication required. Please login to submit this form."
 msgid "Author"
 msgstr "Author"
 
+msgid "Available"
+msgstr "Available"
+
+msgid "BA Rompharm"
+msgstr "BA Rompharm"
+
 msgid "Back"
 msgstr "Back"
 
 msgid "Back to Dashboard"
 msgstr "Back to Dashboard"
+
+msgid "Back to Sales Orders"
+msgstr "Back to Sales Orders"
+
+msgid "Batch"
+msgstr "Batch"
+
+msgid "Batch Code"
+msgstr "Batch Code"
+
+msgid "Batch Codes"
+msgstr "Batch Codes"
+
+msgid "Build orders"
+msgstr "Build orders"
+
+msgid "Build simulation"
+msgstr "Build simulation"
 
 msgid "By"
 msgstr "By"
@@ -167,6 +461,9 @@ msgstr "Campaign marked for sending. It will be processed by the cron job."
 msgid "Campaign updated successfully"
 msgstr "Campaign updated successfully"
 
+msgid "Campaign will be sent automatically at this date/time if active"
+msgstr "Campaign will be sent automatically at this date/time if active"
+
 msgid "Campaigns"
 msgstr "Campaigns"
 
@@ -176,14 +473,89 @@ msgstr "Cancel"
 msgid "Cannot connect to server. Please check if the backend is running."
 msgstr "Cannot connect to server. Please check if the backend is running."
 
+msgid "Cannot delete items not added in Operations"
+msgstr "Cannot delete items not added in Operations"
+
+msgid "Cannot set a descendant as parent (circular reference)"
+msgstr "Cannot set a descendant as parent (circular reference)"
+
+msgid "Categories"
+msgstr "Categories"
+
+msgid "Category created successfully"
+msgstr "Category created successfully"
+
+msgid "Category deleted successfully"
+msgstr "Category deleted successfully"
+
+msgid "Category description"
+msgstr "Category description"
+
+msgid "Category name"
+msgstr "Category name"
+
+msgid "Category updated successfully"
+msgstr "Category updated successfully"
+
 msgid "Cererea a fost înregistrată"
 msgstr "Cererea a fost înregistrată"
+
+msgid "Change History"
+msgstr "Change History"
 
 msgid "Change State"
 msgstr "Change State"
 
+msgid "Change status"
+msgstr "Change status"
+
+msgid "Check status"
+msgstr "Check status"
+
+msgid "City"
+msgstr "City"
+
+msgid "Clean Transport"
+msgstr "Clean Transport"
+
+msgid "Click refresh icon to check status"
+msgstr "Click refresh icon to check status"
+
+msgid "Clients"
+msgstr "Clients"
+
+msgid "Cod"
+msgstr "Cod"
+
+msgid "Code"
+msgstr "Code"
+
+msgid "Code (IPN)"
+msgstr "Code (IPN)"
+
+msgid "Coming soon..."
+msgstr "Coming soon..."
+
+msgid "Comma-separated email addresses to notify when a new submission is received"
+msgstr "Comma-separated email addresses to notify when a new submission is received"
+
+msgid "Comment"
+msgstr "Comment"
+
+msgid "Company Name"
+msgstr "Company Name"
+
+msgid "Company name is required"
+msgstr "Company name is required"
+
+msgid "Components & Batch Selection"
+msgstr "Components & Batch Selection"
+
 msgid "Confirm"
 msgstr "Confirm"
+
+msgid "Confirm Signature"
+msgstr "Confirm Signature"
 
 msgid "Confirm Submission"
 msgstr "Confirm Submission"
@@ -191,11 +563,20 @@ msgstr "Confirm Submission"
 msgid "Confirmi trimiterea formularului în forma actuală?"
 msgstr "Confirmi trimiterea formularului în forma actuală?"
 
+msgid "Conform"
+msgstr "Conform"
+
 msgid "Consents"
 msgstr "Consents"
 
 msgid "Contact Form"
 msgstr "Contact Form"
+
+msgid "Containers"
+msgstr "Containers"
+
+msgid "Containers Cleaned"
+msgstr "Containers Cleaned"
 
 msgid "Content"
 msgstr "Content"
@@ -203,8 +584,14 @@ msgstr "Content"
 msgid "Content is required"
 msgstr "Content is required"
 
+msgid "Country"
+msgstr "Country"
+
 msgid "Create"
 msgstr "Create"
+
+msgid "Create Approval Flow"
+msgstr "Create Approval Flow"
 
 msgid "Create Form"
 msgstr "Create Form"
@@ -215,11 +602,38 @@ msgstr "Create New Form"
 msgid "Create New Template"
 msgstr "Create New Template"
 
+msgid "Create Recipe"
+msgstr "Create Recipe"
+
 msgid "Create Template"
 msgstr "Create Template"
 
 msgid "Create your first form to get started."
 msgstr "Create your first form to get started."
+
+msgid "Created"
+msgstr "Created"
+
+msgid "Created At"
+msgstr "Created At"
+
+msgid "Created By"
+msgstr "Created By"
+
+msgid "Creation Date"
+msgstr "Creation Date"
+
+msgid "Currency"
+msgstr "Currency"
+
+msgid "Current"
+msgstr "Current"
+
+msgid "Customer"
+msgstr "Customer"
+
+msgid "Damaged"
+msgstr "Damaged"
 
 msgid "Data"
 msgstr "Data"
@@ -230,17 +644,50 @@ msgstr "DataFlows Docu is not configured"
 msgid "DataFlows Docu is not configured. Please configure it in config.yaml to use document templates."
 msgstr "DataFlows Docu is not configured. Please configure it in config.yaml to use document templates."
 
+msgid "Date"
+msgstr "Date"
+
+msgid "Date BA Rompharm"
+msgstr "Date BA Rompharm"
+
+msgid "Dates"
+msgstr "Dates"
+
+msgid "Decision"
+msgstr "Decision"
+
+msgid "Decision saved successfully"
+msgstr "Decision saved successfully"
+
 msgid "Delete"
 msgstr "Delete"
+
+msgid "Delete Alternative"
+msgstr "Delete Alternative"
 
 msgid "Delete Campaign"
 msgstr "Delete Campaign"
 
+msgid "Delete Category"
+msgstr "Delete Category"
+
 msgid "Delete Form"
 msgstr "Delete Form"
 
+msgid "Delete Item"
+msgstr "Delete Item"
+
+msgid "Delete Location"
+msgstr "Delete Location"
+
 msgid "Delete Part"
 msgstr "Delete Part"
+
+msgid "Delete Received Stock"
+msgstr "Delete Received Stock"
+
+msgid "Delete Request"
+msgstr "Delete Request"
 
 msgid "Delete Segment"
 msgstr "Delete Segment"
@@ -257,26 +704,86 @@ msgstr "Delete form"
 msgid "Delete submission"
 msgstr "Delete submission"
 
+msgid "Deliveries"
+msgstr "Deliveries"
+
+msgid "Delivery Date"
+msgstr "Delivery Date"
+
 msgid "Description"
 msgstr "Description"
+
+msgid "Destination"
+msgstr "Destination"
+
+msgid "Destination Location"
+msgstr "Destination Location"
+
+msgid "Details"
+msgstr "Details"
 
 msgid "Document Templates"
 msgstr "Document Templates"
 
+msgid "Document deleted"
+msgstr "Document deleted"
+
+msgid "Document downloaded"
+msgstr "Document downloaded"
+
+msgid "Document downloaded successfully"
+msgstr "Document downloaded successfully"
+
 msgid "Document generated successfully!"
 msgstr "Document generated successfully!"
+
+msgid "Document generation started"
+msgstr "Document generation started"
+
+msgid "Documents"
+msgstr "Documents"
+
+msgid "Download"
+msgstr "Download"
+
+msgid "Drag files here or click to select"
+msgstr "Drag files here or click to select"
 
 msgid "Drag image here or click to select"
 msgstr "Drag image here or click to select"
 
+msgid "Duplicate"
+msgstr "Duplicate"
+
+msgid "Duplicate Recipe"
+msgstr "Duplicate Recipe"
+
 msgid "Edit"
 msgstr "Edit"
+
+msgid "Edit Alternative"
+msgstr "Edit Alternative"
 
 msgid "Edit Campaign"
 msgstr "Edit Campaign"
 
+msgid "Edit Category"
+msgstr "Edit Category"
+
 msgid "Edit Form"
 msgstr "Edit Form"
+
+msgid "Edit Ingredient"
+msgstr "Edit Ingredient"
+
+msgid "Edit Item"
+msgstr "Edit Item"
+
+msgid "Edit Location"
+msgstr "Edit Location"
+
+msgid "Edit QC Record"
+msgstr "Edit QC Record"
 
 msgid "Edit Segment"
 msgstr "Edit Segment"
@@ -293,11 +800,29 @@ msgstr "Email"
 msgid "Email marketing consent"
 msgstr "Email marketing consent"
 
+msgid "Email template to use for notifications"
+msgstr "Email template to use for notifications"
+
+msgid "End Date"
+msgstr "End Date"
+
 msgid "English"
 msgstr "English"
 
+msgid "Enter BA number"
+msgstr "Enter BA number"
+
+msgid "Enter Rompharm BA number"
+msgstr "Enter Rompharm BA number"
+
+msgid "Enter batch code"
+msgstr "Enter batch code"
+
 msgid "Enter campaign title"
 msgstr "Enter campaign title"
+
+msgid "Enter company name"
+msgstr "Enter company name"
 
 msgid "Enter description"
 msgstr "Enter description"
@@ -314,8 +839,20 @@ msgstr "Enter name"
 msgid "Enter phone"
 msgstr "Enter phone"
 
+msgid "Enter product code"
+msgstr "Enter product code"
+
+msgid "Enter product name"
+msgstr "Enter product name"
+
+msgid "Enter reason for refusal"
+msgstr "Enter reason for refusal"
+
 msgid "Enter segment name"
 msgstr "Enter segment name"
+
+msgid "Enter supplier batch code"
+msgstr "Enter supplier batch code"
 
 msgid "Enter tax ID"
 msgstr "Enter tax ID"
@@ -329,20 +866,89 @@ msgstr "Enter your username"
 msgid "Error"
 msgstr "Error"
 
+msgid "Expected Quantity"
+msgstr "Expected Quantity"
+
+msgid "Expiry Date"
+msgstr "Expiry Date"
+
+msgid "Expiry date"
+msgstr "Expiry date"
+
+msgid "F001"
+msgstr "F001"
+
+msgid "Failed"
+msgstr "Failed"
+
+msgid "Failed to add alternative"
+msgstr "Failed to add alternative"
+
+msgid "Failed to add ingredient"
+msgstr "Failed to add ingredient"
+
+msgid "Failed to add item"
+msgstr "Failed to add item"
+
+msgid "Failed to confirm QC record"
+msgstr "Failed to confirm QC record"
+
+msgid "Failed to create approval flow"
+msgstr "Failed to create approval flow"
+
+msgid "Failed to create purchase order"
+msgstr "Failed to create purchase order"
+
+msgid "Failed to create recipe"
+msgstr "Failed to create recipe"
+
+msgid "Failed to create request"
+msgstr "Failed to create request"
+
+msgid "Failed to create supplier"
+msgstr "Failed to create supplier"
+
 msgid "Failed to create template"
 msgstr "Failed to create template"
+
+msgid "Failed to delete alternative"
+msgstr "Failed to delete alternative"
+
+msgid "Failed to delete attachment"
+msgstr "Failed to delete attachment"
 
 msgid "Failed to delete campaign"
 msgstr "Failed to delete campaign"
 
+msgid "Failed to delete category"
+msgstr "Failed to delete category"
+
+msgid "Failed to delete document"
+msgstr "Failed to delete document"
+
 msgid "Failed to delete form"
 msgstr "Failed to delete form"
+
+msgid "Failed to delete ingredient"
+msgstr "Failed to delete ingredient"
+
+msgid "Failed to delete item"
+msgstr "Failed to delete item"
+
+msgid "Failed to delete location"
+msgstr "Failed to delete location"
 
 msgid "Failed to delete part"
 msgstr "Failed to delete part"
 
+msgid "Failed to delete request"
+msgstr "Failed to delete request"
+
 msgid "Failed to delete segment"
 msgstr "Failed to delete segment"
+
+msgid "Failed to delete stock item"
+msgstr "Failed to delete stock item"
 
 msgid "Failed to delete submission"
 msgstr "Failed to delete submission"
@@ -350,14 +956,26 @@ msgstr "Failed to delete submission"
 msgid "Failed to delete subscriber"
 msgstr "Failed to delete subscriber"
 
+msgid "Failed to download document"
+msgstr "Failed to download document"
+
+msgid "Failed to duplicate recipe"
+msgstr "Failed to duplicate recipe"
+
 msgid "Failed to generate document"
 msgstr "Failed to generate document"
 
 msgid "Failed to import from InvenTree"
 msgstr "Failed to import from InvenTree"
 
+msgid "Failed to increment version"
+msgstr "Failed to increment version"
+
 msgid "Failed to load campaigns"
 msgstr "Failed to load campaigns"
+
+msgid "Failed to load categories"
+msgstr "Failed to load categories"
 
 msgid "Failed to load form"
 msgstr "Failed to load form"
@@ -365,11 +983,38 @@ msgstr "Failed to load form"
 msgid "Failed to load forms"
 msgstr "Failed to load forms"
 
+msgid "Failed to load locations"
+msgstr "Failed to load locations"
+
 msgid "Failed to load part content"
 msgstr "Failed to load part content"
 
+msgid "Failed to load production data"
+msgstr "Failed to load production data"
+
+msgid "Failed to load purchase order"
+msgstr "Failed to load purchase order"
+
+msgid "Failed to load purchase orders"
+msgstr "Failed to load purchase orders"
+
+msgid "Failed to load recipe"
+msgstr "Failed to load recipe"
+
+msgid "Failed to load recipes"
+msgstr "Failed to load recipes"
+
+msgid "Failed to load request"
+msgstr "Failed to load request"
+
+msgid "Failed to load requests"
+msgstr "Failed to load requests"
+
 msgid "Failed to load segments"
 msgstr "Failed to load segments"
+
+msgid "Failed to load stock statuses"
+msgstr "Failed to load stock statuses"
 
 msgid "Failed to load submission"
 msgstr "Failed to load submission"
@@ -386,11 +1031,32 @@ msgstr "Failed to load template content"
 msgid "Failed to load templates"
 msgstr "Failed to load templates"
 
+msgid "Failed to receive stock"
+msgstr "Failed to receive stock"
+
+msgid "Failed to remove signature"
+msgstr "Failed to remove signature"
+
+msgid "Failed to save QC record"
+msgstr "Failed to save QC record"
+
 msgid "Failed to save campaign"
 msgstr "Failed to save campaign"
 
+msgid "Failed to save category"
+msgstr "Failed to save category"
+
+msgid "Failed to save items"
+msgstr "Failed to save items"
+
+msgid "Failed to save location"
+msgstr "Failed to save location"
+
 msgid "Failed to save part"
 msgstr "Failed to save part"
+
+msgid "Failed to save results"
+msgstr "Failed to save results"
 
 msgid "Failed to save segment"
 msgstr "Failed to save segment"
@@ -398,17 +1064,74 @@ msgstr "Failed to save segment"
 msgid "Failed to save subscriber"
 msgstr "Failed to save subscriber"
 
+msgid "Failed to save unused quantities"
+msgstr "Failed to save unused quantities"
+
 msgid "Failed to send campaign"
 msgstr "Failed to send campaign"
+
+msgid "Failed to sign operations"
+msgstr "Failed to sign operations"
+
+msgid "Failed to sign order"
+msgstr "Failed to sign order"
+
+msgid "Failed to sign production"
+msgstr "Failed to sign production"
+
+msgid "Failed to sign reception"
+msgstr "Failed to sign reception"
+
+msgid "Failed to sign request"
+msgstr "Failed to sign request"
 
 msgid "Failed to submit form. Please try again."
 msgstr "Failed to submit form. Please try again."
 
+msgid "Failed to update QC information"
+msgstr "Failed to update QC information"
+
+msgid "Failed to update QC record"
+msgstr "Failed to update QC record"
+
+msgid "Failed to update ingredient"
+msgstr "Failed to update ingredient"
+
+msgid "Failed to update item"
+msgstr "Failed to update item"
+
+msgid "Failed to update order"
+msgstr "Failed to update order"
+
+msgid "Failed to update request"
+msgstr "Failed to update request"
+
 msgid "Failed to update state"
 msgstr "Failed to update state"
 
+msgid "Failed to update status"
+msgstr "Failed to update status"
+
+msgid "Failed to upload file"
+msgstr "Failed to upload file"
+
 msgid "Failed to upload image"
 msgstr "Failed to upload image"
+
+msgid "File"
+msgstr "File"
+
+msgid "File uploaded successfully"
+msgstr "File uploaded successfully"
+
+msgid "Filter by form"
+msgstr "Filter by form"
+
+msgid "Final Decision"
+msgstr "Final Decision"
+
+msgid "Finished"
+msgstr "Finished"
 
 msgid "Form"
 msgstr "Form"
@@ -443,20 +1166,23 @@ msgstr "Form submitted successfully!"
 msgid "Form updated successfully"
 msgstr "Form updated successfully"
 
-msgid "Forms"
-msgstr "Forms"
-
 msgid "Forms Management"
 msgstr "Forms Management"
 
 msgid "Generate Document"
 msgstr "Generate Document"
 
+msgid "Generate Documents"
+msgstr "Generate Documents"
+
 msgid "History"
 msgstr "History"
 
 msgid "IP Address"
 msgstr "IP Address"
+
+msgid "IPN"
+msgstr "IPN"
 
 msgid "Image"
 msgstr "Image"
@@ -473,14 +1199,80 @@ msgstr "Import from InvenTree"
 msgid "Imported"
 msgstr "Imported"
 
+msgid "In Accordance with Supplier BA"
+msgstr "In Accordance with Supplier BA"
+
+msgid "In Progress"
+msgstr "In Progress"
+
+msgid "In builds"
+msgstr "In builds"
+
+msgid "In procurement"
+msgstr "In procurement"
+
+msgid "In sales"
+msgstr "In sales"
+
 msgid "Inactive"
 msgstr "Inactive"
+
+msgid "Increment Version"
+msgstr "Increment Version"
+
+msgid "Ingredient added successfully"
+msgstr "Ingredient added successfully"
+
+msgid "Ingredient deleted successfully"
+msgstr "Ingredient deleted successfully"
+
+msgid "Ingredient updated successfully"
+msgstr "Ingredient updated successfully"
+
+msgid "Ingredients"
+msgstr "Ingredients"
 
 msgid "Invalid InvenTree credentials. Please check your username and password."
 msgstr "Invalid InvenTree credentials. Please check your username and password."
 
 msgid "Invalid file type. Please upload an image."
 msgstr "Invalid file type. Please upload an image."
+
+msgid "Inventory"
+msgstr "Inventory"
+
+msgid "Is Manufacturer"
+msgstr "Is Manufacturer"
+
+msgid "Is Supplier"
+msgstr "Is Supplier"
+
+msgid "Issue Date"
+msgstr "Issue Date"
+
+msgid "Item added successfully"
+msgstr "Item added successfully"
+
+msgid "Item deleted successfully"
+msgstr "Item deleted successfully"
+
+msgid "Item not found"
+msgstr "Item not found"
+
+msgid "Item reference"
+msgstr "Item reference"
+
+msgid "Item updated successfully"
+msgstr "Item updated successfully"
+
+msgid "Items"
+msgstr "Items"
+
+msgid "Items saved successfully"
+msgstr "Items saved successfully"
+
+msgid "J40/12345/2020"
+msgstr "J40/12345/2020"
 
 msgid "JSON Forms Documentation"
 msgstr "JSON Forms Documentation"
@@ -491,11 +1283,23 @@ msgstr "JSON Schema"
 msgid "JavaScript code"
 msgstr "JavaScript code"
 
+msgid "Journal"
+msgstr "Journal"
+
+msgid "LOTALLEXP - Auto-received Items"
+msgstr "LOTALLEXP - Auto-received Items"
+
 msgid "Last Login"
 msgstr "Last Login"
 
 msgid "Last updated"
 msgstr "Last updated"
+
+msgid "Line Item"
+msgstr "Line Item"
+
+msgid "Line Items"
+msgstr "Line Items"
 
 msgid "Link"
 msgstr "Link"
@@ -508,6 +1312,9 @@ msgstr "Loading audit logs..."
 
 msgid "Loading campaigns..."
 msgstr "Loading campaigns..."
+
+msgid "Loading components..."
+msgstr "Loading components..."
 
 msgid "Loading form..."
 msgstr "Loading form..."
@@ -536,14 +1343,71 @@ msgstr "Loading templates..."
 msgid "Loading users..."
 msgstr "Loading users..."
 
+msgid "Loading..."
+msgstr "Loading..."
+
+msgid "Location"
+msgstr "Location"
+
+msgid "Location created successfully"
+msgstr "Location created successfully"
+
+msgid "Location deleted successfully"
+msgstr "Location deleted successfully"
+
+msgid "Location description"
+msgstr "Location description"
+
+msgid "Location name"
+msgstr "Location name"
+
+msgid "Location updated successfully"
+msgstr "Location updated successfully"
+
+msgid "Locations"
+msgstr "Locations"
+
 msgid "Login"
 msgstr "Login"
 
 msgid "Logout"
 msgstr "Logout"
 
+msgid "Lot"
+msgstr "Lot"
+
+msgid "MU"
+msgstr "MU"
+
+msgid "Mandatory"
+msgstr "Mandatory"
+
+msgid "Manufacturers"
+msgstr "Manufacturers"
+
+msgid "Manufacturing Date"
+msgstr "Manufacturing Date"
+
+msgid "Material"
+msgstr "Material"
+
+msgid "Max"
+msgstr "Max"
+
+msgid "Max file size: 10MB"
+msgstr "Max file size: 10MB"
+
 msgid "Message"
 msgstr "Message"
+
+msgid "Metadata"
+msgstr "Metadata"
+
+msgid "Minimum"
+msgstr "Minimum"
+
+msgid "Mislabeled"
+msgstr "Mislabeled"
 
 msgid "My Template"
 msgstr "My Template"
@@ -551,14 +1415,47 @@ msgstr "My Template"
 msgid "Name"
 msgstr "Name"
 
+msgid "Name is required"
+msgstr "Name is required"
+
+msgid "Neconform"
+msgstr "Neconform"
+
 msgid "Need help with JSON Schema or UI Schema?"
 msgstr "Need help with JSON Schema or UI Schema?"
 
 msgid "Never"
 msgstr "Never"
 
+msgid "New Category"
+msgstr "New Category"
+
+msgid "New Location"
+msgstr "New Location"
+
+msgid "New Purchase Order"
+msgstr "New Purchase Order"
+
+msgid "New QC Record"
+msgstr "New QC Record"
+
+msgid "New Recipe"
+msgstr "New Recipe"
+
+msgid "New Request"
+msgstr "New Request"
+
+msgid "New Supplier"
+msgstr "New Supplier"
+
 msgid "New Template"
 msgstr "New Template"
+
+msgid "New item"
+msgstr "New item"
+
+msgid "New supplier"
+msgstr "New supplier"
 
 msgid "Next: Add JSON Schema"
 msgstr "Next: Add JSON Schema"
@@ -569,8 +1466,29 @@ msgstr "Next: Update JSON Schema"
 msgid "No"
 msgstr "No"
 
+msgid "No Approval Flow"
+msgstr "No Approval Flow"
+
+msgid "No BA Rompharm"
+msgstr "No BA Rompharm"
+
+msgid "No QC records"
+msgstr "No QC records"
+
+msgid "No approval flow created yet"
+msgstr "No approval flow created yet"
+
+msgid "No attachments"
+msgstr "No attachments"
+
 msgid "No audit logs found"
 msgstr "No audit logs found"
+
+msgid "No batch codes available. Please receive stock with batch codes first."
+msgstr "No batch codes available. Please receive stock with batch codes first."
+
+msgid "No batch codes defined"
+msgstr "No batch codes defined"
 
 msgid "No campaigns"
 msgstr "No campaigns"
@@ -578,20 +1496,71 @@ msgstr "No campaigns"
 msgid "No campaigns found. Create your first campaign to send to subscribers."
 msgstr "No campaigns found. Create your first campaign to send to subscribers."
 
+msgid "No categories"
+msgstr "No categories"
+
+msgid "No changes recorded yet"
+msgstr "No changes recorded yet"
+
+msgid "No data"
+msgstr "No data"
+
+msgid "No documents generated yet"
+msgstr "No documents generated yet"
+
 msgid "No forms yet"
 msgstr "No forms yet"
 
 msgid "No history"
 msgstr "No history"
 
+msgid "No ingredients added yet"
+msgstr "No ingredients added yet"
+
+msgid "No items"
+msgstr "No items"
+
+msgid "No locations"
+msgstr "No locations"
+
+msgid "No materials"
+msgstr "No materials"
+
 msgid "No notifications"
 msgstr "No notifications"
+
+msgid "No products found"
+msgstr "No products found"
+
+msgid "No received items"
+msgstr "No received items"
+
+msgid "No recipes found"
+msgstr "No recipes found"
+
+msgid "No requests configured"
+msgstr "No requests configured"
+
+msgid "No requests found"
+msgstr "No requests found"
+
+msgid "No results found"
+msgstr "No results found"
+
+msgid "No sales orders found"
+msgstr "No sales orders found"
 
 msgid "No segments"
 msgstr "No segments"
 
 msgid "No segments found. Add your first segment to organize subscribers."
 msgstr "No segments found. Add your first segment to organize subscribers."
+
+msgid "No shipments"
+msgstr "No shipments"
+
+msgid "No signatures yet"
+msgstr "No signatures yet"
 
 msgid "No submissions"
 msgstr "No submissions"
@@ -620,17 +1589,101 @@ msgstr "No templates found"
 msgid "No users found"
 msgstr "No users found"
 
+msgid "None (Root Category)"
+msgstr "None (Root Category)"
+
+msgid "None (Root Location)"
+msgstr "None (Root Location)"
+
 msgid "Not Found"
 msgstr "Not Found"
 
+msgid "Note: Set quantity to 0 for items not available. Use Add Item to add materials with batch codes from source location."
+msgstr "Note: Set quantity to 0 for items not available. Use Add Item to add materials with batch codes from source location."
+
 msgid "Notes"
 msgstr "Notes"
+
+msgid "Notification Emails"
+msgstr "Notification Emails"
+
+msgid "Notification Template"
+msgstr "Notification Template"
 
 msgid "Notifications"
 msgstr "Notifications"
 
 msgid "Notify author"
 msgstr "Notify author"
+
+msgid "Num"
+msgstr "Num"
+
+msgid "Num Containers"
+msgstr "Num Containers"
+
+msgid "OK - Transactionable"
+msgstr "OK - Transactionable"
+
+msgid "Operations"
+msgstr "Operations"
+
+msgid "Operations Flow"
+msgstr "Operations Flow"
+
+msgid "Operations flow will be created automatically when request is approved"
+msgstr "Operations flow will be created automatically when request is approved"
+
+msgid "Operations signed successfully"
+msgstr "Operations signed successfully"
+
+msgid "Operator"
+msgstr "Operator"
+
+msgid "Optional"
+msgstr "Optional"
+
+msgid "Optional Approvers"
+msgstr "Optional Approvers"
+
+msgid "Optional notes..."
+msgstr "Optional notes..."
+
+msgid "Or enter manually"
+msgstr "Or enter manually"
+
+msgid "Order Date"
+msgstr "Order Date"
+
+msgid "Order Items"
+msgstr "Order Items"
+
+msgid "Order Reference"
+msgstr "Order Reference"
+
+msgid "Order description"
+msgstr "Order description"
+
+msgid "Order signed successfully"
+msgstr "Order signed successfully"
+
+msgid "Order updated successfully"
+msgstr "Order updated successfully"
+
+msgid "Parent"
+msgstr "Parent"
+
+msgid "Parent Category"
+msgstr "Parent Category"
+
+msgid "Parent Location"
+msgstr "Parent Location"
+
+msgid "Part"
+msgstr "Part"
+
+msgid "Part (Article)"
+msgstr "Part (Article)"
 
 msgid "Part Type"
 msgstr "Part Type"
@@ -644,14 +1697,101 @@ msgstr "Part updated successfully"
 msgid "Password"
 msgstr "Password"
 
+msgid "Pending"
+msgstr "Pending"
+
+msgid "Person"
+msgstr "Person"
+
 msgid "Phone"
 msgstr "Phone"
+
+msgid "Planned quant."
+msgstr "Planned quant."
+
+msgid "Please complete all fields including test results"
+msgstr "Please complete all fields including test results"
+
+msgid "Please fill in all fields"
+msgstr "Please fill in all fields"
+
+msgid "Please fill in all required fields"
+msgstr "Please fill in all required fields"
 
 msgid "Please login to submit this form"
 msgstr "Please login to submit this form"
 
+msgid "Please provide a reason for refusal"
+msgstr "Please provide a reason for refusal"
+
+msgid "Please select a decision status before signing"
+msgstr "Please select a decision status before signing"
+
+msgid "Please select a part"
+msgstr "Please select a part"
+
+msgid "Please select a part and enter quantity"
+msgstr "Please select a part and enter quantity"
+
+msgid "Please select a product"
+msgstr "Please select a product"
+
+msgid "Please select a status"
+msgstr "Please select a status"
+
+msgid "Please select a status before signing"
+msgstr "Please select a status before signing"
+
+msgid "Please select a supplier"
+msgstr "Please select a supplier"
+
+msgid "Prelevated Quantity"
+msgstr "Prelevated Quantity"
+
+msgid "Prelevation Date"
+msgstr "Prelevation Date"
+
 msgid "Preview"
 msgstr "Preview"
+
+msgid "Price"
+msgstr "Price"
+
+msgid "Processing"
+msgstr "Processing"
+
+msgid "Processing..."
+msgstr "Processing..."
+
+msgid "Procurement"
+msgstr "Procurement"
+
+msgid "Product"
+msgstr "Product"
+
+msgid "Product Name"
+msgstr "Product Name"
+
+msgid "Product cannot be changed. To change product, delete this ingredient and add a new one."
+msgstr "Product cannot be changed. To change product, delete this ingredient and add a new one."
+
+msgid "Production"
+msgstr "Production"
+
+msgid "Production Approval"
+msgstr "Production Approval"
+
+msgid "Production approval flow will be created automatically"
+msgstr "Production approval flow will be created automatically"
+
+msgid "Production completed successfully. Stock operations have been executed."
+msgstr "Production completed successfully. Stock operations have been executed."
+
+msgid "Production signed successfully"
+msgstr "Production signed successfully"
+
+msgid "Products/Container"
+msgstr "Products/Container"
 
 msgid "Protected"
 msgstr "Protected"
@@ -668,11 +1808,203 @@ msgstr "Public Form"
 msgid "Public forms can be filled by anyone. Protected forms require authentication."
 msgstr "Public forms can be filled by anyone. Protected forms require authentication."
 
+msgid "Purchase Order"
+msgstr "Purchase Order"
+
+msgid "Purchase Price"
+msgstr "Purchase Price"
+
+msgid "Purchase order created successfully"
+msgstr "Purchase order created successfully"
+
+msgid "Purchase order not found"
+msgstr "Purchase order not found"
+
+msgid "QC"
+msgstr "QC"
+
+msgid "QC information updated successfully"
+msgstr "QC information updated successfully"
+
+msgid "QC record confirmed - Batch is transactionable"
+msgstr "QC record confirmed - Batch is transactionable"
+
+msgid "QC record confirmed - Non-conforming batch"
+msgstr "QC record confirmed - Non-conforming batch"
+
+msgid "QC record saved successfully"
+msgstr "QC record saved successfully"
+
+msgid "QC record updated successfully"
+msgstr "QC record updated successfully"
+
+msgid "Qty"
+msgstr "Qty"
+
+msgid "Quality Control"
+msgstr "Quality Control"
+
+msgid "Quality Control Records"
+msgstr "Quality Control Records"
+
+msgid "Quantity"
+msgstr "Quantity"
+
+msgid "Queued"
+msgstr "Queued"
+
+msgid "Quick Actions"
+msgstr "Quick Actions"
+
+msgid "Reason for Refusal"
+msgstr "Reason for Refusal"
+
+msgid "Receive"
+msgstr "Receive"
+
+msgid "Receive Stock"
+msgstr "Receive Stock"
+
+msgid "Received"
+msgstr "Received"
+
+msgid "Received Date"
+msgstr "Received Date"
+
+msgid "Received Qty"
+msgstr "Received Qty"
+
+msgid "Received Quantities"
+msgstr "Received Quantities"
+
+msgid "Received Quantity"
+msgstr "Received Quantity"
+
+msgid "Received Stock"
+msgstr "Received Stock"
+
+msgid "Recent Activity"
+msgstr "Recent Activity"
+
 msgid "Recent Submissions"
 msgstr "Recent Submissions"
 
+msgid "Reception Flow"
+msgstr "Reception Flow"
+
+msgid "Reception flow completed successfully"
+msgstr "Reception flow completed successfully"
+
+msgid "Reception flow will be created automatically when operations are finished"
+msgstr "Reception flow will be created automatically when operations are finished"
+
+msgid "Reception signed successfully"
+msgstr "Reception signed successfully"
+
+msgid "Recipe"
+msgstr "Recipe"
+
+msgid "Recipe created successfully"
+msgstr "Recipe created successfully"
+
+msgid "Recipe duplicated successfully"
+msgstr "Recipe duplicated successfully"
+
+msgid "Recipe not found"
+msgstr "Recipe not found"
+
+msgid "Recipes"
+msgstr "Recipes"
+
+msgid "Reference"
+msgstr "Reference"
+
+msgid "Refresh"
+msgstr "Refresh"
+
+msgid "Refused"
+msgstr "Refused"
+
+msgid "Registration No."
+msgstr "Registration No."
+
+msgid "Remove"
+msgstr "Remove"
+
+msgid "Remove Item"
+msgstr "Remove Item"
+
+msgid "Remove Signature"
+msgstr "Remove Signature"
+
+msgid "Request created successfully"
+msgstr "Request created successfully"
+
+msgid "Request deleted successfully"
+msgstr "Request deleted successfully"
+
+msgid "Request must have at least one item"
+msgstr "Request must have at least one item"
+
+msgid "Request not found"
+msgstr "Request not found"
+
+msgid "Request signed successfully"
+msgstr "Request signed successfully"
+
+msgid "Request updated successfully"
+msgstr "Request updated successfully"
+
+msgid "Requested"
+msgstr "Requested"
+
+msgid "Requested Qty"
+msgstr "Requested Qty"
+
+msgid "Requests"
+msgstr "Requests"
+
+msgid "Required Approvers"
+msgstr "Required Approvers"
+
+msgid "Required Qty"
+msgstr "Required Qty"
+
+msgid "Reset Date"
+msgstr "Reset Date"
+
+msgid "Result"
+msgstr "Result"
+
+msgid "Resulted Qty"
+msgstr "Resulted Qty"
+
+msgid "Results"
+msgstr "Results"
+
+msgid "Results saved successfully"
+msgstr "Results saved successfully"
+
+msgid "Returns"
+msgstr "Returns"
+
+msgid "Revision"
+msgstr "Revision"
+
+msgid "Revisions"
+msgstr "Revisions"
+
 msgid "Role"
 msgstr "Role"
+
+msgid "Rompharm BA Date"
+msgstr "Rompharm BA Date"
+
+msgid "Rompharm BA No"
+msgstr "Rompharm BA No"
+
+msgid "Rompharm QC"
+msgstr "Rompharm QC"
 
 msgid "Română"
 msgstr "Română"
@@ -680,8 +2012,53 @@ msgstr "Română"
 msgid "SMS marketing consent"
 msgstr "SMS marketing consent"
 
+msgid "Sales"
+msgstr "Sales"
+
+msgid "Sales Orders"
+msgstr "Sales Orders"
+
 msgid "Save"
 msgstr "Save"
+
+msgid "Save Changes"
+msgstr "Save Changes"
+
+msgid "Save Decision"
+msgstr "Save Decision"
+
+msgid "Save Results"
+msgstr "Save Results"
+
+msgid "Save Unused"
+msgstr "Save Unused"
+
+msgid "Scheduled At"
+msgstr "Scheduled At"
+
+msgid "Search by product name or code..."
+msgstr "Search by product name or code..."
+
+msgid "Search by reference, supplier, description, or status..."
+msgstr "Search by reference, supplier, description, or status..."
+
+msgid "Search categories..."
+msgstr "Search categories..."
+
+msgid "Search for article..."
+msgstr "Search for article..."
+
+msgid "Search for part..."
+msgstr "Search for part..."
+
+msgid "Search for product..."
+msgstr "Search for product..."
+
+msgid "Search items..."
+msgstr "Search items..."
+
+msgid "Search locations..."
+msgstr "Search locations..."
 
 msgid "Segment"
 msgstr "Segment"
@@ -698,11 +2075,80 @@ msgstr "Segment updated successfully"
 msgid "Segments"
 msgstr "Segments"
 
+msgid "Select Alternative"
+msgstr "Select Alternative"
+
+msgid "Select Product"
+msgstr "Select Product"
+
+msgid "Select a product for the new recipe. All ingredients will be copied."
+msgstr "Select a product for the new recipe. All ingredients will be copied."
+
+msgid "Select batch code"
+msgstr "Select batch code"
+
+msgid "Select batch code (optional)"
+msgstr "Select batch code (optional)"
+
+msgid "Select batch code..."
+msgstr "Select batch code..."
+
+msgid "Select currency"
+msgstr "Select currency"
+
+msgid "Select date"
+msgstr "Select date"
+
+msgid "Select date and time"
+msgstr "Select date and time"
+
+msgid "Select destination location"
+msgstr "Select destination location"
+
+msgid "Select email template"
+msgstr "Select email template"
+
+msgid "Select expiry date"
+msgstr "Select expiry date"
+
+msgid "Select item to receive"
+msgstr "Select item to receive"
+
+msgid "Select location"
+msgstr "Select location"
+
+msgid "Select parent category"
+msgstr "Select parent category"
+
+msgid "Select parent location"
+msgstr "Select parent location"
+
+msgid "Select part"
+msgstr "Select part"
+
+msgid "Select reset date"
+msgstr "Select reset date"
+
+msgid "Select result"
+msgstr "Select result"
+
 msgid "Select segment"
 msgstr "Select segment"
 
 msgid "Select segments"
 msgstr "Select segments"
+
+msgid "Select source location"
+msgstr "Select source location"
+
+msgid "Select status"
+msgstr "Select status"
+
+msgid "Select stock location"
+msgstr "Select stock location"
+
+msgid "Select supplier"
+msgstr "Select supplier"
 
 msgid "Select templates"
 msgstr "Select templates"
@@ -713,11 +2159,59 @@ msgstr "Select templates for document generation"
 msgid "Select the type of template part to create"
 msgstr "Select the type of template part to create"
 
+msgid "Select unit"
+msgstr "Select unit"
+
+msgid "Selected item not found"
+msgstr "Selected item not found"
+
 msgid "Send Campaign"
 msgstr "Send Campaign"
 
 msgid "Sent Count"
 msgstr "Sent Count"
+
+msgid "Series"
+msgstr "Series"
+
+msgid "Shipment Date"
+msgstr "Shipment Date"
+
+msgid "Shipments"
+msgstr "Shipments"
+
+msgid "Shipped"
+msgstr "Shipped"
+
+msgid "Sign"
+msgstr "Sign"
+
+msgid "Sign Production"
+msgstr "Sign Production"
+
+msgid "Signature Hash"
+msgstr "Signature Hash"
+
+msgid "Signature removed successfully"
+msgstr "Signature removed successfully"
+
+msgid "Signatures"
+msgstr "Signatures"
+
+msgid "Signed"
+msgstr "Signed"
+
+msgid "Signed At"
+msgstr "Signed At"
+
+msgid "Signed by"
+msgstr "Signed by"
+
+msgid "Single"
+msgstr "Single"
+
+msgid "Single Product"
+msgstr "Single Product"
 
 msgid "Skipped"
 msgstr "Skipped"
@@ -725,8 +2219,20 @@ msgstr "Skipped"
 msgid "Slug"
 msgstr "Slug"
 
+msgid "Source"
+msgstr "Source"
+
+msgid "Source Location"
+msgstr "Source Location"
+
+msgid "Source and destination cannot be the same"
+msgstr "Source and destination cannot be the same"
+
 msgid "Standard CSS syntax"
 msgstr "Standard CSS syntax"
+
+msgid "Start Date"
+msgstr "Start Date"
 
 msgid "State"
 msgstr "State"
@@ -737,6 +2243,33 @@ msgstr "State updated successfully"
 msgid "Status"
 msgstr "Status"
 
+msgid "Status updated successfully"
+msgstr "Status updated successfully"
+
+msgid "Stock Details"
+msgstr "Stock Details"
+
+msgid "Stock Information"
+msgstr "Stock Information"
+
+msgid "Stock Value"
+msgstr "Stock Value"
+
+msgid "Stock can be transferred while in quarantine"
+msgstr "Stock can be transferred while in quarantine"
+
+msgid "Stock item deleted successfully"
+msgstr "Stock item deleted successfully"
+
+msgid "Stock received successfully"
+msgstr "Stock received successfully"
+
+msgid "Stocks"
+msgstr "Stocks"
+
+msgid "Street address"
+msgstr "Street address"
+
 msgid "Submission Details"
 msgstr "Submission Details"
 
@@ -745,6 +2278,12 @@ msgstr "Submission deleted successfully"
 
 msgid "Submission not found"
 msgstr "Submission not found"
+
+msgid "Submissions (30 days)"
+msgstr "Submissions (30 days)"
+
+msgid "Submissions (7 days)"
+msgstr "Submissions (7 days)"
 
 msgid "Submit"
 msgstr "Submit"
@@ -770,17 +2309,65 @@ msgstr "Subscribers"
 msgid "Success"
 msgstr "Success"
 
+msgid "Supplier"
+msgstr "Supplier"
+
+msgid "Supplier BA Date"
+msgstr "Supplier BA Date"
+
+msgid "Supplier BA Information"
+msgstr "Supplier BA Information"
+
+msgid "Supplier BA No"
+msgstr "Supplier BA No"
+
+msgid "Supplier Batch Code"
+msgstr "Supplier Batch Code"
+
+msgid "Supplier Reference"
+msgstr "Supplier Reference"
+
+msgid "Supplier U.M."
+msgstr "Supplier U.M."
+
+msgid "Supplier created successfully"
+msgstr "Supplier created successfully"
+
+msgid "Supplier in List"
+msgstr "Supplier in List"
+
+msgid "Supplier order number"
+msgstr "Supplier order number"
+
+msgid "Suppliers"
+msgstr "Suppliers"
+
 msgid "System Notifications"
 msgstr "System Notifications"
 
 msgid "T"
 msgstr "T"
 
+msgid "Target Date"
+msgstr "Target Date"
+
 msgid "Tax ID"
 msgstr "Tax ID"
 
 msgid "Tax ID (CUI/CIF)"
 msgstr "Tax ID (CUI/CIF)"
+
+msgid "Tax identification number"
+msgstr "Tax identification number"
+
+msgid "Temperature Conditions Met"
+msgstr "Temperature Conditions Met"
+
+msgid "Temperature Control"
+msgstr "Temperature Control"
+
+msgid "Temperature Control Transport"
+msgstr "Temperature Control Transport"
 
 msgid "Template Name"
 msgstr "Template Name"
@@ -797,14 +2384,32 @@ msgstr "Template name is required"
 msgid "Templates"
 msgstr "Templates"
 
+msgid "Test Result (Conform/Neconform)"
+msgstr "Test Result (Conform/Neconform)"
+
 msgid "The DataFlows Docu server may be experiencing issues with the /raw endpoint."
 msgstr "The DataFlows Docu server may be experiencing issues with the /raw endpoint."
+
+msgid "These items were automatically received as transactionable (OK) without quarantine."
+msgstr "These items were automatically received as transactionable (OK) without quarantine."
 
 msgid "This action cannot be undone."
 msgstr "This action cannot be undone."
 
+msgid "This form is read-only because it has been signed."
+msgstr "This form is read-only because it has been signed."
+
 msgid "This is a protected form. You need to login to access it."
 msgstr "This is a protected form. You need to login to access it."
+
+msgid "This part is already in the list"
+msgstr "This part is already in the list"
+
+msgid "This purchase order does not have an approval flow. Approval flows are automatically created for new orders based on the configured approval template."
+msgstr "This purchase order does not have an approval flow. Approval flows are automatically created for new orders based on the configured approval template."
+
+msgid "This request has signatures and cannot be edited. Remove all signatures to enable editing."
+msgstr "This request has signatures and cannot be edited. Remove all signatures to enable editing."
 
 msgid "Timestamp"
 msgstr "Timestamp"
@@ -812,14 +2417,71 @@ msgstr "Timestamp"
 msgid "Title"
 msgstr "Title"
 
+msgid "Total"
+msgstr "Total"
+
+msgid "Total Price"
+msgstr "Total Price"
+
+msgid "Total Submissions"
+msgstr "Total Submissions"
+
+msgid "Tracking Number"
+msgstr "Tracking Number"
+
+msgid "Transactionable"
+msgstr "Transactionable"
+
+msgid "Transactionable (În carantină tranzacționabil)"
+msgstr "Transactionable (În carantină tranzacționabil)"
+
+msgid "Transferable"
+msgstr "Transferable"
+
+msgid "Transport"
+msgstr "Transport"
+
+msgid "Transport Conditions"
+msgstr "Transport Conditions"
+
 msgid "Type"
 msgstr "Type"
+
+msgid "Type at least 2 characters"
+msgstr "Type at least 2 characters"
+
+msgid "Type at least 2 characters to search..."
+msgstr "Type at least 2 characters to search..."
 
 msgid "UI Schema (optional)"
 msgstr "UI Schema (optional)"
 
 msgid "Unable to load template content. Please try again later or contact support."
 msgstr "Unable to load template content. Please try again later or contact support."
+
+msgid "Unit"
+msgstr "Unit"
+
+msgid "Unit Price"
+msgstr "Unit Price"
+
+msgid "Unit of Measure"
+msgstr "Unit of Measure"
+
+msgid "Unknown error"
+msgstr "Unknown error"
+
+msgid "Unsealed"
+msgstr "Unsealed"
+
+msgid "Unused Materials"
+msgstr "Unused Materials"
+
+msgid "Unused Qty"
+msgstr "Unused Qty"
+
+msgid "Unused quantities saved successfully"
+msgstr "Unused quantities saved successfully"
 
 msgid "Update"
 msgstr "Update"
@@ -830,8 +2492,29 @@ msgstr "Update Form Schema"
 msgid "Update State"
 msgstr "Update State"
 
+msgid "Updated"
+msgstr "Updated"
+
+msgid "Updated At"
+msgstr "Updated At"
+
+msgid "Updated By"
+msgstr "Updated By"
+
+msgid "Upload Date"
+msgstr "Upload Date"
+
+msgid "Upload File"
+msgstr "Upload File"
+
+msgid "Use Expiry Date (uncheck for Reset Date)"
+msgstr "Use Expiry Date (uncheck for Reset Date)"
+
 msgid "Use Jinja2 syntax: {{variable}}, {% for %}, {% if %}"
 msgstr "Use Jinja2 syntax: {{variable}}, {% for %}, {% if %}"
+
+msgid "Used Qty"
+msgstr "Used Qty"
 
 msgid "User"
 msgstr "User"
@@ -845,11 +2528,23 @@ msgstr "Users"
 msgid "Users List"
 msgstr "Users List"
 
-msgid "View All Submissions"
-msgstr "View All Submissions"
+msgid "Value"
+msgstr "Value"
+
+msgid "Version incremented to"
+msgstr "Version incremented to"
+
+msgid "View"
+msgstr "View"
+
+msgid "View Articles"
+msgstr "View Articles"
 
 msgid "View Documentation"
 msgstr "View Documentation"
+
+msgid "View Stocks"
+msgstr "View Stocks"
 
 msgid "View details"
 msgstr "View details"
@@ -857,8 +2552,20 @@ msgstr "View details"
 msgid "View submissions"
 msgstr "View submissions"
 
+msgid "Warehouse Operations"
+msgstr "Warehouse Operations"
+
+msgid "Warning"
+msgstr "Warning"
+
+msgid "Welcome"
+msgstr "Welcome"
+
 msgid "Will be verified with ANAF if provided"
 msgstr "Will be verified with ANAF if provided"
+
+msgid "Withdrawals"
+msgstr "Withdrawals"
 
 msgid "Yes"
 msgstr "Yes"
@@ -866,5 +2573,83 @@ msgstr "Yes"
 msgid "a"
 msgstr "a"
 
+msgid "by"
+msgstr "by"
+
+msgid "category"
+msgstr "category"
+
+msgid "code"
+msgstr "code"
+
+msgid "description"
+msgstr "description"
+
+msgid "destination_detail"
+msgstr "destination_detail"
+
+msgid "filter"
+msgstr "filter"
+
+msgid "form_title"
+msgstr "form_title"
+
+msgid "initial"
+msgstr "initial"
+
+msgid "ipn"
+msgstr "ipn"
+
+msgid "issue_date"
+msgstr "issue_date"
+
+msgid "items"
+msgstr "items"
+
+msgid "items_count"
+msgstr "items_count"
+
+msgid "name"
+msgstr "name"
+
 msgid "part"
 msgstr "part"
+
+msgid "part_detail"
+msgstr "part_detail"
+
+msgid "purchase_price"
+msgstr "purchase_price"
+
+msgid "quantity"
+msgstr "quantity"
+
+msgid "received"
+msgstr "received"
+
+msgid "reference"
+msgstr "reference"
+
+msgid "state"
+msgstr "state"
+
+msgid "status_text"
+msgstr "status_text"
+
+msgid "submitted_at"
+msgstr "submitted_at"
+
+msgid "submitted_by"
+msgstr "submitted_by"
+
+msgid "supplier_detail"
+msgstr "supplier_detail"
+
+msgid "target_date"
+msgstr "target_date"
+
+msgid "um"
+msgstr "um"
+
+msgid "updated_at"
+msgstr "updated_at"

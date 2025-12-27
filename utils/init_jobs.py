@@ -25,7 +25,7 @@ def init_jobs():
             'name': 'update_roles',
             'frequency': '*/5 * * * *',  # Every 5 minutes
             'enabled': True,
-            'description': 'Synchronize roles from InvenTree'
+            'description': 'Synchronize user roles'
         }
     ]
     

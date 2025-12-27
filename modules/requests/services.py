@@ -8,7 +8,6 @@ from fastapi import HTTPException
 from bson import ObjectId
 
 from src.backend.utils.config import load_config
-from .utils import get_inventree_headers
 
 
 async def fetch_stock_locations(current_user: dict, db=None) -> Dict[str, Any]:
@@ -26,8 +25,9 @@ async def fetch_stock_locations(current_user: dict, db=None) -> Dict[str, Any]:
         # Convert ObjectId to string and format for frontend
         results = []
         for loc in locations:
+            loc_id = str(loc['_id'])
             results.append({
-                '_id': str(loc['_id']),
+                '_id': loc_id,
                 'name': loc.get('code', str(loc['_id'])),  # Use code as name
                 'code': loc.get('code', ''),
                 'description': loc.get('description', '')
@@ -76,7 +76,7 @@ async def search_parts(db, search: Optional[str] = None) -> Dict[str, Any]:
 async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
     """Get stock information for a part from MongoDB depo_stocks with batches
     
-    Shows stock with states: QUARANTINED, QUARANTINED TRANSACTIONABLE, and OK
+    Shows stock with states where is_requestable = true
     Uses part_id as ObjectId string directly
     """
     try:
@@ -94,15 +94,24 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
                 "batches": []
             }
         
-        # State IDs to include:
-        # - QUARANTINED (not transferable): 694322758728e4d75ae7278f
-        # - QUARANTINED TRANSACTIONABLE: 694322878728e4d75ae72790
-        # - OK: 694321db8728e4d75ae72789
-        allowed_state_ids = [
-            ObjectId('694322758728e4d75ae7278f'),  # QUARANTINED
-            ObjectId('694322878728e4d75ae72790'),  # QUARANTINED TRANSACTIONABLE
-            ObjectId('694321db8728e4d75ae72789')   # OK
-        ]
+        # Get all states where is_requestable = true
+        requestable_states = list(db.depo_stocks_states.find({
+            "is_requestable": True
+        }))
+        
+        # If no requestable states found, return empty
+        if not requestable_states:
+            return {
+                "part_id": part_id,
+                "total": 0,
+                "in_sales": 0,
+                "in_builds": 0,
+                "in_procurement": 0,
+                "available": 0,
+                "batches": []
+            }
+        
+        allowed_state_ids = [state["_id"] for state in requestable_states]
         
         # Query depo_stocks using part_id and allowed states
         stock_records = list(db.depo_stocks.find({
@@ -208,11 +217,11 @@ async def fetch_part_bom(current_user: dict, part_id: str, db=None) -> Dict[str,
                 sub_part = db.depo_parts.find_one({"_id": sub_part_id})
                 if sub_part:
                     results.append({
-                        "pk": str(bom_item.get("_id")),
+                        "_id": str(bom_item.get("_id")),
                         "part": part_id,
                         "sub_part": sub_part.get("id"),
                         "sub_part_detail": {
-                            "pk": sub_part.get("id"),
+                            "_id": str(sub_part.get("_id")),
                             "name": sub_part.get("name", ""),
                             "IPN": sub_part.get("ipn", "")
                         },
@@ -230,7 +239,11 @@ async def fetch_part_bom(current_user: dict, part_id: str, db=None) -> Dict[str,
 
 
 async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: Optional[str] = None, db=None) -> Dict[str, Any]:
-    """Get available batch codes for a part from MongoDB depo_stocks using ObjectId"""
+    """Get available batch codes for a part from MongoDB depo_stocks using ObjectId
+    
+    Returns batch codes where state has is_requestable = true
+    Also includes state info (is_transferable, name) for frontend validation
+    """
     from src.backend.utils.db import get_db
     
     if db is None:
@@ -243,13 +256,30 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
         except:
             return {"batch_codes": []}
         
-        # Transferable state_id (quarantined and transferable)
-        transferable_state_id = ObjectId('694322878728e4d75ae72790')
+        # Get all states where is_requestable = true
+        requestable_states = list(db.depo_stocks_states.find({
+            "is_requestable": True
+        }))
+        
+        # If no requestable states found, return empty
+        if not requestable_states:
+            return {"batch_codes": []}
+        
+        requestable_state_ids = [state["_id"] for state in requestable_states]
+        
+        # Create state info map for later use
+        state_info_map = {}
+        for state in requestable_states:
+            state_info_map[str(state["_id"])] = {
+                "name": state.get("name", ""),
+                "is_transferable": state.get("is_transferable", False),
+                "is_requestable": state.get("is_requestable", False)
+            }
         
         # Build query
         query = {
             "part_id": part_oid,
-            "state_id": transferable_state_id,
+            "state_id": {"$in": requestable_state_ids},
             "quantity": {"$gt": 0}  # Only stock with quantity > 0
         }
         
@@ -268,13 +298,26 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
         batch_map = {}
         for stock in stock_records:
             batch_code = stock.get("batch_code", "")
+            state_id = str(stock.get("state_id", ""))
+            
             if batch_code and batch_code.strip():
                 if batch_code not in batch_map:
+                    # Get state info
+                    state_info = state_info_map.get(state_id, {
+                        "name": "Unknown",
+                        "is_transferable": False,
+                        "is_requestable": False
+                    })
+                    
                     batch_map[batch_code] = {
                         'batch_code': batch_code,
                         'expiry_date': stock.get("expiry_date", ""),
                         'quantity': 0,
-                        'location_id': str(stock.get("location_id", ""))
+                        'location_id': str(stock.get("location_id", "")),
+                        'state_id': state_id,
+                        'state_name': state_info.get("name", ""),
+                        'is_transferable': state_info.get("is_transferable", False),
+                        'is_requestable': state_info.get("is_requestable", False)
                     }
                 batch_map[batch_code]['quantity'] += stock.get("quantity", 0)
         

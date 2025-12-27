@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Table, Select, NumberInput, Text, Badge, Group, Paper, Title, Loader, Stack, Collapse, Button } from '@mantine/core';
-import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { Table, Select, NumberInput, Text, Paper, Title, Loader, ActionIcon, Group } from '@mantine/core';
+import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
@@ -16,23 +16,25 @@ interface Batch {
   batch_date?: string;
 }
 
-interface ComponentBatchSelection {
+interface BatchAllocation {
+  batch_unique_key: string;
   batch_code: string;
   quantity: number;
 }
 
 interface Component {
-  part_id: string;  // ObjectId string
+  part_id: string;
   name: string;
   IPN: string;
   quantity: number;
-  required_quantity: number; // quantity * product_quantity
+  required_quantity: number;
   mandatory: boolean;
   type: number;
   alternatives?: Component[];
-  selected_alternative?: number; // Index of selected alternative
+  selected_alternative?: number;
   batches?: Batch[];
-  batch_selections?: ComponentBatchSelection[];
+  batch_allocations?: BatchAllocation[];
+  requested_quantity?: number;
 }
 
 interface ComponentsTableProps {
@@ -45,6 +47,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
   const { t } = useTranslation();
   const [components, setComponents] = useState<Component[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (recipeData && recipeData.items) {
@@ -59,7 +62,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
 
       for (const item of recipeData.items) {
         if (item.type === 2 && item.alternatives && item.alternatives.length > 0) {
-          // Alternative group
+          // Alternative group - preload batches for all alternatives
           const alternativesWithBatches = await Promise.all(
             item.alternatives.map(async (alt: any) => {
               const batches = await loadBatches(alt.part_id);
@@ -72,13 +75,14 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
                 mandatory: item.mandatory,
                 type: 1,
                 batches,
-                batch_selections: []
+                batch_allocations: [],
+                requested_quantity: batches.length > 0 ? 0 : alt.quantity * productQuantity
               };
             })
           );
 
           processedComponents.push({
-            part_id: '',  // Alternative group doesn't have a part_id
+            part_id: '',
             name: t('Alternative Group'),
             IPN: '',
             quantity: 0,
@@ -86,9 +90,10 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
             mandatory: item.mandatory,
             type: 2,
             alternatives: alternativesWithBatches,
-            selected_alternative: 0, // Default to first alternative
+            selected_alternative: 0,
             batches: [],
-            batch_selections: []
+            batch_allocations: [],
+            requested_quantity: 0
           });
         } else if (item.type === 1 && item.part_id) {
           // Regular component
@@ -102,7 +107,8 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
             mandatory: item.mandatory,
             type: 1,
             batches,
-            batch_selections: []
+            batch_allocations: [],
+            requested_quantity: batches.length > 0 ? 0 : item.quantity * productQuantity
           });
         }
       }
@@ -126,76 +132,98 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     }
   };
 
-  const handleAlternativeChange = (componentIndex: number, alternativeIndex: number) => {
-    const updated = [...components];
-    updated[componentIndex].selected_alternative = alternativeIndex;
-    setComponents(updated);
-    onComponentsChange(updated);
+  const toggleRow = (index: number) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedRows(newExpanded);
   };
 
-  const handleBatchAdd = (componentIndex: number, alternativeIndex: number | null, batchCode: string) => {
+  const handleAlternativeChange = (componentIndex: number, alternativeIndex: number) => {
     const updated = [...components];
-    const component = alternativeIndex !== null 
-      ? updated[componentIndex].alternatives![alternativeIndex]
-      : updated[componentIndex];
-
-    if (!component.batch_selections) {
-      component.batch_selections = [];
-    }
-
-    // Check if batch already added
-    const existing = component.batch_selections.find(b => b.batch_code === batchCode);
-    if (!existing) {
-      component.batch_selections.push({
-        batch_code: batchCode,
-        quantity: 0
+    const component = updated[componentIndex];
+    
+    // Flush batch allocations when changing alternative
+    if (component.alternatives) {
+      component.alternatives.forEach(alt => {
+        alt.batch_allocations = [];
+        alt.requested_quantity = alt.batches && alt.batches.length > 0 ? 0 : alt.required_quantity;
       });
     }
-
+    
+    component.selected_alternative = alternativeIndex;
     setComponents(updated);
     onComponentsChange(updated);
   };
 
   const handleBatchQuantityChange = (
     componentIndex: number,
-    alternativeIndex: number | null,
-    batchCode: string,
-    quantity: number
+    batchUniqueKey: string,
+    quantity: number,
+    maxQuantity: number,
+    alternativeIndex?: number
   ) => {
     const updated = [...components];
-    const component = alternativeIndex !== null 
+    const component = alternativeIndex !== undefined 
       ? updated[componentIndex].alternatives![alternativeIndex]
       : updated[componentIndex];
 
-    const batchSelection = component.batch_selections?.find(b => b.batch_code === batchCode);
-    if (batchSelection) {
-      batchSelection.quantity = quantity;
+    if (!component.batch_allocations) {
+      component.batch_allocations = [];
+    }
+
+    // Limit quantity to available
+    const limitedQuantity = Math.min(quantity, maxQuantity);
+
+    const existingAllocation = component.batch_allocations.find(
+      b => b.batch_unique_key === batchUniqueKey
+    );
+
+    if (existingAllocation) {
+      existingAllocation.quantity = limitedQuantity;
+    } else {
+      const batch = component.batches?.find(b => getBatchUniqueKey(b) === batchUniqueKey);
+      if (batch) {
+        component.batch_allocations.push({
+          batch_unique_key: batchUniqueKey,
+          batch_code: batch.batch_code,
+          quantity: limitedQuantity
+        });
+      }
     }
 
     setComponents(updated);
     onComponentsChange(updated);
   };
 
+  const handleRequestedQuantityChange = (
+    componentIndex: number,
+    quantity: number,
+    alternativeIndex?: number
+  ) => {
+    const updated = [...components];
+    const component = alternativeIndex !== undefined 
+      ? updated[componentIndex].alternatives![alternativeIndex]
+      : updated[componentIndex];
+
+    component.requested_quantity = quantity;
+    setComponents(updated);
+    onComponentsChange(updated);
+  };
+
   const getTotalAllocated = (component: Component): number => {
-    return component.batch_selections?.reduce((sum, b) => sum + b.quantity, 0) || 0;
+    return component.batch_allocations?.reduce((sum, b) => sum + b.quantity, 0) || 0;
   };
 
-  const getAvailableBatches = (component: Component): Batch[] => {
-    const selectedBatches = component.batch_selections?.map(b => b.batch_code) || [];
-    return component.batches?.filter(b => !selectedBatches.includes(b.batch_code)) || [];
-  };
-
-  const getStateColor = (stateName?: string): string => {
-    if (!stateName) return 'gray';
-    const lower = stateName.toLowerCase();
-    if (lower.includes('quarantined') && lower.includes('transactionable')) return 'blue';
-    if (lower.includes('quarantined')) return 'violet';
-    if (lower.includes('ok')) return 'green';
-    return 'gray';
+  const getBatchUniqueKey = (batch: Batch): string => {
+    return `${batch.batch_code}_${batch.location_id}_${batch.state_id || 'no_state'}`;
   };
 
   const formatDate = (dateStr?: string): string => {
-    if (!dateStr) return '';
+    if (!dateStr) return '-';
     try {
       const date = new Date(dateStr);
       return date.toLocaleDateString();
@@ -204,12 +232,206 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     }
   };
 
-  const formatBatchLabel = (batch: Batch): string => {
-    const parts = [batch.batch_code];
-    if (batch.state_name) parts.push(`[${batch.state_name}]`);
-    parts.push(`${batch.quantity} available`);
-    if (batch.expiry_date) parts.push(`Exp: ${formatDate(batch.expiry_date)}`);
-    return parts.join(' - ');
+  const renderBatchRows = (component: Component, componentIndex: number, alternativeIndex?: number) => {
+    if (!component.batches || component.batches.length === 0) {
+      return null;
+    }
+
+    return component.batches.map((batch, batchIndex) => {
+      const batchKey = getBatchUniqueKey(batch);
+      const allocation = component.batch_allocations?.find(b => b.batch_unique_key === batchKey);
+      const allocatedQty = allocation?.quantity || 0;
+
+      return (
+        <Table.Tr 
+          key={`batch-${componentIndex}-${alternativeIndex}-${batchIndex}`}
+          style={{ backgroundColor: '#fafafa' }}
+        >
+          <Table.Td style={{ paddingLeft: '48px' }}>
+            <Text size="sm">↳ {batch.batch_code}</Text>
+          </Table.Td>
+          <Table.Td>
+            <Text size="sm">{formatDate(batch.expiry_date)}</Text>
+          </Table.Td>
+          <Table.Td>
+            <Text size="sm">{batch.quantity}</Text>
+          </Table.Td>
+          <Table.Td>
+            <NumberInput
+              size="xs"
+              value={allocatedQty}
+              onChange={(val) => handleBatchQuantityChange(
+                componentIndex,
+                batchKey,
+                Number(val) || 0,
+                batch.quantity,
+                alternativeIndex
+              )}
+              min={0}
+              max={batch.quantity}
+              style={{ width: '100px' }}
+            />
+          </Table.Td>
+        </Table.Tr>
+      );
+    });
+  };
+
+  const renderComponentRow = (component: Component, componentIndex: number) => {
+    const hasBatches = component.batches && component.batches.length > 0;
+    const isExpanded = expandedRows.has(componentIndex);
+    const totalAllocated = getTotalAllocated(component);
+    const isFullyAllocated = hasBatches && totalAllocated === component.required_quantity;
+    const requestedQty = component.requested_quantity || 0;
+
+    const rows = [];
+
+    // Main row
+    rows.push(
+      <Table.Tr 
+        key={`comp-${componentIndex}`}
+        style={{ cursor: hasBatches ? 'pointer' : 'default' }}
+        onClick={() => hasBatches && toggleRow(componentIndex)}
+      >
+        <Table.Td>
+          <Group gap="xs">
+            {hasBatches && (
+              <ActionIcon size="sm" variant="subtle" color="gray">
+                {isExpanded ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+              </ActionIcon>
+            )}
+            <div>
+              <Text size="sm" fw={500}>{component.name}</Text>
+              <Text size="xs" c="dimmed">{component.IPN}</Text>
+            </div>
+          </Group>
+        </Table.Td>
+        <Table.Td>
+          <Text size="sm">{component.required_quantity}</Text>
+        </Table.Td>
+        <Table.Td>
+          {hasBatches ? (
+            <Text size="sm" c={isFullyAllocated ? 'green' : 'dimmed'}>
+              {totalAllocated}
+            </Text>
+          ) : (
+            <Text size="sm" c="dimmed">-</Text>
+          )}
+        </Table.Td>
+        <Table.Td onClick={(e) => e.stopPropagation()}>
+          {hasBatches ? (
+            <Text 
+              size="sm" 
+              fw={isFullyAllocated ? 700 : 400}
+              c={isFullyAllocated ? 'green' : 'dimmed'}
+            >
+              {totalAllocated}
+            </Text>
+          ) : (
+            <NumberInput
+              size="xs"
+              value={requestedQty}
+              onChange={(val) => handleRequestedQuantityChange(componentIndex, Number(val) || 0)}
+              min={0}
+              style={{ width: '100px' }}
+            />
+          )}
+        </Table.Td>
+      </Table.Tr>
+    );
+
+    // Batch rows (if expanded)
+    if (hasBatches && isExpanded) {
+      rows.push(...renderBatchRows(component, componentIndex));
+    }
+
+    return rows;
+  };
+
+  const renderAlternativeRow = (component: Component, componentIndex: number) => {
+    if (!component.alternatives) return null;
+
+    const selectedAlt = component.alternatives[component.selected_alternative || 0];
+    const hasBatches = selectedAlt.batches && selectedAlt.batches.length > 0;
+    const isExpanded = expandedRows.has(componentIndex);
+    const totalAllocated = getTotalAllocated(selectedAlt);
+    const isFullyAllocated = hasBatches && totalAllocated === selectedAlt.required_quantity;
+    const requestedQty = selectedAlt.requested_quantity || 0;
+
+    const rows = [];
+
+    // Main row with alternative selector
+    rows.push(
+      <Table.Tr 
+        key={`alt-${componentIndex}`}
+        style={{ cursor: hasBatches ? 'pointer' : 'default' }}
+        onClick={() => hasBatches && toggleRow(componentIndex)}
+      >
+        <Table.Td>
+          <Group gap="xs">
+            {hasBatches && (
+              <ActionIcon size="sm" variant="subtle" color="gray">
+                {isExpanded ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+              </ActionIcon>
+            )}
+            <Select
+              data={component.alternatives.map((alt, idx) => ({
+                value: String(idx),
+                label: `${idx + 1}. ${alt.name} (${alt.IPN})`
+              }))}
+              value={String(component.selected_alternative || 0)}
+              onChange={(value) => handleAlternativeChange(componentIndex, parseInt(value || '0'))}
+              size="xs"
+              style={{ width: '300px' }}
+              onClick={(e) => e.stopPropagation()}
+              comboboxProps={{ withinPortal: false }}
+            />
+          </Group>
+        </Table.Td>
+        <Table.Td>
+          <Text size="sm">{selectedAlt.required_quantity}</Text>
+        </Table.Td>
+        <Table.Td>
+          {hasBatches ? (
+            <Text size="sm" c={isFullyAllocated ? 'green' : 'dimmed'}>
+              {totalAllocated}
+            </Text>
+          ) : (
+            <Text size="sm" c="dimmed">-</Text>
+          )}
+        </Table.Td>
+        <Table.Td onClick={(e) => e.stopPropagation()}>
+          {hasBatches ? (
+            <Text 
+              size="sm" 
+              fw={isFullyAllocated ? 700 : 400}
+              c={isFullyAllocated ? 'green' : 'dimmed'}
+            >
+              {totalAllocated}
+            </Text>
+          ) : (
+            <NumberInput
+              size="xs"
+              value={requestedQty}
+              onChange={(val) => handleRequestedQuantityChange(
+                componentIndex, 
+                Number(val) || 0, 
+                component.selected_alternative || 0
+              )}
+              min={0}
+              style={{ width: '100px' }}
+            />
+          )}
+        </Table.Td>
+      </Table.Tr>
+    );
+
+    // Batch rows (if expanded)
+    if (hasBatches && isExpanded) {
+      rows.push(...renderBatchRows(selectedAlt, componentIndex, component.selected_alternative || 0));
+    }
+
+    return rows;
   };
 
   if (loading) {
@@ -231,141 +453,21 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     <Paper p="md" withBorder>
       <Title order={5} mb="md">{t('Components & Batch Selection')}</Title>
       
-      <Table striped withTableBorder>
+      <Table striped withTableBorder highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>{t('Component')}</Table.Th>
+            <Table.Th>{t('Material')}</Table.Th>
             <Table.Th>{t('Required Qty')}</Table.Th>
             <Table.Th>{t('Allocated')}</Table.Th>
-            <Table.Th>{t('Batch Selection')}</Table.Th>
+            <Table.Th>{t('Requested Qty')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
           {components.map((component, compIndex) => {
-            if (component.type === 2 && component.alternatives) {
-              // Alternative group
-              const selectedAlt = component.alternatives[component.selected_alternative || 0];
-              const totalAllocated = getTotalAllocated(selectedAlt);
-              const remaining = selectedAlt.required_quantity - totalAllocated;
-
-              return (
-                <Table.Tr key={`comp-${compIndex}`}>
-                  <Table.Td>
-                    <Select
-                      data={component.alternatives.map((alt, idx) => ({
-                        value: String(idx),
-                        label: `${alt.name} (${alt.IPN})`
-                      }))}
-                      value={String(component.selected_alternative || 0)}
-                      onChange={(value) => handleAlternativeChange(compIndex, parseInt(value || '0'))}
-                      size="xs"
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge color={remaining > 0 ? 'red' : 'green'}>
-                      {selectedAlt.required_quantity}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c={remaining > 0 ? 'red' : 'green'}>
-                      {totalAllocated} / {selectedAlt.required_quantity}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      {selectedAlt.batch_selections?.map((batchSel, bIdx) => (
-                        <Group key={`batch-${bIdx}`} gap="xs">
-                          <Text size="xs">{batchSel.batch_code}:</Text>
-                          <NumberInput
-                            size="xs"
-                            value={batchSel.quantity}
-                            onChange={(val) => handleBatchQuantityChange(
-                              compIndex,
-                              component.selected_alternative || 0,
-                              batchSel.batch_code,
-                              Number(val) || 0
-                            )}
-                            min={0}
-                            max={selectedAlt.batches?.find(b => b.batch_code === batchSel.batch_code)?.quantity || 0}
-                            style={{ width: '80px' }}
-                          />
-                        </Group>
-                      ))}
-                      {getAvailableBatches(selectedAlt).length > 0 && (
-                        <Select
-                          placeholder={t('Add batch')}
-                          data={getAvailableBatches(selectedAlt).map(b => ({
-                            value: b.batch_code,
-                            label: formatBatchLabel(b)
-                          }))}
-                          onChange={(value) => value && handleBatchAdd(compIndex, component.selected_alternative || 0, value)}
-                          size="xs"
-                          clearable
-                          style={{ width: '400px' }}
-                        />
-                      )}
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              );
+            if (component.type === 2) {
+              return renderAlternativeRow(component, compIndex);
             } else {
-              // Regular component
-              const totalAllocated = getTotalAllocated(component);
-              const remaining = component.required_quantity - totalAllocated;
-
-              return (
-                <Table.Tr key={`comp-${compIndex}`}>
-                  <Table.Td>
-                    <Text size="sm" fw={500}>{component.name}</Text>
-                    <Text size="xs" c="dimmed">{component.IPN}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge color={remaining > 0 ? 'red' : 'green'}>
-                      {component.required_quantity}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c={remaining > 0 ? 'red' : 'green'}>
-                      {totalAllocated} / {component.required_quantity}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      {component.batch_selections?.map((batchSel, bIdx) => (
-                        <Group key={`batch-${bIdx}`} gap="xs">
-                          <Text size="xs">{batchSel.batch_code}:</Text>
-                          <NumberInput
-                            size="xs"
-                            value={batchSel.quantity}
-                            onChange={(val) => handleBatchQuantityChange(
-                              compIndex,
-                              null,
-                              batchSel.batch_code,
-                              Number(val) || 0
-                            )}
-                            min={0}
-                            max={component.batches?.find(b => b.batch_code === batchSel.batch_code)?.quantity || 0}
-                            style={{ width: '80px' }}
-                          />
-                        </Group>
-                      ))}
-                      {getAvailableBatches(component).length > 0 && (
-                        <Select
-                          placeholder={t('Add batch')}
-                          data={getAvailableBatches(component).map(b => ({
-                            value: b.batch_code,
-                            label: formatBatchLabel(b)
-                          }))}
-                          onChange={(value) => value && handleBatchAdd(compIndex, null, value)}
-                          size="xs"
-                          clearable
-                          style={{ width: '400px' }}
-                        />
-                      )}
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              );
+              return renderComponentRow(component, compIndex);
             }
           })}
         </Table.Tbody>

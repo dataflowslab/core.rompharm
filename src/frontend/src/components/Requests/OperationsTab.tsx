@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Button, Group, Badge, Table, ActionIcon, Select, Textarea, Grid, NumberInput, Modal } from '@mantine/core';
-import { IconSignature, IconTrash, IconDeviceFloppy, IconPlus, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
+import { Paper, Title, Text, Button, Group, Badge, Grid } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
@@ -8,6 +7,11 @@ import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
 import { DocumentGenerator } from '../Common/DocumentGenerator';
+import { debounce } from '../../utils/selectHelpers';
+import { WarehouseOperationsTable } from './WarehouseOperationsTable';
+import { AddItemModal } from './AddItemModal';
+import { DecisionSection } from './DecisionSection';
+import { SignaturesSection } from './SignaturesSection';
 
 interface ApprovalOfficer {
   type: string;
@@ -42,18 +46,18 @@ interface BatchOption {
 }
 
 interface Part {
-  pk: number;
+  _id: string;
   name: string;
   IPN: string;
 }
 
 interface ItemWithBatch {
-  part: number;
+  part: string;
   part_name?: string;
   quantity: number;
-  init_q: number;  // Initial requested quantity
+  init_q: number;
   batch_code: string;
-  added_in_operations?: boolean;  // Flag to identify items added in Operations
+  added_in_operations?: boolean;
 }
 
 interface OperationsTabProps {
@@ -73,10 +77,12 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const [refusalReason, setRefusalReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [request, setRequest] = useState<any>(null);
+  const [availableStates, setAvailableStates] = useState<any[]>([]);
   
   // Add Item Modal state
   const [addItemModalOpened, setAddItemModalOpened] = useState(false);
   const [parts, setParts] = useState<Part[]>([]);
+  const [selectedPartData, setSelectedPartData] = useState<Part | null>(null);
   const [partSearch, setPartSearch] = useState('');
   const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
   const [newItem, setNewItem] = useState({
@@ -88,7 +94,24 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   useEffect(() => {
     loadOperationsFlow();
     loadRequestItems();
+    loadAvailableStates();
   }, [requestId]);
+
+  const loadAvailableStates = async () => {
+    try {
+      const response = await api.get('/modules/requests/api/states');
+      const allStates = response.data.results || [];
+      
+      // Filter states that have 'operations' in their scenes array
+      const operationsStates = allStates.filter((state: any) => 
+        state.scenes && Array.isArray(state.scenes) && state.scenes.includes('operations')
+      );
+      
+      setAvailableStates(operationsStates);
+    } catch (error) {
+      console.error('Failed to load states:', error);
+    }
+  };
 
   const loadOperationsFlow = async () => {
     try {
@@ -106,15 +129,19 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
       const response = await api.get(requestsApi.getRequest(requestId));
       setRequest(response.data);
       
-      // Load saved operations decision
-      if (response.data.operations_result) {
-        setFinalStatus(response.data.operations_result);
-        setRefusalReason(response.data.operations_result_reason || '');
+      // Load last status from status_log for operations scene
+      const statusLog = response.data.status_log || [];
+      const lastOperationsStatus = statusLog
+        .filter((log: any) => log.scene === 'operations')
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      
+      if (lastOperationsStatus) {
+        setFinalStatus(lastOperationsStatus.status_id);
+        setRefusalReason(lastOperationsStatus.reason || '');
+        console.log('[OperationsTab] Loaded last status from log:', lastOperationsStatus);
       }
       
       const items = response.data.items || [];
-      
-      // Initialize items - save init_q if not already saved
       const itemsData: ItemWithBatch[] = items.map((item: any) => ({
         part: item.part,
         part_name: item.part_detail?.name || String(item.part),
@@ -124,7 +151,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         added_in_operations: item.added_in_operations || false
       }));
       
-      // Sort items: non-zero quantities first, then zero quantities (grayed out)
       const sortedItems = itemsData.sort((a, b) => {
         if (a.quantity === 0 && b.quantity !== 0) return 1;
         if (a.quantity !== 0 && b.quantity === 0) return -1;
@@ -139,7 +165,12 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
   const searchParts = async (query: string) => {
     if (!query || query.length < 2) {
-      setParts([]);
+      // Keep selected part even when clearing search
+      if (selectedPartData) {
+        setParts([selectedPartData]);
+      } else {
+        setParts([]);
+      }
       return;
     }
     
@@ -148,13 +179,21 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         params: { search: query }
       });
       const results = response.data.results || response.data || [];
-      setParts(results);
+      
+      // Always include selected part in results if it exists
+      if (selectedPartData && !results.some((p: Part) => p._id === selectedPartData._id)) {
+        setParts([selectedPartData, ...results]);
+      } else {
+        setParts(results);
+      }
     } catch (error) {
       console.error('Failed to search parts:', error);
     }
   };
 
-  const loadBatchCodes = async (partId: number) => {
+  const debouncedSearchParts = debounce(searchParts, 250);
+
+  const loadBatchCodes = async (partId: string) => {
     if (!request || !request.source) {
       setBatchOptions([]);
       return;
@@ -185,7 +224,19 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     setBatchOptions([]);
     
     if (partId) {
-      loadBatchCodes(parseInt(partId));
+      // Find selected part in current parts array
+      const selected = parts.find(p => p._id === partId);
+      
+      if (selected) {
+        // Always ensure selected part is in the array (move to front if exists)
+        const filteredParts = parts.filter(p => p._id !== partId);
+        setParts([selected, ...filteredParts]);
+        setSelectedPartData(selected);
+      }
+      
+      loadBatchCodes(partId);
+    } else {
+      setSelectedPartData(null);
     }
   };
 
@@ -199,19 +250,18 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
       return;
     }
 
-    const partDetail = parts.find(p => String(p.pk) === newItem.part);
+    const partDetail = parts.find(p => p._id === newItem.part);
     const newItemData: ItemWithBatch = {
-      part: parseInt(newItem.part),
+      part: newItem.part,
       part_name: partDetail?.name || String(newItem.part),
       quantity: newItem.quantity,
-      init_q: newItem.quantity,  // For new items, init_q = quantity
+      init_q: newItem.quantity,
       batch_code: newItem.batch_code,
-      added_in_operations: true  // Mark as added in Operations
+      added_in_operations: true
     };
 
     setItemsWithBatch([...itemsWithBatch, newItemData]);
     
-    // Reset form
     setNewItem({ part: '', batch_code: '', quantity: 1 });
     setPartSearch('');
     setParts([]);
@@ -226,36 +276,13 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   };
 
   const handleDeleteItem = (index: number) => {
-    const item = itemsWithBatch[index];
+    const newItems = itemsWithBatch.filter((_, i) => i !== index);
+    setItemsWithBatch(newItems);
     
-    if (!item.added_in_operations) {
-      notifications.show({
-        title: t('Error'),
-        message: t('Cannot delete items not added in Operations'),
-        color: 'red'
-      });
-      return;
-    }
-
-    modals.openConfirmModal({
-      title: t('Delete Item'),
-      children: (
-        <Text size="sm">
-          {t('Are you sure you want to delete this item?')}
-        </Text>
-      ),
-      labels: { confirm: t('Delete'), cancel: t('Cancel') },
-      confirmProps: { color: 'red' },
-      onConfirm: () => {
-        const newItems = itemsWithBatch.filter((_, i) => i !== index);
-        setItemsWithBatch(newItems);
-        
-        notifications.show({
-          title: t('Success'),
-          message: t('Item deleted successfully'),
-          color: 'green'
-        });
-      }
+    notifications.show({
+      title: t('Success'),
+      message: t('Item deleted successfully'),
+      color: 'green'
     });
   };
 
@@ -284,7 +311,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         color: 'green'
       });
 
-      // Reload items to apply sorting
       await loadRequestItems();
     } catch (error: any) {
       console.error('Failed to save items:', error);
@@ -299,7 +325,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   };
 
   const handleSign = async () => {
-    // Check if decision is set
     if (!finalStatus) {
       notifications.show({
         title: t('Error'),
@@ -311,10 +336,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
     setSigning(true);
     try {
-      // Save items first
       await handleSaveBatchData();
-      
-      // Then sign
       await api.post(requestsApi.signOperations(requestId));
       notifications.show({
         title: t('Success'),
@@ -404,8 +426,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         color: 'green'
       });
 
-      // Don't clear the status - keep it visible
-      // Reload to get updated data
       await loadRequestItems();
       onReload();
     } catch (error: any) {
@@ -430,18 +450,32 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
-
   const canUserSign = () => {
     if (!flow || !username) return false;
+    
     const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
-    const canSign = flow.can_sign_officers.some(o => o.username === username);
-    const mustSign = flow.must_sign_officers.some(o => o.username === username);
+    
+    // Check if user can sign - support both username and role-based officers
+    const canSign = flow.can_sign_officers.some(o => {
+      // Direct username match
+      if (o.username === username) return true;
+      
+      // Role-based match: check if user has the role
+      if (o.type === 'role' && o.reference) {
+        // For admin role, check if user is staff
+        if (o.reference === 'admin' && isStaff) return true;
+        // Add other role checks here if needed
+      }
+      
+      return false;
+    });
+    
+    const mustSign = flow.must_sign_officers.some(o => {
+      if (o.username === username) return true;
+      if (o.type === 'role' && o.reference === 'admin' && isStaff) return true;
+      return false;
+    });
     
     return canSign || mustSign;
   };
@@ -468,63 +502,6 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
   const isFormReadonly = hasAnySignature();
 
-  // Group items by part and calculate totals
-  const getGroupedItems = () => {
-    // Group items by part_name
-    const grouped = itemsWithBatch.reduce((acc, item) => {
-      const key = item.part_name || String(item.part);
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(item);
-      return acc;
-    }, {} as Record<string, ItemWithBatch[]>);
-
-    // Sort groups alphabetically
-    const sortedKeys = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
-
-    // Separate zero and non-zero items
-    const nonZeroGroups: Array<{ key: string; items: ItemWithBatch[] }> = [];
-    const zeroGroups: Array<{ key: string; items: ItemWithBatch[] }> = [];
-
-    sortedKeys.forEach(key => {
-      const items = grouped[key];
-      const hasNonZero = items.some(item => item.quantity > 0);
-      
-      if (hasNonZero) {
-        nonZeroGroups.push({ key, items });
-      } else {
-        zeroGroups.push({ key, items });
-      }
-    });
-
-    return [...nonZeroGroups, ...zeroGroups];
-  };
-
-  // Check if a material group is complete (all requested quantities are fulfilled)
-  const isGroupComplete = (items: ItemWithBatch[]) => {
-    // Find the original item (not added in operations)
-    const originalItem = items.find(item => !item.added_in_operations);
-    if (!originalItem) return false;
-
-    // Sum quantities of all items with batch codes
-    const totalWithBatch = items
-      .filter(item => item.batch_code && item.batch_code.trim() !== '')
-      .reduce((sum, item) => sum + item.quantity, 0);
-
-    return totalWithBatch === originalItem.init_q;
-  };
-
-  // Check if all groups are complete
-  const areAllGroupsComplete = () => {
-    const groups = getGroupedItems();
-    const nonZeroGroups = groups.filter(group => 
-      group.items.some(item => item.quantity > 0)
-    );
-    
-    return nonZeroGroups.every(group => isGroupComplete(group.items));
-  };
-
   if (loading) {
     return <Paper p="md"><Text>{t('Loading...')}</Text></Paper>;
   }
@@ -546,214 +523,43 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         </Badge>
       </Group>
 
-      {/* Warehouse Operations Table - First */}
-      <Paper withBorder p="md" mb="md">
-        <Group justify="space-between" mb="md">
-          <Group>
-            <Title order={5}>{t('Warehouse Operations')}</Title>
-            {areAllGroupsComplete() ? (
-              <IconCheck size={20} color="green" />
-            ) : (
-              <IconAlertTriangle size={20} color="orange" />
-            )}
-          </Group>
-          <Group>
-            {!isFormReadonly && (
-              <>
-                <Button
-                  leftSection={<IconPlus size={16} />}
-                  onClick={() => setAddItemModalOpened(true)}
-                  size="sm"
-                  variant="outline"
-                >
-                  {t('Add Item')}
-                </Button>
-                <Button
-                  leftSection={<IconDeviceFloppy size={16} />}
-                  onClick={handleSaveBatchData}
-                  loading={savingBatch}
-                  size="sm"
-                  variant="light"
-                >
-                  {t('Save')}
-                </Button>
-              </>
-            )}
-          </Group>
-        </Group>
-
-        <Table striped withTableBorder withColumnBorders>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('Part')}</Table.Th>
-              <Table.Th style={{ width: '120px' }}>{t('Requested')}</Table.Th>
-              <Table.Th style={{ width: '120px' }}>{t('Qty')}</Table.Th>
-              <Table.Th>{t('Batch Code')}</Table.Th>
-              {!isFormReadonly && <Table.Th style={{ width: '60px' }}></Table.Th>}
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {getGroupedItems().map((group, groupIndex) => {
-              const isGroupZero = group.items.every(item => item.quantity === 0);
-              const groupComplete = isGroupComplete(group.items);
-              
-              return group.items.map((item, itemIndex) => {
-                const isZeroQuantity = item.quantity === 0;
-                const isOriginalItem = !item.added_in_operations;
-                const flatIndex = itemsWithBatch.findIndex(i => 
-                  i.part === item.part && 
-                  i.batch_code === item.batch_code && 
-                  i.added_in_operations === item.added_in_operations
-                );
-                
-                return (
-                  <Table.Tr key={`${groupIndex}-${itemIndex}`} style={{ opacity: isZeroQuantity ? 0.5 : 1 }}>
-                    <Table.Td style={{ color: isZeroQuantity ? '#868e96' : 'inherit' }}>
-                      {item.part_name}
-                    </Table.Td>
-                    <Table.Td>
-                      {isOriginalItem ? (
-                        <Text 
-                          size="sm" 
-                          fw={groupComplete ? 700 : 400}
-                          c={groupComplete ? 'green' : 'dimmed'}
-                        >
-                          {item.init_q}
-                        </Text>
-                      ) : (
-                        <Text size="sm" c="dimmed">-</Text>
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      <NumberInput
-                        value={item.quantity}
-                        onChange={(value) => handleQuantityChange(flatIndex, Number(value) || 0)}
-                        disabled={isFormReadonly}
-                        min={0}
-                        size="xs"
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm" style={{ color: isZeroQuantity ? '#868e96' : 'inherit' }}>
-                        {item.batch_code || '-'}
-                      </Text>
-                    </Table.Td>
-                    {!isFormReadonly && (
-                      <Table.Td>
-                        {item.added_in_operations && (
-                          <ActionIcon
-                            color="red"
-                            variant="subtle"
-                            size="sm"
-                            onClick={() => handleDeleteItem(flatIndex)}
-                            title={t('Delete')}
-                          >
-                            <IconTrash size={14} />
-                          </ActionIcon>
-                        )}
-                      </Table.Td>
-                    )}
-                  </Table.Tr>
-                );
-              });
-            })}
-          </Table.Tbody>
-        </Table>
-
-        {isFormReadonly && (
-          <Text size="sm" c="orange" mt="md">
-            {t('This form is read-only because it has been signed.')}
-          </Text>
-        )}
-
-        {!isFormReadonly && (
-          <Text size="sm" c="dimmed" mt="md">
-            {t('Note: Set quantity to 0 for items not available. Use Add Item to add materials with batch codes from source location.')}
-          </Text>
-        )}
-      </Paper>
+      {/* Warehouse Operations Table */}
+      <WarehouseOperationsTable
+        items={itemsWithBatch}
+        isReadonly={isFormReadonly}
+        onQuantityChange={handleQuantityChange}
+        onDeleteItem={handleDeleteItem}
+        onSave={handleSaveBatchData}
+        onAddItem={() => setAddItemModalOpened(true)}
+        saving={savingBatch}
+      />
 
       {/* Add Item Modal */}
-      <Modal
+      <AddItemModal
         opened={addItemModalOpened}
         onClose={() => {
           setAddItemModalOpened(false);
           setNewItem({ part: '', batch_code: '', quantity: 1 });
+          setSelectedPartData(null);
           setPartSearch('');
           setParts([]);
           setBatchOptions([]);
         }}
-        title={t('Add Item')}
-        size="md"
-      >
-        <Grid>
-          <Grid.Col span={12}>
-            <Select
-              label={t('Article')}
-              placeholder={t('Search for article...')}
-              data={parts.map(part => ({
-                value: String(part.pk),
-                label: `${part.name} (${part.IPN})`
-              }))}
-              value={newItem.part}
-              onChange={(value) => {
-                handlePartSelect(value);
-                setPartSearch(''); // Clear search to keep selected value visible
-              }}
-              onSearchChange={(query) => {
-                setPartSearch(query);
-                searchParts(query);
-              }}
-              searchValue={partSearch}
-              searchable
-              clearable
-              required
-            />
-          </Grid.Col>
+        parts={parts}
+        selectedPartData={selectedPartData}
+        batchOptions={batchOptions}
+        newItem={newItem}
+        onPartSelect={handlePartSelect}
+        onBatchCodeChange={(value) => setNewItem({ ...newItem, batch_code: value || '' })}
+        onQuantityChange={(value) => setNewItem({ ...newItem, quantity: value })}
+        onAdd={handleAddItem}
+        onPartSearchChange={(query) => {
+          setPartSearch(query);
+          debouncedSearchParts(query);
+        }}
+      />
 
-          <Grid.Col span={12}>
-            <Select
-              label={t('Batch Code')}
-              placeholder={t('Select batch code...')}
-              data={batchOptions}
-              value={newItem.batch_code}
-              onChange={(value) => setNewItem({ ...newItem, batch_code: value || '' })}
-              disabled={!newItem.part}
-              searchable
-              required
-            />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <NumberInput
-              label={t('Quantity')}
-              placeholder="1"
-              value={newItem.quantity}
-              onChange={(value) => setNewItem({ ...newItem, quantity: Number(value) || 1 })}
-              min={1}
-              step={1}
-              required
-            />
-          </Grid.Col>
-        </Grid>
-
-        <Group justify="flex-end" mt="md">
-          <Button variant="default" onClick={() => {
-            setAddItemModalOpened(false);
-            setNewItem({ part: '', batch_code: '', quantity: 1 });
-            setPartSearch('');
-            setParts([]);
-            setBatchOptions([]);
-          }}>
-            {t('Cancel')}
-          </Button>
-          <Button onClick={handleAddItem}>
-            {t('Add')}
-          </Button>
-        </Group>
-      </Modal>
-
-      {/* Bottom Section: 1/3 Documents + 2/3 Signatures */}
+      {/* Bottom Section: 1/3 Documents + 2/3 Decision & Signatures */}
       <Grid gutter="md">
         {/* Left - Documents (1/3) */}
         <Grid.Col span={4}>
@@ -774,136 +580,31 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         {/* Right - Decision & Signatures (2/3) */}
         <Grid.Col span={8}>
           <Paper withBorder p="md">
-            {/* Decision Section - ALWAYS VISIBLE */}
+            {/* Decision Section */}
             <Title order={5} mb="md">{t('Decision')}</Title>
-            
-            <Select
-              label={t('Status')}
-              placeholder={t('Select status')}
-              data={[
-                { value: 'Finished', label: t('Finished') },
-                { value: 'Refused', label: t('Refused') }
-              ]}
-              value={finalStatus}
-              onChange={(value) => setFinalStatus(value || '')}
-              required
-              mb="md"
-              disabled={isFlowCompleted()}
+            <DecisionSection
+              status={finalStatus}
+              reason={refusalReason}
+              isCompleted={isFlowCompleted()}
+              availableStates={availableStates}
+              onStatusChange={(value) => setFinalStatus(value || '')}
+              onReasonChange={setRefusalReason}
+              onSubmit={handleSubmitStatus}
+              submitting={submitting}
             />
 
-            {finalStatus === 'Refused' && (
-              <Textarea
-                label={t('Reason for Refusal')}
-                placeholder={t('Enter reason for refusal')}
-                value={refusalReason}
-                onChange={(e) => setRefusalReason(e.target.value)}
-                required
-                minRows={3}
-                mb="md"
-                disabled={isFlowCompleted()}
-              />
-            )}
-
-            {finalStatus && !isFlowCompleted() && (
-              <Group justify="flex-end" mb="xl">
-                <Button
-                  onClick={handleSubmitStatus}
-                  loading={submitting}
-                  color={finalStatus === 'Finished' ? 'green' : 'red'}
-                >
-                  {t('Save Decision')}
-                </Button>
-              </Group>
-            )}
-
             {/* Signatures Section */}
-            <Group justify="space-between" mb="md">
-              <Title order={5}>{t('Signatures')}</Title>
-              {canUserSign() && !isFlowCompleted() && (
-                <Button
-                  leftSection={<IconSignature size={16} />}
-                  onClick={handleSign}
-                  loading={signing}
-                >
-                  {t('Sign')}
-                </Button>
-              )}
-            </Group>
-
-            {/* Optional Approvers */}
-            {flow.can_sign_officers.length > 0 && (
-              <>
-                <Text size="sm" fw={500} mb="xs">
-                  {t('Optional Approvers')} ({t('Minimum')}: {flow.min_signatures})
-                </Text>
-                <Table striped withTableBorder withColumnBorders mb="md">
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>{t('User')}</Table.Th>
-                      <Table.Th>{t('Status')}</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {flow.can_sign_officers.map((officer, index) => {
-                      const hasSigned = flow.signatures.some(s => s.user_id === officer.reference);
-                      return (
-                        <Table.Tr key={index}>
-                          <Table.Td>{officer.username}</Table.Td>
-                          <Table.Td>
-                            <Badge color={hasSigned ? 'green' : 'gray'} size="sm">
-                              {hasSigned ? t('Signed') : t('Pending')}
-                            </Badge>
-                          </Table.Td>
-                        </Table.Tr>
-                      );
-                    })}
-                  </Table.Tbody>
-                </Table>
-              </>
-            )}
-
-            {/* Signatures List */}
-            {flow.signatures.length > 0 && (
-              <>
-                <Text size="sm" fw={500} mb="xs">{t('Signed by')}</Text>
-                <Table striped withTableBorder withColumnBorders>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>{t('User')}</Table.Th>
-                      <Table.Th>{t('Date')}</Table.Th>
-                      {isStaff && <Table.Th style={{ width: '40px' }}></Table.Th>}
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {flow.signatures.map((signature, index) => (
-                      <Table.Tr key={index}>
-                        <Table.Td>{signature.user_name || signature.username}</Table.Td>
-                        <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
-                        {isStaff && (
-                          <Table.Td>
-                            <ActionIcon
-                              color="red"
-                              variant="subtle"
-                              size="sm"
-                              onClick={() => handleRemoveSignature(signature.user_id, signature.username)}
-                              title={t('Remove')}
-                            >
-                              <IconTrash size={14} />
-                            </ActionIcon>
-                          </Table.Td>
-                        )}
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </>
-            )}
-
-            {flow.signatures.length === 0 && (
-              <Text size="sm" c="dimmed" ta="center" py="xl">
-                {t('No signatures yet')}
-              </Text>
-            )}
+            <SignaturesSection
+              canSign={canUserSign()}
+              isCompleted={isFlowCompleted()}
+              canSignOfficers={flow.can_sign_officers}
+              minSignatures={flow.min_signatures}
+              signatures={flow.signatures}
+              isStaff={isStaff}
+              onSign={handleSign}
+              onRemoveSignature={handleRemoveSignature}
+              signing={signing}
+            />
           </Paper>
         </Grid.Col>
       </Grid>

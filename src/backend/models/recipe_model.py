@@ -11,7 +11,7 @@ from bson import ObjectId
 class RecipeItem(BaseModel):
     """Recipe item (ingredient or alternative group)"""
     type: int = Field(..., description="1=Single product, 2=Alternative group")
-    id: Optional[int] = Field(None, description="Product ID from InvenTree (for type=1)")
+    id: Optional[int] = Field(None, description="Product ID (for type=1)")
     q: float = Field(..., description="Quantity")
     start: datetime = Field(default_factory=datetime.utcnow, description="Validity start date")
     fin: Optional[datetime] = Field(None, description="Validity end date (optional)")
@@ -34,7 +34,7 @@ RecipeItem.model_rebuild()
 
 class RecipeModel(BaseModel):
     """Recipe model"""
-    id: int = Field(..., description="Product ID from InvenTree (will be replaced with oid)")
+    id: int = Field(..., description="Product ID")
     items: List[RecipeItem] = Field(default_factory=list, description="Recipe items")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     created_by: str

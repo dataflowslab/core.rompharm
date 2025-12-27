@@ -6,7 +6,7 @@ from typing import Optional, List
 
 
 class RequestItemCreate(BaseModel):
-    part: int
+    part: str  # Part ObjectId (MongoDB)
     quantity: float
     init_q: Optional[float] = None  # Initial requested quantity
     notes: Optional[str] = None
@@ -20,7 +20,7 @@ class RequestCreate(BaseModel):
     destination: str  # Stock location ObjectId from depo_locations
     items: List[RequestItemCreate]
     notes: Optional[str] = None
-    product_id: Optional[int] = None  # Main product ID if recipe-based
+    product_id: Optional[str] = None  # Main product ObjectId if recipe-based
     product_quantity: Optional[float] = None  # Quantity of main product
     recipe_id: Optional[str] = None  # Recipe ObjectId if recipe-based
     recipe_part_id: Optional[str] = None  # Recipe part ObjectId if recipe-based

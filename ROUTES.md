@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2025-12-24 15:07:48
+**Last Updated:** 2025-12-27 11:46:01
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -42,7 +42,6 @@
 - `PUT /api/crm/segments/{segment_id}` - Update a segment
 - `GET /api/crm/subscribers` - Get all subscribers
 - `POST /api/crm/subscribers` - Create a new subscriber
-- `POST /api/crm/subscribers/import-inventree` - Import customers from InvenTree
 - `DELETE /api/crm/subscribers/{subscriber_id}` - Delete a subscriber
 - `PUT /api/crm/subscribers/{subscriber_id}` - Update a subscriber
 
@@ -90,15 +89,13 @@
 - `GET /api/recipes/{recipe_id}/logs` - Get recipe change history
 - `GET /api/recipes/{recipe_id}/revisions` - Get all revisions for a recipe's product
 
-### Sales
-- `GET /api/sales/customers` - Get list of customers from InvenTree
-- `GET /api/sales/order-statuses` - Get available sales order statuses from InvenTree
-- `GET /api/sales/sales-orders` - Get list of sales orders from InvenTree
-- `GET /api/sales/sales-orders/{order_id}` - Get a specific sales order from InvenTree
-- `GET /api/sales/sales-orders/{order_id}/attachments` - Get attachments for a sales order
-- `GET /api/sales/sales-orders/{order_id}/items` - Get items for a sales order with complete part details
-- `GET /api/sales/sales-orders/{order_id}/shipments` - Get shipments for a sales order
-- `PATCH /api/sales/sales-orders/{order_id}/status` - Update sales order status
+### Roles
+- `GET /api/roles/` - List all roles
+- `POST /api/roles/` - Create new role
+- `GET /api/roles/permissions/items` - List all available permission items from roles_items collection
+- `DELETE /api/roles/{role_id}` - Delete role
+- `GET /api/roles/{role_id}` - Get role by ID
+- `PUT /api/roles/{role_id}` - Update role
 
 ### System
 - `GET /api/currencies` - Get list of currencies
@@ -124,6 +121,13 @@
 
 ### Users
 - `GET /api/users/` - List all users with their last login information
+
+### Users Local
+- `GET /api/users/` - List all users
+- `POST /api/users/` - Create new user
+- `DELETE /api/users/{user_id}` - Delete user
+- `GET /api/users/{user_id}` - Get user by ID
+- `PUT /api/users/{user_id}` - Update user
 
 ---
 

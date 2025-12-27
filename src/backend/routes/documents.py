@@ -411,35 +411,19 @@ async def _generate_stock_request_document(db, request_obj_id, request, user):
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
     
-    config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', 'config.yaml')
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
-    
-    inventree_url = config['inventree']['url'].rstrip('/')
-    token = user.get('token')
-    
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    headers = {'Authorization': f'Token {token}', 'Content-Type': 'application/json'}
-    
-    import requests as http_requests
+    # Get location details from local database
     source_detail = None
     destination_detail = None
     
     if req.get('source'):
         try:
-            resp = http_requests.get(f"{inventree_url}/api/stock/location/{req['source']}/", headers=headers, timeout=10)
-            if resp.status_code == 200:
-                source_detail = resp.json()
+            source_detail = db['depo_locations'].find_one({'_id': ObjectId(req['source'])})
         except:
             pass
     
     if req.get('destination'):
         try:
-            resp = http_requests.get(f"{inventree_url}/api/stock/location/{req['destination']}/", headers=headers, timeout=10)
-            if resp.status_code == 200:
-                destination_detail = resp.json()
+            destination_detail = db['depo_locations'].find_one({'_id': ObjectId(req['destination'])})
         except:
             pass
     
@@ -451,15 +435,14 @@ async def _generate_stock_request_document(db, request_obj_id, request, user):
         part_id = item.get('part')
         
         if part_id:
-            try:
-                resp = http_requests.get(f"{inventree_url}/api/part/{part_id}/", headers=headers, timeout=10)
-                if resp.status_code == 200:
-                    item_data['part_detail'] = resp.json()
-            except:
-                pass
-            
+            # Get part details from local database
             depo_part = depo_parts_collection.find_one({'id': part_id})
             if depo_part:
+                item_data['part_detail'] = {
+                    'name': depo_part.get('name'),
+                    'IPN': depo_part.get('ipn'),
+                    'description': depo_part.get('description', '')
+                }
                 item_data['purchase_price'] = depo_part.get('purchase_price')
                 item_data['purchase_price_currency'] = depo_part.get('purchase_price_currency', 'RON')
         

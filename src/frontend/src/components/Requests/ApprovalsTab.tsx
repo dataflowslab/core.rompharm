@@ -97,10 +97,9 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
         color: 'green'
       });
       
-      // Reload after 1 second to show updated status
+      // Reload page after 1 second to refresh all tabs
       setTimeout(() => {
-        loadApprovalFlow();
-        onReload();
+      window.location.reload();
       }, 1000);
     } catch (error: any) {
       console.error('Failed to sign request:', error);

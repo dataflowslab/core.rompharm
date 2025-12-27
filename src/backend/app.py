@@ -1,6 +1,13 @@
 """
 Main FastAPI application
 """
+import sys
+import io
+
+# Fix UTF-8 encoding for Windows console
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -14,11 +21,12 @@ from .routes import config
 from .routes import documents
 from .routes import templates
 from .routes import users
+from .routes import users_local
+from .routes import roles
 from .routes import audit
 from .routes import system
 from .routes import external
 from .routes import approvals
-from .routes import sales
 from .routes import recipes
 from .utils.db import close_db
 from .scheduler import get_scheduler
@@ -31,7 +39,7 @@ from modules import register_modules
 # Create FastAPI app
 app = FastAPI(
     title="DataFlows Core API",
-    description="API for managing dynamic forms and submissions with InvenTree authentication",
+    description="API for managing dynamic forms and submissions",
     version="1.0.0"
 )
 
@@ -52,11 +60,12 @@ app.include_router(config.router)
 app.include_router(documents.router)
 app.include_router(templates.router)
 app.include_router(users.router)
+app.include_router(users_local.router)
+app.include_router(roles.router)
 app.include_router(audit.router)
 app.include_router(system.router)
 app.include_router(external.router)
 app.include_router(approvals.router)
-app.include_router(sales.router)
 app.include_router(recipes.router)
 
 # Register modules dynamically

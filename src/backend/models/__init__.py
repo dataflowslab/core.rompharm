@@ -1,5 +1,5 @@
 """Models package"""
-from .user_model import UserModel
+# UserModel removed - using Pydantic models in user_model.py instead
 from .form_model import FormModel
 from .role_model import RoleModel
 from .job_model import JobModel
@@ -14,7 +14,6 @@ from .config_model import ConfigModel
 from .template_model import TemplateModel
 
 __all__ = [
-    'UserModel',
     'FormModel',
     'RoleModel',
     'JobModel',

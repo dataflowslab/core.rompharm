@@ -12,7 +12,7 @@ from src.backend.utils.config import load_config
 from src.backend.routes.auth import verify_admin
 
 from .models import RequestCreate, RequestUpdate
-from .utils import get_inventree_headers, generate_request_reference
+from .utils import generate_request_reference
 from .services import (
     fetch_stock_locations,
     search_parts,
@@ -235,7 +235,7 @@ async def get_request(
             source_loc = locations_collection.find_one({'_id': source_oid})
             if source_loc:
                 req['source_detail'] = {
-                    'pk': str(source_loc['_id']),
+                    '_id': str(source_loc['_id']),
                     'name': source_loc.get('code', str(source_loc['_id'])),
                     'code': source_loc.get('code', ''),
                     'description': source_loc.get('description', '')
@@ -250,7 +250,7 @@ async def get_request(
             dest_loc = locations_collection.find_one({'_id': dest_oid})
             if dest_loc:
                 req['destination_detail'] = {
-                    'pk': str(dest_loc['_id']),
+                    '_id': str(dest_loc['_id']),
                     'name': dest_loc.get('code', str(dest_loc['_id'])),
                     'code': dest_loc.get('code', ''),
                     'description': dest_loc.get('description', '')
@@ -264,11 +264,12 @@ async def get_request(
         for item in req['items']:
             if item.get('part'):
                 try:
-                    # Get part from MongoDB using integer id
-                    part = parts_collection.find_one({"id": item['part']})
+                    # Get part from MongoDB using ObjectId
+                    part_oid = ObjectId(item['part']) if isinstance(item['part'], str) else item['part']
+                    part = parts_collection.find_one({"_id": part_oid})
                     if part:
                         item['part_detail'] = {
-                            'pk': part.get('id'),
+                            '_id': str(part['_id']),
                             'name': part.get('name', ''),
                             'IPN': part.get('ipn', ''),
                             'description': part.get('description', ''),
@@ -283,6 +284,22 @@ async def get_request(
                 except Exception as e:
                     print(f"Warning: Failed to get part details: {e}")
     
+    # Get product details if product_id exists (for recipe-based requests)
+    if req.get('product_id'):
+        parts_collection = db['depo_parts']
+        try:
+            product_oid = ObjectId(req['product_id']) if isinstance(req['product_id'], str) else req['product_id']
+            product = parts_collection.find_one({"_id": product_oid})
+            if product:
+                req['product_detail'] = {
+                    '_id': str(product['_id']),
+                    'name': product.get('name', ''),
+                    'IPN': product.get('ipn', ''),
+                    'description': product.get('description', '')
+                }
+        except Exception as e:
+            print(f"Warning: Failed to get product details: {e}")
+    
     # Convert all ObjectIds to strings
     req['_id'] = str(req['_id'])
     
@@ -295,6 +312,14 @@ async def get_request(
             if state:
                 req['state_level'] = state.get('workflow_level', 0)  # Use workflow_level not level
                 req['state_order'] = state.get('order', 0)  # Add order field
+                # Populate state_detail
+                req['state_detail'] = {
+                    '_id': str(state['_id']),
+                    'name': state.get('name', 'Unknown'),
+                    'slug': state.get('slug', ''),
+                    'workflow_level': state.get('workflow_level', 0),
+                    'order': state.get('order', 0)
+                }
                 # Also set status from state if not present
                 if not req.get('status'):
                     req['status'] = state.get('name', 'Unknown')
@@ -318,6 +343,14 @@ async def get_request(
         req['recipe_id'] = str(req['recipe_id'])
     if 'recipe_part_id' in req and isinstance(req['recipe_part_id'], ObjectId):
         req['recipe_part_id'] = str(req['recipe_part_id'])
+    
+    # Convert status_log ObjectIds to strings
+    if 'status_log' in req and req['status_log']:
+        for log_entry in req['status_log']:
+            if 'status_id' in log_entry and isinstance(log_entry['status_id'], ObjectId):
+                log_entry['status_id'] = str(log_entry['status_id'])
+            if 'created_at' in log_entry and isinstance(log_entry['created_at'], datetime):
+                log_entry['created_at'] = log_entry['created_at'].isoformat()
     
     # Convert datetime to ISO format
     if 'created_at' in req and isinstance(req['created_at'], datetime):
@@ -382,6 +415,14 @@ async def create_request(
     result = requests_collection.insert_one(request_doc)
     request_id = str(result.inserted_id)
     request_doc['_id'] = request_id
+    
+    # Convert all ObjectIds to strings
+    if 'recipe_id' in request_doc and isinstance(request_doc['recipe_id'], ObjectId):
+        request_doc['recipe_id'] = str(request_doc['recipe_id'])
+    if 'recipe_part_id' in request_doc and isinstance(request_doc['recipe_part_id'], ObjectId):
+        request_doc['recipe_part_id'] = str(request_doc['recipe_part_id'])
+    
+    # Convert datetime to ISO format
     request_doc['created_at'] = request_doc['created_at'].isoformat()
     request_doc['updated_at'] = request_doc['updated_at'].isoformat()
     request_doc['issue_date'] = request_doc['issue_date'].isoformat()
@@ -520,6 +561,33 @@ async def update_request(
         updated['recipe_id'] = str(updated['recipe_id'])
     if 'recipe_part_id' in updated and isinstance(updated['recipe_part_id'], ObjectId):
         updated['recipe_part_id'] = str(updated['recipe_part_id'])
+    
+    # Populate part_detail for items
+    if 'items' in updated and updated['items']:
+        parts_collection = db['depo_parts']
+        for item in updated['items']:
+            if 'part' in item:
+                try:
+                    part_oid = ObjectId(item['part']) if isinstance(item['part'], str) else item['part']
+                    part = parts_collection.find_one({"_id": part_oid})
+                    if part:
+                        item['part_detail'] = {
+                            '_id': str(part['_id']),
+                            'name': part.get('name', ''),
+                            'IPN': part.get('ipn', ''),
+                            'description': part.get('description', ''),
+                            'active': part.get('active', True)
+                        }
+                except:
+                    pass
+    
+    # Convert status_log ObjectIds to strings
+    if 'status_log' in updated and updated['status_log']:
+        for log_entry in updated['status_log']:
+            if 'status_id' in log_entry and isinstance(log_entry['status_id'], ObjectId):
+                log_entry['status_id'] = str(log_entry['status_id'])
+            if 'created_at' in log_entry and isinstance(log_entry['created_at'], datetime):
+                log_entry['created_at'] = log_entry['created_at'].isoformat()
     
     # Convert datetime to ISO format
     if 'created_at' in updated and isinstance(updated['created_at'], datetime):

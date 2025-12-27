@@ -40,4 +40,14 @@ export const requestsApi = {
   signReception: (requestId: string) => `${API_PREFIX}/${requestId}/reception-sign`,
   removeReceptionSignature: (requestId: string, userId: string) => `${API_PREFIX}/${requestId}/reception-signatures/${userId}`,
   updateReceptionStatus: (requestId: string) => `${API_PREFIX}/${requestId}/reception-status`,
+  
+  // Production Flow
+  getProductionData: (requestId: string) => `${API_PREFIX}/${requestId}/production`,
+  saveProductionData: (requestId: string) => `${API_PREFIX}/${requestId}/production`,
+  getProductionFlow: (requestId: string) => `${API_PREFIX}/${requestId}/production-flow`,
+  signProduction: (requestId: string) => `${API_PREFIX}/${requestId}/production-sign`,
+  updateProductionStatus: (requestId: string) => `${API_PREFIX}/${requestId}/production-status`,
+  
+  // States
+  getStates: () => `${API_PREFIX}/states`,
 };

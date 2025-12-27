@@ -10,7 +10,7 @@ import { requestsApi } from '../../services/requests';
 import { DocumentGenerator } from '../Common/DocumentGenerator';
 
 interface StockLocation {
-  pk: number;
+  pk: string;
   name: string;
 }
 
@@ -30,8 +30,8 @@ interface RequestItem {
 interface Request {
   _id: string;
   reference: string;
-  source: number;
-  destination: number;
+  source: string;  // ObjectId string
+  destination: string;  // ObjectId string
   items: RequestItem[];
   line_items: number;
   status: string;
@@ -42,6 +42,14 @@ interface Request {
   created_by: string;
   source_detail?: StockLocation;
   destination_detail?: StockLocation;
+  product_id?: string;
+  product_quantity?: number;
+  product_detail?: {
+    pk: string;
+    name: string;
+    IPN: string;
+    description: string;
+  };
 }
 
 interface DetailsTabProps {
@@ -210,8 +218,8 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
     setSaving(true);
     try {
       await api.patch(requestsApi.updateRequest(request._id), {
-        source: parseInt(formData.source),
-        destination: parseInt(formData.destination),
+        source: formData.source,  // Keep as string (ObjectId)
+        destination: formData.destination,  // Keep as string (ObjectId)
         issue_date: formData.issue_date.toISOString().split('T')[0],
         notes: formData.notes || undefined,
         batch_codes: formData.batch_codes,
@@ -281,6 +289,18 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
 
       {/* Right side - Form (3/4 width) */}
       <Grid.Col span={9}>
+        {/* Product Info - Only show if exists */}
+        {request.product_detail && (
+          <Paper p="md" mb="md" withBorder style={{ backgroundColor: '#f8f9fa' }}>
+            <Text size="lg" fw={600} mb="xs">
+              {request.product_detail.name} ({request.product_detail.IPN})
+            </Text>
+            <Text size="sm" c="dimmed">
+              {t('Product Quantity')}: {request.product_quantity || 0}
+            </Text>
+          </Paper>
+        )}
+
         <Group justify="flex-end" mb="md">
           {!editing ? (
             <Button onClick={() => setEditing(true)} disabled={!canEdit}>
@@ -309,31 +329,37 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
         )}
 
         <Grid>
-        <Grid.Col span={6}>
-          <TextInput
-            label={t('Reference')}
-            value={request.reference}
-            disabled
-          />
+        {/* Batch Codes - First field */}
+        <Grid.Col span={12}>
+          {editing ? (
+            <TagsInput
+              label={t('Batch Codes')}
+              placeholder={t('Add batch codes')}
+              value={formData.batch_codes}
+              onChange={(value) => setFormData({ ...formData, batch_codes: value })}
+            />
+          ) : (
+            <TagsInput
+              label={t('Batch Codes')}
+              value={request.batch_codes || []}
+              disabled
+            />
+          )}
         </Grid.Col>
 
-        <Grid.Col span={6}>
-          <TextInput
-            label={t('Status')}
-            value={request.status}
-            disabled
-          />
-        </Grid.Col>
-
+        {/* Source and Destination */}
         <Grid.Col span={6}>
           {editing ? (
             <Select
               label={t('Source Location')}
               data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
               value={formData.source}
-              onChange={(value) => setFormData({ ...formData, source: value || '' })}
+              onChange={(value) => {
+                if (value) setFormData({ ...formData, source: value });
+              }}
               searchable
               required
+              disabled={stockLocations.length === 0}
             />
           ) : (
             <TextInput
@@ -352,9 +378,12 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
                 .filter(loc => String(loc.pk) !== formData.source)
                 .map(loc => ({ value: String(loc.pk), label: loc.name }))}
               value={formData.destination}
-              onChange={(value) => setFormData({ ...formData, destination: value || '' })}
+              onChange={(value) => {
+                if (value) setFormData({ ...formData, destination: value });
+              }}
               searchable
               required
+              disabled={stockLocations.length === 0}
             />
           ) : (
             <TextInput
@@ -365,32 +394,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           )}
         </Grid.Col>
 
-        <Grid.Col span={6}>
-          {editing ? (
-            <DatePickerInput
-              label={t('Issue Date')}
-              value={formData.issue_date}
-              onChange={(value) => setFormData({ ...formData, issue_date: value || new Date() })}
-              valueFormat="DD/MM/YYYY"
-              required
-            />
-          ) : (
-            <TextInput
-              label={t('Issue Date')}
-              value={formatDate(request.issue_date)}
-              disabled
-            />
-          )}
-        </Grid.Col>
-
-        <Grid.Col span={6}>
-          <TextInput
-            label={t('Created By')}
-            value={request.created_by}
-            disabled
-          />
-        </Grid.Col>
-
+        {/* Notes */}
         <Grid.Col span={12}>
           {editing ? (
             <Textarea
@@ -409,21 +413,20 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           )}
         </Grid.Col>
 
+        {/* Metadata section - separated by divider */}
         <Grid.Col span={12}>
-          {editing ? (
-            <TagsInput
-              label={t('Batch Codes')}
-              placeholder={t('Add batch codes')}
-              value={formData.batch_codes}
-              onChange={(value) => setFormData({ ...formData, batch_codes: value })}
-            />
-          ) : (
-            <TagsInput
-              label={t('Batch Codes')}
-              value={request.batch_codes || []}
-              disabled
-            />
-          )}
+          <div style={{ borderTop: '1px solid #dee2e6', marginTop: '1rem', paddingTop: '1rem' }}>
+            <Grid>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed" mb={4}>{t('Issue Date')}</Text>
+                <Text size="sm">{formatDate(request.issue_date)}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed" mb={4}>{t('Created By')}</Text>
+                <Text size="sm">{request.created_by}</Text>
+              </Grid.Col>
+            </Grid>
+          </div>
         </Grid.Col>
         </Grid>
       </Grid.Col>

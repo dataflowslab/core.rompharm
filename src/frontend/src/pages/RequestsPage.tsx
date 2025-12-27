@@ -8,6 +8,8 @@ import api from '../services/api';
 import { requestsApi } from '../services/requests';
 import { notifications } from '@mantine/notifications';
 import { ComponentsTable } from '../components/Requests/ComponentsTable';
+import { debounce } from '../utils/selectHelpers';
+import { sanitizeSelectOptions } from '../utils/selectHelpers';
 
 interface StockLocation {
   _id: string;
@@ -49,6 +51,7 @@ export function RequestsPage() {
   const [partSearch, setPartSearch] = useState('');
   const [stockInfo, setStockInfo] = useState<any>(null);
   const [recipeData, setRecipeData] = useState<any>(null);
+  const [componentsData, setComponentsData] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     source: '',
@@ -105,6 +108,8 @@ export function RequestsPage() {
       console.error('Failed to search parts:', error);
     }
   };
+
+  const debouncedSearchParts = debounce(searchParts, 250);
 
   const loadStockInfo = async (partId: number) => {
     try {
@@ -167,32 +172,64 @@ export function RequestsPage() {
       // Prepare items list
       let itemsToSend: any[] = [];
 
-      // If recipe/BOM exists with components, use components instead of main part
-      if (recipeData && recipeData.items && recipeData.items.length > 0) {
-        // Flatten recipe items (handle alternatives by taking first alternative)
-        for (const item of recipeData.items) {
-          if (item.type === 2 && item.alternatives && item.alternatives.length > 0) {
-            // Alternative group - take first alternative
-            const firstAlt = item.alternatives[0];
-            itemsToSend.push({
-              part: firstAlt.part,
-              quantity: firstAlt.quantity * formData.quantity,
-              notes: formData.notes || undefined
-            });
-          } else if (item.type === 1 && item.part) {
+      // If recipe/BOM exists with components data from ComponentsTable
+      if (componentsData && componentsData.length > 0) {
+        // Process components from ComponentsTable
+        for (const component of componentsData) {
+          if (component.type === 2 && component.alternatives) {
+            // Alternative group - use selected alternative
+            const selectedAlt = component.alternatives[component.selected_alternative || 0];
+            
+            // Calculate total allocated from batches
+            const totalAllocated = selectedAlt.batch_allocations?.reduce((sum: number, b: any) => sum + b.quantity, 0) || 0;
+            
+            // Use batch allocations if available, otherwise use requested_quantity
+            const quantityToUse = totalAllocated > 0 ? totalAllocated : (selectedAlt.requested_quantity || 0);
+            
+            if (quantityToUse > 0) {
+              // Get batch_code from first allocation if available
+              const batchCode = selectedAlt.batch_allocations && selectedAlt.batch_allocations.length > 0 
+                ? selectedAlt.batch_allocations[0].batch_code 
+                : undefined;
+              
+              itemsToSend.push({
+                part: selectedAlt.part_id,
+                quantity: quantityToUse,
+                init_q: quantityToUse,  // Save initial quantity
+                batch_code: batchCode,
+                notes: formData.notes || undefined
+              });
+            }
+          } else if (component.type === 1) {
             // Regular component
-            itemsToSend.push({
-              part: item.part,
-              quantity: item.quantity * formData.quantity,
-              notes: formData.notes || undefined
-            });
+            // Calculate total allocated from batches
+            const totalAllocated = component.batch_allocations?.reduce((sum: number, b: any) => sum + b.quantity, 0) || 0;
+            
+            // Use batch allocations if available, otherwise use requested_quantity
+            const quantityToUse = totalAllocated > 0 ? totalAllocated : (component.requested_quantity || 0);
+            
+            if (quantityToUse > 0) {
+              // Get batch_code from first allocation if available
+              const batchCode = component.batch_allocations && component.batch_allocations.length > 0 
+                ? component.batch_allocations[0].batch_code 
+                : undefined;
+              
+              itemsToSend.push({
+                part: component.part_id,
+                quantity: quantityToUse,
+                init_q: quantityToUse,  // Save initial quantity
+                batch_code: batchCode,
+                notes: formData.notes || undefined
+              });
+            }
           }
         }
       } else {
-        // No recipe/BOM, use the selected part directly (part is now ObjectId string)
+        // No recipe/BOM, use the selected part directly
         itemsToSend = [{
-          part: formData.part,  // Already ObjectId string
+          part: formData.part,
           quantity: formData.quantity,
+          init_q: formData.quantity,  // Save initial quantity
           notes: formData.notes || undefined
         }];
       }
@@ -407,34 +444,33 @@ export function RequestsPage() {
           </Grid.Col>
 
           <Grid.Col span={12}>
-          <Select
-          label={t('Part')}
-          placeholder={t('Search for part...')}
-          data={[
-            // Include selected part if exists
-            ...(selectedPartData ? [{
-              value: selectedPartData._id,
-              label: `${selectedPartData.name} (${selectedPartData.IPN})`
-            }] : []),
-            // Add search results (filter out selected to avoid duplicates)
-            ...parts
-              .filter(p => !selectedPartData || p._id !== selectedPartData._id)
-              .map(part => ({
-                value: part._id,
-                label: `${part.name} (${part.IPN})`
-              }))
-          ]}
-          value={formData.part}
-          onChange={handlePartChange}
-          onSearchChange={(query) => {
-          setPartSearch(query);
-          searchParts(query);
-          }}
-          searchValue={partSearch}
-          searchable
-          clearable
-          required
-          />
+            <Select
+              label={t('Part')}
+              placeholder={t('Search for part...')}
+              data={sanitizeSelectOptions([
+                // Include selected part first if exists
+                ...(selectedPartData ? [{
+                  value: selectedPartData._id,
+                  label: `${selectedPartData.name} (${selectedPartData.IPN})`
+                }] : []),
+                // Add search results (filter out selected to avoid duplicates)
+                ...parts
+                  .filter(p => !selectedPartData || p._id !== selectedPartData._id)
+                  .map(part => ({
+                    value: part._id,
+                    label: `${part.name} (${part.IPN})`
+                  }))
+              ])}
+              value={formData.part}
+              onChange={handlePartChange}
+              onSearchChange={(query) => {
+                setPartSearch(query);
+                debouncedSearchParts(query);
+              }}
+              searchable
+              clearable
+              required
+            />
           </Grid.Col>
 
           {stockInfo && (
@@ -458,8 +494,7 @@ export function RequestsPage() {
                 recipeData={recipeData}
                 productQuantity={formData.quantity}
                 onComponentsChange={(components) => {
-                  // Store components for later use when creating request
-                  console.log('Components updated:', components);
+                  setComponentsData(components);
                 }}
               />
             </Grid.Col>

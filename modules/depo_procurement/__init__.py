@@ -1,6 +1,6 @@
 """
 DEPO Procurement Module
-InvenTree procurement integration for DataFlows Core
+Procurement management for DataFlows Core
 """
 import os
 import importlib.util

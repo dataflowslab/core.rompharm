@@ -36,6 +36,21 @@ async def get_production_data(
     production['_id'] = str(production['_id'])
     production['request_id'] = str(production['request_id'])
     
+    # Convert ObjectIds in series materials if present
+    if 'series' in production and production['series']:
+        for serie in production['series']:
+            if 'materials' in serie:
+                for material in serie['materials']:
+                    # Convert part ObjectId to string if it's an ObjectId
+                    if 'part' in material and isinstance(material['part'], ObjectId):
+                        material['part'] = str(material['part'])
+    
+    # Convert datetime to ISO format
+    if 'created_at' in production and isinstance(production['created_at'], datetime):
+        production['created_at'] = production['created_at'].isoformat()
+    if 'updated_at' in production and isinstance(production['updated_at'], datetime):
+        production['updated_at'] = production['updated_at'].isoformat()
+    
     return production
 
 
@@ -45,7 +60,7 @@ async def save_production_data(
     request: Request,
     current_user: dict = Depends(verify_admin)
 ):
-    """Save or update production data"""
+    """Save or update production data with series and materials"""
     db = get_db()
     
     try:
@@ -55,6 +70,7 @@ async def save_production_data(
     
     # Get request body
     body = await request.json()
+    series = body.get('series', [])  # Array of {batch_code, materials: [{part, batch, received_qty, used_qty}]}
     
     # Check if production data exists
     existing = db.depo_production.find_one({'request_id': req_obj_id})
@@ -62,25 +78,12 @@ async def save_production_data(
     timestamp = datetime.utcnow()
     
     if existing:
-        # Update existing - preserve other fields
+        # Update existing
         update_data = {
+            'series': series,
             'updated_at': timestamp,
             'updated_by': current_user.get('username')
         }
-        
-        if 'resulted' in body:
-            update_data['resulted'] = body['resulted']
-        else:
-            # Preserve existing resulted if not in body
-            if 'resulted' in existing:
-                update_data['resulted'] = existing['resulted']
-        
-        if 'unused' in body:
-            update_data['unused'] = body['unused']
-        else:
-            # Preserve existing unused if not in body
-            if 'unused' in existing:
-                update_data['unused'] = existing['unused']
         
         db.depo_production.update_one(
             {'_id': existing['_id']},
@@ -92,8 +95,7 @@ async def save_production_data(
         # Create new
         production_data = {
             'request_id': req_obj_id,
-            'resulted': body.get('resulted', []),
-            'unused': body.get('unused', []),
+            'series': series,
             'created_at': timestamp,
             'created_by': current_user.get('username'),
             'updated_at': timestamp,
@@ -108,6 +110,92 @@ async def save_production_data(
         "production_id": production_id,
         "message": "Production data saved successfully"
     }
+
+
+@router.patch("/{request_id}/production-status")
+async def update_production_status(
+    request_id: str,
+    request: Request,
+    current_user: dict = Depends(verify_admin)
+):
+    """Update production status"""
+    db = get_db()
+    requests_collection = db['depo_requests']
+    
+    body = await request.json()
+    status = body.get('status')
+    reason = body.get('reason', '')
+    
+    if not status:
+        raise HTTPException(status_code=400, detail="Status is required")
+    
+    # Validate that status is a valid state ID with 'production' scene
+    try:
+        state_id = ObjectId(status)
+        state = db.depo_requests_states.find_one({"_id": state_id})
+        
+        if not state:
+            raise HTTPException(status_code=400, detail="Invalid state ID")
+        
+        # Check if state has 'production' in scenes
+        if not state.get('scenes') or 'production' not in state.get('scenes', []):
+            raise HTTPException(status_code=400, detail="State must have 'production' in scenes")
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=400, detail="Invalid state ID format")
+    
+    try:
+        req_obj_id = ObjectId(request_id)
+        timestamp = datetime.utcnow()
+        
+        # Create status log entry
+        status_log_entry = {
+            'status_id': state_id,
+            'scene': 'production',
+            'created_at': timestamp,
+            'created_by': current_user.get('username'),
+            'reason': reason if reason else None
+        }
+        
+        # Update state_id and add to status_log
+        update_data = {
+            'state_id': state_id,
+            'updated_at': timestamp
+        }
+        
+        requests_collection.update_one(
+            {'_id': req_obj_id},
+            {
+                '$set': update_data,
+                '$push': {'status_log': status_log_entry}
+            }
+        )
+        
+        # Log to audit logs
+        is_canceled = str(state_id) == '67890abc1234567890abcde9'
+        db.logs.insert_one({
+            'collection': 'depo_requests',
+            'object_id': request_id,
+            'action': 'production_decision',
+            'state_id': str(state_id),
+            'state_name': state.get('name'),
+            'is_canceled': is_canceled,
+            'reason': reason if is_canceled else '',
+            'user': current_user.get('username'),
+            'timestamp': timestamp
+        })
+        
+        print(f"[REQUESTS] Request {request_id} state_id updated to {state.get('name')} ({status})")
+        
+        return {
+            "message": f"State updated to {state.get('name')}",
+            "state_id": str(state_id),
+            "state_name": state.get('name')
+        }
+    except Exception as e:
+        print(f"[REQUESTS] Error updating production decision: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update production decision: {str(e)}")
 
 
 @router.get("/{request_id}/production-flow")
@@ -298,101 +386,6 @@ async def sign_production(
 
 
 async def execute_production_stock_operations(db, request_id: str, current_user: dict):
-    """Execute stock operations after production approval"""
-    
-    # Get request
-    request = db.depo_requests.find_one({"_id": ObjectId(request_id)})
-    if not request:
-        raise Exception("Request not found")
-    
-    # Get production data
-    production = db.depo_production.find_one({"request_id": ObjectId(request_id)})
-    if not production:
-        raise Exception("Production data not found")
-    
-    # Get product from recipe (recipe_part_id is the final product ObjectId)
-    recipe_part_id = request.get('recipe_part_id')
-    if not recipe_part_id:
-        raise Exception("No recipe_part_id in request")
-    
-    # Ensure recipe_part_id is ObjectId
-    if isinstance(recipe_part_id, str):
-        recipe_part_id = ObjectId(recipe_part_id)
-    
-    destination_location = request.get('destination')
-    if not destination_location:
-        raise Exception("No destination location")
-    
-    # Constants
-    supplier_id = ObjectId("694a1b9f297c9dde6d70661c")  # depo_companies (Rompharm)
-    status_ok_id = ObjectId("694321db8728e4d75ae72789")  # OK status
-    
-    # A. Create stock entries for produced batches
-    resulted = production.get('resulted', [])
-    for result in resulted:
-        batch_code = result.get('batch_code')
-        resulted_qty = result.get('resulted_qty', 0)
-        
-        if resulted_qty > 0:
-            stock_entry = {
-                'part_id': recipe_part_id,  # ObjectId of the final product
-                'location_id': ObjectId(destination_location),
-                'quantity': resulted_qty,
-                'batch': batch_code,
-                'supplier': supplier_id,
-                'status_id': status_ok_id,
-                'created_at': datetime.utcnow(),
-                'created_by': current_user.get('username'),
-                'notes': f"Produced from request {request.get('reference')}"
-            }
-            
-            db.depo_stocks.insert_one(stock_entry)
-            print(f"[PRODUCTION] Created stock entry for batch {batch_code}: {resulted_qty} units (part_id: {recipe_part_id})")
-    
-    # B. Decrease stock for used materials
-    unused = production.get('unused', [])
-    items = request.get('items', [])
-    
-    for item in items:
-        part_id = item.get('part')
-        received_qty = item.get('received_quantity', item.get('quantity', 0))
-        
-        # Find unused quantity for this part
-        unused_qty = 0
-        for u in unused:
-            if u.get('part') == part_id:
-                unused_qty = u.get('unused_qty', 0)
-                break
-        
-        used_qty = received_qty - unused_qty
-        
-        if used_qty > 0:
-            # Decrease stock
-            # Find stock entries for this part at destination location
-            stock_entries = list(db.depo_stocks.find({
-                'part': part_id,
-                'location_id': ObjectId(destination_location),
-                'quantity': {'$gt': 0}
-            }).sort('created_at', 1))  # FIFO
-            
-            remaining_to_decrease = used_qty
-            
-            for stock in stock_entries:
-                if remaining_to_decrease <= 0:
-                    break
-                
-                stock_qty = stock.get('quantity', 0)
-                decrease_amount = min(stock_qty, remaining_to_decrease)
-                
-                new_qty = stock_qty - decrease_amount
-                
-                db.depo_stocks.update_one(
-                    {'_id': stock['_id']},
-                    {'$set': {'quantity': new_qty, 'updated_at': datetime.utcnow()}}
-                )
-                
-                remaining_to_decrease -= decrease_amount
-                print(f"[PRODUCTION] Decreased stock for part {part_id}: -{decrease_amount} (remaining: {new_qty})")
-            
-            if remaining_to_decrease > 0:
-                print(f"[PRODUCTION] Warning: Could not decrease full amount for part {part_id}. Remaining: {remaining_to_decrease}")
+    """Execute stock operations after production approval using ledger system"""
+    from .production_stock_operations import execute_production_stock_operations as execute_ops
+    return await execute_ops(db, request_id, current_user)

@@ -256,8 +256,8 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
         <Table.Thead>
           <Table.Tr>
             <Table.Th>{t('Description')}</Table.Th>
-            <Table.Th style={{ width: '120px' }}>{t('Quantity')}</Table.Th>
             <Table.Th style={{ width: '250px' }}>{t('Batch Code')}</Table.Th>
+            <Table.Th style={{ width: '120px' }}>{t('Requested Qty')}</Table.Th>
             {isEditable && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
           </Table.Tr>
         </Table.Thead>
@@ -273,6 +273,9 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
               <Table.Tr key={index}>
                 <Table.Td>{item.part_name}</Table.Td>
                 <Table.Td>
+                  {item.batch_code || '-'}
+                </Table.Td>
+                <Table.Td>
                   {isEditable ? (
                     <NumberInput
                       value={item.quantity}
@@ -283,9 +286,6 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
                   ) : (
                     item.quantity
                   )}
-                </Table.Td>
-                <Table.Td>
-                  {item.batch_code || '-'}
                 </Table.Td>
                 {isEditable && (
                   <Table.Td>

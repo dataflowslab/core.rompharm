@@ -1,5 +1,30 @@
 # Changelog - Requests Module
 
+## Version 1.0.20 - MongoDB ObjectId Migration
+
+### Changed
+- **Part Identification**: Changed from integer IDs to MongoDB ObjectId strings
+  - `RequestItemCreate.part`: `int` → `str` (ObjectId)
+  - `RequestCreate.product_id`: `Optional[int]` → `Optional[str]` (ObjectId)
+  - All part references now use MongoDB `_id` field instead of integer `id`
+
+### Fixed
+- **Part Details Loading**: Fixed `get_request()` to query by `_id` (ObjectId) instead of `id` (integer)
+  - Changed from `parts_collection.find_one({"id": item['part']})` 
+  - To `parts_collection.find_one({"_id": ObjectId(item['part'])})`
+  - Properly handles ObjectId conversion for part lookups
+
+### Technical Details
+- Frontend sends part ObjectIds as strings
+- Backend converts strings to ObjectId for MongoDB queries
+- Consistent with other MongoDB collections (locations, recipes, etc.)
+- All part references now use `_id` field throughout the system
+
+### Migration Impact
+- Existing requests with integer part IDs will need migration
+- New requests will use ObjectId strings for all part references
+- Part details now loaded correctly using MongoDB ObjectId
+
 ## Version 1.0.19 - Complete InvenTree Decoupling
 
 ### Changed

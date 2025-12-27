@@ -1,8 +1,12 @@
 # DataFlows Core Configuration Sample
 # Copy this file to config.yaml and fill in your values
 
+# Identity Server Configuration
+# Authentication method: "inventree" or "localhost"
+identity_server: "localhost"  # Use "localhost" for local authentication, "inventree" for InvenTree
+
 # InvenTree Configuration
-# Used for authentication - users login with InvenTree credentials
+# Used for authentication when identity_server is "inventree"
 inventree:
   url: "https://your-inventree-instance.com/"  # Your InvenTree instance URL
 
