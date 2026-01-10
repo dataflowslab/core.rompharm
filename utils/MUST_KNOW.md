@@ -2,7 +2,7 @@
 
 ## Critical Issues & Solutions
 
-### 1. Mantine Select "Duplicate options" Error
+### 1. Mantine Select "Duplicate options" Error - SOLVED WITH SafeSelect
 
 **Problem**: Mantine Select throws error when receiving duplicate values or `undefined` values in options array.
 
@@ -12,72 +12,131 @@
 - Happens when typing in searchable Select components
 
 **Root Cause**:
+- API returns `_id` but code uses `id` inconsistently
 - Select receives options with `undefined`, `null`, or empty string values
 - Multiple options have the same value
 - State updates cause temporary undefined values during data loading
 
-**Solution - Use Safe Select Helper**:
+**✅ BEST SOLUTION - Use SafeSelect Component**:
 
 ```typescript
-// utils/selectHelpers.ts
-export function sanitizeSelectOptions<T extends { value: string | number; label: string }>(
-  options: T[]
-): T[] {
-  const seen = new Set<string | number>();
-  return options.filter(option => {
-    // Filter out undefined, null, or empty values
-    if (option.value === undefined || option.value === null || option.value === '') {
-      return false;
-    }
-    
-    // Filter out duplicates
-    const key = String(option.value);
-    if (seen.has(key)) {
-      return false;
-    }
-    
-    seen.add(key);
-    return true;
-  });
-}
+// Import the safe component
+import { SafeSelect, SafeMultiSelect } from '@/components/Common';
+
+// ✅ BEST - Automatic handling of everything
+<SafeSelect
+  label="Article"
+  data={parts}  // API data with _id and name - auto-detected!
+  value={selectedPart}
+  onChange={setSelectedPart}
+  searchable
+  debug={true}  // Enable for troubleshooting
+/>
 ```
 
-**Usage Example**:
+**What SafeSelect Does Automatically**:
+1. ✅ Detects `_id` or `id` automatically (no manual mapping!)
+2. ✅ Removes `undefined`, `null`, empty values
+3. ✅ Removes duplicate values
+4. ✅ Validates selected value exists in options
+5. ✅ Provides debug logging when `debug={true}`
+6. ✅ Works with any data format (objects, strings, pre-formatted)
+
+**SafeSelect Props**:
+```typescript
+<SafeSelect
+  data={items}        // Array of objects, strings, or {value, label}
+  valueKey="custom"   // Optional: specify value key (default: auto-detect _id/id)
+  labelKey="name"     // Optional: specify label key (default: 'name')
+  debug={true}        // Optional: enable console logging
+  // ... all standard Mantine Select props
+/>
+```
+
+**Migration Examples**:
 
 ```typescript
-// ❌ BAD - Can cause duplicate options error
-<Select
-  data={parts.map(part => ({
-    value: String(part.pk),
-    label: part.name
-  }))}
-/>
-
-// ✅ GOOD - Safe from duplicates
+// ❌ OLD WAY - Manual mapping and sanitization
 import { sanitizeSelectOptions } from '../utils/selectHelpers';
 
 <Select
   data={sanitizeSelectOptions(
     parts.map(part => ({
-      value: String(part.pk),
-      label: part.name
+      value: part._id,
+      label: `${part.name} (${part.IPN})`
     }))
   )}
 />
+
+// ✅ NEW WAY - Automatic with SafeSelect
+import { SafeSelect } from '@/components/Common';
+
+<SafeSelect
+  data={parts.map(part => ({
+    _id: part._id,
+    label: `${part.name} (${part.IPN})`
+  }))}
+/>
+
+// ✅ EVEN SIMPLER - Let SafeSelect handle everything
+<SafeSelect
+  data={parts}  // Just pass raw API data!
+  labelKey="name"  // Or custom: (item) => `${item.name} (${item.IPN})`
+/>
 ```
 
-**Prevention Checklist**:
-1. ✅ Always convert values to strings: `String(value)` or `value?.toString() || ''`
-2. ✅ Filter out undefined/null before mapping
-3. ✅ Use `sanitizeSelectOptions()` helper for all Select components
-4. ✅ Add loading state checks: `disabled={data.length === 0}`
-5. ✅ Validate data before rendering Select
+**Debug Mode**:
+```typescript
+<SafeSelect
+  data={parts}
+  debug={true}  // Logs to console
+/>
 
-**Common Locations**:
-- Search dropdowns (parts, locations, users)
-- Dynamic options loaded from API
-- Filtered options based on other selections
-- Options with conditional rendering
+// Console output:
+// [SafeSelect] Data processed: {
+//   input: 10,
+//   output: 9,
+//   removed: 1,
+//   sample: { value: "693ea...", label: "PRODUS TEST" }
+// }
+```
+
+**For MultiSelect**:
+```typescript
+import { SafeMultiSelect } from '@/components/Common';
+
+<SafeMultiSelect
+  label="Select Multiple Items"
+  data={items}
+  value={selectedItems}
+  onChange={setSelectedItems}
+  searchable
+/>
+```
+
+**Where to Use**:
+- ✅ **ALL Select components** - Replace `<Select>` with `<SafeSelect>`
+- ✅ **ALL MultiSelect components** - Replace `<MultiSelect>` with `<SafeMultiSelect>`
+- ✅ Search dropdowns (parts, locations, users)
+- ✅ Dynamic options loaded from API
+- ✅ Filtered options based on other selections
+
+**Documentation**:
+- Full guide: `src/frontend/SAFE_SELECT_GUIDE.md`
+- Component location: `src/frontend/src/components/Common/SafeSelect.tsx`
+- Helper functions: `src/frontend/src/utils/selectHelpers.ts`
+
+**Prevention Checklist**:
+1. ✅ Use `SafeSelect` instead of `Select`
+2. ✅ Use `SafeMultiSelect` instead of `MultiSelect`
+3. ✅ Enable `debug={true}` during development
+4. ✅ Let SafeSelect auto-detect `_id`/`id` (don't map manually)
+5. ✅ Check console for `[SafeSelect]` warnings
+
+**Common Locations Updated**:
+- ✅ `AddItemModal.tsx` - Article and batch selection
+- ✅ `OperationsTab.tsx` - Part search
+- ✅ `RequestsPage.tsx` - Filters
 
 ### ⚠️ CRITICAL: Select with AJAX Search - "Disappearing Value" Fix
 

@@ -2,20 +2,24 @@
 Stocks Router
 Endpoints pentru gestionare stocks cu ledger system
 """
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 
 from src.backend.utils.db import get_db
 from src.backend.routes.auth import verify_token
 
-from ..models.stock_models import (
+from modules.inventory.models.stock_models import (
     StockCreateRequest,
     StockUpdateRequest,
     StockTransferRequest,
     StockAdjustmentRequest,
     StockConsumptionRequest
 )
-from ..services.stocks_service import (
+from modules.inventory.services.stocks_service import (
     get_stocks_list,
     get_stock_by_id,
     create_stock,
@@ -239,8 +243,8 @@ async def get_stock_movement_history(
     Returns:
         Listă mișcări sortate descrescător după dată
     """
-    from ..stock_movements import get_stock_movements
-    from ..services.common import validate_object_id
+    from modules.inventory.stock_movements import get_stock_movements
+    from modules.inventory.services.common import validate_object_id
     
     db = get_db()
     stock_oid = validate_object_id(stock_id, "stock_id")
@@ -271,8 +275,8 @@ async def get_stock_balance_info(
         - Pentru o locație: {stock_id, location_id, quantity, updated_at}
         - Pentru toate: {stock_id, locations: [...], total_quantity}
     """
-    from ..stock_movements import get_stock_balance
-    from ..services.common import validate_object_id
+    from modules.inventory.stock_movements import get_stock_balance
+    from modules.inventory.services.common import validate_object_id
     from bson import ObjectId
     
     db = get_db()

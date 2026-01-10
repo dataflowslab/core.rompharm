@@ -6,6 +6,10 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from fastapi import HTTPException
 from bson import ObjectId
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from src.backend.utils.serializers import serialize_doc
 
 from src.backend.utils.config import load_config
 
@@ -56,11 +60,15 @@ async def search_parts(db, search: Optional[str] = None) -> Dict[str, Any]:
         
         parts = list(db.depo_parts.find(query).limit(30))
         
-        # Format results to match expected structure
+        # Use serialize_doc to automatically add 'value' field
+        serialized_parts = serialize_doc(parts)
+        
+        # Map 'ipn' to 'IPN' for frontend compatibility
         results = []
-        for part in parts:
+        for part in serialized_parts:
             results.append({
-                "_id": str(part.get("_id")),  # Use ObjectId as _id
+                "_id": part.get("_id"),
+                "value": part.get("value"),  # Added by serialize_doc
                 "name": part.get("name", ""),
                 "IPN": part.get("ipn", "")  # Map 'ipn' to 'IPN'
             })
@@ -309,9 +317,12 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
                         "is_requestable": False
                     })
                     
+                    expiry = stock.get("expiry_date", "")
+                    
                     batch_map[batch_code] = {
                         'batch_code': batch_code,
-                        'expiry_date': stock.get("expiry_date", ""),
+                        'value': batch_code,  # For Select component
+                        'expiry_date': expiry,
                         'quantity': 0,
                         'location_id': str(stock.get("location_id", "")),
                         'state_id': state_id,
@@ -321,7 +332,11 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
                     }
                 batch_map[batch_code]['quantity'] += stock.get("quantity", 0)
         
-        batch_codes = list(batch_map.values())
+        # Add label after quantity is calculated
+        batch_codes = []
+        for batch in batch_map.values():
+            batch['label'] = f"{batch['batch_code']} - Qty: {batch['quantity']} - Exp: {batch['expiry_date'] or 'N/A'}"
+            batch_codes.append(batch)
         
         return {"batch_codes": batch_codes}
     except Exception as e:

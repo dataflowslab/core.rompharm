@@ -7,8 +7,13 @@ from bson import ObjectId
 from datetime import datetime
 from fastapi import HTTPException
 
-from .common import serialize_doc, validate_object_id, build_search_query, paginate_results
-from ..stock_movements import (
+# Import common utilities
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+
+from modules.inventory.services.common import serialize_doc, validate_object_id, build_search_query, paginate_results
+from modules.inventory.stock_movements import (
     MovementType,
     create_movement,
     create_transfer,

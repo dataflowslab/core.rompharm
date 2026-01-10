@@ -1,7 +1,7 @@
-import { Modal, Grid, Select, NumberInput, Button, Group, Text } from '@mantine/core';
+import { Modal, Grid, NumberInput, Button, Group, Text } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import { sanitizeSelectOptions } from '../../utils/selectHelpers';
+import { SafeSelect } from '../Common/SafeSelect';
 
 interface Part {
   _id: string;
@@ -61,26 +61,28 @@ export function AddItemModal({
     >
       <Grid>
         <Grid.Col span={12}>
-          <Select
+          <SafeSelect
             label={t('Article')}
             placeholder={t('Search for article...')}
-            data={sanitizeSelectOptions(
-              parts.map(part => ({
-                value: part._id,
-                label: `${part.name} (${part.IPN})`
-              }))
-            )}
+            data={parts.map(part => ({
+              _id: part._id,
+              value: part._id,
+              label: `${part.name} (${part.IPN})`,
+              name: part.name,
+              IPN: part.IPN
+            }))}
             value={newItem.part}
             onChange={onPartSelect}
             onSearchChange={onPartSearchChange}
             searchable
             clearable
             required
+            debug={true}
           />
         </Grid.Col>
 
         <Grid.Col span={12}>
-          <Select
+          <SafeSelect
             label={t('Batch Code')}
             placeholder={t('Select batch code...')}
             data={batchOptions}
@@ -89,6 +91,7 @@ export function AddItemModal({
             disabled={!newItem.part}
             searchable
             required
+            debug={true}
           />
           {newItem.batch_code && (() => {
             const selectedBatch = batchOptions.find(b => b.value === newItem.batch_code);

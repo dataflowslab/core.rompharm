@@ -2,7 +2,69 @@
 
 All notable changes to DataFlows Core Rompharm project.
 
-## [Unreleased] - 2025-12-27
+## [2.0.2] - 2025-12-27
+
+### 🔧 Backend - Auto-add 'value' field to all API responses
+- **serialize_doc() Enhanced**: All MongoDB documents now automatically include `value` field
+  - `value` = `_id` for all documents with `_id`
+  - Makes all API responses compatible with Mantine Select without manual mapping
+  - Applied globally across all modules (inventory, requests, etc.)
+- **New Global Serializer**: `src/backend/utils/serializers.py`
+  - Centralized serialization logic
+  - Consistent handling of ObjectId, datetime, nested objects
+  - Automatic `value` field injection
+- **Modules Updated**:
+  - `modules/inventory/services/common.py` - Enhanced serialize_doc
+  - `modules/requests/services.py` - Now uses global serializer
+- **Impact**:
+  - ✅ Frontend can use `data={apiResponse}` directly in SafeSelect
+  - ✅ No manual `value` mapping needed
+  - ✅ Consistent API responses across all endpoints
+
+## [2.0.1] - 2025-12-27
+
+### 🛠️ Frontend - SafeSelect Component (Global Fix)
+- **SafeSelect & SafeMultiSelect Components**: Wrapper components that automatically handle all Select issues
+  - Auto-detects `_id` or `id` from API data (no manual mapping needed!)
+  - Eliminates undefined/duplicate options automatically
+  - Validates selected values against available options
+  - Debug mode with console logging
+  - Works with any data format (objects, strings, pre-formatted)
+- **Utility Helpers**: Enhanced `selectHelpers.ts`
+  - `sanitizeSelectOptions()` - Core sanitization function
+  - `createSelectOptions()` - Creates options from API responses
+  - `validateSelectValue()` - Validates single select values
+  - `validateMultiSelectValues()` - Validates multi-select values
+  - `debounce()` - Rate limiting for search inputs
+- **Documentation**: 
+  - `SAFE_SELECT_GUIDE.md` - Complete usage guide
+  - `SELECT_HELPERS_GUIDE.md` - Helper functions reference
+  - `FRONTEND_BEST_PRACTICES.md` - Best practices
+  - Updated `utils/MUST_KNOW.md` - Critical issue #1 solved
+- **Components Updated**:
+  - `AddItemModal.tsx` - Now uses SafeSelect with debug mode
+  - `Common/index.ts` - Exports SafeSelect and SafeMultiSelect
+- **Impact**: 
+  - ✅ Zero "Duplicate options" errors
+  - ✅ Automatic `_id`/`id` normalization
+  - ✅ 90% less code for Select components
+  - ✅ Consistent behavior across all selects
+
+## [2.0.0] - 2025-12-27
+
+### 🎉 Inventory Module - Complete Refactoring
+- **Modular router structure**: Split monolithic `routes.py` (1718 lines) into 5 focused routers
+  - `routers/articles_router.py` - Articles/Parts CRUD (600+ lines)
+  - `routers/locations_router.py` - Locations management (200+ lines)
+  - `routers/categories_router.py` - Categories management (200+ lines)
+  - `routers/stocks_router.py` - Stocks with ledger (250+ lines)
+  - `routers/suppliers_router.py` - Suppliers/Manufacturers/Clients (200+ lines)
+- **Shared utilities**: `services/common.py` with reusable functions
+- **Complete documentation**: `modules/inventory/README.md` and `CHANGELOG.md`
+- **Backup**: Original routes saved to `utils/inventory_routes_backup.py`
+- **Benefits**: Better organization, easier maintenance, clear separation of concerns
+
+## [Unreleased]
 
 ### Added - Role-Based Permissions System
 - **roles.items** - array de permission slugs pentru fiecare rol

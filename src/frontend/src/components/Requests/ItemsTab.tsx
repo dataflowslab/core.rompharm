@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Table, Button, Group, Modal, Select, NumberInput, TextInput, ActionIcon, Text, Grid } from '@mantine/core';
+import { Paper, Title, Table, Button, Group, Modal, NumberInput, TextInput, ActionIcon, Text, Grid } from '@mantine/core';
 import { IconPlus, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
+import { SafeSelect } from '../Common/SafeSelect';
 
 interface BatchOption {
   value: string;
@@ -317,13 +318,12 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
       >
         <Grid>
           <Grid.Col span={12}>
-            <Select
+            <SafeSelect
               label={t('Part')}
               placeholder={t('Search for part...')}
-              data={parts.map(part => ({
-                value: String(part.pk),
-                label: `${part.name} (${part.IPN})`
-              }))}
+              data={parts}
+              valueKey="_id"
+              labelKey="name"
               value={newItem.part}
               onChange={handlePartSelect}
               onSearchChange={(query) => {
@@ -334,6 +334,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
               searchable
               clearable
               required
+              debug={true}
             />
           </Grid.Col>
 
@@ -350,7 +351,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
           </Grid.Col>
 
           <Grid.Col span={12}>
-            <Select
+            <SafeSelect
               label={t('Batch Code')}
               placeholder={t('Select batch code (optional)')}
               data={newItemBatchOptions}
@@ -359,6 +360,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
               searchable
               clearable
               disabled={!newItem.part}
+              debug={true}
             />
           </Grid.Col>
         </Grid>
