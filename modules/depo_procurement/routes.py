@@ -522,21 +522,11 @@ async def sign_purchase_order(
             can_sign = True
             break
         elif officer["type"] == "role":
-            # Check if user has this role (role is ObjectId in users.role field)
-            user_role_id = current_user.get("role")  # Can be ObjectId, string, or dict
+            # ✅ SIMPLIFIED: role is now always a string (normalized in verify_token)
+            user_role_id = current_user.get("role")
             if user_role_id:
-                # ✅ FIX: Handle different types - convert to ObjectId if needed
-                if isinstance(user_role_id, str):
-                    role_oid = ObjectId(user_role_id)
-                elif isinstance(user_role_id, dict) and '_id' in user_role_id:
-                    role_oid = ObjectId(user_role_id['_id'])
-                elif isinstance(user_role_id, ObjectId):
-                    role_oid = user_role_id
-                else:
-                    continue  # Skip if invalid format
-                
-                # Get role details and check slug (lowercase identifier)
-                role = db.roles.find_one({"_id": role_oid})
+                # Get role details and check slug
+                role = db.roles.find_one({"_id": ObjectId(user_role_id)})
                 if role and role.get("slug") == officer["reference"]:
                     can_sign = True
                     break

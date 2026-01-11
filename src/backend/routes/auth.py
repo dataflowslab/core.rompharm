@@ -160,7 +160,10 @@ async def login(request_data: LoginRequest, request: Request):
 async def verify_token(authorization: Optional[str] = Header(None)):
     """
     Dependency to verify authentication token (localhost or InvenTree)
+    Returns normalized user data with consistent types
     """
+    from bson import ObjectId
+    
     if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header missing")
     
@@ -181,7 +184,8 @@ async def verify_token(authorization: Optional[str] = Header(None)):
         if not user_data:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         
-        return user_data
+        # ✅ Normalize user data
+        return _normalize_user_data(user_data)
     
     else:
         # Verify token exists in database (InvenTree)
@@ -192,7 +196,43 @@ async def verify_token(authorization: Optional[str] = Header(None)):
         if not user:
             raise HTTPException(status_code=401, detail="Invalid token")
         
-        return user
+        # ✅ Normalize user data
+        return _normalize_user_data(user)
+
+
+def _normalize_user_data(user: dict) -> dict:
+    """
+    Normalize user data to ensure consistent types across the application
+    - _id: always string
+    - role: always string (ObjectId converted to string)
+    - All ObjectId fields converted to strings
+    """
+    from bson import ObjectId
+    
+    normalized = user.copy()
+    
+    # Normalize _id to string
+    if '_id' in normalized:
+        if isinstance(normalized['_id'], ObjectId):
+            normalized['_id'] = str(normalized['_id'])
+    
+    # Normalize role field (can be 'role' or 'local_role')
+    role_field = normalized.get('role') or normalized.get('local_role')
+    if role_field:
+        if isinstance(role_field, ObjectId):
+            normalized['role'] = str(role_field)
+        elif isinstance(role_field, dict) and '_id' in role_field:
+            normalized['role'] = str(role_field['_id'])
+        elif isinstance(role_field, str):
+            normalized['role'] = role_field
+        else:
+            normalized['role'] = None
+        
+        # Ensure both 'role' and 'local_role' are set for compatibility
+        if 'local_role' not in normalized:
+            normalized['local_role'] = normalized['role']
+    
+    return normalized
 
 
 async def verify_admin(authorization: Optional[str] = Header(None)):
