@@ -53,6 +53,11 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
   const [qcModalOpened, setQcModalOpened] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingRecord, setEditingRecord] = useState<QCRecord | null>(null);
+  
+  // Order state management
+  const [orderState, setOrderState] = useState<string>('Finished');
+  const [savingState, setSavingState] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Form state for QC record
   const [qcData, setQcData] = useState({
@@ -74,7 +79,17 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
   useEffect(() => {
     loadQCRecords();
     loadReceivedItems();
+    loadCurrentUser();
   }, [orderId]);
+  
+  const loadCurrentUser = async () => {
+    try {
+      const response = await api.get('/api/auth/me');
+      setCurrentUser(response.data);
+    } catch (error) {
+      console.error('Failed to load current user:', error);
+    }
+  };
 
   const loadQCRecords = async () => {
     try {
@@ -344,13 +359,18 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
       label: batch
     }));
 
-  // Get parts for selected batch code
+  // Get parts for selected batch code with quantity info
   const partsForBatch = receivedItems
     .filter(item => (item.batch_code || item.batch) === qcData.batch_code)
     .map(item => ({
       value: item.part_id,  // Use part_id (ObjectId string)
-      label: `${item.part_detail?.name || 'Part ' + item.part_id} (${item.part_detail?.IPN || ''})`
+      label: `${item.part_detail?.name || 'Part ' + item.part_id} (${item.part_detail?.IPN || 'No IPN'}) - Qty: ${item.quantity}`,
+      maxQuantity: item.quantity  // Store max quantity for validation
     }));
+  
+  // Get max quantity for selected part
+  const selectedPartData = partsForBatch.find(p => p.value === qcData.part);
+  const maxPrelevatedQty = selectedPartData?.maxQuantity || 0;
 
   const getResultBadge = (result: string) => {
     const colors: Record<string, string> = {
@@ -365,6 +385,39 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
     return <Badge color={transactionable ? 'green' : 'red'}>
       {transactionable ? t('Yes') : t('No')}
     </Badge>;
+  };
+  
+  const handleSaveOrderState = async () => {
+    setSavingState(true);
+    try {
+      await api.patch(`/modules/depo_procurement/api/purchase-orders/${orderId}/state`, null, {
+        params: { state_name: orderState }
+      });
+      
+      notifications.show({
+        title: t('Success'),
+        message: t('Order state updated successfully'),
+        color: 'green'
+      });
+    } catch (error: any) {
+      console.error('Failed to update order state:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to update order state'),
+        color: 'red'
+      });
+    } finally {
+      setSavingState(false);
+    }
+  };
+  
+  // Check if user can change order state (admin or qc role)
+  const canChangeOrderState = () => {
+    if (!currentUser) return false;
+    const isAdmin = currentUser.is_staff || currentUser.is_superuser || false;
+    // Check if user has QC role (you may need to adjust this based on your role structure)
+    const hasQCRole = currentUser.role_name === 'QC' || currentUser.role_slug === 'qc';
+    return isAdmin || hasQCRole;
   };
 
   return (
@@ -431,6 +484,40 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
             ))}
           </Table.Tbody>
         </Table>
+      )}
+
+      {/* Order State Management - Only for Admin/QC */}
+      {canChangeOrderState() && (
+        <Paper p="md" withBorder mt="xl">
+          <Title order={5} mb="md">{t('Order State Management')}</Title>
+          <Text size="sm" c="dimmed" mb="md">
+            {t('Set the final state of the purchase order after QC completion')}
+          </Text>
+          <Grid>
+            <Grid.Col span={8}>
+              <Select
+                label={t('Order State')}
+                value={orderState}
+                onChange={(value) => setOrderState(value || 'Finished')}
+                data={[
+                  { value: 'Finished', label: t('Finished') },
+                  { value: 'Refused', label: t('Refused') },
+                  { value: 'Canceled', label: t('Canceled') }
+                ]}
+                required
+              />
+            </Grid.Col>
+            <Grid.Col span={4} style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <Button
+                fullWidth
+                onClick={handleSaveOrderState}
+                loading={savingState}
+              >
+                {t('Save State')}
+              </Button>
+            </Grid.Col>
+          </Grid>
+        </Paper>
       )}
 
       {/* LOTALLEXP Items Table - Separate section */}
@@ -540,10 +627,13 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
               value={qcData.prelevated_quantity}
               onChange={(value) => setQcData({ ...qcData, prelevated_quantity: Number(value) || 0 })}
               min={0}
+              max={maxPrelevatedQty}
               step={1}
               required
               readOnly={!!editingRecord}
               disabled={!!editingRecord}
+              description={maxPrelevatedQty > 0 ? `Max: ${maxPrelevatedQty}` : ''}
+              error={qcData.prelevated_quantity > maxPrelevatedQty ? t('Quantity exceeds received stock') : ''}
             />
           </Grid.Col>
 
