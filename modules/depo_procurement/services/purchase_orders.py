@@ -57,12 +57,20 @@ async def get_purchase_order_by_id(order_id: str):
             if supplier:
                 order['supplier_detail'] = serialize_doc(supplier)
         
-        # Enrich with status from depo_purchase_orders_states
+        # ✅ FIX: Get status from state_id (depo_purchase_orders_states)
         if order.get('state_id'):
-            state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId(order['state_id'])})
+            state = db['depo_purchase_orders_states'].find_one({'_id': order['state_id']})
             if state:
-                order['status'] = state.get('name')  # Override hardcoded status with state name
+                order['status'] = state.get('name')  # Use state name as status
                 order['status_color'] = state.get('color', 'gray')
+                order['status_value'] = state.get('value', 0)
+        elif order.get('status'):
+            # Legacy: if no state_id but has old status field, keep it
+            pass
+        else:
+            # No state_id and no status - default to Pending
+            order['status'] = 'Pending'
+            order['status_color'] = 'gray'
         
         # Enrich with destination details
         if order.get('destination_id'):
@@ -117,7 +125,7 @@ async def create_new_purchase_order(order_data, current_user):
         'destination_id': ObjectId(order_data.destination_id) if order_data.destination_id else None,
         'notes': order_data.notes or '',
         'state_id': pending_state['_id'],
-        'status': 'Pending',  # Keep for backward compatibility
+        # Don't set 'status' field - use state_id only
         'items': [],
         'line_items': 0,
         'lines': 0,

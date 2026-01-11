@@ -581,17 +581,25 @@ async def sign_purchase_order(
             }
         )
         
-        processing_state = db['depo_purchase_orders_states'].find_one({'name': 'Processing'})
-        if processing_state:
+        # ✅ FIX: Change to "Issued" state (value: 10) after signing
+        # State ID: 6943a4a6451609dd8a618cdf
+        issued_state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId('6943a4a6451609dd8a618cdf')})
+        if not issued_state:
+            # Fallback: find by name
+            issued_state = db['depo_purchase_orders_states'].find_one({'name': 'Issued'})
+        
+        if issued_state:
             db['depo_purchase_orders'].update_one(
                 {'_id': ObjectId(order_id)},
                 {
                     '$set': {
-                        'state_id': processing_state['_id'],
-                        'status': 'Processing',
+                        'state_id': issued_state['_id'],
                         'updated_at': timestamp,
                         'approved_at': timestamp,
                         'approved_by': username
+                    },
+                    '$unset': {
+                        'status': ''  # Remove old status field
                     }
                 }
             )

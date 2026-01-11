@@ -223,11 +223,11 @@ export function ProcurementDetailPage() {
       signatures: approvalFlow?.signatures?.length || 0,
     });
 
-    // Once order is signed/approved (status is Processing or beyond), only Notes can be edited
-    // Status "Pending" = can edit, "Processing" = signed/approved = cannot edit items/details
+    // ✅ FIX: Once order is signed (status is Issued or beyond), cannot edit items/details
+    // Status "Pending" = can edit, "Issued"/"Processing"/"Finished" = signed = cannot edit
     const orderStatus = order.status?.toLowerCase();
     if (orderStatus && orderStatus !== 'pending') {
-      console.log('[canEdit] Order is signed/approved (status:', order.status, ') - CANNOT EDIT');
+      console.log('[canEdit] Order is signed (status:', order.status, ') - CANNOT EDIT');
       return false;
     }
 
@@ -252,13 +252,13 @@ export function ProcurementDetailPage() {
   const getStatusColor = (status: string) => {
     // MongoDB status names based on depo_purchase_orders_states
     switch (status?.toLowerCase()) {
-      case 'pending': return 'gray';      // value: 0
-      case 'issued': return 'cyan';       // value: 10
-      case 'processing': return 'blue';   // value: 20
-      case 'finished': return 'green';    // value: 30
-      case 'refused': return 'red';       // value: 30
+      case 'pending': return 'gray';      // value: 0 - Not signed yet
+      case 'issued': return 'cyan';       // value: 10 - Signed, ready for receiving
+      case 'processing': return 'blue';   // value: 20 - Receiving in progress
+      case 'finished': return 'green';    // value: 30 - All received and QC done
+      case 'refused': return 'red';       // value: 40 - Refused
       case 'canceled': 
-      case 'cancelled': return 'red';     // value: 90
+      case 'cancelled': return 'red';     // value: 90 - Cancelled
       default: return 'gray';
     }
   };
@@ -314,14 +314,14 @@ export function ProcurementDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconPackage size={16} />}>
             {t('Items')}
           </Tabs.Tab>
-          {/* Show Receive Stock tab only if order status is Processing or beyond (approved) */}
-          {order.status && ['Processing', 'Finished'].includes(order.status) && (
+          {/* Show Receive Stock tab only if order is Issued or beyond (after signing) */}
+          {order.status && ['Issued', 'Processing', 'Finished'].includes(order.status) && (
             <Tabs.Tab value="receive-stock" leftSection={<IconTruckDelivery size={16} />}>
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
-          {/* Show Quality Control tab only if order status is Processing or beyond (approved) */}
-          {order.status && ['Processing', 'Finished'].includes(order.status) && (
+          {/* Show Quality Control tab only if order is Issued or beyond */}
+          {order.status && ['Issued', 'Processing', 'Finished'].includes(order.status) && (
             <Tabs.Tab value="quality-control" leftSection={<IconClipboardCheck size={16} />}>
               {t('Quality Control')}
             </Tabs.Tab>
