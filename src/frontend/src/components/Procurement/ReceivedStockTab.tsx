@@ -152,7 +152,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
           <br />
           {t('Quantity')}: {item.quantity}
           <br />
-          {t('Batch')}: {item.batch || '-'}
+          {t('Batch')}: {item.batch_code || item.batch || '-'}
         </Text>
       ),
       labels: { confirm: t('Delete'), cancel: t('Cancel') },
@@ -360,7 +360,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
                 </Table.Td>
                 <Table.Td>{item.quantity}</Table.Td>
                 <Table.Td>{item.location_detail?.name || item.location}</Table.Td>
-                <Table.Td>{item.batch || '-'}</Table.Td>
+                <Table.Td>{item.batch_code || item.batch || '-'}</Table.Td>
                 <Table.Td>
                   {item.status_detail ? (
                     <Badge

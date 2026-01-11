@@ -224,6 +224,56 @@ async def get_received_items(
     return await get_received_stock_items(order_id)
 
 
+@router.delete("/stock-items/{stock_id}")
+async def delete_stock_item(
+    request: Request,
+    stock_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Delete a received stock item"""
+    db = get_db()
+    
+    try:
+        # Get stock item
+        stock = db.depo_stocks.find_one({'_id': ObjectId(stock_id)})
+        if not stock:
+            raise HTTPException(status_code=404, detail="Stock item not found")
+        
+        # Get purchase order
+        order_id = stock.get('purchase_order_id')
+        if order_id:
+            order = db.depo_purchase_orders.find_one({'_id': order_id})
+            if order:
+                # Remove stock_id from items.stocks array
+                items = order.get('items', [])
+                for item in items:
+                    if 'stocks' in item and ObjectId(stock_id) in item['stocks']:
+                        item['stocks'].remove(ObjectId(stock_id))
+                        
+                        # Recalculate received quantity
+                        received_qty = 0
+                        for stock_oid in item.get('stocks', []):
+                            stock_entry = db.depo_stocks.find_one({'_id': stock_oid})
+                            if stock_entry:
+                                received_qty += stock_entry.get('quantity', 0)
+                        item['received'] = received_qty
+                
+                # Update order
+                db.depo_purchase_orders.update_one(
+                    {'_id': order_id},
+                    {'$set': {'items': items, 'updated_at': datetime.utcnow()}}
+                )
+        
+        # Delete stock item
+        db.depo_stocks.delete_one({'_id': ObjectId(stock_id)})
+        
+        return {"message": "Stock item deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete stock item: {str(e)}")
+
+
 @router.get("/order-statuses")
 async def get_order_statuses(
     request: Request,
