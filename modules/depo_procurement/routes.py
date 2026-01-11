@@ -493,6 +493,7 @@ async def sign_purchase_order(
 ):
     """Sign a purchase order approval flow"""
     from src.backend.models.approval_flow_model import ApprovalFlowModel
+    from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
     
     db = get_db()
     
@@ -515,21 +516,16 @@ async def sign_purchase_order(
         raise HTTPException(status_code=400, detail="You have already signed this order")
     
     username = current_user["username"]
-    can_sign = False
+    user_role_id = current_user.get("role")
     
-    for officer in flow.get("required_officers", []) + flow.get("optional_officers", []):
-        if officer["type"] == "person" and officer["reference"] == user_id:
-            can_sign = True
-            break
-        elif officer["type"] == "role":
-            # ✅ SIMPLIFIED: role is now always a string (normalized in verify_token)
-            user_role_id = current_user.get("role")
-            if user_role_id:
-                # Get role details and check slug
-                role = db.roles.find_one({"_id": ObjectId(user_role_id)})
-                if role and role.get("slug") == officer["reference"]:
-                    can_sign = True
-                    break
+    # ✅ Use global helper function
+    can_sign = check_user_can_sign(
+        db,
+        user_id,
+        user_role_id,
+        flow.get("required_officers", []),
+        flow.get("optional_officers", [])
+    )
     
     if not can_sign:
         raise HTTPException(status_code=403, detail="You are not authorized to sign this order")
@@ -566,38 +562,14 @@ async def sign_purchase_order(
     required_officers = updated_flow.get("required_officers", [])
     signatures = updated_flow.get("signatures", [])
     
-    # ✅ FIX: Check both person and role signatures
-    required_signed = 0
-    for officer in required_officers:
-        has_signed = False
-        
-        if officer["type"] == "person":
-            # Check if this specific person has signed
-            if any(s["user_id"] == officer["reference"] for s in signatures):
-                has_signed = True
-        
-        elif officer["type"] == "role":
-            # Check if anyone with this role has signed
-            role_slug = officer["reference"]
-            role = db.roles.find_one({"slug": role_slug})
-            
-            if role:
-                role_id = str(role["_id"])
-                # Check if any signature is from a user with this role
-                for sig in signatures:
-                    user = db.users.find_one({"_id": ObjectId(sig["user_id"])})
-                    if user:
-                        user_role = user.get("role") or user.get("local_role")
-                        if user_role == role_id:
-                            has_signed = True
-                            break
-        
-        if has_signed:
-            required_signed += 1
+    # ✅ Use global helper function
+    is_complete, required_signed, required_count = check_approval_completion(
+        db,
+        required_officers,
+        signatures
+    )
     
-    required_count = len(required_officers)
-    
-    if required_signed == required_count:
+    if is_complete:
         db.approval_flows.update_one(
             {"_id": ObjectId(flow["_id"])},
             {
