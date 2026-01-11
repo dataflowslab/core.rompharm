@@ -20,8 +20,8 @@ export const procurementApi = {
   // Items
   getOrderItems: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/items`,
   addOrderItem: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/items`,
-  updateOrderItem: (orderId: string | number, itemId: number) => `${API_PREFIX}/purchase-orders/${orderId}/items/${itemId}`,
-  deleteOrderItem: (orderId: string | number, itemId: number) => `${API_PREFIX}/purchase-orders/${orderId}/items/${itemId}`,
+  updateOrderItem: (orderId: string | number, itemId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/items/${itemId}`,
+  deleteOrderItem: (orderId: string | number, itemId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/items/${itemId}`,
   
   // Parts - FROM INVENTORY MODULE
   getParts: () => `/modules/inventory/api/parts`,
@@ -35,7 +35,7 @@ export const procurementApi = {
   // Attachments
   getAttachments: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/attachments`,
   uploadAttachment: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/attachments`,
-  deleteAttachment: (orderId: string | number, attachmentId: number) => `${API_PREFIX}/purchase-orders/${orderId}/attachments/${attachmentId}`,
+  deleteAttachment: (orderId: string | number, attachmentId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/attachments/${attachmentId}`,
   
   // Stock Reception
   getReceivedItems: (orderId: string | number) => `${API_PREFIX}/purchase-orders/${orderId}/received-items`,

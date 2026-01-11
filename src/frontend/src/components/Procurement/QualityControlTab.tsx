@@ -9,7 +9,6 @@ import { notifications } from '@mantine/notifications';
 
 interface QCRecord {
   _id: string;
-  pk?: number;
   batch_code: string;
   part: string;
   part_name: string;
@@ -24,7 +23,8 @@ interface QCRecord {
 }
 
 interface ReceivedItem {
-  pk: number;
+  _id: string;
+  pk?: number;  // Legacy support
   batch: string;
   part: number;
   part_detail?: {
@@ -437,7 +437,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
             </Table.Thead>
             <Table.Tbody>
               {lotallexpItems.map((item) => (
-                <Table.Tr key={item.pk}>
+                <Table.Tr key={item._id || item.pk}>
                   <Table.Td>{item.part_detail?.name || `Part ${item.part}`}</Table.Td>
                   <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
                   <Table.Td>{item.quantity}</Table.Td>

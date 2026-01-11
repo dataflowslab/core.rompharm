@@ -9,7 +9,8 @@ import { notifications } from '@mantine/notifications';
 import { ReceiveStockForm, ReceiveStockFormData } from '../Common/ReceiveStockForm';
 
 interface ReceivedItem {
-  pk: number;
+  _id: string;
+  pk?: number;  // Legacy support
   part: number;
   part_detail?: {
     name: string;
@@ -158,7 +159,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/modules/depo_procurement/api/stock-items/${item.pk}`);
+          await api.delete(`/modules/depo_procurement/api/stock-items/${item._id || item.pk}`);
           notifications.show({
             title: t('Success'),
             message: t('Stock item deleted successfully'),
@@ -352,7 +353,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
           </Table.Thead>
           <Table.Tbody>
             {receivedItems.map((item) => (
-              <Table.Tr key={item.pk}>
+              <Table.Tr key={item._id || item.pk}>
                 <Table.Td>
                   {item.part_detail?.name || item.part}
                   {item.part_detail?.IPN && ` (${item.part_detail.IPN})`}
