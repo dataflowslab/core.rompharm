@@ -25,7 +25,8 @@ interface QCRecord {
 interface ReceivedItem {
   _id: string;
   pk?: number;  // Legacy support
-  batch: string;
+  batch?: string;  // Legacy field
+  batch_code?: string;  // New field
   part: number;
   part_detail?: {
     name: string;
@@ -99,9 +100,12 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
         
         if (hasLotallexp) {
           lotallexpFiltered.push(item);
-        } else if (item.batch && item.batch.trim() !== '') {
-          // Only add to regular items if it has a batch code
-          regularItems.push(item);
+        } else {
+          const batchCode = item.batch_code || item.batch;
+          if (batchCode && batchCode.trim() !== '') {
+            // Only add to regular items if it has a batch code
+            regularItems.push(item);
+          }
         }
       });
       
@@ -322,7 +326,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
   };
 
   // Get unique batch codes from received items
-  const batchCodes = Array.from(new Set(receivedItems.map(item => item.batch)))
+  const batchCodes = Array.from(new Set(receivedItems.map(item => item.batch_code || item.batch)))
     .filter(batch => batch && batch.trim() !== '')
     .map(batch => ({
       value: batch,
@@ -331,7 +335,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
 
   // Get parts for selected batch code
   const partsForBatch = receivedItems
-    .filter(item => item.batch === qcData.batch_code)
+    .filter(item => (item.batch_code || item.batch) === qcData.batch_code)
     .map(item => ({
       value: String(item.part),
       label: `${item.part_detail?.name || 'Part ' + item.part} (${item.part_detail?.IPN || ''})`

@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-01-11 21:39:11
+**Last Updated:** 2026-01-11 21:44:20
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -164,6 +164,9 @@
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/sign` - Sign a purchase order approval flow
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/signatures/{user_id}` - Remove signature from purchase order approval flow (admin only)
 - `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}/state` - Update purchase order state
+
+**Stock Items**
+- `DELETE /modules/depo_procurement/api/stock-items/{stock_id}` - Delete a received stock item
 
 **Stock Statuses**
 - `GET /modules/depo_procurement/api/stock-statuses` - Get available stock statuses from depo_stocks_states collection
