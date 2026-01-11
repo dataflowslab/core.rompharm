@@ -9,6 +9,7 @@ import hashlib
 
 from src.backend.utils.db import get_db
 from ..utils import serialize_doc
+from .order_state import check_and_auto_finish_order
 
 
 async def receive_stock_item(order_id: str, stock_data, current_user):
