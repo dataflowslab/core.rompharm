@@ -563,13 +563,39 @@ async def sign_purchase_order(
     )
     
     updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
-    required_count = len(updated_flow.get("required_officers", []))
+    required_officers = updated_flow.get("required_officers", [])
+    signatures = updated_flow.get("signatures", [])
     
+    # ✅ FIX: Check both person and role signatures
     required_signed = 0
-    for officer in updated_flow.get("required_officers", []):
+    for officer in required_officers:
+        has_signed = False
+        
         if officer["type"] == "person":
-            if any(s["user_id"] == officer["reference"] for s in updated_flow.get("signatures", [])):
-                required_signed += 1
+            # Check if this specific person has signed
+            if any(s["user_id"] == officer["reference"] for s in signatures):
+                has_signed = True
+        
+        elif officer["type"] == "role":
+            # Check if anyone with this role has signed
+            role_slug = officer["reference"]
+            role = db.roles.find_one({"slug": role_slug})
+            
+            if role:
+                role_id = str(role["_id"])
+                # Check if any signature is from a user with this role
+                for sig in signatures:
+                    user = db.users.find_one({"_id": ObjectId(sig["user_id"])})
+                    if user:
+                        user_role = user.get("role") or user.get("local_role")
+                        if user_role == role_id:
+                            has_signed = True
+                            break
+        
+        if has_signed:
+            required_signed += 1
+    
+    required_count = len(required_officers)
     
     if required_signed == required_count:
         db.approval_flows.update_one(
