@@ -314,14 +314,14 @@ export function ProcurementDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconPackage size={16} />}>
             {t('Items')}
           </Tabs.Tab>
-          {/* Show Receive Stock tab only if order has been signed (has approval flow with signatures) */}
-          {approvalFlow && approvalFlow.signatures && approvalFlow.signatures.length > 0 && (
+          {/* Show Receive Stock tab only if order status is Processing or beyond (approved) */}
+          {order.status && ['Processing', 'Finished'].includes(order.status) && (
             <Tabs.Tab value="receive-stock" leftSection={<IconTruckDelivery size={16} />}>
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
-          {/* Show Quality Control tab only if order has been signed (has approval flow with signatures) */}
-          {approvalFlow && approvalFlow.signatures && approvalFlow.signatures.length > 0 && (
+          {/* Show Quality Control tab only if order status is Processing or beyond (approved) */}
+          {order.status && ['Processing', 'Finished'].includes(order.status) && (
             <Tabs.Tab value="quality-control" leftSection={<IconClipboardCheck size={16} />}>
               {t('Quality Control')}
             </Tabs.Tab>

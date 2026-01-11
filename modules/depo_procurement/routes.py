@@ -391,9 +391,10 @@ async def get_order_approval_flow(
     """Get approval flow for a purchase order"""
     db = get_db()
     
+    # ✅ FIX: Convert order_id to ObjectId for proper filtering
     flow = db.approval_flows.find_one({
         "object_type": "procurement_order",
-        "object_id": order_id
+        "object_id": ObjectId(order_id)
     })
     
     if not flow:
@@ -418,9 +419,10 @@ async def create_order_approval_flow(
     """Create approval flow for a purchase order using approval_templates"""
     db = get_db()
     
+    # ✅ FIX: Convert order_id to ObjectId for proper filtering
     existing = db.approval_flows.find_one({
         "object_type": "procurement_order",
-        "object_id": order_id
+        "object_id": ObjectId(order_id)
     })
     
     if existing:
@@ -465,7 +467,7 @@ async def create_order_approval_flow(
     flow_data = {
         "object_type": "procurement_order",
         "object_source": "depo_procurement",
-        "object_id": order_id,
+        "object_id": ObjectId(order_id),  # ✅ FIX: Store as ObjectId
         "template_id": str(approval_template['_id']),
         "template_name": approval_template.get('name'),
         "min_signatures": min_signatures,
@@ -494,9 +496,10 @@ async def sign_purchase_order(
     
     db = get_db()
     
+    # ✅ FIX: Convert order_id to ObjectId for proper filtering
     flow = db.approval_flows.find_one({
         "object_type": "procurement_order",
-        "object_id": order_id
+        "object_id": ObjectId(order_id)
     })
     
     if not flow:
@@ -613,9 +616,10 @@ async def remove_order_signature(
     if not is_admin:
         raise HTTPException(status_code=403, detail="Only admin can remove signatures")
     
+    # ✅ FIX: Convert order_id to ObjectId for proper filtering
     flow = db.approval_flows.find_one({
         "object_type": "procurement_order",
-        "object_id": order_id
+        "object_id": ObjectId(order_id)
     })
     
     if not flow:
