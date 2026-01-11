@@ -27,7 +27,8 @@ interface ReceivedItem {
   pk?: number;  // Legacy support
   batch?: string;  // Legacy field
   batch_code?: string;  // New field
-  part: number;
+  part_id: string;  // MongoDB ObjectId
+  part?: number;  // Legacy field
   part_detail?: {
     name: string;
     IPN: string;
@@ -129,9 +130,15 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
     setSubmitting(true);
     try {
       const payload = {
-        ...qcData,
+        batch_code: qcData.batch_code,
+        part_id: qcData.part,  // ✅ FIX: Send as part_id
         prelevation_date: qcData.prelevation_date?.toISOString().split('T')[0],
+        prelevated_quantity: qcData.prelevated_quantity,
+        ba_rompharm_no: qcData.ba_rompharm_no,
         ba_rompharm_date: qcData.ba_rompharm_date?.toISOString().split('T')[0],
+        test_result: qcData.test_result,
+        transactionable: qcData.transactionable,
+        comment: qcData.comment,
         confirmed: false
       };
 
@@ -171,12 +178,16 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
     setSubmitting(true);
     try {
       const payload = {
-        ...qcData,
+        batch_code: qcData.batch_code,
+        part_id: qcData.part,  // ✅ FIX: Send as part_id
         prelevation_date: qcData.prelevation_date?.toISOString().split('T')[0],
+        prelevated_quantity: qcData.prelevated_quantity,
+        ba_rompharm_no: qcData.ba_rompharm_no,
         ba_rompharm_date: qcData.ba_rompharm_date?.toISOString().split('T')[0],
-        confirmed: true,
-        // Auto-set transactionable based on test result
-        transactionable: qcData.test_result === 'conform'
+        test_result: qcData.test_result,
+        transactionable: qcData.test_result === 'conform',  // Auto-set based on result
+        comment: qcData.comment,
+        confirmed: true
       };
 
       await api.post(procurementApi.createQCRecord(orderId), payload);
@@ -337,8 +348,8 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
   const partsForBatch = receivedItems
     .filter(item => (item.batch_code || item.batch) === qcData.batch_code)
     .map(item => ({
-      value: String(item.part),
-      label: `${item.part_detail?.name || 'Part ' + item.part} (${item.part_detail?.IPN || ''})`
+      value: item.part_id,  // Use part_id (ObjectId string)
+      label: `${item.part_detail?.name || 'Part ' + item.part_id} (${item.part_detail?.IPN || ''})`
     }));
 
   const getResultBadge = (result: string) => {

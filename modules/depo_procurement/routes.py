@@ -429,6 +429,156 @@ async def get_qc_records(
         return {"results": serialize_doc(qc_records)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch QC records: {str(e)}")
+
+
+@router.post("/purchase-orders/{order_id}/qc-records")
+async def create_qc_record(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Create a new QC record for a purchase order"""
+    db = get_db()
+    
+    try:
+        # Get JSON body
+        body = await request.json()
+        
+        # Validate required fields
+        if not body.get('batch_code') or not body.get('part_id'):
+            raise HTTPException(status_code=400, detail="batch_code and part_id are required")
+        
+        # Get part details
+        part_id = body.get('part_id')
+        part = db.depo_parts.find_one({'_id': ObjectId(part_id)})
+        if not part:
+            raise HTTPException(status_code=404, detail="Part not found")
+        
+        # Create QC record
+        qc_record = {
+            'order_id': ObjectId(order_id),
+            'batch_code': body.get('batch_code'),
+            'part_id': ObjectId(part_id),
+            'part_name': part.get('name', ''),
+            'prelevation_date': body.get('prelevation_date'),
+            'prelevated_quantity': body.get('prelevated_quantity', 0),
+            'ba_rompharm_no': body.get('ba_rompharm_no', ''),
+            'ba_rompharm_date': body.get('ba_rompharm_date'),
+            'test_result': body.get('test_result', ''),
+            'transactionable': body.get('transactionable', False),
+            'comment': body.get('comment', ''),
+            'confirmed': body.get('confirmed', False),
+            'created_at': datetime.utcnow(),
+            'created_by': current_user.get('username'),
+            'updated_at': datetime.utcnow()
+        }
+        
+        result = db.depo_procurement_qc.insert_one(qc_record)
+        qc_record['_id'] = result.inserted_id
+        
+        # If confirmed and conform, update stock status to OK
+        if qc_record['confirmed'] and qc_record['test_result'] == 'conform':
+            # Find stock items with this batch_code and part_id
+            stocks = db.depo_stocks.find({
+                'purchase_order_id': ObjectId(order_id),
+                'part_id': ObjectId(part_id),
+                'batch_code': body.get('batch_code')
+            })
+            
+            # Get OK state
+            ok_state = db.depo_stocks_states.find_one({'_id': ObjectId('694321db8728e4d75ae72789')})
+            if not ok_state:
+                ok_state = db.depo_stocks_states.find_one({'name': 'OK'})
+            
+            if ok_state:
+                # Update all matching stocks to OK status
+                db.depo_stocks.update_many(
+                    {
+                        'purchase_order_id': ObjectId(order_id),
+                        'part_id': ObjectId(part_id),
+                        'batch_code': body.get('batch_code')
+                    },
+                    {
+                        '$set': {
+                            'state_id': ok_state['_id'],
+                            'updated_at': datetime.utcnow()
+                        }
+                    }
+                )
+        
+        return serialize_doc(qc_record)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create QC record: {str(e)}")
+
+
+@router.patch("/purchase-orders/{order_id}/qc-records/{qc_id}")
+async def update_qc_record(
+    request: Request,
+    order_id: str,
+    qc_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Update a QC record"""
+    db = get_db()
+    
+    try:
+        # Get JSON body
+        body = await request.json()
+        
+        # Get existing record
+        qc_record = db.depo_procurement_qc.find_one({'_id': ObjectId(qc_id)})
+        if not qc_record:
+            raise HTTPException(status_code=404, detail="QC record not found")
+        
+        # Update fields
+        update_data = {
+            'ba_rompharm_no': body.get('ba_rompharm_no', qc_record.get('ba_rompharm_no')),
+            'ba_rompharm_date': body.get('ba_rompharm_date', qc_record.get('ba_rompharm_date')),
+            'test_result': body.get('test_result', qc_record.get('test_result')),
+            'transactionable': body.get('transactionable', qc_record.get('transactionable')),
+            'comment': body.get('comment', qc_record.get('comment')),
+            'confirmed': body.get('confirmed', qc_record.get('confirmed')),
+            'updated_at': datetime.utcnow(),
+            'updated_by': current_user.get('username')
+        }
+        
+        db.depo_procurement_qc.update_one(
+            {'_id': ObjectId(qc_id)},
+            {'$set': update_data}
+        )
+        
+        # If confirmed and conform, update stock status to OK
+        if update_data['confirmed'] and update_data['test_result'] == 'conform':
+            # Get OK state
+            ok_state = db.depo_stocks_states.find_one({'_id': ObjectId('694321db8728e4d75ae72789')})
+            if not ok_state:
+                ok_state = db.depo_stocks_states.find_one({'name': 'OK'})
+            
+            if ok_state:
+                # Update all matching stocks to OK status
+                db.depo_stocks.update_many(
+                    {
+                        'purchase_order_id': ObjectId(order_id),
+                        'part_id': qc_record['part_id'],
+                        'batch_code': qc_record['batch_code']
+                    },
+                    {
+                        '$set': {
+                            'state_id': ok_state['_id'],
+                            'updated_at': datetime.utcnow()
+                        }
+                    }
+                )
+        
+        # Return updated record
+        updated_record = db.depo_procurement_qc.find_one({'_id': ObjectId(qc_id)})
+        return serialize_doc(updated_record)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update QC record: {str(e)}")
     
 # ==================== APPROVAL FLOW ENDPOINTS ====================
 
