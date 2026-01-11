@@ -39,9 +39,10 @@ interface ApprovalFlow {
 }
 
 interface PurchaseOrder {
-  pk: number;
-  status: number;
-  status_text: string;
+  _id?: string;
+  pk?: number;
+  status: number | string;
+  status_text?: string;
 }
 
 interface ApprovalsTabProps {
@@ -59,19 +60,22 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
   const [removeModalOpened, setRemoveModalOpened] = useState(false);
   const [userToRemove, setUserToRemove] = useState<string | null>(null);
 
+  // ✅ FIX: Use _id or pk (support both formats)
+  const orderId = order._id || order.pk;
+
   useEffect(() => {
     loadApprovalFlow();
-  }, [order.pk]);
+  }, [orderId]);
 
   const loadApprovalFlow = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`${procurementApi.getPurchaseOrder(order.pk)}/approval-flow`);
+      const response = await api.get(`${procurementApi.getPurchaseOrder(orderId!)}/approval-flow`);
       
       // If no flow exists, create it automatically
       if (!response.data.flow) {
         try {
-          const createResponse = await api.post(`${procurementApi.getPurchaseOrder(order.pk)}/approval-flow`);
+          const createResponse = await api.post(`${procurementApi.getPurchaseOrder(orderId!)}/approval-flow`);
           setFlow(createResponse.data);
         } catch (createError: any) {
           console.error('Failed to create approval flow:', createError);
@@ -92,7 +96,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
   const handleCreateFlow = async () => {
     setSubmitting(true);
     try {
-      const response = await api.post(`${procurementApi.getPurchaseOrder(order.pk)}/approval-flow`);
+      const response = await api.post(`${procurementApi.getPurchaseOrder(orderId!)}/approval-flow`);
       setFlow(response.data);
       
       notifications.show({
@@ -116,7 +120,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
     setSignModalOpened(false);
     setSubmitting(true);
     try {
-      const response = await api.post(`${procurementApi.getPurchaseOrder(order.pk)}/sign`);
+      const response = await api.post(`${procurementApi.getPurchaseOrder(orderId!)}/sign`);
       setFlow(response.data);
       
       notifications.show({
@@ -149,7 +153,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
     
     setRemoveModalOpened(false);
     try {
-      await api.delete(`${procurementApi.getPurchaseOrder(order.pk)}/signatures/${userToRemove}`);
+      await api.delete(`${procurementApi.getPurchaseOrder(orderId!)}/signatures/${userToRemove}`);
       
       notifications.show({
         title: t('Success'),

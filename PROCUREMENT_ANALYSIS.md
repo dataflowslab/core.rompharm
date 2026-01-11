@@ -254,6 +254,37 @@ flow = db.approval_flows.find_one({
 
 **Reason**: Tab-urile trebuie să apară când comanda este aprobată (status = Processing), nu doar când există semnături.
 
+### 3. ✅ FIXED: ApprovalsTab Order ID Mismatch
+**Issue**: Approval flow exista în DB dar nu apărea în interfață (mesaj "No Approval Flow")
+
+**Root Cause**: `ApprovalsTab` se aștepta la `order.pk` (number), dar primea `order._id` (string) de la `ProcurementDetailPage`
+```typescript
+// ❌ GREȘIT - ApprovalsTab interface
+interface PurchaseOrder {
+  pk: number;  // Dar primea _id: string!
+}
+
+// Folosea order.pk care era undefined
+const response = await api.get(`${procurementApi.getPurchaseOrder(order.pk)}/approval-flow`);
+// URL devenea: /purchase-orders/undefined/approval-flow
+```
+
+**Fix Applied**: Suport pentru ambele formate (_id și pk):
+```typescript
+// ✅ CORECT
+interface PurchaseOrder {
+  _id?: string;
+  pk?: number;
+  status: number | string;
+}
+
+// Folosește _id sau pk (oricare există)
+const orderId = order._id || order.pk;
+const response = await api.get(`${procurementApi.getPurchaseOrder(orderId!)}/approval-flow`);
+```
+
+**Impact**: Acum approval flow-ul se încarcă corect pentru toate comenzile.
+
 ---
 
 ## 🐛 Known Issues & Debugging Areas
