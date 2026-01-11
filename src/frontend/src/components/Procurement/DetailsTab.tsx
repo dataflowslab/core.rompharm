@@ -4,7 +4,7 @@ import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { IconDeviceFloppy } from '@tabler/icons-react';
-import { DocumentGenerator } from '../Common/DocumentGenerator';
+import { DocumentManager } from '../Common/DocumentManager';
 import api from '../../services/api';
 
 interface Supplier {
@@ -49,8 +49,7 @@ interface DetailsTabProps {
 export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: DetailsTabProps) {
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
-  const [templateCodes, setTemplateCodes] = useState<string[]>([]);
-  const [templateNames, setTemplateNames] = useState<Record<string, string>>({});
+  const [documentTemplates, setDocumentTemplates] = useState<Array<{code: string; name: string; label: string}>>([]);
   
   // Editable state
   const [formData, setFormData] = useState({
@@ -66,25 +65,28 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
   const issueDate = order.issue_date ? new Date(order.issue_date) : null;
   const targetDate = formData.target_date ? new Date(formData.target_date) : null;
 
-  // Load template codes from backend
+  // Load document templates from backend
   useEffect(() => {
-    const loadTemplateCodes = async () => {
+    const loadTemplates = async () => {
       try {
         const response = await api.get('/modules/depo_procurement/api/document-templates');
         const templatesObj = response.data.templates || {};
-        // Convert object {code: name} to array of codes
-        const codes = Object.keys(templatesObj);
-        setTemplateCodes(codes);
-        setTemplateNames(templatesObj);
+        
+        // Convert object {code: name} to array of template objects
+        const templates = Object.entries(templatesObj).map(([code, name]) => ({
+          code,
+          name: name as string,
+          label: name as string
+        }));
+        
+        setDocumentTemplates(templates);
       } catch (error) {
-        console.error('Failed to load template codes:', error);
-        // Fallback to empty array
-        setTemplateCodes([]);
-        setTemplateNames({});
+        console.error('Failed to load templates:', error);
+        setDocumentTemplates([]);
       }
     };
     
-    loadTemplateCodes();
+    loadTemplates();
   }, []);
 
   const handleSave = async () => {
@@ -138,25 +140,14 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
     <Grid gutter="md">
       {/* Document Sidebar - 1/3 width */}
       <Grid.Col span={4}>
-        <Paper p="md" withBorder>
-          <Title order={5} mb="md">{t('Documents')}</Title>
-          <DocumentGenerator
-            objectId={order._id}
-            templateCodes={templateCodes}
-            templateNames={templateNames}
-            onDocumentsChange={async (docs) => {
-              // Save documents to purchase order
-              try {
-                await api.patch(`/modules/depo_procurement/api/purchase-orders/${order._id}/documents`, {
-                  documents: docs
-                });
-                console.log('Documents saved to order:', docs);
-              } catch (error) {
-                console.error('Failed to save documents:', error);
-              }
-            }}
-          />
-        </Paper>
+        <DocumentManager
+          entityId={order._id}
+          entityType="procurement-order"
+          templates={documentTemplates}
+          onDocumentGenerated={() => {
+            console.log('Document generated for order:', order._id);
+          }}
+        />
       </Grid.Col>
 
       {/* Order Details Form - 2/3 width */}
