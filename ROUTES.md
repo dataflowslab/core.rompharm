@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-01-11 22:20:03
+**Last Updated:** 2026-01-11 22:50:55
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -159,6 +159,8 @@
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_id}` - Delete an item from a purchase order by item _id
 - `PUT /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_id}` - Update an item in a purchase order by item _id
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/qc-records` - Get QC records for a purchase order
+- `POST /modules/depo_procurement/api/purchase-orders/{order_id}/qc-records` - Create a new QC record for a purchase order
+- `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}/qc-records/{qc_id}` - Update a QC record
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/receive-stock` - Receive stock items for a purchase order line
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/received-items` - Get received stock items for a purchase order
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/sign` - Sign a purchase order approval flow
