@@ -2,6 +2,73 @@
 
 All notable changes to DataFlows Core Rompharm project.
 
+## [2.1.2] - 2026-01-17
+
+### 🎨 Frontend - Procurement Module Improvements
+- **Purchase Order Currency**: Currency now auto-fills from supplier when creating new order
+  - Already implemented - currency is automatically selected based on supplier
+  - User can still change currency if needed
+- **U.M. Column in Items Tab**: Added Unit of Measure column in purchase order items table
+  - Displays article's base unit of measure (`part_detail.um`)
+  - Helps reduce errors during stock reception
+  - Located between Part name and Quantity columns
+- **Stock Reception - Unlimited Quantities**: Removed max quantity validation
+  - Users can now receive quantities larger than ordered
+  - Useful for bonus quantities, rounding, or supplier adjustments
+  - Discussion needed: How should orders be closed/removed from list?
+- **Container Table - Value Column Removed**: Eliminated "Value" column from containers table
+  - Simplified container data entry
+  - Columns now: Num, Products/Container, Unit, Damaged, Unsealed, Mislabeled, Actions
+- **Date Format Standardization**: All dates in procurement now display in DD.MM.YYYY format
+  - Created global `formatDate()` and `formatDateTime()` utilities in `src/frontend/src/utils/dateFormat.ts`
+  - Applied to all procurement components:
+    - **ProcurementPage**: Issue Date, Target Date in orders list
+    - **QualityControlTab**: Prelevation Date, BA Rompharm Date
+    - **ApprovalsTab**: Signed At timestamps (DD.MM.YYYY HH:MM)
+  - Consistent date display across all procurement pages
+- **Benefits**:
+  - ✅ Faster data entry with auto-filled currency
+  - ✅ Better visibility of units of measure
+  - ✅ More flexible stock reception process
+  - ✅ Cleaner container interface
+  - ✅ Consistent date formatting (DD.MM.YYYY)
+
+### 📝 Notes
+- **Transferable Checkbox**: Kept in Receive Stock form (user request to keep it)
+- **Container Unit Auto-fill**: To be implemented - should inherit from Supplier U.M.
+- **Order Closure Logic**: Needs discussion on how to handle over-received orders
+
+### 🔧 Technical
+- **New Utility**: `src/frontend/src/utils/dateFormat.ts`
+  - `formatDate()` - Converts ISO dates to DD.MM.YYYY
+  - `formatDateTime()` - Converts ISO dates to DD.MM.YYYY HH:MM
+  - Handles null/undefined values gracefully
+
+## [2.1.1] - 2026-01-17
+
+### 🎨 Frontend - Field Type Improvements
+- **Total Delivery Time** (Articles): Changed from TextInput to NumberInput with " zile" suffix
+  - Now accepts only integer values for EDT calculations
+  - Located in Article Details → Part Details tab
+  - Value stored as string in database for backward compatibility
+- **Payment Condition** (Companies): Changed from Textarea to NumberInput with " zile" suffix
+  - Now accepts only integer values for system queries
+  - Applied to Suppliers, Manufacturers, and Clients detail pages
+  - Consistent UI with Delivery Conditions (Textarea) side-by-side
+  - Value stored as string in database for backward compatibility
+- **Benefits**:
+  - ✅ Easier data entry (numeric only)
+  - ✅ Consistent formatting (" zile" suffix)
+  - ✅ Ready for calculations and queries
+  - ✅ Better UX with validation
+
+### 📝 Documentation
+- **Article-Supplier Relationship**: Confirmed bidirectional implementation is correct
+  - Articles → Suppliers tab shows suppliers for that article
+  - Suppliers → Articles tab shows articles for that supplier
+  - Both use same `depo_parts_suppliers` collection (many-to-many)
+  - No changes needed - working as designed
+
 ## [2.0.2] - 2025-12-27
 
 ### 🔧 Backend - Auto-add 'value' field to all API responses

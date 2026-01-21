@@ -56,16 +56,20 @@ interface PurchaseOrder {
 
 interface PurchaseOrderItem {
   _id: string;
+  part: number;  // Legacy field for compatibility
   part_id: string;
   part_detail?: {
     name: string;
     description: string;
+    IPN: string;
     ipn: string;
+    um?: string;
   };
   quantity: number;
   received: number;
   purchase_price: number;
   purchase_price_currency: string;
+  destination?: number;  // Legacy field
   destination_id?: string;
   destination_detail?: {
     name: string;
@@ -76,6 +80,7 @@ interface PurchaseOrderItem {
 
 interface StockLocation {
   _id: string;
+  pk: number;  // Legacy field for compatibility
   name: string;
   description?: string;
 }
@@ -352,7 +357,7 @@ export function ProcurementDetailPage() {
           <ItemsTab
             orderId={id!}
             items={items}
-            orderCurrency={order.order_currency}
+            orderCurrency={order.order_currency || order.currency || 'EUR'}
             stockLocations={stockLocations}
             supplierId={order.supplier_id}
             onReload={loadItems}

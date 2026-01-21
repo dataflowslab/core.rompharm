@@ -438,7 +438,7 @@ export function ArticleDetailPage() {
             <Tabs.Tab value="suppliers" leftSection={<IconTruckDelivery size={16} />}>
               Suppliers
             </Tabs.Tab>
-            <Tabs.Tab value="attachments" leftSection={<IconPaperclip size={16} />} disabled>
+            <Tabs.Tab value="attachments" leftSection={<IconPaperclip size={16} />}>
               Attachments
             </Tabs.Tab>
           </Tabs.List>

@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-01-11 22:50:55
+**Last Updated:** 2026-01-22 00:28:29
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -172,74 +172,6 @@
 
 **Stock Statuses**
 - `GET /modules/depo_procurement/api/stock-statuses` - Get available stock statuses from depo_stocks_states collection
-
-### inventory (`/modules/inventory/api`)
-
-**Articles**
-- `GET /modules/inventory/api/articles` - Get list of articles from MongoDB with search, category filter, pagination and sorting
-- `POST /modules/inventory/api/articles` - Create a new article
-- `DELETE /modules/inventory/api/articles/{article_id}` - Delete an article
-- `GET /modules/inventory/api/articles/{article_id}` - Get a specific article by ID
-- `PUT /modules/inventory/api/articles/{article_id}` - Update an existing article
-- `GET /modules/inventory/api/articles/{article_id}/allocations` - Get allocations for an article from sales and purchase orders
-- `GET /modules/inventory/api/articles/{article_id}/recipes` - Get all recipes that use this article
-- `GET /modules/inventory/api/articles/{article_id}/stock-calculations` - Calculate stock metrics for an article
-- `GET /modules/inventory/api/articles/{article_id}/suppliers` - Get all suppliers for an article
-- `POST /modules/inventory/api/articles/{article_id}/suppliers` - Add a supplier to an article
-- `DELETE /modules/inventory/api/articles/{article_id}/suppliers/{supplier_relation_id}` - Remove a supplier from an article
-- `PUT /modules/inventory/api/articles/{article_id}/suppliers/{supplier_relation_id}` - Update supplier information for an article
-
-**Categories**
-- `GET /modules/inventory/api/categories` - Get list of categories from MongoDB with parent details populated
-- `POST /modules/inventory/api/categories` - Create a new category
-- `DELETE /modules/inventory/api/categories/{category_id}` - Delete a category (only if it has no children and no articles)
-- `PUT /modules/inventory/api/categories/{category_id}` - Update an existing category
-
-**Clients**
-- `GET /modules/inventory/api/clients` - Get list of clients (companies with is_client=true)
-- `POST /modules/inventory/api/clients` - Create a new client
-- `DELETE /modules/inventory/api/clients/{client_id}` - Delete a client
-- `GET /modules/inventory/api/clients/{client_id}` - Get a specific client by ID
-- `PUT /modules/inventory/api/clients/{client_id}` - Update an existing client
-
-**Companies**
-- `GET /modules/inventory/api/companies` - Get list of companies from MongoDB
-
-**Locations**
-- `GET /modules/inventory/api/locations` - Get list of locations from MongoDB with parent details populated
-- `POST /modules/inventory/api/locations` - Create a new location
-- `DELETE /modules/inventory/api/locations/{location_id}` - Delete a location (only if it has no children and no stocks)
-- `PUT /modules/inventory/api/locations/{location_id}` - Update an existing location
-
-**Manufacturers**
-- `GET /modules/inventory/api/manufacturers` - Get list of manufacturers (companies with is_manufacturer=true)
-- `POST /modules/inventory/api/manufacturers` - Create a new manufacturer
-- `DELETE /modules/inventory/api/manufacturers/{manufacturer_id}` - Delete a manufacturer
-- `GET /modules/inventory/api/manufacturers/{manufacturer_id}` - Get a specific manufacturer by ID
-- `PUT /modules/inventory/api/manufacturers/{manufacturer_id}` - Update an existing manufacturer
-
-**Parts**
-- `GET /modules/inventory/api/parts` - Get list of parts (alias for articles) from MongoDB with search, pagination and sorting
-
-**Stocks**
-- `GET /modules/inventory/api/stocks` - Get list of stocks with enriched data including supplier information
-- `POST /modules/inventory/api/stocks` - Create a new stock item
-- `GET /modules/inventory/api/stocks/{stock_id}` - Get a specific stock entry with enriched data
-- `PUT /modules/inventory/api/stocks/{stock_id}` - Update stock QC information
-
-**Suppliers**
-- `GET /modules/inventory/api/suppliers` - Get list of suppliers (companies with is_supplier=true)
-- `POST /modules/inventory/api/suppliers` - Create a new supplier
-- `DELETE /modules/inventory/api/suppliers/{supplier_id}` - Delete a supplier
-- `GET /modules/inventory/api/suppliers/{supplier_id}` - Get a specific supplier by ID
-- `PUT /modules/inventory/api/suppliers/{supplier_id}` - Update an existing supplier
-- `GET /modules/inventory/api/suppliers/{supplier_id}/parts` - Get parts associated with a supplier
-- `POST /modules/inventory/api/suppliers/{supplier_id}/parts` - Add a part to supplier's parts list
-- `DELETE /modules/inventory/api/suppliers/{supplier_id}/parts/{part_id}` - Remove a part from supplier's parts list
-- `PUT /modules/inventory/api/suppliers/{supplier_id}/parts/{part_id}` - Update supplier-specific data for a part
-
-**System Ums**
-- `GET /modules/inventory/api/system-ums` - Get list of system units of measure from MongoDB
 
 ### requests (`/modules/requests/api`)
 

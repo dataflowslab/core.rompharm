@@ -6,6 +6,7 @@ import {
   Paper,
   Tabs,
   TextInput,
+  Textarea,
   Button,
   Group,
   LoadingOverlay,
@@ -15,6 +16,7 @@ import {
   Modal,
   Select,
   Text,
+  NumberInput,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconEdit, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
@@ -24,11 +26,15 @@ import { api } from '../../../../src/frontend/src/services/api';
 
 interface Supplier {
   _id: string;
+  pk?: number;
   name: string;
   code?: string;
   vatno?: string;
   regno?: string;
   payment_conditions?: string;
+  delivery_conditions?: string;
+  bank_account?: string;
+  currency_id?: string;
   is_supplier: boolean;
   is_manufacturer: boolean;
   is_client: boolean;
@@ -39,7 +45,9 @@ interface Supplier {
 interface Address {
   name: string;
   country?: string;
+  country_id?: string;
   city?: string;
+  postal_code?: string;
   address?: string;
   description?: string;
   contact?: string;
@@ -75,10 +83,17 @@ export function SupplierDetailPage() {
     vatno: '',
     regno: '',
     payment_conditions: '',
+    delivery_conditions: '',
+    bank_account: '',
+    currency_id: '',
     is_supplier: false,
     is_manufacturer: false,
     is_client: false,
   });
+
+  // Countries and Currencies
+  const [countries, setCountries] = useState<Array<{ value: string; label: string }>>([]);
+  const [currencies, setCurrencies] = useState<Array<{ value: string; label: string }>>([]);
 
   // Address modal
   const [addressModalOpened, { open: openAddressModal, close: closeAddressModal }] = useDisclosure(false);
@@ -119,7 +134,29 @@ export function SupplierDetailPage() {
       fetchSupplierParts();
       fetchAllParts();
     }
+    fetchCountries();
+    fetchCurrencies();
   }, [id]);
+
+  const fetchCountries = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/countries');
+      const data = response.data || [];
+      setCountries(data.map((c: any) => ({ value: c._id, label: c.name })));
+    } catch (error) {
+      console.error('Failed to fetch countries:', error);
+    }
+  };
+
+  const fetchCurrencies = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/currencies');
+      const data = response.data || [];
+      setCurrencies(data.map((c: any) => ({ value: c._id, label: `${c.code} - ${c.name}` })));
+    } catch (error) {
+      console.error('Failed to fetch currencies:', error);
+    }
+  };
 
   const fetchSupplier = async () => {
     setLoading(true);
@@ -133,6 +170,9 @@ export function SupplierDetailPage() {
         vatno: data.vatno || '',
         regno: data.regno || '',
         payment_conditions: data.payment_conditions || '',
+        delivery_conditions: data.delivery_conditions || '',
+        bank_account: data.bank_account || '',
+        currency_id: data.currency_id || '',
         is_supplier: data.is_supplier || false,
         is_manufacturer: data.is_manufacturer || false,
         is_client: data.is_client || false,
@@ -200,7 +240,9 @@ export function SupplierDetailPage() {
     setAddressForm({
       name: '',
       country: '',
+      country_id: '',
       city: '',
+      postal_code: '',
       address: '',
       description: '',
       contact: '',
@@ -415,7 +457,9 @@ export function SupplierDetailPage() {
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
-        <Title order={2}>{supplier.name}</Title>
+        <Title order={2}>
+          {supplier.name} {supplier.id_str && <Text span c="dimmed" size="lg">({supplier.id_str})</Text>}
+        </Title>
         <Button variant="default" onClick={() => navigate('/inventory/suppliers')}>
           Back
         </Button>
@@ -435,22 +479,23 @@ export function SupplierDetailPage() {
           </Tabs.List>
 
           <Tabs.Panel value="details" pt="md">
-            <TextInput
-              label="Name"
-              placeholder="Supplier name"
-              required
-              value={detailsForm.name}
-              onChange={(e) => setDetailsForm({ ...detailsForm, name: e.currentTarget.value })}
-              mb="sm"
-            />
-
-            <TextInput
-              label="Code"
-              placeholder="Supplier code"
-              value={detailsForm.code}
-              onChange={(e) => setDetailsForm({ ...detailsForm, code: e.currentTarget.value })}
-              mb="sm"
-            />
+            <Group grow mb="sm">
+              <TextInput
+                label="Name"
+                placeholder="Supplier name"
+                required
+                value={detailsForm.name}
+                onChange={(e) => setDetailsForm({ ...detailsForm, name: e.currentTarget.value })}
+                style={{ flex: 3 }}
+              />
+              <TextInput
+                label="Code"
+                placeholder="Auto-generated"
+                value={detailsForm.code}
+                disabled
+                style={{ flex: 1 }}
+              />
+            </Group>
 
             <TextInput
               label="VAT Number"
@@ -468,11 +513,41 @@ export function SupplierDetailPage() {
               mb="sm"
             />
 
+            <Group grow mb="sm" align="flex-start">
+              <Textarea
+                label="Delivery Conditions"
+                placeholder="Delivery terms and conditions"
+                value={detailsForm.delivery_conditions}
+                onChange={(e) => setDetailsForm({ ...detailsForm, delivery_conditions: e.currentTarget.value })}
+                minRows={3}
+              />
+              <NumberInput
+                label="Payment Condition"
+                placeholder="0"
+                suffix=" zile"
+                value={detailsForm.payment_conditions ? parseInt(detailsForm.payment_conditions) : 0}
+                onChange={(value) => setDetailsForm({ ...detailsForm, payment_conditions: String(value || 0) })}
+                min={0}
+                allowNegative={false}
+              />
+            </Group>
+
             <TextInput
-              label="Payment Conditions"
-              placeholder="e.g., 30 days"
-              value={detailsForm.payment_conditions}
-              onChange={(e) => setDetailsForm({ ...detailsForm, payment_conditions: e.currentTarget.value })}
+              label="Bank Account"
+              placeholder="Bank account information"
+              value={detailsForm.bank_account}
+              onChange={(e) => setDetailsForm({ ...detailsForm, bank_account: e.currentTarget.value })}
+              mb="sm"
+            />
+
+            <Select
+              label="Currency"
+              placeholder="Select currency"
+              data={currencies}
+              value={detailsForm.currency_id}
+              onChange={(value) => setDetailsForm({ ...detailsForm, currency_id: value || '' })}
+              searchable
+              clearable
               mb="sm"
             />
 
@@ -644,20 +719,32 @@ export function SupplierDetailPage() {
           onChange={(e) => setAddressForm({ ...addressForm, name: e.currentTarget.value })}
           mb="sm"
         />
-        <TextInput
+        <Select
           label="Country"
-          placeholder="Country"
-          value={addressForm.country}
-          onChange={(e) => setAddressForm({ ...addressForm, country: e.currentTarget.value })}
+          placeholder="Select country"
+          data={countries}
+          value={addressForm.country_id}
+          onChange={(value) => setAddressForm({ ...addressForm, country_id: value || '' })}
+          searchable
+          clearable
           mb="sm"
         />
-        <TextInput
-          label="City"
-          placeholder="City"
-          value={addressForm.city}
-          onChange={(e) => setAddressForm({ ...addressForm, city: e.currentTarget.value })}
-          mb="sm"
-        />
+        <Group grow mb="sm">
+          <TextInput
+            label="City"
+            placeholder="City"
+            value={addressForm.city}
+            onChange={(e) => setAddressForm({ ...addressForm, city: e.currentTarget.value })}
+            style={{ flex: 2 }}
+          />
+          <TextInput
+            label="Postal Code"
+            placeholder="Postal code"
+            value={addressForm.postal_code}
+            onChange={(e) => setAddressForm({ ...addressForm, postal_code: e.currentTarget.value })}
+            style={{ flex: 1 }}
+          />
+        </Group>
         <TextInput
           label="Address"
           placeholder="Street address"

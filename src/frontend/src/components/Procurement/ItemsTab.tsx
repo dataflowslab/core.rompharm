@@ -35,6 +35,7 @@ interface PurchaseOrderItem {
     name: string;
     description: string;
     IPN: string;
+    um?: string;  // Unit of measure
   };
   quantity: number;
   received: number;
@@ -330,6 +331,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
                 {getItemSortIcon('part_detail')}
               </Group>
             </Table.Th>
+            <Table.Th>{t('U.M.')}</Table.Th>
             <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('quantity')}>
               <Group gap="xs">
                 {t('Quantity')}
@@ -366,7 +368,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
         <Table.Tbody>
           {filteredAndSortedItems.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={canEdit ? 7 : 6}>
+              <Table.Td colSpan={canEdit ? 8 : 7}>
                 {itemSearchQuery ? t('No results found') : t('No items')}
               </Table.Td>
             </Table.Tr>
@@ -380,6 +382,9 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
                       <Text size="xs" c="dimmed">{item.part_detail.IPN}</Text>
                     )}
                   </div>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="sm">{(item.part_detail as any)?.um || '-'}</Text>
                 </Table.Td>
                 <Table.Td>{item.quantity}</Table.Td>
                 <Table.Td>{item.received || 0}</Table.Td>

@@ -22,6 +22,7 @@ import { api } from '../../../../src/frontend/src/services/api';
 
 interface Supplier {
   _id: string;
+  pk?: number;
   name: string;
   code?: string;
   vatno?: string;
@@ -193,6 +194,7 @@ export function SuppliersPage() {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th>#</Table.Th>
               <Table.Th>Name</Table.Th>
               <Table.Th>Country</Table.Th>
               <Table.Th>VAT</Table.Th>
@@ -203,6 +205,9 @@ export function SuppliersPage() {
           <Table.Tbody>
             {suppliers.map((supplier) => (
               <Table.Tr key={supplier._id}>
+                <Table.Td style={{ fontWeight: 500, color: supplier.pk ? 'inherit' : '#868e96' }}>
+                  {supplier.pk || 'N/A'}
+                </Table.Td>
                 <Table.Td>{supplier.name}</Table.Td>
                 <Table.Td>{getCountry(supplier)}</Table.Td>
                 <Table.Td>{supplier.vatno || '-'}</Table.Td>

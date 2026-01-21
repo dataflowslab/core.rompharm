@@ -27,6 +27,8 @@ get_supplier_parts = services_module.get_supplier_parts
 add_supplier_part = services_module.add_supplier_part
 update_supplier_part = services_module.update_supplier_part
 remove_supplier_part = services_module.remove_supplier_part
+get_stock_by_id = services_module.get_stock_by_id
+get_stocks_list = services_module.get_stocks_list
 
 __all__ = [
     'get_suppliers_list',
@@ -40,4 +42,6 @@ __all__ = [
     'add_supplier_part',
     'update_supplier_part',
     'remove_supplier_part',
+    'get_stock_by_id',
+    'get_stocks_list',
 ]

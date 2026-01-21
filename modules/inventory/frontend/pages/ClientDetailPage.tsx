@@ -6,6 +6,7 @@ import {
   Paper,
   Tabs,
   TextInput,
+  Textarea,
   Button,
   Group,
   LoadingOverlay,
@@ -15,6 +16,7 @@ import {
   Modal,
   Select,
   Text,
+  NumberInput,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconPlus, IconEdit, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
@@ -22,13 +24,17 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { api } from '../../../../src/frontend/src/services/api';
 
-interface Supplier {
+interface Client {
   _id: string;
+  pk?: number;
   name: string;
   code?: string;
   vatno?: string;
   regno?: string;
   payment_conditions?: string;
+  delivery_conditions?: string;
+  bank_account?: string;
+  currency_id?: string;
   is_supplier: boolean;
   is_manufacturer: boolean;
   is_client: boolean;
@@ -39,7 +45,9 @@ interface Supplier {
 interface Address {
   name: string;
   country?: string;
+  country_id?: string;
   city?: string;
+  postal_code?: string;
   address?: string;
   description?: string;
   contact?: string;
@@ -64,7 +72,7 @@ interface Part {
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [supplier, setSupplier] = useState<Supplier | null>(null);
+  const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>('details');
 
@@ -75,10 +83,17 @@ export function ClientDetailPage() {
     vatno: '',
     regno: '',
     payment_conditions: '',
+    delivery_conditions: '',
+    bank_account: '',
+    currency_id: '',
     is_supplier: false,
     is_manufacturer: false,
     is_client: false,
   });
+
+  // Countries and Currencies
+  const [countries, setCountries] = useState<Array<{ value: string; label: string }>>([]);
+  const [currencies, setCurrencies] = useState<Array<{ value: string; label: string }>>([]);
 
   // Address modal
   const [addressModalOpened, { open: openAddressModal, close: closeAddressModal }] = useDisclosure(false);
@@ -115,24 +130,49 @@ export function ClientDetailPage() {
 
   useEffect(() => {
     if (id) {
-      fetchSupplier();
-      fetchSupplierParts();
+      fetchClient();
+      fetchClientParts();
       fetchAllParts();
     }
+    fetchCountries();
+    fetchCurrencies();
   }, [id]);
 
-  const fetchSupplier = async () => {
+  const fetchCountries = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/countries');
+      const data = response.data || [];
+      setCountries(data.map((c: any) => ({ value: c._id, label: c.name })));
+    } catch (error) {
+      console.error('Failed to fetch countries:', error);
+    }
+  };
+
+  const fetchCurrencies = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/currencies');
+      const data = response.data || [];
+      setCurrencies(data.map((c: any) => ({ value: c._id, label: `${c.code} - ${c.name}` })));
+    } catch (error) {
+      console.error('Failed to fetch currencies:', error);
+    }
+  };
+
+  const fetchClient = async () => {
     setLoading(true);
     try {
       const response = await api.get(`/modules/inventory/api/clients/${id}`);
       const data = response.data;
-      setSupplier(data);
+      setClient(data);
       setDetailsForm({
         name: data.name || '',
         code: data.code || '',
         vatno: data.vatno || '',
         regno: data.regno || '',
         payment_conditions: data.payment_conditions || '',
+        delivery_conditions: data.delivery_conditions || '',
+        bank_account: data.bank_account || '',
+        currency_id: data.currency_id || '',
         is_supplier: data.is_supplier || false,
         is_manufacturer: data.is_manufacturer || false,
         is_client: data.is_client || false,
@@ -140,7 +180,7 @@ export function ClientDetailPage() {
     } catch (error) {
       notifications.show({
         title: 'Error',
-        message: 'Failed to fetch supplier',
+        message: 'Failed to fetch client',
         color: 'red',
       });
     } finally {
@@ -148,12 +188,12 @@ export function ClientDetailPage() {
     }
   };
 
-  const fetchSupplierParts = async () => {
+  const fetchClientParts = async () => {
     try {
-      const response = await api.get(`/modules/inventory/api/clients/${id}/parts`);
+      const response = await api.get(`/modules/inventory/api/suppliers/${id}/parts`);
       setParts(response.data || []);
     } catch (error) {
-      console.error('Failed to fetch supplier parts:', error);
+      console.error('Failed to fetch client parts:', error);
     }
   };
 
@@ -181,14 +221,14 @@ export function ClientDetailPage() {
       await api.put(`/modules/inventory/api/clients/${id}`, detailsForm);
       notifications.show({
         title: 'Success',
-        message: 'Supplier updated successfully',
+        message: 'Client updated successfully',
         color: 'green',
       });
-      fetchSupplier();
+      fetchClient();
     } catch (error: any) {
       notifications.show({
         title: 'Error',
-        message: error.response?.data?.detail || 'Failed to update supplier',
+        message: error.response?.data?.detail || 'Failed to update client',
         color: 'red',
       });
     }
@@ -200,7 +240,9 @@ export function ClientDetailPage() {
     setAddressForm({
       name: '',
       country: '',
+      country_id: '',
       city: '',
+      postal_code: '',
       address: '',
       description: '',
       contact: '',
@@ -210,15 +252,15 @@ export function ClientDetailPage() {
   };
 
   const handleEditAddress = (index: number) => {
-    if (supplier?.addresses && supplier.addresses[index]) {
+    if (client?.addresses && client.addresses[index]) {
       setEditingAddressIndex(index);
-      setAddressForm(supplier.addresses[index]);
+      setAddressForm(client.addresses[index]);
       openAddressModal();
     }
   };
 
   const handleSaveAddress = async () => {
-    const addresses = [...(supplier?.addresses || [])];
+    const addresses = [...(client?.addresses || [])];
     if (editingAddressIndex !== null) {
       addresses[editingAddressIndex] = addressForm;
     } else {
@@ -233,7 +275,7 @@ export function ClientDetailPage() {
         color: 'green',
       });
       closeAddressModal();
-      fetchSupplier();
+      fetchClient();
     } catch (error) {
       notifications.show({
         title: 'Error',
@@ -250,7 +292,7 @@ export function ClientDetailPage() {
       labels: { confirm: 'Delete', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
       onConfirm: async () => {
-        const addresses = [...(supplier?.addresses || [])];
+        const addresses = [...(client?.addresses || [])];
         addresses.splice(index, 1);
         try {
           await api.put(`/modules/inventory/api/clients/${id}`, { addresses });
@@ -259,7 +301,7 @@ export function ClientDetailPage() {
             message: 'Address deleted successfully',
             color: 'green',
           });
-          fetchSupplier();
+          fetchClient();
         } catch (error) {
           notifications.show({
             title: 'Error',
@@ -284,15 +326,15 @@ export function ClientDetailPage() {
   };
 
   const handleEditContact = (index: number) => {
-    if (supplier?.contacts && supplier.contacts[index]) {
+    if (client?.contacts && client.contacts[index]) {
       setEditingContactIndex(index);
-      setContactForm(supplier.contacts[index]);
+      setContactForm(client.contacts[index]);
       openContactModal();
     }
   };
 
   const handleSaveContact = async () => {
-    const contacts = [...(supplier?.contacts || [])];
+    const contacts = [...(client?.contacts || [])];
     if (editingContactIndex !== null) {
       contacts[editingContactIndex] = contactForm;
     } else {
@@ -307,7 +349,7 @@ export function ClientDetailPage() {
         color: 'green',
       });
       closeContactModal();
-      fetchSupplier();
+      fetchClient();
     } catch (error) {
       notifications.show({
         title: 'Error',
@@ -324,7 +366,7 @@ export function ClientDetailPage() {
       labels: { confirm: 'Delete', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
       onConfirm: async () => {
-        const contacts = [...(supplier?.contacts || [])];
+        const contacts = [...(client?.contacts || [])];
         contacts.splice(index, 1);
         try {
           await api.put(`/modules/inventory/api/clients/${id}`, { contacts });
@@ -333,7 +375,7 @@ export function ClientDetailPage() {
             message: 'Contact deleted successfully',
             color: 'green',
           });
-          fetchSupplier();
+          fetchClient();
         } catch (error) {
           notifications.show({
             title: 'Error',
@@ -357,14 +399,14 @@ export function ClientDetailPage() {
 
   const handleSavePart = async () => {
     try {
-      await api.post(`/modules/inventory/api/clients/${id}/parts`, partForm);
+      await api.post(`/modules/inventory/api/suppliers/${id}/parts`, partForm);
       notifications.show({
         title: 'Success',
         message: 'Part added successfully',
         color: 'green',
       });
       closePartModal();
-      fetchSupplierParts();
+      fetchClientParts();
     } catch (error: any) {
       notifications.show({
         title: 'Error',
@@ -379,20 +421,20 @@ export function ClientDetailPage() {
       title: 'Remove Part',
       children: (
         <Text size="sm">
-          Are you sure you want to remove <strong>{partName}</strong> from this supplier?
+          Are you sure you want to remove <strong>{partName}</strong> from this client?
         </Text>
       ),
       labels: { confirm: 'Remove', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/modules/inventory/api/clients/${id}/parts/${partId}`);
+          await api.delete(`/modules/inventory/api/suppliers/${id}/parts/${partId}`);
           notifications.show({
             title: 'Success',
             message: 'Part removed successfully',
             color: 'green',
           });
-          fetchSupplierParts();
+          fetchClientParts();
         } catch (error) {
           notifications.show({
             title: 'Error',
@@ -404,7 +446,7 @@ export function ClientDetailPage() {
     });
   };
 
-  if (!supplier) {
+  if (!client) {
     return (
       <Container size="xl">
         <LoadingOverlay visible={true} />
@@ -415,7 +457,9 @@ export function ClientDetailPage() {
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
-        <Title order={2}>{supplier.name}</Title>
+        <Title order={2}>
+          {client.name} {client.id_str && <Text span c="dimmed" size="lg">({client.id_str})</Text>}
+        </Title>
         <Button variant="default" onClick={() => navigate('/inventory/clients')}>
           Back
         </Button>
@@ -429,28 +473,29 @@ export function ClientDetailPage() {
             <Tabs.Tab value="addresses">Addresses</Tabs.Tab>
             <Tabs.Tab value="contacts">Contacts</Tabs.Tab>
             <Tabs.Tab value="articles">Articles</Tabs.Tab>
-            <Tabs.Tab value="purchase_orders" disabled>
-              Purchase Orders
+            <Tabs.Tab value="sales_orders" disabled>
+              Sales Orders
             </Tabs.Tab>
           </Tabs.List>
 
           <Tabs.Panel value="details" pt="md">
-            <TextInput
-              label="Name"
-              placeholder="Supplier name"
-              required
-              value={detailsForm.name}
-              onChange={(e) => setDetailsForm({ ...detailsForm, name: e.currentTarget.value })}
-              mb="sm"
-            />
-
-            <TextInput
-              label="Code"
-              placeholder="Supplier code"
-              value={detailsForm.code}
-              onChange={(e) => setDetailsForm({ ...detailsForm, code: e.currentTarget.value })}
-              mb="sm"
-            />
+            <Group grow mb="sm">
+              <TextInput
+                label="Name"
+                placeholder="Client name"
+                required
+                value={detailsForm.name}
+                onChange={(e) => setDetailsForm({ ...detailsForm, name: e.currentTarget.value })}
+                style={{ flex: 3 }}
+              />
+              <TextInput
+                label="Code"
+                placeholder="Auto-generated"
+                value={detailsForm.code}
+                disabled
+                style={{ flex: 1 }}
+              />
+            </Group>
 
             <TextInput
               label="VAT Number"
@@ -468,11 +513,41 @@ export function ClientDetailPage() {
               mb="sm"
             />
 
+            <Group grow mb="sm" align="flex-start">
+              <Textarea
+                label="Delivery Conditions"
+                placeholder="Delivery terms and conditions"
+                value={detailsForm.delivery_conditions}
+                onChange={(e) => setDetailsForm({ ...detailsForm, delivery_conditions: e.currentTarget.value })}
+                minRows={3}
+              />
+              <NumberInput
+                label="Payment Condition"
+                placeholder="0"
+                suffix=" zile"
+                value={detailsForm.payment_conditions ? parseInt(detailsForm.payment_conditions) : 0}
+                onChange={(value) => setDetailsForm({ ...detailsForm, payment_conditions: String(value || 0) })}
+                min={0}
+                allowNegative={false}
+              />
+            </Group>
+
             <TextInput
-              label="Payment Conditions"
-              placeholder="e.g., 30 days"
-              value={detailsForm.payment_conditions}
-              onChange={(e) => setDetailsForm({ ...detailsForm, payment_conditions: e.currentTarget.value })}
+              label="Bank Account"
+              placeholder="Bank account information"
+              value={detailsForm.bank_account}
+              onChange={(e) => setDetailsForm({ ...detailsForm, bank_account: e.currentTarget.value })}
+              mb="sm"
+            />
+
+            <Select
+              label="Currency"
+              placeholder="Select currency"
+              data={currencies}
+              value={detailsForm.currency_id}
+              onChange={(value) => setDetailsForm({ ...detailsForm, currency_id: value || '' })}
+              searchable
+              clearable
               mb="sm"
             />
 
@@ -524,7 +599,7 @@ export function ClientDetailPage() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {supplier.addresses?.map((address, index) => (
+                {client.addresses?.map((address, index) => (
                   <Table.Tr key={index}>
                     <Table.Td>{address.name}</Table.Td>
                     <Table.Td>{address.country || '-'}</Table.Td>
@@ -566,7 +641,7 @@ export function ClientDetailPage() {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {supplier.contacts?.map((contact, index) => (
+                {client.contacts?.map((contact, index) => (
                   <Table.Tr key={index}>
                     <Table.Td>{contact.name}</Table.Td>
                     <Table.Td>{contact.role || '-'}</Table.Td>
@@ -628,8 +703,8 @@ export function ClientDetailPage() {
             </Table>
           </Tabs.Panel>
 
-          <Tabs.Panel value="purchase_orders" pt="md">
-            <Text c="dimmed">Purchase orders functionality coming soon...</Text>
+          <Tabs.Panel value="sales_orders" pt="md">
+            <Text c="dimmed">Sales orders functionality coming soon...</Text>
           </Tabs.Panel>
         </Tabs>
       </Paper>
@@ -644,20 +719,32 @@ export function ClientDetailPage() {
           onChange={(e) => setAddressForm({ ...addressForm, name: e.currentTarget.value })}
           mb="sm"
         />
-        <TextInput
+        <Select
           label="Country"
-          placeholder="Country"
-          value={addressForm.country}
-          onChange={(e) => setAddressForm({ ...addressForm, country: e.currentTarget.value })}
+          placeholder="Select country"
+          data={countries}
+          value={addressForm.country_id}
+          onChange={(value) => setAddressForm({ ...addressForm, country_id: value || '' })}
+          searchable
+          clearable
           mb="sm"
         />
-        <TextInput
-          label="City"
-          placeholder="City"
-          value={addressForm.city}
-          onChange={(e) => setAddressForm({ ...addressForm, city: e.currentTarget.value })}
-          mb="sm"
-        />
+        <Group grow mb="sm">
+          <TextInput
+            label="City"
+            placeholder="City"
+            value={addressForm.city}
+            onChange={(e) => setAddressForm({ ...addressForm, city: e.currentTarget.value })}
+            style={{ flex: 2 }}
+          />
+          <TextInput
+            label="Postal Code"
+            placeholder="Postal code"
+            value={addressForm.postal_code}
+            onChange={(e) => setAddressForm({ ...addressForm, postal_code: e.currentTarget.value })}
+            style={{ flex: 1 }}
+          />
+        </Group>
         <TextInput
           label="Address"
           placeholder="Street address"

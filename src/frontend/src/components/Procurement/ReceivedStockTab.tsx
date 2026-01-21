@@ -21,7 +21,8 @@ interface ReceivedItem {
   location_detail?: {
     name: string;
   };
-  batch: string;
+  batch?: string;  // Legacy field
+  batch_code?: string;  // New field
   serial: string;
   packaging: string;
   status: number;

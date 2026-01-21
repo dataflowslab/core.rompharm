@@ -22,6 +22,7 @@ import { api } from '../../../../src/frontend/src/services/api';
 
 interface Manufacturer {
   _id: string;
+  pk?: number;
   name: string;
   code?: string;
   vatno?: string;
@@ -193,6 +194,7 @@ export function ManufacturersPage() {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th>#</Table.Th>
               <Table.Th>Name</Table.Th>
               <Table.Th>Country</Table.Th>
               <Table.Th>VAT</Table.Th>
@@ -203,6 +205,9 @@ export function ManufacturersPage() {
           <Table.Tbody>
             {manufacturers.map((manufacturer) => (
               <Table.Tr key={manufacturer._id}>
+                <Table.Td style={{ fontWeight: 500, color: manufacturer.pk ? 'inherit' : '#868e96' }}>
+                  {manufacturer.pk || 'N/A'}
+                </Table.Td>
                 <Table.Td>{manufacturer.name}</Table.Td>
                 <Table.Td>{getCountry(manufacturer)}</Table.Td>
                 <Table.Td>{manufacturer.vatno || '-'}</Table.Td>

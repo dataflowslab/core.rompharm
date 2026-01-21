@@ -40,6 +40,7 @@ interface Article {
   description?: string;
   category_id?: string;
   is_active: boolean;
+  total_stock?: number;
 }
 
 interface Location {
@@ -307,7 +308,7 @@ export function ArticlesPage() {
                 <Table.Td>{article.system_um_detail?.abrev || article.um || '-'}</Table.Td>
                 <Table.Td>{article.description || '-'}</Table.Td>
                 <Table.Td>{article.category_detail?.name || '-'}</Table.Td>
-                <Table.Td>-</Table.Td>
+                <Table.Td>{article.total_stock || 0}</Table.Td>
                 <Table.Td>
                   <Badge color={article.is_active ? 'green' : 'gray'}>
                     {article.is_active ? 'Active' : 'Inactive'}

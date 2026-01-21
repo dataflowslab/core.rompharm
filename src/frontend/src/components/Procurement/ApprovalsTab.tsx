@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
+import { formatDateTime } from '../../utils/dateFormat';
 
 interface ApprovalSignature {
   user_id: string;
@@ -334,7 +335,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
                 {flow.signatures.map((signature, index) => (
                   <Table.Tr key={index}>
                     <Table.Td>{signature.user_name || signature.username}</Table.Td>
-                    <Table.Td>{new Date(signature.signed_at).toLocaleString()}</Table.Td>
+                    <Table.Td>{formatDateTime(signature.signed_at)}</Table.Td>
                     <Table.Td>
                       <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace' }}>
                         {signature.signature_hash.substring(0, 16)}...

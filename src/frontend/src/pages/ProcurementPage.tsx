@@ -8,6 +8,7 @@ import api from '../services/api';
 import { procurementApi } from '../services/procurement';
 import { notifications } from '@mantine/notifications';
 import { ApiSelect } from '../components/Common/ApiSelect';
+import { formatDate } from '../utils/dateFormat';
 
 interface PurchaseOrder {
   _id?: string;
@@ -438,8 +439,8 @@ export function ProcurementPage() {
                     </div>
                   </Table.Td>
                   <Table.Td>{order.status_text || '-'}</Table.Td>
-                  <Table.Td>{order.issue_date || '-'}</Table.Td>
-                  <Table.Td>{order.target_date || '-'}</Table.Td>
+                  <Table.Td>{formatDate(order.issue_date)}</Table.Td>
+                  <Table.Td>{formatDate(order.target_date)}</Table.Td>
                 </Table.Tr>
               );
             })

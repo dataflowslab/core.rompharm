@@ -124,7 +124,7 @@ function App() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="md">
+      <AppShell.Navbar p="md" style={{ backgroundColor: '#f6fbff' }}>
         <ScrollArea h="calc(100vh - 60px)" type="auto" offsetScrollbars scrollbarSize={8}>
           <Navbar />
         </ScrollArea>

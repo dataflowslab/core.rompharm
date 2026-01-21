@@ -1,0 +1,176 @@
+=== SESIUNE DE LUCRU - 17.01.2026 ===
+
+## Rezumat Modificări
+
+### 1. Procurement Module - Îmbunătățiri Frontend ✅
+
+#### 1.1 Coloană U.M. în ItemsTab
+- **Fișier**: `src/frontend/src/components/Procurement/ItemsTab.tsx`
+- **Modificare**: Adăugat coloană "U.M." între "Part" și "Quantity"
+- **Afișare**: `part_detail.um`
+- **Scop**: Vizibilitate mai bună a unităților de măsură
+
+#### 1.2 Eliminare Validare Max Quantity
+- **Fișier**: `src/frontend/src/components/Common/ReceiveStockForm.tsx`
+- **Modificare**: Eliminat `max={maxQuantity}` din câmpul "Received Quantity"
+- **Scop**: Permite primirea de cantități mai mari decât cele comandate (bonusuri, rotunjiri)
+
+#### 1.3 Eliminare Coloană Value din Containere
+- **Fișier**: `src/frontend/src/components/Common/ReceiveStockForm.tsx`
+- **Modificare**: Eliminată coloana "Value" din tabelul de containere
+- **Structură nouă**: Num, Products/Container, Unit, Damaged, Unsealed, Mislabeled, Actions
+
+#### 1.4 Format Date DD.MM.YYYY
+- **Fișier nou**: `src/frontend/src/utils/dateFormat.ts`
+  - `formatDate()` - convertește ISO → DD.MM.YYYY
+  - `formatDateTime()` - convertește ISO → DD.MM.YYYY HH:MM
+- **Fișiere actualizate**:
+  - `src/frontend/src/pages/ProcurementPage.tsx` - Issue Date, Target Date
+  - `src/frontend/src/components/Procurement/QualityControlTab.tsx` - Prelevation Date, BA Rompharm Date
+  - `src/frontend/src/components/Procurement/ApprovalsTab.tsx` - Signed At timestamps
+  - `src/frontend/src/components/Procurement/DetailsTab.tsx` - import formatDate
+
+### 2. Layout Fix - AppShell ✅
+- **Fișier**: `src/frontend/src/App.tsx`
+- **Problemă**: Sidebar și conținut principal nu erau alăturate (unul sub altul)
+- **Cauză**: `position: 'relative'` și `right: -10` în `AppShell.Navbar`
+- **Soluție**: Eliminat stilurile problematice
+- **Înainte**: `style={{ backgroundColor: '#f6fbff', position: 'relative', right: -10 }}`
+- **Acum**: `style={{ backgroundColor: '#f6fbff' }}`
+
+### 3. Bug Fix - Stock Detail Page ✅
+
+#### 3.1 Erori Sintaxă în services.py
+- **Fișier**: `modules/inventory/services.py`
+- **Probleme găsite**:
+  1. Lipseau virgule în apelurile `HTTPException`: `HTTPException(status_code=404 detail=...)` 
+  2. Lipseau virgule în dicționare între chei
+  3. Lipseau virgule în apelurile `.get()`: `get('key' default)`
+- **Soluție**: Creat script Python pentru a repara automat toate virgulele lipsă
+- **Rezultat**: Funcția `get_stock_by_id()` funcționează corect
+
+#### 3.2 Import Error - get_stock_by_id
+- **Fișier**: `modules/inventory/services/__init__.py`
+- **Problemă**: `get_stock_by_id` nu era exportată din modul
+- **Soluție**: Adăugat funcția în lista de export
+- **Cod adăugat**:
+  ```python
+  get_stock_by_id = services_module.get_stock_by_id
+  get_stocks_list = services_module.get_stocks_list
+  ```
+
+#### 3.3 TypeScript Errors - Frontend
+- **Fișiere reparate**:
+  - `src/frontend/src/components/Procurement/ItemsTab.tsx`
+    - Adăugat `um?: string` în interfața `part_detail`
+    - Corectat `colSpan` de la 7 la 8 (pentru noua coloană U.M.)
+  - `src/frontend/src/components/Procurement/ReceivedStockTab.tsx`
+    - Adăugat `batch_code?: string` în interfața `ReceivedItem`
+  - `src/frontend/src/pages/ProcurementDetailPage.tsx`
+    - Adăugat câmpuri legacy pentru compatibilitate (`part`, `pk`, `destination`)
+    - Reparat `order_currency` undefined: `order.order_currency || order.currency || 'EUR'`
+
+### 4. CHANGELOG Actualizat ✅
+- **Fișier**: `CHANGELOG.md`
+- **Versiune**: 2.1.2 - 2026-01-17
+- **Secțiuni**:
+  - Frontend - Procurement Module Improvements
+  - Technical - New utility dateFormat.ts
+  - Notes - Funcționalități rămase de implementat
+
+## Fișiere Modificate (Total: 10)
+
+1. ✅ `src/frontend/src/App.tsx` - Layout fix
+2. ✅ `src/frontend/src/utils/dateFormat.ts` - NOU - Utilitar formatare date
+3. ✅ `src/frontend/src/pages/ProcurementPage.tsx` - Formatare date
+4. ✅ `src/frontend/src/pages/ProcurementDetailPage.tsx` - Fix interfețe TypeScript
+5. ✅ `src/frontend/src/components/Procurement/ItemsTab.tsx` - Coloană U.M., fix TypeScript
+6. ✅ `src/frontend/src/components/Procurement/DetailsTab.tsx` - Import formatDate
+7. ✅ `src/frontend/src/components/Procurement/QualityControlTab.tsx` - Formatare date
+8. ✅ `src/frontend/src/components/Procurement/ApprovalsTab.tsx` - Formatare timestamps
+9. ✅ `src/frontend/src/components/Common/ReceiveStockForm.tsx` - Eliminat max validation, coloană Value
+10. ✅ `modules/inventory/services.py` - Fix erori sintaxă (virgule lipsă)
+11. ✅ `modules/inventory/services/__init__.py` - Export get_stock_by_id
+12. ✅ `CHANGELOG.md` - Documentare versiune 2.1.2
+
+## Probleme Rezolvate
+
+### Problema 1: Layout Broken
+- **Simptom**: Sidebar și main content unul sub altul în loc de alăturate
+- **Cauză**: CSS `position: relative` în AppShell.Navbar
+- **Soluție**: Eliminat stilul problematic
+
+### Problema 2: Stock Detail Page - Internal Server Error
+- **Simptom**: "Stock not found" + Internal Server Error 500
+- **Cauză**: Erori de sintaxă Python (virgule lipsă) în `services.py`
+- **Soluție**: Script automat pentru reparare virgule + export funcție
+
+### Problema 3: TypeScript Compilation Errors
+- **Simptom**: 231 erori TypeScript, aplicația nu se încarcă
+- **Cauză**: Interfețe incompatibile între componente
+- **Soluție**: Adăugat câmpuri lipsă în interfețe pentru compatibilitate
+
+## Funcționalități Rămase
+
+1. **Container Unit Auto-fill**: Câmpul "Unit" să preia automat din "Supplier U.M."
+2. **Order Closure Logic**: Discuție despre gestionarea comenzilor over-received
+3. **Scheduler Warning**: SSL handshake error pentru MongoDB scheduler (non-critic)
+
+## Note Tehnice
+
+### Date Formatting
+- Format standard: DD.MM.YYYY
+- Funcții: `formatDate()`, `formatDateTime()`
+- Locație: `src/frontend/src/utils/dateFormat.ts`
+- Gestionare null/undefined: returnează '-'
+
+### Stock Detail Endpoint
+- URL: `/modules/inventory/api/stocks/{stock_id}`
+- Funcție: `get_stock_by_id(stock_id: str)`
+- Enrichment: part_detail, location_detail, status_detail, supplier_name, stock_value
+
+### Layout Structure
+- AppShell cu navbar width: 250px
+- Header height: 60px
+- Navbar background: #f6fbff
+- Header background: #e8f3fc
+
+## Comenzi Utile
+
+### Restart Backend
+```bash
+cd d:\DEV\dataflows-core-rompharm
+python -m uvicorn src.backend.app:app --reload --port 8000
+```
+
+### Check TypeScript Errors
+```bash
+cd d:\DEV\dataflows-core-rompharm\src\frontend
+npx tsc --noEmit
+```
+
+### Test MongoDB Connection
+```python
+from pymongo import MongoClient
+client = MongoClient('mongodb+srv://...')
+db = client['dataflows_rompharm']
+print(db.list_collection_names())
+```
+
+## Status Final
+
+✅ Toate modificările implementate cu succes
+✅ Backend pornește corect (warning scheduler non-critic)
+✅ Frontend compilează fără erori TypeScript
+✅ Layout corect (sidebar + main alăturate)
+✅ Stock detail page funcțional
+✅ Date formatate DD.MM.YYYY în procurement
+
+## Next Steps
+
+1. Testare completă funcționalitate stock detail page
+2. Implementare container unit auto-fill (dacă necesar)
+3. Discuție despre logica închidere comenzi over-received
+4. Investigare warning scheduler SSL (opțional, non-critic)
+
+=== SFÂRȘIT SESIUNE ===

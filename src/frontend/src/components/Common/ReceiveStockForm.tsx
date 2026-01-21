@@ -226,10 +226,8 @@ export function ReceiveStockForm({
           value={formData.quantity}
           onChange={(value) => handleQuantityChange(Number(value) || 0)}
           min={0.01}
-          max={maxQuantity}
           step={1}
           required
-          description={maxQuantity ? `${t('Max')}: ${maxQuantity}` : ''}
         />
       </Grid.Col>
 
@@ -363,7 +361,6 @@ export function ReceiveStockForm({
                 <Table.Th>{t('Num')}</Table.Th>
                 <Table.Th>{t('Products/Container')}</Table.Th>
                 <Table.Th>{t('Unit')}</Table.Th>
-                <Table.Th>{t('Value')}</Table.Th>
                 <Table.Th>{t('Damaged')}</Table.Th>
                 <Table.Th>{t('Unsealed')}</Table.Th>
                 <Table.Th>{t('Mislabeled')}</Table.Th>
@@ -397,16 +394,6 @@ export function ReceiveStockForm({
                       onChange={(e) => updateContainerRow(container.id, 'unit', e.target.value)}
                       size="xs"
                       styles={{ input: { width: '60px' } }}
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <NumberInput
-                      value={container.value}
-                      onChange={(val) => updateContainerRow(container.id, 'value', Number(val) || 0)}
-                      min={0}
-                      step={0.1}
-                      size="xs"
-                      styles={{ input: { width: '80px' } }}
                     />
                   </Table.Td>
                   <Table.Td>

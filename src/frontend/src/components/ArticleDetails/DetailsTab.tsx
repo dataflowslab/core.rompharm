@@ -189,11 +189,14 @@ export function DetailsTab({
           searchable
           clearable
         />
-        <TextInput
+        <NumberInput
           label="Total Delivery Time"
-          placeholder="e.g., 2-3 weeks"
-          value={article.total_delivery_time || ''}
-          onChange={(e) => setArticle({ ...article, total_delivery_time: e.currentTarget.value })}
+          placeholder="0"
+          suffix=" zile"
+          value={article.total_delivery_time ? parseInt(article.total_delivery_time) : 0}
+          onChange={(value) => setArticle({ ...article, total_delivery_time: String(value || 0) })}
+          min={0}
+          allowNegative={false}
         />
       </Group>
 

@@ -8,6 +8,26 @@ from bson import ObjectId
 from src.backend.utils.db import get_db
 
 
+def generate_company_pk():
+    """
+    Generate auto-increment pk (primary key) for company
+    Starts from 1 and increments for each new company
+    """
+    db = get_db()
+    companies_collection = db['depo_companies']
+    
+    # Find the maximum pk value
+    max_pk_doc = companies_collection.find_one(
+        {'pk': {'$exists': True}},
+        sort=[('pk', -1)]
+    )
+    
+    if max_pk_doc and 'pk' in max_pk_doc:
+        return max_pk_doc['pk'] + 1
+    else:
+        return 1
+
+
 def generate_company_code(company_data):
     """
     Generate auto-increment code for company based on type
@@ -59,6 +79,30 @@ def generate_company_code(company_data):
     return f"{prefix}-{next_number:04d}"
 
 
+def generate_company_id_str(company):
+    """
+    Generate display ID string for company based on type and pk
+    Format: S009 (Supplier), M009 (Manufacturer), C009 (Client)
+    Priority: M (if is_manufacturer) > S (if is_supplier) > C (if is_client)
+    """
+    pk = company.get('pk')
+    if not pk:
+        return 'N/A'
+    
+    # Determine prefix based on company type (priority: M > S > C)
+    if company.get('is_manufacturer'):
+        prefix = 'M'
+    elif company.get('is_supplier'):
+        prefix = 'S'
+    elif company.get('is_client'):
+        prefix = 'C'
+    else:
+        prefix = 'N'  # Unknown
+    
+    # Format as PREFIX + 00 + PK (e.g., S009, M015, C001)
+    return f"{prefix}{pk:03d}"
+
+
 def serialize_doc(doc):
     """Convert MongoDB document to JSON-serializable format"""
     if doc is None:
@@ -80,6 +124,11 @@ def serialize_doc(doc):
                 result[key] = value.isoformat()
             else:
                 result[key] = value
+        
+        # Add id_str for companies (if pk exists)
+        if 'pk' in doc and ('is_supplier' in doc or 'is_manufacturer' in doc or 'is_client' in doc):
+            result['id_str'] = generate_company_id_str(doc)
+        
         return result
     return doc
 
@@ -376,7 +425,7 @@ async def get_supplier_by_id(supplier_id: str):
 
 
 async def create_supplier(supplier_data, current_user):
-    """Create a new supplier with auto-generated code"""
+    """Create a new supplier with auto-generated pk and code"""
     db = get_db()
     companies_collection = db['depo_companies']
     
@@ -384,10 +433,14 @@ async def create_supplier(supplier_data, current_user):
     if not (supplier_data.get('is_supplier') or supplier_data.get('is_client') or supplier_data.get('is_manufacturer')):
         raise HTTPException(status_code=400, detail="At least one of is_supplier, is_client, or is_manufacturer must be selected")
     
+    # Generate auto-increment pk
+    auto_pk = generate_company_pk()
+    
     # Generate auto-increment code based on company type
     auto_code = generate_company_code(supplier_data)
     
     doc = {
+        'pk': auto_pk,  # Auto-generated primary key
         'name': supplier_data.get('name'),
         'code': auto_code,  # Auto-generated, readonly
         'is_supplier': supplier_data.get('is_supplier', False),
@@ -396,6 +449,9 @@ async def create_supplier(supplier_data, current_user):
         'vatno': supplier_data.get('vatno', ''),
         'regno': supplier_data.get('regno', ''),
         'payment_conditions': supplier_data.get('payment_conditions', ''),
+        'delivery_conditions': supplier_data.get('delivery_conditions', ''),
+        'bank_account': supplier_data.get('bank_account', ''),
+        'currency_id': ObjectId(supplier_data['currency_id']) if supplier_data.get('currency_id') else None,
         'addresses': supplier_data.get('addresses', []),
         'contacts': supplier_data.get('contacts', []),
         'created_at': datetime.utcnow(),
@@ -434,7 +490,9 @@ async def update_supplier(supplier_id: str, supplier_data, current_user):
     # Update fields if provided
     if 'name' in supplier_data:
         update_doc['name'] = supplier_data['name']
-    # Note: 'code' is auto-generated and readonly, cannot be updated
+    if 'code' in supplier_data:
+        update_doc['code'] = supplier_data['code']
+    # Note: 'pk' is auto-generated and readonly, cannot be updated
     if 'is_supplier' in supplier_data:
         update_doc['is_supplier'] = supplier_data['is_supplier']
     if 'is_manufacturer' in supplier_data:
@@ -447,6 +505,12 @@ async def update_supplier(supplier_id: str, supplier_data, current_user):
         update_doc['regno'] = supplier_data['regno']
     if 'payment_conditions' in supplier_data:
         update_doc['payment_conditions'] = supplier_data['payment_conditions']
+    if 'delivery_conditions' in supplier_data:
+        update_doc['delivery_conditions'] = supplier_data['delivery_conditions']
+    if 'bank_account' in supplier_data:
+        update_doc['bank_account'] = supplier_data['bank_account']
+    if 'currency_id' in supplier_data:
+        update_doc['currency_id'] = ObjectId(supplier_data['currency_id']) if supplier_data['currency_id'] else None
     if 'addresses' in supplier_data:
         update_doc['addresses'] = supplier_data['addresses']
     if 'contacts' in supplier_data:

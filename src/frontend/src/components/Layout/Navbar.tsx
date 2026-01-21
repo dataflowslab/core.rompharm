@@ -38,7 +38,7 @@ export function Navbar() {
   const isInSection = (basePath: string) => location.pathname.startsWith(basePath);
 
   return (
-    <Stack gap="xs">
+    <Stack gap={0}>
       <NavLink
         label="Dashboard"
         leftSection={<IconDashboard size={20} />}

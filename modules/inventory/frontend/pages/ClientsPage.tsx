@@ -22,11 +22,12 @@ import { api } from '../../../../src/frontend/src/services/api';
 
 interface Client {
   _id: string;
+  pk?: number;
   name: string;
   code?: string;
   vatno?: string;
   regno?: string;
-  is_Client: boolean;
+  is_supplier: boolean;
   is_manufacturer: boolean;
   is_client: boolean;
   addresses?: Array<{
@@ -52,9 +53,9 @@ export function ClientsPage() {
     vatno: '',
     regno: '',
     payment_conditions: '',
-    is_Client: true,
+    is_supplier: false,
     is_manufacturer: false,
-    is_client: false,
+    is_client: true,
   });
 
   useEffect(() => {
@@ -82,10 +83,10 @@ export function ClientsPage() {
 
   const handleCreate = async () => {
     // Validate at least one checkbox is selected
-    if (!formData.is_Client && !formData.is_manufacturer && !formData.is_client) {
+    if (!formData.is_supplier && !formData.is_manufacturer && !formData.is_client) {
       notifications.show({
         title: 'Validation Error',
-        message: 'At least one of Client, Manufacturer, or Client must be selected',
+        message: 'At least one of Supplier, Manufacturer, or Client must be selected',
         color: 'red',
       });
       return;
@@ -147,9 +148,9 @@ export function ClientsPage() {
       vatno: '',
       regno: '',
       payment_conditions: '',
-      is_Client: true,
+      is_supplier: false,
       is_manufacturer: false,
-      is_client: false,
+      is_client: true,
     });
   };
 
@@ -193,6 +194,7 @@ export function ClientsPage() {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th>#</Table.Th>
               <Table.Th>Name</Table.Th>
               <Table.Th>Country</Table.Th>
               <Table.Th>VAT</Table.Th>
@@ -203,6 +205,9 @@ export function ClientsPage() {
           <Table.Tbody>
             {Clients.map((Client) => (
               <Table.Tr key={Client._id}>
+                <Table.Td style={{ fontWeight: 500, color: Client.pk ? 'inherit' : '#868e96' }}>
+                  {Client.pk || 'N/A'}
+                </Table.Td>
                 <Table.Td>{Client.name}</Table.Td>
                 <Table.Td>{getCountry(Client)}</Table.Td>
                 <Table.Td>{Client.vatno || '-'}</Table.Td>
@@ -278,9 +283,9 @@ export function ClientsPage() {
         </Text>
         <Group mb="md">
           <Checkbox
-            label="Client"
-            checked={formData.is_Client}
-            onChange={(e) => setFormData({ ...formData, is_Client: e.currentTarget.checked })}
+            label="Supplier"
+            checked={formData.is_supplier}
+            onChange={(e) => setFormData({ ...formData, is_supplier: e.currentTarget.checked })}
           />
           <Checkbox
             label="Manufacturer"

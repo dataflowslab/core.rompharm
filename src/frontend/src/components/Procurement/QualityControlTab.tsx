@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
+import { formatDate } from '../../utils/dateFormat';
 
 interface QCRecord {
   _id: string;
@@ -460,11 +461,11 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
               <Table.Tr key={record._id}>
                 <Table.Td>{record.part_name}</Table.Td>
                 <Table.Td>{record.batch_code}</Table.Td>
-                <Table.Td>{new Date(record.prelevation_date).toLocaleDateString()}</Table.Td>
+                <Table.Td>{formatDate(record.prelevation_date)}</Table.Td>
                 <Table.Td>{getResultBadge(record.test_result)}</Table.Td>
                 <Table.Td>
                   {record.ba_rompharm_no}
-                  {record.ba_rompharm_date && ` (${new Date(record.ba_rompharm_date).toLocaleDateString()})`}
+                  {record.ba_rompharm_date && ` (${formatDate(record.ba_rompharm_date)})`}
                 </Table.Td>
                 <Table.Td>{getTransactionableBadge(record.transactionable)}</Table.Td>
                 <Table.Td>{record.comment || '-'}</Table.Td>
