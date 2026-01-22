@@ -412,15 +412,26 @@ async def get_suppliers_list(search=None, skip=0, limit=100):
 
 
 async def get_supplier_by_id(supplier_id: str):
-    """Get a specific supplier by ID"""
+    """Get a specific supplier by ID with enriched addresses"""
     db = get_db()
     companies_collection = db['depo_companies']
-    
+
     try:
         supplier = companies_collection.find_one({'_id': ObjectId(supplier_id)})
         if not supplier:
             raise HTTPException(status_code=404, detail="Supplier not found")
         
+        # Enrich addresses with country names
+        if supplier.get('addresses'):
+            for address in supplier['addresses']:
+                if address.get('country_id'):
+                    try:
+                        country = db['depo_countries'].find_one({'_id': ObjectId(address['country_id'])})
+                        if country:
+                            address['country'] = country.get('name', '')
+                    except:
+                        pass  # If country_id is invalid, skip
+
         return serialize_doc(supplier)
     except HTTPException:
         raise
