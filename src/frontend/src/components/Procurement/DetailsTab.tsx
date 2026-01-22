@@ -78,6 +78,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
   const [removeModalOpened, setRemoveModalOpened] = useState(false);
   const [userToRemove, setUserToRemove] = useState<string | null>(null);
   const [itemsCount, setItemsCount] = useState(0);
+  const [signAction, setSignAction] = useState<'issue' | 'cancel'>('issue');
   
   // Editable state
   const [formData, setFormData] = useState({
@@ -200,18 +201,28 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
     setSignModalOpened(false);
     setSubmitting(true);
     try {
-      const response = await api.post(`${procurementApi.getPurchaseOrder(order._id)}/sign`);
+      // Send action to backend
+      const response = await api.post(`${procurementApi.getPurchaseOrder(order._id)}/sign`, {
+        action: signAction  // 'issue' or 'cancel'
+      });
       setFlow(response.data);
+      
+      const message = signAction === 'issue' 
+        ? t('Order issued successfully')
+        : t('Order cancelled successfully');
       
       notifications.show({
         title: t('Success'),
-        message: t('Order signed successfully'),
+        message,
         color: 'green'
       });
 
       if (onOrderUpdate) {
         onOrderUpdate();
       }
+      
+      // Reset action to default
+      setSignAction('issue');
       
       setTimeout(() => {
         window.location.reload();
@@ -489,19 +500,53 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
       {/* Sign Confirmation Modal */}
       <Modal
         opened={signModalOpened}
-        onClose={() => setSignModalOpened(false)}
-        title={t('Confirm Signature')}
+        onClose={() => {
+          setSignModalOpened(false);
+          setSignAction('issue'); // Reset to default
+        }}
+        title={t('Sign Order')}
         centered
       >
-        <Stack>
-          <Text>
-            {t('Are you sure you want to sign this order? This action will be recorded with a digital signature.')}
+        <Stack gap="md">
+          <Select
+            label={t('Action')}
+            description={t('Select the action to perform when signing')}
+            value={signAction}
+            onChange={(value) => setSignAction(value as 'issue' | 'cancel')}
+            data={[
+              { value: 'issue', label: t('Issue Order') },
+              { value: 'cancel', label: t('Cancel Order') }
+            ]}
+            required
+          />
+          
+          <Alert color={signAction === 'cancel' ? 'red' : 'blue'} icon={<IconAlertCircle />}>
+            {signAction === 'issue' 
+              ? t('The order will be issued and ready for receiving items.')
+              : t('The order will be cancelled and cannot be processed further.')
+            }
+          </Alert>
+
+          <Text size="sm" c="dimmed">
+            {t('This action will be recorded with a digital signature and timestamp.')}
           </Text>
+
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => setSignModalOpened(false)}>
+            <Button 
+              variant="default" 
+              onClick={() => {
+                setSignModalOpened(false);
+                setSignAction('issue');
+              }}
+            >
               {t('Cancel')}
             </Button>
-            <Button color="green" onClick={confirmSign} loading={submitting}>
+            <Button 
+              color={signAction === 'cancel' ? 'red' : 'green'} 
+              onClick={confirmSign} 
+              loading={submitting}
+              leftSection={<IconCheck size={16} />}
+            >
               {t('Sign')}
             </Button>
           </Group>
