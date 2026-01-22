@@ -264,15 +264,21 @@ export function ProcurementPage() {
   };
 
   const handleSupplierChange = (value: string | null) => {
-    setFormData({ ...formData, supplier_id: value || '' });
-    
-    // Update currency based on supplier
-    if (value) {
-      const supplier = suppliers.find(s => String(s.pk || s._id) === value);
-      if (supplier?.currency) {
-        setFormData(prev => ({ ...prev, currency: supplier.currency || 'EUR' }));
-      }
+    if (!value) {
+      setFormData({ ...formData, supplier_id: '' });
+      return;
     }
+    
+    // Find supplier and get currency
+    const supplier = suppliers.find(s => String(s.pk || s._id) === value);
+    const supplierCurrency = supplier?.currency || 'EUR';
+    
+    // Update both supplier_id and currency
+    setFormData(prev => ({ 
+      ...prev, 
+      supplier_id: value,
+      currency: supplierCurrency
+    }));
   };
 
   const supplierOptions = [
@@ -493,19 +499,7 @@ export function ProcurementPage() {
             />
           </Grid.Col>
 
-          <Grid.Col span={6}>
-            <ApiSelect
-              label={t('Currency')}
-              endpoint="/api/currencies"
-              value={formData.currency}
-              onChange={(value) => setFormData({ ...formData, currency: value || 'EUR' })}
-              valueField="_id"
-              labelFormat={(item) => item.abrev ? `${item.name} (${item.abrev})` : item.name}
-              searchable
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
+          <Grid.Col span={12}>
             <Select
               label={t('Destination')}
               placeholder={t('Select stock location')}
