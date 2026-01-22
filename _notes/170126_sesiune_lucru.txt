@@ -165,6 +165,24 @@ print(db.list_collection_names())
 ✅ Layout corect (sidebar + main alăturate)
 ✅ Stock detail page funcțional
 ✅ Date formatate DD.MM.YYYY în procurement
+✅ Total Stock afișat în lista de articole
+✅ Location și Supplier afișate în Stock Tab
+✅ Push la git realizat cu succes (commit 775219d)
+
+## Git Commit
+
+**Commit**: 775219d
+**Message**: fix: Stock detail page and articles total stock display
+- Fixed syntax errors in services.py (missing commas)
+- Added total_stock calculation to articles endpoint
+- Fixed get_stocks_list enrichment (location, supplier)
+- Exported get_stock_by_id from services module
+- Fixed layout issue (removed position:relative from navbar)
+- Updated frontend to display total_stock in articles list
+- Date formatting improvements (DD.MM.YYYY)
+- Version 2.1.2
+
+**Files Changed**: 220 files, +49823 insertions, -3683 deletions
 
 ## Next Steps
 

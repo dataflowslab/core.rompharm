@@ -11,13 +11,24 @@ import {
   Group,
   Button,
   Stack,
-  Card,
+  Table,
+  Anchor,
 } from '@mantine/core';
-import { IconArrowLeft, IconInfoCircle, IconClipboardCheck } from '@tabler/icons-react';
+import { 
+  IconArrowLeft, 
+  IconInfoCircle, 
+  IconClipboardCheck,
+  IconTransfer,
+  IconBook,
+  IconExternalLink,
+} from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
-import { QCTab } from '../components/Stock/QCTab';
+import { formatDate } from '../utils/dateFormat';
+import { QualityControlTab } from '../components/Stock/QualityControlTab';
+import { TransfersTab } from '../components/Stock/TransfersTab';
+import { JournalTab } from '../components/Stock/JournalTab';
 
 interface StockDetail {
   _id: string;
@@ -54,6 +65,7 @@ interface StockDetail {
     name: string;
     ipn: string;
     um: string;
+    manufacturer_id?: string;
   };
   location_detail?: {
     name: string;
@@ -98,6 +110,22 @@ export function StockItemDetailPage() {
     }
   };
 
+  const getDaysUntilExpiry = (expiryDate?: string) => {
+    if (!expiryDate) return null;
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const getExpiryColor = (days: number | null) => {
+    if (days === null) return undefined;
+    if (days < 0) return 'red';
+    if (days <= 7) return 'orange';
+    return undefined;
+  };
+
   if (loading) {
     return (
       <Container size="xl" py="xl">
@@ -114,19 +142,27 @@ export function StockItemDetailPage() {
     );
   }
 
+  const daysUntilExpiry = getDaysUntilExpiry(stock.expiry_date);
+  const expiryColor = getExpiryColor(daysUntilExpiry);
+
   return (
     <Container size="xl" py="xl">
-      <Group justify="space-between" mb="xl">
-        <Group>
-          <Button
-            variant="subtle"
-            leftSection={<IconArrowLeft size={16} />}
-            onClick={() => navigate(-1)}
-          >
-            {t('Back')}
-          </Button>
-          <Title order={2}>{t('Stock Details')}</Title>
-        </Group>
+      {/* Header */}
+      <Group justify="space-between" mb="md">
+        <Stack gap={4}>
+          <Group>
+            <Button
+              variant="subtle"
+              leftSection={<IconArrowLeft size={16} />}
+              onClick={() => navigate(-1)}
+              size="sm"
+            >
+              {t('Back')}
+            </Button>
+          </Group>
+          <Title order={2}>Stock {stock.batch_code}</Title>
+          <Text size="sm" c="dimmed">{stock.part_detail?.name}</Text>
+        </Stack>
         {stock.status_detail && (
           <Badge
             size="lg"
@@ -146,169 +182,141 @@ export function StockItemDetailPage() {
             {t('Stock Details')}
           </Tabs.Tab>
           <Tabs.Tab value="qc" leftSection={<IconClipboardCheck size={16} />}>
-            {t('QC')}
+            {t('Quality Control')}
+          </Tabs.Tab>
+          <Tabs.Tab value="transfers" leftSection={<IconTransfer size={16} />}>
+            {t('Transfers')}
+          </Tabs.Tab>
+          <Tabs.Tab value="journal" leftSection={<IconBook size={16} />}>
+            {t('Journal')}
           </Tabs.Tab>
         </Tabs.List>
 
+        {/* Stock Details Tab */}
         <Tabs.Panel value="details" pt="md">
-          <Stack gap="md">
-            {/* Article Information */}
-            <Paper shadow="xs" p="md" withBorder>
-              <Title order={4} mb="md">{t('Article Information')}</Title>
-              <Grid>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Article Name')}</Text>
-                  <Text fw={500}>{stock.part_detail?.name || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('IPN')}</Text>
-                  <Text fw={500}>{stock.part_detail?.ipn || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Unit of Measure')}</Text>
-                  <Text fw={500}>{stock.part_detail?.um || '-'}</Text>
-                </Grid.Col>
-              </Grid>
-            </Paper>
-
-            {/* Stock Information */}
-            <Paper shadow="xs" p="md" withBorder>
-              <Title order={4} mb="md">{t('Stock Information')}</Title>
-              <Grid>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Quantity')}</Text>
-                  <Text fw={500}>{stock.quantity}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Expected Quantity')}</Text>
-                  <Text fw={500}>{stock.expected_quantity || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Location')}</Text>
-                  <Text fw={500}>{stock.location_detail?.name || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Supplier')}</Text>
-                  <Text fw={500}>{stock.supplier_name || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Batch Code')}</Text>
-                  <Text fw={500}>{stock.batch_code || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Supplier Batch Code')}</Text>
-                  <Text fw={500}>{stock.supplier_batch_code || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Stock Value')}</Text>
-                  <Text fw={500}>{stock.stock_value ? `${stock.stock_value.toFixed(2)} RON` : '-'}</Text>
-                </Grid.Col>
-              </Grid>
-            </Paper>
-
-            {/* Dates */}
-            <Paper shadow="xs" p="md" withBorder>
-              <Title order={4} mb="md">{t('Dates')}</Title>
-              <Grid>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Manufacturing Date')}</Text>
-                  <Text fw={500}>{stock.manufacturing_date || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Received Date')}</Text>
-                  <Text fw={500}>{stock.received_date || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Expiry Date')}</Text>
-                  <Text fw={500}>{stock.expiry_date || '-'}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Reset Date')}</Text>
-                  <Text fw={500}>{stock.reset_date || '-'}</Text>
-                </Grid.Col>
-              </Grid>
-            </Paper>
-
-            {/* Containers */}
-            {stock.containers && stock.containers.length > 0 && (
+          <Grid>
+            {/* Column A: Stock Information */}
+            <Grid.Col span={6}>
               <Paper shadow="xs" p="md" withBorder>
-                <Title order={4} mb="md">{t('Containers')}</Title>
-                <Stack gap="xs">
-                  {stock.containers.map((container: any, index: number) => (
-                    <Card key={index} withBorder>
-                      <Grid>
-                        <Grid.Col span={3}>
-                          <Text size="sm" c="dimmed">{t('Num Containers')}</Text>
-                          <Text fw={500}>{container.num_containers}</Text>
-                        </Grid.Col>
-                        <Grid.Col span={3}>
-                          <Text size="sm" c="dimmed">{t('Products/Container')}</Text>
-                          <Text fw={500}>{container.products_per_container}</Text>
-                        </Grid.Col>
-                        <Grid.Col span={3}>
-                          <Text size="sm" c="dimmed">{t('Unit')}</Text>
-                          <Text fw={500}>{container.unit}</Text>
-                        </Grid.Col>
-                        <Grid.Col span={3}>
-                          <Text size="sm" c="dimmed">{t('Value')}</Text>
-                          <Text fw={500}>{container.value}</Text>
-                        </Grid.Col>
-                        <Grid.Col span={12}>
-                          <Group gap="xs">
-                            {container.is_damaged && <Badge color="red">{t('Damaged')}</Badge>}
-                            {container.is_unsealed && <Badge color="orange">{t('Unsealed')}</Badge>}
-                            {container.is_mislabeled && <Badge color="yellow">{t('Mislabeled')}</Badge>}
-                          </Group>
-                        </Grid.Col>
-                      </Grid>
-                    </Card>
-                  ))}
-                  <Text size="sm" c="dimmed" mt="xs">
-                    {t('Containers Cleaned')}: {stock.containers_cleaned ? t('Yes') : t('No')}
-                  </Text>
-                </Stack>
+                <Title order={4} mb="md">{t('Stock Information')}</Title>
+                <Table>
+                  <Table.Tbody>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Batch Code')}</Table.Td>
+                      <Table.Td>{stock.batch_code || '-'}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Location')}</Table.Td>
+                      <Table.Td>{stock.location_detail?.name || '-'}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Supplier')}</Table.Td>
+                      <Table.Td>{stock.supplier_name || '-'}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Supplier Batch Code')}</Table.Td>
+                      <Table.Td>{stock.supplier_batch_code || '-'}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Received Quantity')}</Table.Td>
+                      <Table.Td>{stock.quantity} {stock.part_detail?.um}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Received On')}</Table.Td>
+                      <Table.Td>{formatDate(stock.received_date)}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Manufactured On')}</Table.Td>
+                      <Table.Td>{formatDate(stock.manufacturing_date)}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Expiry Date')}</Table.Td>
+                      <Table.Td>
+                        <Stack gap={4}>
+                          <Text c={expiryColor}>{formatDate(stock.expiry_date)}</Text>
+                          {daysUntilExpiry !== null && (
+                            <Text size="sm" c={expiryColor}>
+                              {daysUntilExpiry >= 0 
+                                ? `${daysUntilExpiry} ${t('days remaining')}`
+                                : `${Math.abs(daysUntilExpiry)} ${t('days expired')}`
+                              }
+                            </Text>
+                          )}
+                        </Stack>
+                      </Table.Td>
+                    </Table.Tr>
+                  </Table.Tbody>
+                </Table>
               </Paper>
-            )}
+            </Grid.Col>
 
-            {/* Notes */}
-            {stock.notes && (
+            {/* Column B: Product Information */}
+            <Grid.Col span={6}>
               <Paper shadow="xs" p="md" withBorder>
-                <Title order={4} mb="md">{t('Notes')}</Title>
-                <Text>{stock.notes}</Text>
+                <Title order={4} mb="md">{t('Product Information')}</Title>
+                <Table>
+                  <Table.Tbody>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Name')}</Table.Td>
+                      <Table.Td>{stock.part_detail?.name || '-'}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('IPN')}</Table.Td>
+                      <Table.Td>{stock.part_detail?.ipn || '-'}</Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Manufacturer')}</Table.Td>
+                      <Table.Td>
+                        {stock.part_detail?.manufacturer_id ? (
+                          <Anchor
+                            href={`/inventory/manufacturers/${stock.part_detail.manufacturer_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View Manufacturer <IconExternalLink size={14} />
+                          </Anchor>
+                        ) : '-'}
+                      </Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('View Product')}</Table.Td>
+                      <Table.Td>
+                        <Button
+                          component="a"
+                          href={`/inventory/articles/${stock.part_id}`}
+                          target="_blank"
+                          size="xs"
+                          variant="light"
+                          rightSection={<IconExternalLink size={14} />}
+                        >
+                          {t('Open in new tab')}
+                        </Button>
+                      </Table.Td>
+                    </Table.Tr>
+                  </Table.Tbody>
+                </Table>
               </Paper>
-            )}
-
-            {/* Metadata */}
-            <Paper shadow="xs" p="md" withBorder>
-              <Title order={4} mb="md">{t('Metadata')}</Title>
-              <Grid>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Created At')}</Text>
-                  <Text fw={500}>{new Date(stock.created_at).toLocaleString()}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Created By')}</Text>
-                  <Text fw={500}>{stock.created_by}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Updated At')}</Text>
-                  <Text fw={500}>{new Date(stock.updated_at).toLocaleString()}</Text>
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" c="dimmed">{t('Updated By')}</Text>
-                  <Text fw={500}>{stock.updated_by}</Text>
-                </Grid.Col>
-              </Grid>
-            </Paper>
-          </Stack>
+            </Grid.Col>
+          </Grid>
         </Tabs.Panel>
 
+        {/* Quality Control Tab */}
         <Tabs.Panel value="qc" pt="md">
-          <QCTab 
+          <QualityControlTab 
             stockId={id!} 
             stock={stock} 
             onUpdate={fetchStockDetails}
           />
+        </Tabs.Panel>
+
+        {/* Transfers Tab */}
+        <Tabs.Panel value="transfers" pt="md">
+          <TransfersTab stockId={id!} />
+        </Tabs.Panel>
+
+        {/* Journal Tab */}
+        <Tabs.Panel value="journal" pt="md">
+          <JournalTab stockId={id!} stock={stock} />
         </Tabs.Panel>
       </Tabs>
     </Container>

@@ -14,7 +14,7 @@ Total: ~1460 lines split across 6 files (vs 1777 lines in single file)
 from fastapi import APIRouter
 
 # Import sub-routers
-from . import articles, locations, categories, stocks, companies
+from . import articles, locations, categories, stocks, companies, stock_movements
 
 # Create main router
 router = APIRouter(prefix="/modules/inventory/api", tags=["inventory"])
@@ -25,3 +25,4 @@ router.include_router(locations.router)
 router.include_router(categories.router)
 router.include_router(stocks.router)
 router.include_router(companies.router)
+router.include_router(stock_movements.router)
