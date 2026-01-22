@@ -50,8 +50,11 @@ interface PurchaseOrder {
   };
   notes: string;
   state_id: string;  // MongoDB ObjectId reference to depo_purchase_orders_states
-  status?: string;  // Status name (populated from state)
-  status_color?: string;  // Color from depo_purchase_orders_states
+  state_detail?: {   // Populated via aggregation with depo_purchase_orders_states
+    name: string;
+    color: string;
+    value: number;
+  };
   created_by?: string;
 }
 
@@ -235,7 +238,7 @@ export function ProcurementDetailPage() {
       currentUserId,
       orderCreatedBy: order.created_by,
       orderStateId: order.state_id,
-      orderStatus: order.status,
+      orderStateName: order.state_detail?.name,
       approvalFlow,
       signatures: approvalFlow?.signatures?.length || 0,
     });
@@ -261,20 +264,6 @@ export function ProcurementDetailPage() {
 
     console.log('[canEdit] Has signatures - CANNOT EDIT');
     return false;
-  };
-
-  const getStatusColor = (status: string) => {
-    // MongoDB status names based on depo_purchase_orders_states
-    switch (status?.toLowerCase()) {
-      case 'pending': return 'gray';      // value: 0 - Not signed yet
-      case 'issued': return 'cyan';       // value: 10 - Signed, ready for receiving
-      case 'processing': return 'blue';   // value: 20 - Receiving in progress
-      case 'finished': return 'green';    // value: 30 - All received and QC done
-      case 'refused': return 'red';       // value: 40 - Refused
-      case 'canceled': 
-      case 'cancelled': return 'red';     // value: 90 - Cancelled
-      default: return 'gray';
-    }
   };
 
   if (loading) {
@@ -312,8 +301,8 @@ export function ProcurementDetailPage() {
           <Title order={2}>{order.reference || t('Purchase Order')}</Title>
           <Text size="sm" c="dimmed">{order.supplier_detail?.name}</Text>
         </div>
-        <Badge color={order.status_color || getStatusColor(order.status)} size="lg">
-          {order.status || 'Unknown'}
+        <Badge color={order.state_detail?.color || 'gray'} size="lg">
+          {order.state_detail?.name || 'Unknown'}
         </Badge>
       </Group>
 
