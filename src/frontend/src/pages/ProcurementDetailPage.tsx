@@ -12,11 +12,10 @@ import {
 import {
   IconArrowLeft,
   IconInfoCircle,
-  IconChecklist,
   IconPackage,
   IconTruckDelivery,
   IconPaperclip,
-  IconClipboardCheck,
+  IconFileText,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
@@ -24,10 +23,8 @@ import api from '../services/api';
 import { procurementApi } from '../services/procurement';
 import { 
   DetailsTab, 
-  ApprovalsTab, 
   ReceivedStockTab,
   ItemsTab,
-  QualityControlTab,
   AttachmentsTab,
 } from '../components/Procurement';
 interface PurchaseOrder {
@@ -311,9 +308,6 @@ export function ProcurementDetailPage() {
           <Tabs.Tab value="details" leftSection={<IconInfoCircle size={16} />}>
             {t('Details')}
           </Tabs.Tab>
-          <Tabs.Tab value="approvals" leftSection={<IconChecklist size={16} />}>
-            {t('Approvals')}
-          </Tabs.Tab>
           <Tabs.Tab value="items" leftSection={<IconPackage size={16} />}>
             {t('Items')}
           </Tabs.Tab>
@@ -327,18 +321,11 @@ export function ProcurementDetailPage() {
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
-          {/* Show Quality Control tab only if order is Issued or beyond */}
-          {order.state_id && [
-            PURCHASE_ORDER_STATES.ISSUED,
-            PURCHASE_ORDER_STATES.PROCESSING,
-            PURCHASE_ORDER_STATES.FINISHED
-          ].includes(order.state_id) && (
-            <Tabs.Tab value="quality-control" leftSection={<IconClipboardCheck size={16} />}>
-              {t('Quality Control')}
-            </Tabs.Tab>
-          )}
           <Tabs.Tab value="attachments" leftSection={<IconPaperclip size={16} />}>
             {t('Attachments')}
+          </Tabs.Tab>
+          <Tabs.Tab value="journal" leftSection={<IconFileText size={16} />}>
+            {t('Journal')}
           </Tabs.Tab>
         </Tabs.List>
 
@@ -350,13 +337,6 @@ export function ProcurementDetailPage() {
             canEdit={isEditable}
             onUpdate={handleUpdateOrder}
             onOrderUpdate={loadPurchaseOrder}
-          />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="approvals" pt="md">
-          <ApprovalsTab 
-            order={order} 
-            onOrderUpdate={loadPurchaseOrder} 
           />
         </Tabs.Panel>
 
@@ -383,12 +363,6 @@ export function ProcurementDetailPage() {
           />
         </Tabs.Panel>
 
-        <Tabs.Panel value="quality-control" pt="md">
-          <QualityControlTab
-            orderId={id!}
-          />
-        </Tabs.Panel>
-
         <Tabs.Panel value="attachments" pt="md">
           <AttachmentsTab
             orderId={id!}
@@ -396,6 +370,12 @@ export function ProcurementDetailPage() {
             onReload={loadAttachments}
             canEdit={isEditable}
           />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="journal" pt="md">
+          <Text c="dimmed">{t('Journal functionality coming soon...')}</Text>
+          {/* TODO: Implement JournalTab component */}
+          {/* Will show: signatures, state changes, stock movements, QC results */}
         </Tabs.Panel>
       </Tabs>
     </Container>

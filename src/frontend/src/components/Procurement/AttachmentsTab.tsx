@@ -8,6 +8,8 @@ import {
   ActionIcon,
   Anchor,
   Grid,
+  Modal,
+  Button,
 } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
 import {
@@ -40,6 +42,8 @@ interface AttachmentsTabProps {
 export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: AttachmentsTabProps) {
   const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
+  const [deleteModalOpened, setDeleteModalOpened] = useState(false);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<Attachment | null>(null);
 
   const handleFileUpload = async (files: File[]) => {
     if (files.length === 0) return;
@@ -76,16 +80,23 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
     }
   };
 
-  const handleDeleteAttachment = async (attachmentId: string) => {
-    if (!confirm(t('Are you sure you want to delete this attachment?'))) return;
+  const openDeleteModal = (attachment: Attachment) => {
+    setAttachmentToDelete(attachment);
+    setDeleteModalOpened(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!attachmentToDelete) return;
 
     try {
-      await api.delete(procurementApi.deleteAttachment(orderId, attachmentId));
+      await api.delete(procurementApi.deleteAttachment(orderId, attachmentToDelete._id || String(attachmentToDelete.pk)));
       notifications.show({
         title: t('Success'),
         message: t('Attachment deleted successfully'),
         color: 'green'
       });
+      setDeleteModalOpened(false);
+      setAttachmentToDelete(null);
       onReload();
     } catch (error: any) {
       console.error('Failed to delete attachment:', error);
@@ -95,6 +106,17 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
         color: 'red'
       });
     }
+  };
+
+  // Helper function to get full attachment URL
+  const getAttachmentUrl = (attachment: Attachment) => {
+    // If attachment path starts with http, return as is
+    if (attachment.attachment.startsWith('http')) {
+      return attachment.attachment;
+    }
+    // Otherwise, prepend base URL
+    const baseUrl = window.location.origin;
+    return `${baseUrl}${attachment.attachment.startsWith('/') ? '' : '/'}${attachment.attachment}`;
   };
 
   return (
@@ -131,51 +153,79 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
             <Text size="sm" c="dimmed">{t('No attachments')}</Text>
           ) : (
             <Stack gap="xs">
-              {attachments.map((attachment) => (
-                <Paper key={attachment._id || attachment.pk} p="sm" withBorder>
-                  <Group justify="space-between">
-                    <Group>
-                      <IconFile size={20} />
-                      <div>
-                        <Anchor 
-                          href={attachment.attachment} 
-                          target="_blank"
-                          size="sm"
-                        >
-                          {attachment.filename}
-                        </Anchor>
-                        {attachment.comment && (
-                          <Text size="xs" c="dimmed">{attachment.comment}</Text>
-                        )}
-                      </div>
-                    </Group>
-                    <Group gap="xs">
-                      <ActionIcon
-                        component="a"
-                        href={attachment.attachment}
-                        target="_blank"
-                        variant="subtle"
-                        color="blue"
-                      >
-                        <IconExternalLink size={16} />
-                      </ActionIcon>
-                      {canEdit && (
+              {attachments.map((attachment) => {
+                const attachmentUrl = getAttachmentUrl(attachment);
+                return (
+                  <Paper key={attachment._id || attachment.pk} p="sm" withBorder>
+                    <Group justify="space-between">
+                      <Group>
+                        <IconFile size={20} />
+                        <div>
+                          <Anchor 
+                            href={attachmentUrl} 
+                            target="_blank"
+                            size="sm"
+                          >
+                            {attachment.filename}
+                          </Anchor>
+                          {attachment.comment && (
+                            <Text size="xs" c="dimmed">{attachment.comment}</Text>
+                          )}
+                        </div>
+                      </Group>
+                      <Group gap="xs">
                         <ActionIcon
+                          component="a"
+                          href={attachmentUrl}
+                          target="_blank"
                           variant="subtle"
-                          color="red"
-                          onClick={() => handleDeleteAttachment(attachment._id || String(attachment.pk))}
+                          color="blue"
                         >
-                          <IconTrash size={16} />
+                          <IconExternalLink size={16} />
                         </ActionIcon>
-                      )}
+                        {canEdit && (
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            onClick={() => openDeleteModal(attachment)}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        )}
+                      </Group>
                     </Group>
-                  </Group>
-                </Paper>
-              ))}
+                  </Paper>
+                );
+              })}
             </Stack>
           )}
         </Paper>
       </Grid.Col>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        opened={deleteModalOpened}
+        onClose={() => setDeleteModalOpened(false)}
+        title={t('Delete Attachment')}
+        centered
+      >
+        <Text size="sm" mb="md">
+          {t('Are you sure you want to delete this attachment?')}
+        </Text>
+        {attachmentToDelete && (
+          <Text size="sm" fw={500} mb="lg">
+            {attachmentToDelete.filename}
+          </Text>
+        )}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setDeleteModalOpened(false)}>
+            {t('Cancel')}
+          </Button>
+          <Button color="red" onClick={confirmDelete}>
+            {t('Delete')}
+          </Button>
+        </Group>
+      </Modal>
     </Grid>
   );
 }
