@@ -134,158 +134,151 @@ def serialize_doc(doc):
 
 
 async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location_id=None, state_id=None, start_date=None, end_date=None):
-    """Get list of stocks with enriched data"""
+    """Get list of stocks with enriched data using aggregation pipeline"""
+    from datetime import datetime
     db = get_db()
-    stocks_collection = db['depo_stocks']
     
-    query = {}
+    # Build match stage
+    match_stage = {}
     
-    # Filter by part_id if provided
+    if part_id:
+        match_stage['part_id'] = ObjectId(part_id)
     
-    # Filter by location_id if provided
     if location_id:
-        query['location_id'] = ObjectId(location_id)
+        match_stage['location_id'] = ObjectId(location_id)
     
-    # Filter by state_id if provided
     if state_id:
-        query['state_id'] = ObjectId(state_id)
+        match_stage['state_id'] = ObjectId(state_id)
     
-    # Filter by date range if provided
+    # Date range filter
     if start_date or end_date:
         date_query = {}
         if start_date:
-            from datetime import datetime
             date_query['$gte'] = datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
         if end_date:
-            from datetime import datetime
             date_query['$lte'] = datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
-        query['received_date'] = date_query
+        match_stage['received_date'] = date_query
     
-    if part_id:
-        query['part_id'] = ObjectId(part_id)
+    # Build aggregation pipeline
+    pipeline = []
     
-    if search:
-        search_conditions = [
-            {'batch_code': {'$regex': search, '$options': 'i'}},
-            {'serial_numbers': {'$regex': search, '$options': 'i'}},
-            {'notes': {'$regex': search, '$options': 'i'}}
-        ]
-        if query:
-            query['$and'] = [{'part_id': part_id}, {'$or': search_conditions}]
-        else:
-            query['$or'] = search_conditions
+    # Initial match (before lookups for performance)
+    if match_stage:
+        pipeline.append({'$match': match_stage})
     
-    try:
-        # Get total count
-        total = stocks_collection.count_documents(query)
-        
-        # Get paginated results
-        cursor = stocks_collection.find(query).sort('created_at', -1).skip(skip).limit(limit)
-        stocks = list(cursor)
-        
-        # Enrich with related data
-        for stock in stocks:
-            # Add batch_date (same as received_date)
-            if stock.get('received_date'):
-                stock['batch_date'] = stock['received_date']
-            
-            # Get part details
-            if stock.get('part_id'):
-                part = db['depo_parts'].find_one({'_id': ObjectId(stock['part_id'])})
-                if part:
-                    stock['part_detail'] = {
-                        'name': part.get('name'),
-                        'ipn': part.get('ipn'),
-                        'um': part.get('um')
-                    }
-            
-            # Get location details
-            if stock.get('location_id'):
-                location = db['depo_locations'].find_one({'_id': ObjectId(stock['location_id'])})
-                if location:
-                    stock['location_detail'] = {
-                        'name': location.get('name'),
-                        'description': location.get('description', '')
-                    }
-            
-            # Get status details from depo_stocks_states using state_id
-            if stock.get('state_id'):
-                state = db['depo_stocks_states'].find_one({'_id': ObjectId(stock['state_id'])})
-                if state:
-                    stock['status'] = state.get('name')
-                    stock['status_detail'] = {
-                        'name': state.get('name'),
-                        'value': state.get('value'),
-                        'color': state.get('color', 'gray')
-                    }
-            
-            # Get supplier UM details
-            if stock.get('supplier_um_id'):
-                supplier_um = db['depo_ums'].find_one({'_id': ObjectId(stock['supplier_um_id'])})
-                if supplier_um:
-                    stock['supplier_um_detail'] = {
-                        'name': supplier_um.get('name'),
-                        'abrev': supplier_um.get('abrev'),
-                        'symbol': supplier_um.get('symbol', '')
-                    }
-            
-            # Determine supplier based on supplier_id, purchase_order_id or build_order_id
-            supplier_name = None
-            supplier_detail = None
-            
-            # First check if supplier_id is directly in stock
-            if stock.get('supplier_id'):
-                supplier = db['depo_companies'].find_one({'_id': ObjectId(stock['supplier_id'])})
-                if supplier:
-                    supplier_name = supplier.get('name')
-                    supplier_detail = {
-                        'name': supplier.get('name'),
-                        'code': supplier.get('code', ''),
-                        '_id': str(supplier['_id'])
-                    }
-            
-            # Check if it's from a build order (internal production)
-            elif stock.get('build_order_id'):
-                # Get organization name from config
-                org_config = db['config'].find_one({'slug': 'organizatie'})
-                if org_config:
-                    supplier_name = org_config.get('value', {}).get('name', 'Internal Production')
-                else:
-                    supplier_name = 'Internal Production'
-            
-            # Check if it's from a purchase order
-            elif stock.get('purchase_order_id'):
-                purchase_order = db['depo_purchase_orders'].find_one({'_id': ObjectId(stock['purchase_order_id'])})
-                if purchase_order and purchase_order.get('supplier_id'):
-                    supplier = db['depo_companies'].find_one({'_id': ObjectId(purchase_order['supplier_id'])})
-                    if supplier:
-                        supplier_name = supplier.get('name')
-            
-            stock['supplier_name'] = supplier_name
-            
-            # Calculate stock value (quantity * purchase_price if available)
-            stock_value = 0
-            if stock.get('purchase_order_id'):
-                purchase_order = db['depo_purchase_orders'].find_one({'_id': ObjectId(stock['purchase_order_id'])})
-                if purchase_order and purchase_order.get('items'):
-                    # Find the matching item in the purchase order
-                    for item in purchase_order['items']:
-                        if str(item.get('part_id')) == str(stock.get('part_id')):
-                            purchase_price = item.get('purchase_price', 0) or 0
-                            quantity = stock.get('quantity', 0) or 0
-                            stock_value = quantity * purchase_price
-                            break
-            
-            stock['stock_value'] = stock_value
-        
-        return {
-            'results': serialize_doc(stocks),
-            'total': total,
-            'skip': skip,
-            'limit': limit
+    # Lookup part details
+    pipeline.append({
+        '$lookup': {
+            'from': 'depo_parts',
+            'localField': 'part_id',
+            'foreignField': '_id',
+            'as': 'part_detail'
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch stocks: {str(e)}")
+    })
+    pipeline.append({'$unwind': {'path': '$part_detail', 'preserveNullAndEmptyArrays': True}})
+    
+    # Lookup location details
+    pipeline.append({
+        '$lookup': {
+            'from': 'depo_locations',
+            'localField': 'location_id',
+            'foreignField': '_id',
+            'as': 'location_detail'
+        }
+    })
+    pipeline.append({'$unwind': {'path': '$location_detail', 'preserveNullAndEmptyArrays': True}})
+    
+    # Lookup supplier details
+    pipeline.append({
+        '$lookup': {
+            'from': 'depo_companies',
+            'localField': 'supplier_id',
+            'foreignField': '_id',
+            'as': 'supplier_detail'
+        }
+    })
+    pipeline.append({'$unwind': {'path': '$supplier_detail', 'preserveNullAndEmptyArrays': True}})
+    
+    # Lookup state details
+    pipeline.append({
+        '$lookup': {
+            'from': 'depo_stocks_states',
+            'localField': 'state_id',
+            'foreignField': '_id',
+            'as': 'status_detail'
+        }
+    })
+    pipeline.append({'$unwind': {'path': '$status_detail', 'preserveNullAndEmptyArrays': True}})
+    
+    # Search filter (after lookups so we can search in joined fields)
+    if search:
+        search_conditions = {
+            '$or': [
+                {'batch_code': {'$regex': search, '$options': 'i'}},
+                {'supplier_batch_code': {'$regex': search, '$options': 'i'}},
+                {'notes': {'$regex': search, '$options': 'i'}},
+                {'part_detail.name': {'$regex': search, '$options': 'i'}},
+                {'part_detail.ipn': {'$regex': search, '$options': 'i'}},
+                {'supplier_detail.name': {'$regex': search, '$options': 'i'}},
+                {'location_detail.name': {'$regex': search, '$options': 'i'}},
+            ]
+        }
+        pipeline.append({'$match': search_conditions})
+    
+    # Add computed fields
+    pipeline.append({
+        '$addFields': {
+            'batch_date': '$received_date',
+            'supplier_name': '$supplier_detail.name',
+            'part_detail': {
+                'name': '$part_detail.name',
+                'ipn': '$part_detail.ipn',
+                'um': '$part_detail.um'
+            },
+            'location_detail': {
+                'name': '$location_detail.name',
+                'description': '$location_detail.description'
+            },
+            'status_detail': {
+                'name': '$status_detail.name',
+                'value': '$status_detail.value',
+                'color': '$status_detail.color'
+            }
+        }
+    })
+    
+    # Count total (before pagination)
+    count_pipeline = pipeline.copy()
+    count_pipeline.append({'$count': 'total'})
+    count_result = list(db['depo_stocks'].aggregate(count_pipeline))
+    total = count_result[0]['total'] if count_result else 0
+    
+    # Sort and paginate
+    pipeline.append({'$sort': {'created_at': -1}})
+    pipeline.append({'$skip': skip})
+    pipeline.append({'$limit': limit})
+    
+    # Execute aggregation
+    stocks = list(db['depo_stocks'].aggregate(pipeline))
+    
+    # Serialize ObjectIds
+    for stock in stocks:
+        stock['_id'] = str(stock['_id'])
+        if 'part_id' in stock:
+            stock['part_id'] = str(stock['part_id'])
+        if 'location_id' in stock:
+            stock['location_id'] = str(stock['location_id'])
+        if 'supplier_id' in stock:
+            stock['supplier_id'] = str(stock['supplier_id'])
+        if 'state_id' in stock:
+            stock['state_id'] = str(stock['state_id'])
+    
+    return {
+        'results': stocks,
+        'total': total,
+        'skip': skip,
+        'limit': limit
+    }
 
 
 async def get_stock_by_id(stock_id: str):
