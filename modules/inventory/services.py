@@ -262,7 +262,7 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location
     stocks = list(db['depo_stocks'].aggregate(pipeline))
     
     # Serialize ObjectIds using helper function
-    from .routes.utils import serialize_doc
+    from modules.inventory.routes.utils import serialize_doc
     
     return {
         'results': serialize_doc(stocks),
