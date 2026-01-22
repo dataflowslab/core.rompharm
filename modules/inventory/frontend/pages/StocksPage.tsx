@@ -226,47 +226,39 @@ export function StocksPage() {
       </Group>
 
       <Paper p="md" mb="md">
-        <Stack gap="sm">
-          {/* First row: Search and Location */}
-          <Group grow>
-            <TextInput
-              placeholder="Search by batch code, IPN, supplier batch, supplier name..."
-              leftSection={<IconSearch size={16} />}
-              value={search}
-              onChange={(e) => setSearch(e.currentTarget.value)}
-            />
-            <Select
-              placeholder="All Locations"
-              data={[
-                { value: '', label: 'All Locations' },
-                ...locations.map(l => ({ value: l._id, label: l.name }))
-              ]}
-              value={locationFilter}
-              onChange={(value) => setLocationFilter(value || '')}
-              searchable
-              clearable
-            />
-          </Group>
-
-          {/* Second row: Status */}
-          <Group>
-            <Select
-              placeholder="All Statuses"
-              data={[
-                { value: '', label: 'All Statuses' },
-                ...stockStates.map(s => ({ value: s._id, label: s.name }))
-              ]}
-              value={statusFilter}
-              onChange={(value) => setStatusFilter(value || '')}
-              searchable
-              clearable
-              style={{ minWidth: '200px' }}
-            />
-            <Text size="sm" c="dimmed">
-              Date range filter coming soon...
-            </Text>
-          </Group>
-        </Stack>
+        <Group>
+          <TextInput
+            placeholder="Search by batch code, IPN, supplier batch, supplier name..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            style={{ flex: 1 }}
+          />
+          <Select
+            placeholder="Any location"
+            data={[
+              { value: '', label: 'Any location' },
+              ...locations.map(l => ({ value: l._id, label: l.name }))
+            ]}
+            value={locationFilter}
+            onChange={(value) => setLocationFilter(value || '')}
+            searchable
+            clearable
+            style={{ minWidth: '180px' }}
+          />
+          <Select
+            placeholder="Any status"
+            data={[
+              { value: '', label: 'Any status' },
+              ...stockStates.map(s => ({ value: s._id, label: s.name }))
+            ]}
+            value={statusFilter}
+            onChange={(value) => setStatusFilter(value || '')}
+            searchable
+            clearable
+            style={{ minWidth: '180px' }}
+          />
+        </Group>
       </Paper>
 
       <Paper p="md" pos="relative">

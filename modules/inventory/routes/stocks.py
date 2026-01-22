@@ -18,14 +18,16 @@ async def get_stocks(
     request: Request,
     search: Optional[str] = Query(None),
     part_id: Optional[str] = Query(None),
+    location_id: Optional[str] = Query(None),
+    state_id: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     current_user: dict = Depends(verify_token),
     db = Depends(get_db)
 ):
     """Get list of stocks with enriched data"""
-    from modules.inventory.services.stocks_service import get_stocks_list
-    return await get_stocks_list(db, search, None, part_id, skip, limit)
+    from modules.inventory.services import get_stocks_list
+    return await get_stocks_list(search, skip, limit, part_id)
 
 
 @router.get("/stocks/{stock_id}")
