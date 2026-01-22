@@ -28,50 +28,50 @@ import { procurementApi } from '../../services/procurement';
 import { ApiSelect } from '../Common/ApiSelect';
 
 interface PurchaseOrderItem {
-  _id: string;  // MongoDB ObjectId
-  pk?: number;  // Legacy field
-  part: number;
+  _id: string;  // MongoDB ObjectId,
+  pk?: number;  // Legacy field,
+  part: number;,
   part_detail?: {
-    name: string;
-    description: string;
-    IPN: string;
+    name: string;,
+    description: string;,
+    IPN: string;,
     um?: string;  // Unit of measure
   };
-  quantity: number;
-  received: number;
-  purchase_price: number;
-  purchase_price_currency: string;
-  destination?: number;
-  destination_id?: string;  // MongoDB ObjectId
+  quantity: number;,
+  received: number;,
+  purchase_price: number;,
+  purchase_price_currency: string;,
+  destination?: number;,
+  destination_id?: string;  // MongoDB ObjectId,
   destination_detail?: {
     name: string;
   };
-  reference: string;
+  reference: string;,
   notes: string;
 }
 
 interface Part {
-  _id: string;
-  pk?: number; // Legacy field, may not exist
-  name: string;
-  description: string;
-  IPN?: string;
+  _id: string;,
+  pk?: number; // Legacy field, may not exist,
+  name: string;,
+  description: string;,
+  IPN?: string;,
   ipn?: string; // MongoDB uses lowercase
 }
 
 interface StockLocation {
-  pk: number;
-  name: string;
+  pk: number;,
+  name: string;,
   description?: string;
 }
 
 interface ItemsTabProps {
-  orderId: string;
-  items: PurchaseOrderItem[];
-  orderCurrency: string;
-  stockLocations: StockLocation[];
-  supplierId?: string;
-  onReload: () => void;
+  orderId: string;,
+  items: PurchaseOrderItem[];,
+  orderCurrency: string;,
+  stockLocations: StockLocation[];,
+  supplierId?: string;,
+  onReload: () => void;,
   canEdit: boolean;
 }
 
@@ -117,11 +117,11 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
     setSubmitting(true);
     try {
       const payload = {
-        part_id: newItemData.part, // MongoDB ObjectId as string
+        part_id: newItemData.part, // MongoDB ObjectId as string,
         quantity: newItemData.quantity,
         purchase_price: newItemData.purchase_price || undefined,
         purchase_price_currency: newItemData.purchase_price_currency || undefined,
-        destination_id: newItemData.destination ? newItemData.destination : undefined, // MongoDB ObjectId as string
+        destination_id: newItemData.destination ? newItemData.destination : undefined, // MongoDB ObjectId as string,
         reference: newItemData.reference || undefined,
         notes: newItemData.notes || undefined
       };
@@ -146,7 +146,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
       setItemModalOpened(false);
       onReload();
     } catch (error: any) {
-      console.error('Failed to add item:', error);
+      console.error('Failed to add item:', error);,
       notifications.show({
         title: t('Error'),
         message: error.response?.data?.detail || t('Failed to add item'),
@@ -196,7 +196,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
       setEditingItem(null);
       onReload();
     } catch (error: any) {
-      console.error('Failed to update item:', error);
+      console.error('Failed to update item:', error);,
       notifications.show({
         title: t('Error'),
         message: error.response?.data?.detail || t('Failed to update item'),
@@ -228,7 +228,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
       });
       onReload();
     } catch (error: any) {
-      console.error('Failed to delete item:', error);
+      console.error('Failed to delete item:', error);,
       notifications.show({
         title: t('Error'),
         message: error.response?.data?.detail || t('Failed to delete item'),
@@ -252,7 +252,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
 
     if (itemSortField) {
       filtered.sort((a, b) => {
-        let aVal: any = a[itemSortField];
+        let aVal: any = a[itemSortField];,
         let bVal: any = b[itemSortField];
 
         if (itemSortField === 'part_detail') {
@@ -277,8 +277,8 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
         const aStr = String(aVal).toLowerCase();
         const bStr = String(bVal).toLowerCase();
 
-        if (aStr < bStr) return itemSortDirection === 'asc' ? -1 : 1;
-        if (aStr > bStr) return itemSortDirection === 'asc' ? 1 : -1;
+        if (aStr < bStr) return itemSortDirection === 'asc' ? -1 : 1;,
+        if (aStr > bStr) return itemSortDirection === 'asc' ? 1 : -1;,
         return 0;
       });
     }
@@ -325,38 +325,38 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
       <Table striped withTableBorder withColumnBorders highlightOnHover>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('part_detail')}>
+            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('part_detail')}>,
               <Group gap="xs">
                 {t('Part')}
                 {getItemSortIcon('part_detail')}
               </Group>
             </Table.Th>
             <Table.Th>{t('U.M.')}</Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('quantity')}>
+            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('quantity')}>,
               <Group gap="xs">
                 {t('Quantity')}
                 {getItemSortIcon('quantity')}
               </Group>
             </Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('received')}>
+            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('received')}>,
               <Group gap="xs">
                 {t('Received')}
                 {getItemSortIcon('received')}
               </Group>
             </Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('purchase_price')}>
+            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('purchase_price')}>,
               <Group gap="xs">
                 {t('Unit Price')}
                 {getItemSortIcon('purchase_price')}
               </Group>
             </Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('destination_detail')}>
+            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('destination_detail')}>,
               <Group gap="xs">
                 {t('Destination')}
                 {getItemSortIcon('destination_detail')}
               </Group>
             </Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('reference')}>
+            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleItemSort('reference')}>,
               <Group gap="xs">
                 {t('Reference')}
                 {getItemSortIcon('reference')}
@@ -368,11 +368,11 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
         <Table.Tbody>
           {filteredAndSortedItems.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={canEdit ? 8 : 7}>
+              <Table.Td colSpan={canEdit ? 8 : 7}>,
                 {itemSearchQuery ? t('No results found') : t('No items')}
               </Table.Td>
             </Table.Tr>
-          ) : (
+          ) : (,
             filteredAndSortedItems.map((item) => (
               <Table.Tr key={item._id}>
                 <Table.Td>
