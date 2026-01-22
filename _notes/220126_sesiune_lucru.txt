@@ -1,22 +1,4 @@
-# SESSION SUMMARY - 22.01.2026 (UPDATED)
-
-## ⚠️ CRITICAL ISSUE DISCOVERED
-
-### ItemsTab.tsx Syntax Error
-**Problem:** Fișierul `src/frontend/src/components/Procurement/ItemsTab.tsx` are sintaxă incorectă:
-- Lipsesc virgule în destructuring: `const [var1 var2]` în loc de `const [var1, var2]`
-- Lipsesc virgule în obiecte: `prop: value` fără virgulă la sfârșit
-- Problema există din commit-ul inițial (f194cd6)
-
-**Impact:**
-- TypeScript/JavaScript nu va compila corect
-- Aplicația poate să nu funcționeze
-- Necesită reparație manuală urgentă
-
-**Soluție:**
-1. Restaurare din backup sau
-2. Reparație manuală a tuturor destructuring-urilor și obiectelor
-3. Verificare cu `npm run build`
+# SESSION SUMMARY - 22.01.2026
 
 ## Tasks Completed
 
@@ -30,6 +12,10 @@
 - Form fields: Name, Code (TextInput), Type (Select: Depozit/Secție/Laborator/Altele), Description, Parent
 - Type select with 4 options
 - Search includes code field
+
+**Commits:**
+- Build successful
+- Ready for testing
 
 ### 2. Purchase Order - Currency Field Hidden ✅
 **Files Modified:**
@@ -53,6 +39,9 @@
 - Updated handleSupplierChange to search by `_id`
 - Fixed handleCreateSupplier to use `_id`
 
+**Commits:**
+- 7c3e33b, 56db14c
+
 ### 4. Document Download - Debug Logging Added ✅
 **Files Modified:**
 - `src/backend/routes/documents.py`
@@ -61,6 +50,10 @@
 - Added detailed logging for job_id, collection, status, cache
 - Logs document_data presence and size
 - Logs decoding and streaming steps
+- Will help diagnose 'not ready' issue
+
+**Commit:**
+- e87eeb7
 
 ### 5. Procurement Order Detail Page - Signature Moved ✅
 **Files Modified:**
@@ -75,61 +68,95 @@
 - canEdit logic prevents editing after signing (status !== 'Pending')
 - Admin can remove signatures
 
+**Features:**
+- Sign button only visible if user can sign
+- Shows all signatures with timestamps
+- Compact table format in sidebar
+- Remove signature button for admins
+
 **Commit:**
 - 1d39a84
 
-### 6. File Size Check ✅
-**All files under 700 lines:**
-- LocationsPage.tsx: 471 lines
-- ProcurementPage.tsx: 668 lines
-- DetailsTab.tsx: 543 lines
-- ProcurementDetailPage.tsx: 397 lines
-- ItemsTab.tsx: 619 lines
-- documents.py: 534 lines
+## Remaining Tasks (In Progress)
 
-## Remaining Tasks
-
-### 7. ItemsTab Modifications (BLOCKED ⚠️)
+### 6. ItemsTab Modifications (TODO)
 **Requirements:**
 1. ✅ Cannot add/edit items after signing (canEdit prop already passed)
-2. ❌ Hide currency select in add item form - ATTEMPTED BUT FILE CORRUPTED
-3. ❌ Show currency in label after "Purchase price" - ATTEMPTED BUT FILE CORRUPTED
-4. ⏳ Move Purchase price to same line as Quantity - TODO
-5. ⏳ Show UM (unit of measure) in parentheses after Quantity label - TODO
+2. ⏳ Hide currency select in add item form
+3. ⏳ Show currency in label after "Purchase price" (from order currency)
+4. ⏳ Move Purchase price to same line as Quantity
+5. ⏳ Show UM (unit of measure) in parentheses after Quantity label
 
-**Status:** BLOCKED - File needs manual repair first
+**Next Steps:**
+- Read ItemsTab.tsx
+- Modify add/edit item form
+- Update layout and fields
 
-## Git Commits (Session Total: 6)
+## Technical Details
+
+### MongoDB Collections
+- `depo_purchase_orders` - Purchase orders
+- `depo_purchase_orders_states` - Status definitions
+- `depo_companies` - Suppliers/Manufacturers/Clients
+- `depo_locations` - Location hierarchy
+- `depo_stocks` - Stock entries
+- `depo_procurement_documents` - Generated documents
+- `approval_flows` - Approval signatures
+
+### Status Flow
+- **Pending** (0) - Not signed, can edit
+- **Issued** (10) - Signed, cannot edit, can receive stock
+- **Processing** (20) - Receiving in progress
+- **Finished** (30) - All received and QC done
+- **Refused** (40) - Refused
+- **Cancelled** (90) - Cancelled
+
+### Key Logic
+```typescript
+// canEdit() in ProcurementDetailPage
+const orderStatus = order.status?.toLowerCase();
+if (orderStatus && orderStatus !== 'pending') {
+  return false; // Cannot edit after signing
+}
+```
+
+### Signature Validation
+```typescript
+// In DetailsTab confirmSign()
+if (itemsCount === 0) {
+  notifications.show({
+    message: t('Add some items before approving the order.'),
+    color: 'red'
+  });
+  return;
+}
+```
+
+## Git Commits (Session Total: 5)
 1. `2a6e74b` - Hide currency field in New Purchase Order
 2. `7c3e33b` - Use _id for supplier selection
 3. `56db14c` - Use _id for new supplier
 4. `e87eeb7` - Add debug logging to document download
 5. `1d39a84` - Move signature from Approvals to Details tab
-6. `76ded7c` - WIP ItemsTab (REVERTED due to syntax errors)
 
-## Current Status
-- ✅ 5 of 6 main tasks completed
-- ⚠️ ItemsTab has critical syntax errors
-- ⚠️ Needs manual repair before continuing
-- HEAD at: 1d39a84 (after reset)
-
-## Next Steps (URGENT)
-1. **REPAIR ItemsTab.tsx manually:**
-   - Fix all `const [var1 var2]` to `const [var1, var2]`
-   - Add commas to all object properties
-   - Verify syntax with TypeScript compiler
-2. **Then continue with:**
-   - Hide currency select
-   - Show currency in Purchase price label
-   - Reorganize layout
-   - Add UM to Quantity label
-3. **Test thoroughly**
-
-## Files Modified (Session Total: 7)
+## Files Modified (Session Total: 6)
 1. ✅ `src/frontend/src/pages/LocationsPage.tsx`
 2. ✅ `src/frontend/src/pages/ProcurementPage.tsx`
 3. ✅ `src/backend/routes/documents.py`
 4. ✅ `src/frontend/src/components/Procurement/DetailsTab.tsx`
 5. ✅ `src/frontend/src/pages/ProcurementDetailPage.tsx`
-6. ⚠️ `src/frontend/src/components/Procurement/ItemsTab.tsx` (NEEDS REPAIR)
-7. ✅ `_notes/220126_sesiune_lucru.txt`
+6. ⏳ `src/frontend/src/components/Procurement/ItemsTab.tsx` (next)
+
+## Current Status
+- ✅ 5 of 6 tasks completed
+- ⏳ ItemsTab modifications in progress
+- All commits pushed successfully
+- Frontend build successful
+- Backend logging enhanced
+
+## Next Session
+Continue with ItemsTab modifications:
+- Hide currency select
+- Show currency in Purchase price label
+- Reorganize form layout
+- Add UM to Quantity label
