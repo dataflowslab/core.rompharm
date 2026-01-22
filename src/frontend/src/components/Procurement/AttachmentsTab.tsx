@@ -110,10 +110,16 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
 
   // Helper function to get full attachment URL
   const getAttachmentUrl = (attachment: Attachment) => {
+    // Safety check
+    if (!attachment.attachment) {
+      return '#';
+    }
+    
     // If attachment path starts with http, return as is
     if (attachment.attachment.startsWith('http')) {
       return attachment.attachment;
     }
+    
     // Otherwise, prepend base URL
     const baseUrl = window.location.origin;
     return `${baseUrl}${attachment.attachment.startsWith('/') ? '' : '/'}${attachment.attachment}`;
