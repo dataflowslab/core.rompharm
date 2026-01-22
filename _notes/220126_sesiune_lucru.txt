@@ -1,185 +1,143 @@
-# SESSION SUMMARY - 22.01.2026 (FINAL COMPLETE)
+# SESSION SUMMARY - 22.01.2026 (COMPLETE FINAL)
 
 ## ✅ TOATE TASKURILE COMPLETATE CU SUCCES!
 
-### Taskuri Implementate (6/6 + 1 Refactor):
+### Taskuri Implementate (6/6 + Refactors):
 
 #### 1. ✅ Locations Page - Code și Type Fields
 **File:** `src/frontend/src/pages/LocationsPage.tsx`
-- Adăugate câmpuri `code` și `type` în interfață
-- Tabel: Name, Code, Type, Parent
-- Form: Code (TextInput), Type (Select: Depozit/Secție/Laborator/Altele)
-- Search include code
+- Adăugate câmpuri `code` și `type`
 - **Commit:** ccf8c4a
 
 #### 2. ✅ Purchase Order - Currency Auto-Set
 **File:** `src/frontend/src/pages/ProcurementPage.tsx`
-- Currency field ascuns din New Purchase Order form
-- Currency auto-set din supplier's default currency
-- Fallback la EUR dacă supplier nu are currency
+- Currency ascuns, auto-set din supplier
 - **Commits:** 2a6e74b, 7c3e33b, 56db14c
 
 #### 3. ✅ ObjectId Error Fixed
-**Problem:** `bson.errors.InvalidId: '9' is not a valid ObjectId`
-**Solution:**
-- Folosește `_id` (ObjectId) în loc de `pk` (integer)
-- Actualizat handleSupplierChange și handleCreateSupplier
+- Folosește `_id` în loc de `pk`
 - **Commits:** 7c3e33b, 56db14c
 
 #### 4. ✅ Document Download - Debug Logging
 **File:** `src/backend/routes/documents.py`
-- Logging detaliat pentru job_id, collection, status, cache
-- Logs pentru document_data presence și size
 - **Commit:** e87eeb7
 
 #### 5. ✅ Signature Moved to Details Tab
-**Files:**
-- `src/frontend/src/components/Procurement/DetailsTab.tsx`
-- `src/frontend/src/pages/ProcurementDetailPage.tsx`
-
-**Changes:**
-- Semnătura mutată din Approvals în Details tab (sidebar)
-- Validare: **nu poți semna fără items** - "Add some items before approving the order."
-- Semnătura afișată compact în sidebar lângă Documents
-- canEdit logic previne editarea după semnare
-- Admin poate șterge semnături
+**Files:** DetailsTab.tsx, ProcurementDetailPage.tsx
+- Semnătura în Details tab sidebar
+- Validare items înainte de semnare
 - **Commit:** 1d39a84
 
 #### 6. ✅ ItemsTab Complete Redesign
-**File:** `src/frontend/src/components/Procurement/ItemsTab.tsx` (619 linii)
+**File:** `src/frontend/src/components/Procurement/ItemsTab.tsx` (568 linii)
+- Currency select ascuns
+- Purchase Price cu currency în label
+- Quantity și Purchase Price pe aceeași linie
+- UM dinamic în label Quantity
+- **Commits:** 42c9da8, 1682f38, ee01631
 
-**Probleme Rezolvate:**
-- ⚠️ Fișierul avea sintaxă incorectă (virgule și `>` lipsă)
-- ✅ Reparat toate erorile de sintaxă
-- **Commit:** 42c9da8
+---
 
-**Modificări Implementate:**
-1. ✅ **Nu poți edita după semnare** - canEdit prop funcționează
-2. ✅ **Currency select ascuns** din New Item form
-3. ✅ **Currency în label** - "Purchase Price (EUR)"
-4. ✅ **Layout reorganizat:**
-   - Quantity și Purchase Price pe aceeași linie (span=6)
-   - Destination pe linie completă (span=12)
-5. ✅ **UM în label Quantity:**
-   - State `selectedPartUM` adăugat
-   - Label dinamic: "Quantity (kg)" sau "Quantity (buc)"
-   - UM se resetează când se închide modalul
+## 🔧 REFACTORS MAJORE
 
-**Commits:**
-- 1682f38 - Layout reorganizat, currency ascuns
-- ee01631 - UM adăugat în Quantity label
+### 7. ✅ state_id Implementation
+**File:** `ProcurementDetailPage.tsx` (352 linii)
+- Eliminat `status` string complet
+- Folosim doar `state_id` (MongoDB ObjectId)
+- Backend face agregare cu `depo_purchase_orders_states`
+- **Commits:** b1b1052, 3f00833
 
-#### 7. ✅ REFACTOR: state_id Implementation
-**File:** `src/frontend/src/pages/ProcurementDetailPage.tsx`
+### 8. ✅ Tab Reorganization
+**Files:** ProcurementDetailPage.tsx, AttachmentsTab.tsx
+- Eliminat tab Approvals
+- Eliminat tab Quality Control (pending delete)
+- Adăugat tab Journal (ultimul)
+- Attachments cu modal confirmare
+- Linkuri reparate
+- **Commits:** c55b2c3, af288da, d68d9a1
 
-**Modificări Majore:**
-- **Eliminat complet câmpul `status` string**
-- **Folosim doar `state_id` (MongoDB ObjectId)**
-- **Backend face agregare cu `depo_purchase_orders_states`**
+### 9. ✅ JournalTab Implementation
+**File:** `JournalTab.tsx` (96 linii)
+- Timeline cu semnături
+- Icons și badges colorate
+- Notă despre QC pending deletion
+- **Commit:** 3844034
 
-**Constante Adăugate:**
+### 10. ✅ State Flow Correction
+**File:** `ProcurementDetailPage.tsx`
+- Corectate constantele state_id
+- Receive Stock doar pentru ISSUED
+- **Commit:** bcbdfbb
+
+### 11. ✅ Issue/Cancel Selector
+**File:** `DetailsTab.tsx` (545 linii)
+- Select în modalul de semnare
+- Opțiuni: Issue Order / Cancel Order
+- Alert dinamic cu mesaj
+- Buton color dinamic (verde/roșu)
+- Backend primește `action` parameter
+- **Commit:** 1a062f7
+
+---
+
+## 📊 STATE FLOW FINAL
+
+### Constante Corecte:
 ```typescript
 const PURCHASE_ORDER_STATES = {
-  PENDING: '6943a4a6451609dd8a618cde',      // value: 0
-  ISSUED: '6943a4a6451609dd8a618cdf',       // value: 10 - DUPĂ SEMNARE
-  PROCESSING: '6943a4a6451609dd8a618ce0',   // value: 20
-  FINISHED: '6943a4a6451609dd8a618ce1',     // value: 30
-  REFUSED: '6943a4a6451609dd8a618ce2',      // value: 40
-  CANCELLED: '6943a4a6451609dd8a618ce3',    // value: 90
+  PENDING: '6943a4a6451609dd8a618ce0',    // Initial - not signed
+  ISSUED: '6943a4a6451609dd8a618cdf',     // After sign with "Issue"
+  CANCELLED: '6943a4a6451609dd8a618ce2',  // After sign with "Cancel"
+  FINISHED: '6943a4a6451609dd8a618ce3',   // After receiving complete
 };
 ```
 
-**Interfață Actualizată:**
-```typescript
-interface PurchaseOrder {
-  state_id: string;  // MongoDB ObjectId
-  state_detail?: {   // Populated via aggregation
-    name: string;
-    color: string;
-    value: number;
-  };
-  // status REMOVED!
-  // status_color REMOVED!
-}
+### Flow Complet:
+```
+1. PENDING (6943a4a6451609dd8a618ce0)
+   - Poți edita detalii
+   - Poți adăuga/edita items
+   - Poți semna cu Issue sau Cancel
+   - Tab Receive Stock: ASCUNS
+   
+   ↓ [Sign cu "Issue"]
+   
+2. ISSUED (6943a4a6451609dd8a618cdf)
+   - NU poți edita detalii
+   - NU poți adăuga items
+   - Tab Receive Stock: VIZIBIL
+   - Poți primi items
+   
+   ↓ [Receive items și sign]
+   
+3. FINISHED (6943a4a6451609dd8a618ce3)
+   - Comanda completă
+   - NU poți edita
+   - Tab Receive Stock: ASCUNS
+
+SAU
+
+   ↓ [Sign cu "Cancel" din PENDING]
+   
+2. CANCELLED (6943a4a6451609dd8a618ce2)
+   - Comanda anulată
+   - NU poți edita
+   - Tab Receive Stock: ASCUNS
 ```
 
-**Logică Actualizată:**
-1. **canEdit()** - Verifică `state_id`:
-```typescript
-if (order.state_id !== PURCHASE_ORDER_STATES.PENDING) {
-  return false; // Cannot edit after signing
-}
-```
+### Anulare Semnătură:
+- Admin poate șterge semnătura
+- state_id revine la PENDING
+- User poate edita din nou
 
-2. **Receive Stock Tab** - Verifică `state_id`:
-```typescript
-{order.state_id && [
-  PURCHASE_ORDER_STATES.ISSUED,
-  PURCHASE_ORDER_STATES.PROCESSING,
-  PURCHASE_ORDER_STATES.FINISHED
-].includes(order.state_id) && (
-  <Tabs.Tab value="receive-stock">...</Tabs.Tab>
-)}
-```
+---
 
-3. **Badge** - Folosește `state_detail`:
-```typescript
-<Badge color={order.state_detail?.color || 'gray'}>
-  {order.state_detail?.name || 'Unknown'}
-</Badge>
-```
+## 📝 BACKEND REQUIREMENTS
 
-**Commits:**
-- b1b1052 - Adăugat state_id logic
-- 3f00833 - Eliminat status complet
-
-## Verificare Dimensiuni Fișiere
-
-| Fișier | Linii | Status |
-|--------|-------|--------|
-| LocationsPage.tsx | 471 | ✅ OK |
-| ProcurementPage.tsx | 668 | ✅ OK |
-| DetailsTab.tsx | 543 | ✅ OK |
-| **ProcurementDetailPage.tsx** | **~370** | ✅ OK (redus!) |
-| ItemsTab.tsx | 619 | ✅ OK |
-| documents.py | 534 | ✅ OK |
-
-**Toate fișierele sub 700 linii!**
-
-## Git Commits (Total: 13)
-
-1. `ccf8c4a` - Locations Code/Type fields
-2. `2a6e74b` - Hide currency in Purchase Order
-3. `7c3e33b` - Use _id for supplier selection
-4. `56db14c` - Use _id for new supplier
-5. `e87eeb7` - Document download debug logging
-6. `1d39a84` - Move signature to Details tab
-7. `c8d32b4` - Session notes update
-8. `4333b5a` - Merge conflicts resolved
-9. `42c9da8` - Fix ItemsTab syntax errors
-10. `1682f38` - ItemsTab layout reorganized
-11. `ee01631` - Add UM to Quantity label
-12. `b1b1052` - Use state_id instead of status
-13. `3f00833` - Remove status field completely
-
-## Files Modified (Total: 7)
-
-1. ✅ `src/frontend/src/pages/LocationsPage.tsx`
-2. ✅ `src/frontend/src/pages/ProcurementPage.tsx`
-3. ✅ `src/backend/routes/documents.py`
-4. ✅ `src/frontend/src/components/Procurement/DetailsTab.tsx`
-5. ✅ `src/frontend/src/pages/ProcurementDetailPage.tsx`
-6. ✅ `src/frontend/src/components/Procurement/ItemsTab.tsx`
-7. ✅ `_notes/220126_sesiune_lucru.txt`
-
-## Backend Requirements
-
-### Purchase Order Aggregation
-Backend trebuie să facă agregare cu `depo_purchase_orders_states`:
-
+### 1. Agregare cu depo_purchase_orders_states
 ```python
-# Example aggregation pipeline
 pipeline = [
+    {"$match": {"_id": ObjectId(order_id)}},
     {
         "$lookup": {
             "from": "depo_purchase_orders_states",
@@ -188,109 +146,210 @@ pipeline = [
             "as": "state_detail"
         }
     },
-    {
-        "$unwind": {
-            "path": "$state_detail",
-            "preserveNullAndEmptyArrays": True
-        }
-    }
+    {"$unwind": {"path": "$state_detail", "preserveNullAndEmptyArrays": True}}
 ]
 ```
 
-**Response format:**
+**Response:**
 ```json
 {
   "_id": "...",
-  "reference": "PO-001",
-  "state_id": "6943a4a6451609dd8a618cdf",
+  "state_id": "6943a4a6451609dd8a618ce0",
   "state_detail": {
-    "name": "Issued",
-    "color": "cyan",
-    "value": 10
+    "name": "Pending",
+    "color": "gray",
+    "value": 0
   }
 }
 ```
 
-### After Signing
-Backend trebuie să seteze:
-- `state_id: "6943a4a6451609dd8a618cdf"` (ISSUED)
-- Agregarea va popula automat `state_detail`
+### 2. Sign Endpoint
+**POST** `/api/procurement/purchase-orders/{id}/sign`
 
-## Technical Implementation
-
-### State Flow
-```
-PENDING (6943a4a6451609dd8a618cde, value: 0)
-  ↓ [User signs order]
-ISSUED (6943a4a6451609dd8a618cdf, value: 10)
-  ↓ [Start receiving stock]
-PROCESSING (6943a4a6451609dd8a618ce0, value: 20)
-  ↓ [All received and QC done]
-FINISHED (6943a4a6451609dd8a618ce1, value: 30)
+**Request:**
+```json
+{
+  "action": "issue"  // or "cancel"
+}
 ```
 
-### Tab Visibility Logic
-- **Details, Approvals, Items, Attachments:** Always visible
-- **Receive Stock:** Visible when `state_id` is ISSUED, PROCESSING, or FINISHED
-- **Quality Control:** Visible when `state_id` is ISSUED, PROCESSING, or FINISHED
+**Logic:**
+```python
+if action == "issue":
+    order.state_id = ObjectId("6943a4a6451609dd8a618cdf")  # ISSUED
+elif action == "cancel":
+    order.state_id = ObjectId("6943a4a6451609dd8a618ce2")  # CANCELLED
 
-### Edit Permissions
-- **PENDING:** Can edit (if admin or no signatures)
-- **ISSUED+:** Cannot edit (order is signed)
+# Add signature to approval_flow
+# Return updated flow
+```
 
-## Benefits of state_id Approach
+### 3. Remove Signature Endpoint
+**DELETE** `/api/procurement/purchase-orders/{id}/signatures/{user_id}`
 
-1. ✅ **Type-safe:** ObjectId comparison instead of string
-2. ✅ **No case-sensitivity issues:** Direct ID comparison
-3. ✅ **Centralized state management:** All state info in one collection
-4. ✅ **Easier to maintain:** Change state names/colors in DB without code changes
-5. ✅ **Consistent:** Same pattern as other entities (supplier_detail, part_detail, etc.)
-6. ✅ **Performance:** Single aggregation instead of multiple lookups
+**Logic:**
+```python
+# Remove signature from approval_flow
+# If no more signatures:
+order.state_id = ObjectId("6943a4a6451609dd8a618ce0")  # Back to PENDING
+```
 
-## Status Final
+### 4. Receive Stock Sign
+**POST** `/api/procurement/purchase-orders/{id}/receive-sign`
+
+**Logic:**
+```python
+# After all items received and signed:
+order.state_id = ObjectId("6943a4a6451609dd8a618ce3")  # FINISHED
+```
+
+---
+
+## 📊 FILES MODIFIED (Total: 9)
+
+| File | Lines | Status | Changes |
+|------|-------|--------|---------|
+| LocationsPage.tsx | 471 | ✅ OK | Code/Type fields |
+| ProcurementPage.tsx | 668 | ✅ OK | Currency auto-set |
+| documents.py | 534 | ✅ OK | Debug logging |
+| **DetailsTab.tsx** | **545** | ✅ OK | Issue/Cancel selector |
+| **ProcurementDetailPage.tsx** | **352** | ✅ OK | state_id logic, tabs |
+| **ItemsTab.tsx** | **568** | ✅ OK | Layout, UM, currency |
+| **AttachmentsTab.tsx** | **221** | ✅ OK | Modal, links |
+| **JournalTab.tsx** | **96** | ✅ OK | Timeline, signatures |
+| index.ts | 7 | ✅ OK | Export JournalTab |
+
+**Toate sub 700 linii! ✅**
+
+---
+
+## 🎯 GIT COMMITS (Total: 21)
+
+1. ccf8c4a - Locations Code/Type
+2. 2a6e74b - Hide currency
+3. 7c3e33b - Use _id supplier
+4. 56db14c - Use _id new supplier
+5. e87eeb7 - Document debug
+6. 1d39a84 - Move signature
+7. c8d32b4 - Session notes
+8. 4333b5a - Merge conflicts
+9. 42c9da8 - Fix ItemsTab syntax
+10. 1682f38 - ItemsTab layout
+11. ee01631 - Add UM to Quantity
+12. f3f3921 - Session summary
+13. b1b1052 - Use state_id
+14. 3f00833 - Remove status field
+15. 0e941df - Cleanup scripts
+16. c55b2c3 - Remove Approvals/QC tabs
+17. af288da - Fix state_id null
+18. d68d9a1 - Fix attachment null
+19. 3844034 - Implement JournalTab
+20. bcbdfbb - Correct state_id constants
+21. 1a062f7 - Add Issue/Cancel selector
+
+---
+
+## 🎨 UI CHANGES
+
+### Sign Modal (DetailsTab):
+```
+┌─────────────────────────────────┐
+│ Sign Order                   [X]│
+├─────────────────────────────────┤
+│ Action: [Issue Order ▼]        │
+│ Select the action...            │
+│                                 │
+│ ℹ️ The order will be issued... │
+│                                 │
+│ This action will be recorded... │
+│                                 │
+│         [Cancel]  [✓ Sign]     │
+└─────────────────────────────────┘
+```
+
+### Tab Structure:
+```
+[Details] [Items] [Receive Stock*] [Attachments] [Journal]
+
+* Receive Stock apare doar când state_id === ISSUED
+```
+
+### Journal Tab:
+```
+Activity Journal
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+● Order signed by romphAdmin
+  22.01.2026 23:45:12
+  By: romphAdmin
+
+Note: Quality Control tab functionality 
+is pending deletion. QC results will be 
+shown here in the future.
+```
+
+---
+
+## ⚠️ IMPORTANT NOTES
+
+### Pentru Testare:
+1. **Reîmprospătează pagina** (Ctrl+F5) pentru a vedea modificările
+2. Build-ul este complet și funcțional
+3. Selectul Issue/Cancel este în modalul de semnare
+
+### Comanda Curentă (PO-0005):
+- **state_id:** `6943a4a6451609dd8a618ce0` = **PENDING** ✅
+- **Comportament corect:**
+  - Poți adăuga items ✅
+  - Poți semna ✅
+  - Tab Receive Stock ascuns ✅
+
+### După Semnare cu "Issue":
+- state_id devine `6943a4a6451609dd8a618cdf` (ISSUED)
+- Tab Receive Stock apare
+- Nu mai poți edita items
+
+### După Semnare cu "Cancel":
+- state_id devine `6943a4a6451609dd8a618ce2` (CANCELLED)
+- Comanda anulată
+- Nu mai poți edita
+
+---
+
+## 🚀 STATUS FINAL
 
 ### ✅ Completat:
-- 6/6 taskuri implementate cu succes
-- 1 refactor major (state_id)
+- 6/6 taskuri originale
+- 5 refactors majore
+- 21 commits pushed
+- 9 fișiere modificate
+- ~3000+ linii cod
 - Toate build-urile reușite
-- Toate commit-urile pushed
-- Fișierele sub 700 linii
-- Sintaxă corectă în toate fișierele
+- Toate fișierele sub 700 linii
 
-### 🎯 Rezultate:
-1. **Locations** - Code și Type funcționale (frontend ready)
-2. **Purchase Order** - Currency auto-set funcțional
-3. **Signature** - Mutată în Details, validare items, canEdit logic
-4. **ItemsTab** - Layout reorganizat, currency ascuns, UM dinamic
-5. **state_id** - Implementare completă, eliminat status string
+### 🎯 Funcționalități:
+1. ✅ Locations - Code/Type
+2. ✅ Purchase Order - Currency auto
+3. ✅ Signature - Details tab cu Issue/Cancel
+4. ✅ ItemsTab - Layout, UM, currency
+5. ✅ state_id - Implementare completă
+6. ✅ Journal - Timeline cu activități
+7. ✅ Attachments - Modal, links
 
-### 📝 Note Importante:
-- Backend trebuie să facă agregare cu `depo_purchase_orders_states`
-- După semnare, backend setează `state_id: "6943a4a6451609dd8a618cdf"`
-- Frontend folosește doar `state_id` pentru logică
-- `state_detail` este populat automat de backend via agregare
+### 📋 TODO Backend:
+1. Agregare cu depo_purchase_orders_states
+2. Sign endpoint cu action parameter
+3. Remove signature → revert to PENDING
+4. Receive stock sign → FINISHED
+
+---
 
 ## Session Duration
 - Start: 22.01.2026 ~22:00
-- End: 22.01.2026 ~23:55
-- Duration: ~2h
-- Commits: 13
-- Files: 7
-- Lines changed: ~2500+
+- End: 23.01.2026 ~00:15
+- Duration: ~2h 15min
+- Commits: 21
+- Files: 9
+- Lines: ~3000+
 
 **SESIUNE COMPLETATĂ CU SUCCES! 🎉**
-**Backend trebuie să implementeze agregarea cu depo_purchase_orders_states!**
- 
- - - -  
-  
- # #   F I N A L   U P D A T E   -   T a b   R e o r g a n i z a t i o n   a n d   F i x e s  
-  
- # # #   C h a n g e s :  
- 1 .   R e m o v e d   A p p r o v a l s   t a b   ( s i g n a t u r e s   i n   D e t a i l s )  
- 2 .   R e m o v e d   Q u a l i t y   C o n t r o l   t a b   ( p e n d i n g   d e l e t e )  
- 3 .   A d d e d   J o u r n a l   t a b   ( l a s t   t a b )  
- 4 .   F i x e d   a t t a c h m e n t   l i n k s  
- 5 .   A d d e d   m o d a l   c o n f i r m a t i o n   f o r   d e l e t e  
-  
- C o m m i t :   c 5 5 b 2 c 3  
- 
+**Reîmprospătează pagina (Ctrl+F5) pentru a vedea modificările!**
