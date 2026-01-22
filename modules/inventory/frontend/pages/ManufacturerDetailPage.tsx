@@ -172,7 +172,7 @@ export function ManufacturerDetailPage() {
         payment_conditions: data.payment_conditions || '',
         delivery_conditions: data.delivery_conditions || '',
         bank_account: data.bank_account || '',
-        currency_id: data.currency_id || '',
+        currency_id: data.currency_id || null,
         is_supplier: data.is_supplier || false,
         is_manufacturer: data.is_manufacturer || false,
         is_client: data.is_client || false,
