@@ -40,7 +40,7 @@ interface PurchaseOrder {
     _id: string;
   };
   supplier_reference: string;
-  order_currency?: string;
+  order_currency: string;
   currency?: string;
   issue_date: string;
   target_date: string;
