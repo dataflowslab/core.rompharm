@@ -269,8 +269,8 @@ export function ProcurementPage() {
       return;
     }
     
-    // Find supplier and get currency
-    const supplier = suppliers.find(s => String(s.pk || s._id) === value);
+    // Find supplier by _id and get currency
+    const supplier = suppliers.find(s => String(s._id) === value);
     const supplierCurrency = supplier?.currency || 'EUR';
     
     // Update both supplier_id and currency
@@ -282,8 +282,8 @@ export function ProcurementPage() {
   };
 
   const supplierOptions = [
-    ...suppliers.filter(s => (s.pk || s._id) != null).map(s => ({ 
-      value: String(s.pk || s._id), 
+    ...suppliers.filter(s => s._id != null).map(s => ({ 
+      value: String(s._id), 
       label: s.name 
     })),
     { value: '__new__', label: `➕ ${t('New supplier')}` }
