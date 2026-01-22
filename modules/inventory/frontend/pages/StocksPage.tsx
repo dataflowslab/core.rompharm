@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Title,
@@ -11,10 +11,13 @@ import {
   Badge,
   Text,
   Select,
+  Stack,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { IconSearch } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from '../../../../src/frontend/src/services/api';
+import { formatDate } from '../../../../src/frontend/src/utils/dateFormat';
 
 interface Stock {
   _id: string;
@@ -36,6 +39,7 @@ interface Stock {
   };
   stock_value: number;
   supplier_name?: string;
+  supplier_batch_code?: string;
   quantity: number;
   received_date?: string;
 }
@@ -45,34 +49,129 @@ interface Location {
   name: string;
 }
 
+interface StockState {
+  _id: string;
+  name: string;
+  value: number;
+  color: string;
+}
+
+// LocalStorage key for filters
+const FILTERS_STORAGE_KEY = 'stocks_filters';
+const FILTERS_EXPIRY_HOURS = 9;
+
+interface StoredFilters {
+  search: string;
+  locationFilter: string;
+  statusFilter: string;
+  dateRange: [string | null, string | null];
+  timestamp: number;
+}
+
 export function StocksPage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Filters state
   const [search, setSearch] = useState('');
-  const [locationFilter, setLocationFilter] = useState<string>(searchParams.get('location') || '');
+  const [locationFilter, setLocationFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+  
+  // Options
   const [locations, setLocations] = useState<Location[]>([]);
+  const [stockStates, setStockStates] = useState<StockState[]>([]);
 
+  // Load filters from localStorage on mount
+  useEffect(() => {
+    loadFiltersFromStorage();
+    fetchLocations();
+    fetchStockStates();
+  }, []);
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    saveFiltersToStorage();
+  }, [search, locationFilter, statusFilter, dateRange]);
+
+  // Fetch stocks when filters change
   useEffect(() => {
     fetchStocks();
-    fetchLocations();
-  }, [search, locationFilter]);
+  }, [search, locationFilter, statusFilter, dateRange]);
 
-  // Update location filter from URL params
-  useEffect(() => {
-    const locationParam = searchParams.get('location');
-    if (locationParam) {
-      setLocationFilter(locationParam);
+  const loadFiltersFromStorage = () => {
+    try {
+      const stored = localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (stored) {
+        const filters: StoredFilters = JSON.parse(stored);
+        
+        // Check if filters are still valid (within 9 hours)
+        const now = Date.now();
+        const expiryTime = filters.timestamp + (FILTERS_EXPIRY_HOURS * 60 * 60 * 1000);
+        
+        if (now < expiryTime) {
+          setSearch(filters.search || '');
+          setLocationFilter(filters.locationFilter || '');
+          setStatusFilter(filters.statusFilter || '');
+          
+          // Parse date range
+          if (filters.dateRange) {
+            const [start, end] = filters.dateRange;
+            setDateRange([
+              start ? new Date(start) : null,
+              end ? new Date(end) : null,
+            ]);
+          }
+        } else {
+          // Filters expired, clear them
+          localStorage.removeItem(FILTERS_STORAGE_KEY);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load filters from storage:', error);
     }
-  }, [searchParams]);
+  };
+
+  const saveFiltersToStorage = () => {
+    try {
+      const filters: StoredFilters = {
+        search,
+        locationFilter,
+        statusFilter,
+        dateRange: [
+          dateRange[0] ? dateRange[0].toISOString() : null,
+          dateRange[1] ? dateRange[1].toISOString() : null,
+        ],
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
+    } catch (error) {
+      console.error('Failed to save filters to storage:', error);
+    }
+  };
 
   const fetchStocks = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      
+      // Search: batch_code, ipn, supplier_batch_code, supplier_name
       if (search) params.append('search', search);
-      if (locationFilter) params.append('location', locationFilter);
+      
+      // Location filter
+      if (locationFilter) params.append('location_id', locationFilter);
+      
+      // Status filter
+      if (statusFilter) params.append('state_id', statusFilter);
+      
+      // Date range filter
+      if (dateRange[0]) {
+        params.append('start_date', dateRange[0].toISOString().split('T')[0]);
+      }
+      if (dateRange[1]) {
+        params.append('end_date', dateRange[1].toISOString().split('T')[0]);
+      }
 
       const response = await api.get(`/modules/inventory/api/stocks?${params.toString()}`);
       setStocks(response.data.results || []);
@@ -96,21 +195,13 @@ export function StocksPage() {
     }
   };
 
-  const handleLocationFilterChange = (value: string | null) => {
-    const newValue = value || '';
-    setLocationFilter(newValue);
-    
-    // Update URL params
-    if (newValue) {
-      setSearchParams({ location: newValue });
-    } else {
-      setSearchParams({});
+  const fetchStockStates = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/stock-states');
+      setStockStates(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch stock states:', error);
     }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString();
   };
 
   const getStatusBadge = (stock: Stock) => {
@@ -129,14 +220,6 @@ export function StocksPage() {
     return <Badge color="gray">{stock.status}</Badge>;
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('ro-RO', {
-      style: 'currency',
-      currency: 'RON',
-      minimumFractionDigits: 2,
-    }).format(value);
-  };
-
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
@@ -144,27 +227,50 @@ export function StocksPage() {
       </Group>
 
       <Paper p="md" mb="md">
-        <Group>
-          <TextInput
-            placeholder="Search stocks..."
-            leftSection={<IconSearch size={16} />}
-            value={search}
-            onChange={(e) => setSearch(e.currentTarget.value)}
-            style={{ flex: 1 }}
-          />
-          <Select
-            placeholder="Location filter"
-            data={[
-              { value: '', label: 'All Locations' },
-              ...locations.map(l => ({ value: l._id, label: l.name }))
-            ]}
-            value={locationFilter}
-            onChange={handleLocationFilterChange}
-            searchable
-            clearable
-            style={{ minWidth: '200px' }}
-          />
-        </Group>
+        <Stack gap="sm">
+          {/* First row: Search and Location */}
+          <Group grow>
+            <TextInput
+              placeholder="Search by batch code, IPN, supplier batch, supplier name..."
+              leftSection={<IconSearch size={16} />}
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+            />
+            <Select
+              placeholder="All Locations"
+              data={[
+                { value: '', label: 'All Locations' },
+                ...locations.map(l => ({ value: l._id, label: l.name }))
+              ]}
+              value={locationFilter}
+              onChange={(value) => setLocationFilter(value || '')}
+              searchable
+              clearable
+            />
+          </Group>
+
+          {/* Second row: Status and Date Range */}
+          <Group grow>
+            <Select
+              placeholder="All Statuses"
+              data={[
+                { value: '', label: 'All Statuses' },
+                ...stockStates.map(s => ({ value: s._id, label: s.name }))
+              ]}
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value || '')}
+              searchable
+              clearable
+            />
+            <DatePickerInput
+              type="range"
+              placeholder="Select date range"
+              value={dateRange}
+              onChange={setDateRange}
+              clearable
+            />
+          </Group>
+        </Stack>
       </Paper>
 
       <Paper p="md" pos="relative">

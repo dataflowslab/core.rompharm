@@ -156,3 +156,17 @@ async def update_stock(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update stock: {str(e)}")
+
+
+@router.get("/stock-states")
+async def get_stock_states(
+    request: Request,
+    current_user: dict = Depends(verify_token),
+    db = Depends(get_db)
+):
+    """Get list of stock states from depo_stocks_states"""
+    try:
+        states = list(db['depo_stocks_states'].find().sort('value', 1))
+        return serialize_doc(states)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stock states: {str(e)}")

@@ -1,194 +1,256 @@
-=== SESIUNE DE LUCRU - 17.01.2026 ===
+=== SESIUNE DE LUCRU - 17.01.2026 (Continuare) ===
 
-## Rezumat Modificări
+## Modificări Majore - Stock Detail Page Redesign
 
-### 1. Procurement Module - Îmbunătățiri Frontend ✅
+### 1. Stock Detail Page - Complete Redesign ✅
 
-#### 1.1 Coloană U.M. în ItemsTab
-- **Fișier**: `src/frontend/src/components/Procurement/ItemsTab.tsx`
-- **Modificare**: Adăugat coloană "U.M." între "Part" și "Quantity"
-- **Afișare**: `part_detail.um`
-- **Scop**: Vizibilitate mai bună a unităților de măsură
+#### 1.1 Header Nou
+- **Titlu**: "Stock {BATCH_CODE}" (ex: "Stock 32423")
+- **Subtitlu**: Nume articol mai mic, sub titlu
+- **Badge Status**: Păstrat în dreapta sus
 
-#### 1.2 Eliminare Validare Max Quantity
-- **Fișier**: `src/frontend/src/components/Common/ReceiveStockForm.tsx`
-- **Modificare**: Eliminat `max={maxQuantity}` din câmpul "Received Quantity"
-- **Scop**: Permite primirea de cantități mai mari decât cele comandate (bonusuri, rotunjiri)
+#### 1.2 Tab "Stock Details" - Layout 2 Coloane
 
-#### 1.3 Eliminare Coloană Value din Containere
-- **Fișier**: `src/frontend/src/components/Common/ReceiveStockForm.tsx`
-- **Modificare**: Eliminată coloana "Value" din tabelul de containere
-- **Structură nouă**: Num, Products/Container, Unit, Damaged, Unsealed, Mislabeled, Actions
+**Coloana A: Stock Information** (Tabel static)
+- Batch Code
+- Location (nume locație)
+- Supplier (nume furnizor)
+- Supplier Batch Code
+- Received Quantity (cantitate + UM)
+- Received On (format DD.MM.YYYY)
+- Manufactured On (format DD.MM.YYYY)
+- Expiry Date (format DD.MM.YYYY)
+  - **Culoare portocalie** dacă < 7 zile
+  - **Culoare roșie** dacă expirat
+  - Sub dată: "X days remaining" sau "-X days expired"
 
-#### 1.4 Format Date DD.MM.YYYY
-- **Fișier nou**: `src/frontend/src/utils/dateFormat.ts`
-  - `formatDate()` - convertește ISO → DD.MM.YYYY
-  - `formatDateTime()` - convertește ISO → DD.MM.YYYY HH:MM
-- **Fișiere actualizate**:
-  - `src/frontend/src/pages/ProcurementPage.tsx` - Issue Date, Target Date
-  - `src/frontend/src/components/Procurement/QualityControlTab.tsx` - Prelevation Date, BA Rompharm Date
-  - `src/frontend/src/components/Procurement/ApprovalsTab.tsx` - Signed At timestamps
-  - `src/frontend/src/components/Procurement/DetailsTab.tsx` - import formatDate
+**Coloana B: Product Information** (Tabel static)
+- Name (nume articol)
+- IPN (cod articol)
+- Manufacturer (link către pagina manufacturer în tab nou)
+- View Product (buton "Open in new tab" către pagina articolului)
 
-### 2. Layout Fix - AppShell ✅
-- **Fișier**: `src/frontend/src/App.tsx`
-- **Problemă**: Sidebar și conținut principal nu erau alăturate (unul sub altul)
-- **Cauză**: `position: 'relative'` și `right: -10` în `AppShell.Navbar`
-- **Soluție**: Eliminat stilurile problematice
-- **Înainte**: `style={{ backgroundColor: '#f6fbff', position: 'relative', right: -10 }}`
-- **Acum**: `style={{ backgroundColor: '#f6fbff' }}`
+#### 1.3 Tab "Quality Control" (redenumit din "QC")
 
-### 3. Bug Fix - Stock Detail Page ✅
+**Coloana Stânga: Formulare**
 
-#### 3.1 Erori Sintaxă în services.py
-- **Fișier**: `modules/inventory/services.py`
-- **Probleme găsite**:
-  1. Lipseau virgule în apelurile `HTTPException`: `HTTPException(status_code=404 detail=...)` 
-  2. Lipseau virgule în dicționare între chei
-  3. Lipseau virgule în apelurile `.get()`: `get('key' default)`
-- **Soluție**: Creat script Python pentru a repara automat toate virgulele lipsă
-- **Rezultat**: Funcția `get_stock_by_id()` funcționează corect
+**Formular Prelevation:**
+- Date (DatePicker)
+- Quantity (NumberInput, float, max = cantitatea din batch)
+- Buton "Save Prelevation"
+- **Logică**: 
+  - Creează înregistrare în `depo_stocks_movements`
+  - Reduce cantitatea din stock
+  - Movement type: "prelevation"
 
-#### 3.2 Import Error - get_stock_by_id
-- **Fișier**: `modules/inventory/services/__init__.py`
-- **Problemă**: `get_stock_by_id` nu era exportată din modul
-- **Soluție**: Adăugat funcția în lista de export
-- **Cod adăugat**:
-  ```python
-  get_stock_by_id = services_module.get_stock_by_id
-  get_stocks_list = services_module.get_stocks_list
-  ```
+**Formular BA Rompharm:**
+- Date (DatePicker)
+- No (TextInput - număr BA)
+- Test Result (TextInput - "conform"/"neconform")
+- Transactionable (Checkbox - "În carantină tranzacționabil")
+- Comments (Textarea)
+- Buton "Save BA Information"
+- **Logică**:
+  - Dacă "neconform" → `state_id` = `694322758728e4d75ae7278f` (Quarantine)
+  - Dacă "conform" → `state_id` = `694321db8728e4d75ae72789` (Conform)
+  - Salvează: `rompharm_ba_no`, `rompharm_ba_date`, `qc_test_result`, `qc_transactionable`, `qc_comments`
 
-#### 3.3 TypeScript Errors - Frontend
-- **Fișiere reparate**:
-  - `src/frontend/src/components/Procurement/ItemsTab.tsx`
-    - Adăugat `um?: string` în interfața `part_detail`
-    - Corectat `colSpan` de la 7 la 8 (pentru noua coloană U.M.)
-  - `src/frontend/src/components/Procurement/ReceivedStockTab.tsx`
-    - Adăugat `batch_code?: string` în interfața `ReceivedItem`
-  - `src/frontend/src/pages/ProcurementDetailPage.tsx`
-    - Adăugat câmpuri legacy pentru compatibilitate (`part`, `pk`, `destination`)
-    - Reparat `order_currency` undefined: `order.order_currency || order.currency || 'EUR'`
+**Coloana Dreapta: Supplier BA Information**
+- Tabel cu informații existente:
+  - Supplier BA No
+  - Supplier BA Date
+  - In Accordance with Supplier BA (badge Yes/No)
+  - Is List Supplier (badge)
+  - Clean Transport (badge)
+  - Temperature Control (badge)
+  - Temperature Conditions Met (badge)
 
-### 4. CHANGELOG Actualizat ✅
-- **Fișier**: `CHANGELOG.md`
-- **Versiune**: 2.1.2 - 2026-01-17
-- **Secțiuni**:
-  - Frontend - Procurement Module Improvements
-  - Technical - New utility dateFormat.ts
-  - Notes - Funcționalități rămase de implementat
+#### 1.4 Tab "Transfers" (NOU)
+- **Tabel dinamic** cu toate `depo_stocks_movements`
+- **Coloane**: Date, Type, Quantity, Notes, Created By
+- **Range Picker** pentru filtrare după dată
+- **Endpoint**: `GET /modules/inventory/api/stock-movements?stock_id={id}&start_date=&end_date=`
 
-## Fișiere Modificate (Total: 10)
+#### 1.5 Tab "Journal" (NOU)
+- **Timeline** cu activitatea pentru acest stock:
+  - Stock Created (created_at, created_by)
+  - Stock Received (received_date, quantity)
+  - Quality Control Completed (rompharm_ba_date, BA No)
+  - Status Changed (updated_at, status)
+- **Metadata Section**:
+  - Created At (format DD.MM.YYYY HH:MM)
+  - Created By
+  - Last Updated (format DD.MM.YYYY HH:MM)
+  - Updated By
 
-1. ✅ `src/frontend/src/App.tsx` - Layout fix
-2. ✅ `src/frontend/src/utils/dateFormat.ts` - NOU - Utilitar formatare date
-3. ✅ `src/frontend/src/pages/ProcurementPage.tsx` - Formatare date
-4. ✅ `src/frontend/src/pages/ProcurementDetailPage.tsx` - Fix interfețe TypeScript
-5. ✅ `src/frontend/src/components/Procurement/ItemsTab.tsx` - Coloană U.M., fix TypeScript
-6. ✅ `src/frontend/src/components/Procurement/DetailsTab.tsx` - Import formatDate
-7. ✅ `src/frontend/src/components/Procurement/QualityControlTab.tsx` - Formatare date
-8. ✅ `src/frontend/src/components/Procurement/ApprovalsTab.tsx` - Formatare timestamps
-9. ✅ `src/frontend/src/components/Common/ReceiveStockForm.tsx` - Eliminat max validation, coloană Value
-10. ✅ `modules/inventory/services.py` - Fix erori sintaxă (virgule lipsă)
-11. ✅ `modules/inventory/services/__init__.py` - Export get_stock_by_id
-12. ✅ `CHANGELOG.md` - Documentare versiune 2.1.2
+### 2. Backend - Stock Movements ✅
 
-## Probleme Rezolvate
+#### 2.1 Nou Fișier: `modules/inventory/routes/stock_movements.py`
+- **GET /stock-movements**: Lista movements cu filtre
+  - Query params: `stock_id`, `start_date`, `end_date`, `skip`, `limit`
+  - Returnează: `{results, total, skip, limit}`
+- **POST /stock-movements**: Creează movement nou
+  - Body: `{stock_id, movement_type, quantity, date, notes}`
+  - Logică specială pentru "prelevation": reduce `stock.quantity`
 
-### Problema 1: Layout Broken
-- **Simptom**: Sidebar și main content unul sub altul în loc de alăturate
-- **Cauză**: CSS `position: relative` în AppShell.Navbar
-- **Soluție**: Eliminat stilul problematic
+#### 2.2 Actualizat: `modules/inventory/routes/__init__.py`
+- Adăugat import și include pentru `stock_movements.router`
 
-### Problema 2: Stock Detail Page - Internal Server Error
-- **Simptom**: "Stock not found" + Internal Server Error 500
-- **Cauză**: Erori de sintaxă Python (virgule lipsă) în `services.py`
-- **Soluție**: Script automat pentru reparare virgule + export funcție
+#### 2.3 Reparat Erori Sintaxă
+- **routes/stocks.py**: Virgule lipsă în parametri funcții și HTTPException
+- **services.py**: Virgule lipsă în `get_stocks_list` (deja reparat anterior)
 
-### Problema 3: TypeScript Compilation Errors
-- **Simptom**: 231 erori TypeScript, aplicația nu se încarcă
-- **Cauză**: Interfețe incompatibile între componente
-- **Soluție**: Adăugat câmpuri lipsă în interfețe pentru compatibilitate
+### 3. Frontend - Componente Noi ✅
 
-## Funcționalități Rămase
+#### 3.1 `src/frontend/src/pages/StockItemDetailPage.tsx` (RESCRIS COMPLET)
+- Header nou cu batch code și nume articol
+- Layout 2 coloane pentru Stock Details
+- Calcul zile până la expirare
+- Culori pentru expiry date
+- 4 taburi: Stock Details, Quality Control, Transfers, Journal
 
-1. **Container Unit Auto-fill**: Câmpul "Unit" să preia automat din "Supplier U.M."
-2. **Order Closure Logic**: Discuție despre gestionarea comenzilor over-received
-3. **Scheduler Warning**: SSL handshake error pentru MongoDB scheduler (non-critic)
+#### 3.2 `src/frontend/src/components/Stock/QualityControlTab.tsx` (NOU)
+- Formular Prelevation cu DatePicker și NumberInput
+- Formular BA Rompharm cu toate câmpurile
+- Tabel Supplier BA Information
+- Integrare cu API pentru salvare
 
-## Note Tehnice
+#### 3.3 `src/frontend/src/components/Stock/TransfersTab.tsx` (NOU)
+- Tabel movements cu paginare
+- DatePickerInput range pentru filtrare
+- Afișare date formatate DD.MM.YYYY HH:MM
 
-### Date Formatting
-- Format standard: DD.MM.YYYY
-- Funcții: `formatDate()`, `formatDateTime()`
-- Locație: `src/frontend/src/utils/dateFormat.ts`
-- Gestionare null/undefined: returnează '-'
+#### 3.4 `src/frontend/src/components/Stock/JournalTab.tsx` (NOU)
+- Timeline cu evenimente
+- Metadata section
+- Icoane pentru fiecare tip de eveniment
+- Culori pentru status
 
-### Stock Detail Endpoint
-- URL: `/modules/inventory/api/stocks/{stock_id}`
-- Funcție: `get_stock_by_id(stock_id: str)`
-- Enrichment: part_detail, location_detail, status_detail, supplier_name, stock_value
+### 4. Dependențe ✅
+- `@mantine/dates` - deja instalat (v7.4.0)
+- `formatDate()` și `formatDateTime()` - deja existente în `utils/dateFormat.ts`
 
-### Layout Structure
-- AppShell cu navbar width: 250px
-- Header height: 60px
-- Navbar background: #f6fbff
-- Header background: #e8f3fc
+## Fișiere Modificate/Create (Total: 8)
 
-## Comenzi Utile
+### Modificate:
+1. ✅ `src/frontend/src/pages/StockItemDetailPage.tsx` - Rescris complet (400+ linii)
+2. ✅ `modules/inventory/routes/__init__.py` - Adăugat stock_movements router
+3. ✅ `modules/inventory/routes/stocks.py` - Reparat virgule lipsă
 
-### Restart Backend
-```bash
-cd d:\DEV\dataflows-core-rompharm
-python -m uvicorn src.backend.app:app --reload --port 8000
+### Create:
+4. ✅ `src/frontend/src/components/Stock/QualityControlTab.tsx` - NOU (250+ linii)
+5. ✅ `src/frontend/src/components/Stock/TransfersTab.tsx` - NOU (100+ linii)
+6. ✅ `src/frontend/src/components/Stock/JournalTab.tsx` - NOU (120+ linii)
+7. ✅ `modules/inventory/routes/stock_movements.py` - NOU (120+ linii)
+
+### Șterse/Înlocuite:
+- `src/frontend/src/components/Stock/QCTab.tsx` - Înlocuit cu QualityControlTab.tsx
+
+## Structura Colecție MongoDB: depo_stocks_movements
+
+```javascript
+{
+  _id: ObjectId,
+  stock_id: ObjectId,           // Referință la depo_stocks
+  part_id: ObjectId,            // Referință la depo_parts
+  movement_type: String,        // "prelevation", "transfer", "adjustment", etc.
+  quantity: Number,             // Cantitate mișcată
+  date: Date,                   // Data mișcării
+  notes: String,                // Note opționale
+  created_by: String,           // Username
+  created_at: Date              // Timestamp creare
+}
 ```
 
-### Check TypeScript Errors
-```bash
-cd d:\DEV\dataflows-core-rompharm\src\frontend
-npx tsc --noEmit
+## Logică Business
+
+### Prelevation (Sampling)
+1. User completează formular cu dată și cantitate
+2. Frontend trimite POST la `/stock-movements`
+3. Backend:
+   - Validează stock există
+   - Validează cantitate <= stock.quantity
+   - Creează movement cu type="prelevation"
+   - **Reduce stock.quantity** cu cantitatea prelevată
+   - Returnează movement creat
+
+### BA Rompharm (Quality Control)
+1. User completează formular cu rezultat test
+2. Frontend trimite PUT la `/stocks/{id}`
+3. Backend:
+   - Salvează `rompharm_ba_no`, `rompharm_ba_date`
+   - Dacă "conform" → `state_id` = Conform (694321db8728e4d75ae72789)
+   - Dacă "neconform" → `state_id` = Quarantine (694322758728e4d75ae7278f)
+   - Salvează `qc_test_result`, `qc_transactionable`, `qc_comments`
+
+### Expiry Date Display
+```typescript
+const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+
+if (daysUntilExpiry < 0) {
+  color = 'red';
+  text = `${Math.abs(daysUntilExpiry)} days expired`;
+} else if (daysUntilExpiry <= 7) {
+  color = 'orange';
+  text = `${daysUntilExpiry} days remaining`;
+} else {
+  color = undefined;
+  text = `${daysUntilExpiry} days remaining`;
+}
 ```
-
-### Test MongoDB Connection
-```python
-from pymongo import MongoClient
-client = MongoClient('mongodb+srv://...')
-db = client['dataflows_rompharm']
-print(db.list_collection_names())
-```
-
-## Status Final
-
-✅ Toate modificările implementate cu succes
-✅ Backend pornește corect (warning scheduler non-critic)
-✅ Frontend compilează fără erori TypeScript
-✅ Layout corect (sidebar + main alăturate)
-✅ Stock detail page funcțional
-✅ Date formatate DD.MM.YYYY în procurement
-✅ Total Stock afișat în lista de articole
-✅ Location și Supplier afișate în Stock Tab
-✅ Push la git realizat cu succes (commit 775219d)
 
 ## Git Commit
 
-**Commit**: 775219d
-**Message**: fix: Stock detail page and articles total stock display
-- Fixed syntax errors in services.py (missing commas)
-- Added total_stock calculation to articles endpoint
-- Fixed get_stocks_list enrichment (location, supplier)
-- Exported get_stock_by_id from services module
-- Fixed layout issue (removed position:relative from navbar)
-- Updated frontend to display total_stock in articles list
-- Date formatting improvements (DD.MM.YYYY)
-- Version 2.1.2
+**Commit**: 2885adc
+**Message**: feat: Complete redesign of Stock Detail page with QC, Transfers and Journal tabs
+- New header: Stock BATCH_CODE with article name below
+- Two-column layout: Stock Information + Product Information
+- Expiry date with color coding (orange <7 days, red expired)
+- Days remaining/expired display
+- Quality Control tab with Prelevation and BA Rompharm forms
+- Transfers tab with movements table and date range picker
+- Journal tab with activity timeline
+- Backend: stock-movements endpoints (GET, POST)
+- Fixed syntax errors in routes/stocks.py and services.py
 
-**Files Changed**: 220 files, +49823 insertions, -3683 deletions
+**Files Changed**: 8 files, +1002 insertions, -320 deletions
+
+## Status Final
+
+✅ Stock Detail Page complet redesigned
+✅ Quality Control tab funcțional
+✅ Transfers tab cu movements
+✅ Journal tab cu timeline
+✅ Backend endpoints pentru movements
+✅ Toate erorile de sintaxă reparate
+✅ Push la git realizat cu succes
 
 ## Next Steps
 
-1. Testare completă funcționalitate stock detail page
-2. Implementare container unit auto-fill (dacă necesar)
-3. Discuție despre logica închidere comenzi over-received
-4. Investigare warning scheduler SSL (opțional, non-critic)
+1. **Testare completă** în browser:
+   - Verificare layout 2 coloane
+   - Testare formular Prelevation
+   - Testare formular BA Rompharm
+   - Verificare culori expiry date
+   - Testare Transfers tab cu range picker
+   - Verificare Journal timeline
+
+2. **Îmbunătățiri opționale**:
+   - Adăugare validări suplimentare
+   - Notificări pentru expiry aproape
+   - Export movements la Excel
+   - Grafice pentru movements
+
+3. **Documentație**:
+   - Actualizare CHANGELOG.md
+   - Screenshots pentru documentație
+
+## Note Tehnice
+
+- **@mantine/dates** folosit pentru DatePicker și DatePickerInput
+- **Timeline component** din Mantine pentru Journal
+- **Badge component** pentru status-uri și Yes/No
+- **Table component** pentru afișare date statice și dinamice
+- **Grid layout** pentru 2 coloane (span={6} fiecare)
 
 === SFÂRȘIT SESIUNE ===
