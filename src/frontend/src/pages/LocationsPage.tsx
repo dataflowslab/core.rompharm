@@ -34,6 +34,8 @@ import { api } from '../services/api';
 interface Location {
   _id: string;
   name: string;
+  code?: string;
+  type?: string;
   description?: string;
   parent_id?: string;
   parent_detail?: {
@@ -42,6 +44,13 @@ interface Location {
   level?: number; // For tree rendering
   children?: Location[];
 }
+
+const LOCATION_TYPES = [
+  { value: 'Depozit', label: 'Depozit' },
+  { value: 'Secție', label: 'Secție' },
+  { value: 'Laborator', label: 'Laborator' },
+  { value: 'Altele', label: 'Altele' },
+];
 
 export function LocationsPage() {
   const { t } = useTranslation();
@@ -54,6 +63,8 @@ export function LocationsPage() {
   
   const [formData, setFormData] = useState({
     name: '',
+    code: '',
+    type: '',
     description: '',
     parent_id: '',
   });
@@ -83,6 +94,8 @@ export function LocationsPage() {
     setEditingLocation(null);
     setFormData({
       name: '',
+      code: '',
+      type: '',
       description: '',
       parent_id: '',
     });
@@ -93,6 +106,8 @@ export function LocationsPage() {
     setEditingLocation(location);
     setFormData({
       name: location.name,
+      code: location.code || '',
+      type: location.type || '',
       description: location.description || '',
       parent_id: location.parent_id || '',
     });
@@ -136,6 +151,8 @@ export function LocationsPage() {
     try {
       const payload = {
         name: formData.name,
+        code: formData.code || undefined,
+        type: formData.type || undefined,
         description: formData.description || undefined,
         parent_id: formData.parent_id || undefined,
       };
@@ -260,6 +277,7 @@ export function LocationsPage() {
       const query = searchQuery.toLowerCase();
       filtered = locations.filter(loc => 
         loc.name.toLowerCase().includes(query) ||
+        loc.code?.toLowerCase().includes(query) ||
         loc.description?.toLowerCase().includes(query)
       );
     }
@@ -319,7 +337,8 @@ export function LocationsPage() {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>{t('Name')}</Table.Th>
-              <Table.Th>{t('Description')}</Table.Th>
+              <Table.Th>{t('Code')}</Table.Th>
+              <Table.Th>{t('Type')}</Table.Th>
               <Table.Th>{t('Parent')}</Table.Th>
               <Table.Th style={{ width: '150px' }}>{t('Actions')}</Table.Th>
             </Table.Tr>
@@ -327,7 +346,7 @@ export function LocationsPage() {
           <Table.Tbody>
             {filteredLocations.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={4}>
+                <Table.Td colSpan={5}>
                   {searchQuery ? t('No results found') : t('No locations')}
                 </Table.Td>
               </Table.Tr>
@@ -339,7 +358,8 @@ export function LocationsPage() {
                       {location.name}
                     </span>
                   </Table.Td>
-                  <Table.Td>{location.description || '-'}</Table.Td>
+                  <Table.Td>{location.code || '-'}</Table.Td>
+                  <Table.Td>{location.type || '-'}</Table.Td>
                   <Table.Td>{location.parent_detail?.name || '-'}</Table.Td>
                   <Table.Td>
                     <Group gap="xs">
@@ -391,6 +411,26 @@ export function LocationsPage() {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
+            />
+          </Grid.Col>
+
+          <Grid.Col span={6}>
+            <TextInput
+              label={t('Code')}
+              placeholder={t('Location code')}
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+            />
+          </Grid.Col>
+
+          <Grid.Col span={6}>
+            <Select
+              label={t('Type')}
+              placeholder={t('Select type')}
+              data={LOCATION_TYPES}
+              value={formData.type}
+              onChange={(value) => setFormData({ ...formData, type: value || '' })}
+              clearable
             />
           </Grid.Col>
 
