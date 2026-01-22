@@ -107,12 +107,11 @@ interface ApprovalFlow {
 
 // Purchase Order State IDs from depo_purchase_orders_states
 const PURCHASE_ORDER_STATES = {
-  PENDING: '6943a4a6451609dd8a618cde',      // value: 0 - Not signed yet
-  ISSUED: '6943a4a6451609dd8a618cdf',       // value: 10 - Signed, ready for receiving
-  PROCESSING: '6943a4a6451609dd8a618ce0',   // value: 20 - Receiving in progress
-  FINISHED: '6943a4a6451609dd8a618ce1',     // value: 30 - All received and QC done
-  REFUSED: '6943a4a6451609dd8a618ce2',      // value: 40 - Refused
-  CANCELLED: '6943a4a6451609dd8a618ce3',    // value: 90 - Cancelled
+  PENDING: '6943a4a6451609dd8a618ce0',      // Initial state - not signed yet
+  ISSUED: '6943a4a6451609dd8a618cdf',       // After signing - ready for receiving
+  CANCELLED: '6943a4a6451609dd8a618ce2',    // Cancelled (can be set when signing)
+  FINISHED: '6943a4a6451609dd8a618ce3',     // After receiving - completed
+  // Note: REFUSED can be set during receiving process
 };
 
 export function ProcurementDetailPage() {
@@ -317,12 +316,8 @@ export function ProcurementDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconPackage size={16} />}>
             {t('Items')}
           </Tabs.Tab>
-          {/* Show Receive Stock tab only if order is Issued or beyond (after signing) */}
-          {order.state_id && [
-            PURCHASE_ORDER_STATES.ISSUED,
-            PURCHASE_ORDER_STATES.PROCESSING,
-            PURCHASE_ORDER_STATES.FINISHED
-          ].includes(order.state_id) && (
+          {/* Show Receive Stock tab only if order is Issued (after signing, before finished) */}
+          {order.state_id === PURCHASE_ORDER_STATES.ISSUED && (
             <Tabs.Tab value="receive-stock" leftSection={<IconTruckDelivery size={16} />}>
               {t('Receive Stock')}
             </Tabs.Tab>
