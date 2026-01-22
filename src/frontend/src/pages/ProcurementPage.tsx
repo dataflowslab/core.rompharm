@@ -156,7 +156,7 @@ export function ProcurementPage() {
 
       // Add to suppliers list and select it
       setSuppliers([...suppliers, newSupplier]);
-      setFormData({ ...formData, supplier_id: String(newSupplier.pk || newSupplier._id) });
+      setFormData({ ...formData, supplier_id: String(newSupplier._id) });
       
       // Reset form and close modal
       setNewSupplierData({
