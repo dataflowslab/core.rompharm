@@ -13,7 +13,6 @@ import {
   Select,
   Stack,
 } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
 import { IconSearch } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from '../../../../src/frontend/src/services/api';
@@ -249,8 +248,8 @@ export function StocksPage() {
             />
           </Group>
 
-          {/* Second row: Status and Date Range */}
-          <Group grow>
+          {/* Second row: Status */}
+          <Group>
             <Select
               placeholder="All Statuses"
               data={[
@@ -261,14 +260,11 @@ export function StocksPage() {
               onChange={(value) => setStatusFilter(value || '')}
               searchable
               clearable
+              style={{ minWidth: '200px' }}
             />
-            <DatePickerInput
-              type="range"
-              placeholder="Select date range"
-              value={dateRange}
-              onChange={setDateRange}
-              clearable
-            />
+            <Text size="sm" c="dimmed">
+              Date range filter coming soon...
+            </Text>
           </Group>
         </Stack>
       </Paper>
