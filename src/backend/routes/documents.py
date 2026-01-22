@@ -106,6 +106,7 @@ async def download_document(
     user = Depends(verify_token)
 ):
     """Download document by job_id"""
+    print(f"[DOCUMENT] Download request for job_id: {job_id}")
     db = get_db()
     
     # Search in all document collections by job_id
@@ -117,29 +118,36 @@ async def download_document(
         doc = db[coll_name].find_one({'job_id': job_id})
         if doc:
             coll = db[coll_name]
+            print(f"[DOCUMENT] Found in collection: {coll_name}")
             break
     
     if not doc:
+        print(f"[DOCUMENT] ERROR: Document not found for job_id: {job_id}")
         raise HTTPException(status_code=404, detail="Document not found")
+    
+    print(f"[DOCUMENT] Document status: {doc.get('status')}, has_cache: {doc.get('document_data') is not None}")
     
     # Check if cached
     if doc.get('document_data'):
-        print(f"[DOCUMENT] Serving cached document")
+        print(f"[DOCUMENT] Serving cached document ({len(doc['document_data'])} chars)")
         try:
             document_bytes = base64.b64decode(doc['document_data'])
+            print(f"[DOCUMENT] Decoded to {len(document_bytes)} bytes")
         except Exception as e:
             print(f"[DOCUMENT] ERROR decoding: {e}")
             raise HTTPException(status_code=500, detail="Failed to decode document")
     else:
-        print(f"[DOCUMENT] Downloading from service...")
+        print(f"[DOCUMENT] No cache, downloading from service...")
         
         if doc.get('status') not in ['done', 'completed']:
+            print(f"[DOCUMENT] ERROR: Document not ready, status={doc.get('status')}")
             raise HTTPException(status_code=400, detail=f"Document not ready. Status: {doc.get('status')}")
         
         client = DataFlowsDocuClient()
         document_bytes = client.download_document(job_id)
         
         if not document_bytes:
+            print(f"[DOCUMENT] ERROR: Failed to download from service")
             raise HTTPException(status_code=500, detail="Failed to download document")
         
         print(f"[DOCUMENT] Downloaded {len(document_bytes)} bytes, caching...")
@@ -152,6 +160,7 @@ async def download_document(
             }}
         )
     
+    print(f"[DOCUMENT] Returning {len(document_bytes)} bytes as PDF")
     return StreamingResponse(
         io.BytesIO(document_bytes),
         media_type='application/pdf',
