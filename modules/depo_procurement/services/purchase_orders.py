@@ -57,20 +57,22 @@ async def get_purchase_order_by_id(order_id: str):
             if supplier:
                 order['supplier_detail'] = serialize_doc(supplier)
         
-        # ✅ FIX: Get status from state_id (depo_purchase_orders_states)
+        # ✅ FIX: Get state_detail from state_id (depo_purchase_orders_states)
         if order.get('state_id'):
             state = db['depo_purchase_orders_states'].find_one({'_id': order['state_id']})
             if state:
-                order['status'] = state.get('name')  # Use state name as status
-                order['status_color'] = state.get('color', 'gray')
-                order['status_value'] = state.get('value', 0)
-        elif order.get('status'):
-            # Legacy: if no state_id but has old status field, keep it
-            pass
+                order['state_detail'] = {
+                    'name': state.get('name'),
+                    'color': state.get('color', 'gray'),
+                    'value': state.get('value', 0)
+                }
         else:
-            # No state_id and no status - default to Pending
-            order['status'] = 'Pending'
-            order['status_color'] = 'gray'
+            # No state_id - default to Pending
+            order['state_detail'] = {
+                'name': 'Pending',
+                'color': 'gray',
+                'value': 0
+            }
         
         # Enrich with destination details
         if order.get('destination_id'):
