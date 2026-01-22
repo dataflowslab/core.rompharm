@@ -110,19 +110,31 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
 
   // Helper function to get full attachment URL
   const getAttachmentUrl = (attachment: Attachment) => {
+    // Debug logging
+    console.log('[AttachmentURL] Processing attachment:', {
+      _id: attachment._id,
+      filename: attachment.filename,
+      attachment: attachment.attachment,
+      fullAttachment: attachment
+    });
+
     // Safety check
     if (!attachment.attachment) {
+      console.warn('[AttachmentURL] No attachment path found, returning #');
       return '#';
     }
     
     // If attachment path starts with http, return as is
     if (attachment.attachment.startsWith('http')) {
+      console.log('[AttachmentURL] Full URL detected:', attachment.attachment);
       return attachment.attachment;
     }
     
     // Otherwise, prepend base URL
     const baseUrl = window.location.origin;
-    return `${baseUrl}${attachment.attachment.startsWith('/') ? '' : '/'}${attachment.attachment}`;
+    const fullUrl = `${baseUrl}${attachment.attachment.startsWith('/') ? '' : '/'}${attachment.attachment}`;
+    console.log('[AttachmentURL] Constructed URL:', fullUrl);
+    return fullUrl;
   };
 
   return (
