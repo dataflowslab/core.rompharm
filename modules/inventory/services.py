@@ -412,27 +412,88 @@ async def get_suppliers_list(search=None, skip=0, limit=100):
 
 
 async def get_supplier_by_id(supplier_id: str):
-    """Get a specific supplier by ID with enriched addresses"""
+    """Get a specific supplier by ID with enriched addresses using aggregation"""
     db = get_db()
-    companies_collection = db['depo_companies']
-
+    
     try:
-        supplier = companies_collection.find_one({'_id': ObjectId(supplier_id)})
-        if not supplier:
+        # Use aggregation pipeline for efficient data enrichment
+        pipeline = [
+            {'$match': {'_id': ObjectId(supplier_id)}},
+            # Unwind addresses to enrich each one
+            {'$unwind': {'path': '$addresses', 'preserveNullAndEmptyArrays': True}},
+            # Lookup country for each address
+            {
+                '$lookup': {
+                    'from': 'depo_countries',
+                    'let': {'country_id': {'$toObjectId': '$addresses.country_id'}},
+                    'pipeline': [
+                        {'$match': {'$expr': {'$eq': ['$_id', '$$country_id']}}}
+                    ],
+                    'as': 'country_info'
+                }
+            },
+            # Add country name to address
+            {
+                '$addFields': {
+                    'addresses.country': {
+                        '$ifNull': [
+                            {'$arrayElemAt': ['$country_info.name', 0]},
+                            '$addresses.country'  # Keep original if lookup fails
+                        ]
+                    }
+                }
+            },
+            # Remove temporary country_info
+            {'$project': {'country_info': 0}},
+            # Group back to reconstruct the document
+            {
+                '$group': {
+                    '_id': '$_id',
+                    'pk': {'$first': '$pk'},
+                    'name': {'$first': '$name'},
+                    'code': {'$first': '$code'},
+                    'vatno': {'$first': '$vatno'},
+                    'regno': {'$first': '$regno'},
+                    'payment_conditions': {'$first': '$payment_conditions'},
+                    'delivery_conditions': {'$first': '$delivery_conditions'},
+                    'bank_account': {'$first': '$bank_account'},
+                    'currency_id': {'$first': '$currency_id'},
+                    'is_supplier': {'$first': '$is_supplier'},
+                    'is_manufacturer': {'$first': '$is_manufacturer'},
+                    'is_client': {'$first': '$is_client'},
+                    'addresses': {'$push': '$addresses'},
+                    'contacts': {'$first': '$contacts'},
+                    'created_at': {'$first': '$created_at'},
+                    'updated_at': {'$first': '$updated_at'},
+                }
+            },
+            # Clean up addresses array (remove null from unwind)
+            {
+                '$addFields': {
+                    'addresses': {
+                        '$filter': {
+                            'input': '$addresses',
+                            'as': 'addr',
+                            'cond': {'$ne': ['$$addr', {}]}
+                        }
+                    }
+                }
+            }
+        ]
+        
+        result = list(db['depo_companies'].aggregate(pipeline))
+        
+        if not result:
             raise HTTPException(status_code=404, detail="Supplier not found")
         
-        # Enrich addresses with country names
-        if supplier.get('addresses'):
-            for address in supplier['addresses']:
-                if address.get('country_id'):
-                    try:
-                        country = db['depo_countries'].find_one({'_id': ObjectId(address['country_id'])})
-                        if country:
-                            address['country'] = country.get('name', '')
-                    except:
-                        pass  # If country_id is invalid, skip
-
+        supplier = result[0]
+        
+        # If no addresses, set empty array
+        if not supplier.get('addresses') or supplier['addresses'] == [{}]:
+            supplier['addresses'] = []
+        
         return serialize_doc(supplier)
+        
     except HTTPException:
         raise
     except Exception as e:
