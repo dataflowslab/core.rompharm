@@ -49,7 +49,8 @@ interface PurchaseOrder {
     name: string;
   };
   notes: string;
-  status: string;  // MongoDB: string status name (e.g., "Pending", "Processing")
+  state_id: string;  // MongoDB ObjectId reference to depo_purchase_orders_states
+  status?: string;  // Status name (populated from state)
   status_color?: string;  // Color from depo_purchase_orders_states
   created_by?: string;
 }
@@ -102,6 +103,16 @@ interface ApprovalFlow {
   }>;
   status: string;
 }
+
+// Purchase Order State IDs from depo_purchase_orders_states
+const PURCHASE_ORDER_STATES = {
+  PENDING: '6943a4a6451609dd8a618cde',      // value: 0 - Not signed yet
+  ISSUED: '6943a4a6451609dd8a618cdf',       // value: 10 - Signed, ready for receiving
+  PROCESSING: '6943a4a6451609dd8a618ce0',   // value: 20 - Receiving in progress
+  FINISHED: '6943a4a6451609dd8a618ce1',     // value: 30 - All received and QC done
+  REFUSED: '6943a4a6451609dd8a618ce2',      // value: 40 - Refused
+  CANCELLED: '6943a4a6451609dd8a618ce3',    // value: 90 - Cancelled
+};
 
 export function ProcurementDetailPage() {
   const { t } = useTranslation();
@@ -223,16 +234,16 @@ export function ProcurementDetailPage() {
       isAdmin,
       currentUserId,
       orderCreatedBy: order.created_by,
+      orderStateId: order.state_id,
       orderStatus: order.status,
       approvalFlow,
       signatures: approvalFlow?.signatures?.length || 0,
     });
 
-    // ✅ FIX: Once order is signed (status is Issued or beyond), cannot edit items/details
-    // Status "Pending" = can edit, "Issued"/"Processing"/"Finished" = signed = cannot edit
-    const orderStatus = order.status?.toLowerCase();
-    if (orderStatus && orderStatus !== 'pending') {
-      console.log('[canEdit] Order is signed (status:', order.status, ') - CANNOT EDIT');
+    // ✅ Use state_id: Once order is signed (state_id is ISSUED or beyond), cannot edit
+    // PENDING state = can edit, ISSUED/PROCESSING/FINISHED = signed = cannot edit
+    if (order.state_id !== PURCHASE_ORDER_STATES.PENDING) {
+      console.log('[canEdit] Order is signed (state_id:', order.state_id, ') - CANNOT EDIT');
       return false;
     }
 
@@ -244,8 +255,6 @@ export function ProcurementDetailPage() {
 
     // If no approval flow exists yet, or no signatures, creator can edit
     if (!approvalFlow || approvalFlow.signatures.length === 0) {
-      // Note: created_by is username, not user_id, so we can't compare directly
-      // For now, allow editing if no signatures (admin will have full control anyway)
       console.log('[canEdit] No signatures - CAN EDIT');
       return true;
     }
@@ -320,13 +329,21 @@ export function ProcurementDetailPage() {
             {t('Items')}
           </Tabs.Tab>
           {/* Show Receive Stock tab only if order is Issued or beyond (after signing) */}
-          {order.status && ['Issued', 'Processing', 'Finished'].includes(order.status) && (
+          {order.state_id && [
+            PURCHASE_ORDER_STATES.ISSUED,
+            PURCHASE_ORDER_STATES.PROCESSING,
+            PURCHASE_ORDER_STATES.FINISHED
+          ].includes(order.state_id) && (
             <Tabs.Tab value="receive-stock" leftSection={<IconTruckDelivery size={16} />}>
               {t('Receive Stock')}
             </Tabs.Tab>
           )}
           {/* Show Quality Control tab only if order is Issued or beyond */}
-          {order.status && ['Issued', 'Processing', 'Finished'].includes(order.status) && (
+          {order.state_id && [
+            PURCHASE_ORDER_STATES.ISSUED,
+            PURCHASE_ORDER_STATES.PROCESSING,
+            PURCHASE_ORDER_STATES.FINISHED
+          ].includes(order.state_id) && (
             <Tabs.Tab value="quality-control" leftSection={<IconClipboardCheck size={16} />}>
               {t('Quality Control')}
             </Tabs.Tab>
