@@ -96,8 +96,15 @@ export function StocksPage() {
   }, [search, locationFilter, statusFilter, dateRange]);
 
   // Fetch stocks when filters change
+  // Only fetch if date range is complete (both dates selected) or empty
   useEffect(() => {
-    fetchStocks();
+    const isDateRangeValid = 
+      (dateRange[0] === null && dateRange[1] === null) || // No date range selected
+      (dateRange[0] !== null && dateRange[1] !== null);   // Both dates selected
+    
+    if (isDateRangeValid) {
+      fetchStocks();
+    }
   }, [search, locationFilter, statusFilter, dateRange]);
 
   const loadFiltersFromStorage = () => {

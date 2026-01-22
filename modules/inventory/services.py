@@ -133,7 +133,7 @@ def serialize_doc(doc):
     return doc
 
 
-async def get_stocks_list(search=None, skip=0, limit=100, part_id=None):
+async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location_id=None, state_id=None, start_date=None, end_date=None):
     """Get list of stocks with enriched data"""
     db = get_db()
     stocks_collection = db['depo_stocks']
