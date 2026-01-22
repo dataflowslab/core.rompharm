@@ -14,6 +14,7 @@ export default defineConfig({
       'react-router-dom': path.resolve(__dirname, './node_modules/react-router-dom'),
       '@mantine/core': path.resolve(__dirname, './node_modules/@mantine/core'),
       '@mantine/hooks': path.resolve(__dirname, './node_modules/@mantine/hooks'),
+      '@mantine/dates': path.resolve(__dirname, './node_modules/@mantine/dates'),
       '@mantine/notifications': path.resolve(__dirname, './node_modules/@mantine/notifications'),
       '@mantine/modals': path.resolve(__dirname, './node_modules/@mantine/modals'),
       '@tabler/icons-react': path.resolve(__dirname, './node_modules/@tabler/icons-react'),

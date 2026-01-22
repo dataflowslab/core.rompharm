@@ -13,6 +13,7 @@ import {
   Select,
   Stack,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { IconSearch } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from '../../../../src/frontend/src/services/api';
@@ -257,6 +258,14 @@ export function StocksPage() {
             searchable
             clearable
             style={{ minWidth: '180px' }}
+          />
+          <DatePickerInput
+            type="range"
+            placeholder="Date range"
+            value={dateRange}
+            onChange={setDateRange}
+            clearable
+            style={{ minWidth: '220px' }}
           />
         </Group>
       </Paper>
