@@ -472,7 +472,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
 
           <Grid.Col span={6}>
             <NumberInput
-              label={t('Purchase Price')}
+              label={t('Purchase Price') + ` (${orderCurrency})`}
               placeholder="0.00"
               value={newItemData.purchase_price}
               onChange={(value) => setNewItemData({ ...newItemData, purchase_price: Number(value) || 0 })}
@@ -548,7 +548,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
 
           <Grid.Col span={6}>
             <NumberInput
-              label={t('Purchase Price')}
+              label={t('Purchase Price') + ` (${orderCurrency})`}
               placeholder="0.00"
               value={editItemData.purchase_price}
               onChange={(value) => setEditItemData({ ...editItemData, purchase_price: Number(value) || 0 })}

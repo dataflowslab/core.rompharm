@@ -1,0 +1,162 @@
+# SESSION SUMMARY - 22.01.2026
+
+## Tasks Completed
+
+### 1. Locations Page - Code and Type Fields ✅
+**Files Modified:**
+- `src/frontend/src/pages/LocationsPage.tsx`
+
+**Changes:**
+- Added `code` and `type` fields to Location interface
+- Table columns: Name, Code, Type, Parent (removed Description)
+- Form fields: Name, Code (TextInput), Type (Select: Depozit/Secție/Laborator/Altele), Description, Parent
+- Type select with 4 options
+- Search includes code field
+
+**Commits:**
+- Build successful
+- Ready for testing
+
+### 2. Purchase Order - Currency Field Hidden ✅
+**Files Modified:**
+- `src/frontend/src/pages/ProcurementPage.tsx`
+
+**Changes:**
+- Currency field removed from New Purchase Order form
+- Currency automatically set from supplier's default currency
+- Falls back to EUR if supplier has no currency set
+- Improved handleSupplierChange logic
+
+**Commits:**
+- 2a6e74b - Hide currency field
+- 7c3e33b - Use _id for supplier options
+- 56db14c - Use _id for new supplier
+
+### 3. Purchase Order - ObjectId Error Fixed ✅
+**Problem:** `bson.errors.InvalidId: '9' is not a valid ObjectId`
+**Solution:**
+- Changed supplier options to use `_id` (ObjectId) instead of `pk` (integer)
+- Updated handleSupplierChange to search by `_id`
+- Fixed handleCreateSupplier to use `_id`
+
+**Commits:**
+- 7c3e33b, 56db14c
+
+### 4. Document Download - Debug Logging Added ✅
+**Files Modified:**
+- `src/backend/routes/documents.py`
+
+**Changes:**
+- Added detailed logging for job_id, collection, status, cache
+- Logs document_data presence and size
+- Logs decoding and streaming steps
+- Will help diagnose 'not ready' issue
+
+**Commit:**
+- e87eeb7
+
+### 5. Procurement Order Detail Page - Signature Moved ✅
+**Files Modified:**
+- `src/frontend/src/components/Procurement/DetailsTab.tsx`
+- `src/frontend/src/pages/ProcurementDetailPage.tsx`
+
+**Changes:**
+- **Signature moved from Approvals tab to Details tab**
+- Signature section now in Details tab sidebar (below Documents)
+- Added validation: **cannot sign without items** - shows error "Add some items before approving the order."
+- Signature shows compact in sidebar
+- canEdit logic prevents editing after signing (status !== 'Pending')
+- Admin can remove signatures
+
+**Features:**
+- Sign button only visible if user can sign
+- Shows all signatures with timestamps
+- Compact table format in sidebar
+- Remove signature button for admins
+
+**Commit:**
+- 1d39a84
+
+## Remaining Tasks (In Progress)
+
+### 6. ItemsTab Modifications (TODO)
+**Requirements:**
+1. ✅ Cannot add/edit items after signing (canEdit prop already passed)
+2. ⏳ Hide currency select in add item form
+3. ⏳ Show currency in label after "Purchase price" (from order currency)
+4. ⏳ Move Purchase price to same line as Quantity
+5. ⏳ Show UM (unit of measure) in parentheses after Quantity label
+
+**Next Steps:**
+- Read ItemsTab.tsx
+- Modify add/edit item form
+- Update layout and fields
+
+## Technical Details
+
+### MongoDB Collections
+- `depo_purchase_orders` - Purchase orders
+- `depo_purchase_orders_states` - Status definitions
+- `depo_companies` - Suppliers/Manufacturers/Clients
+- `depo_locations` - Location hierarchy
+- `depo_stocks` - Stock entries
+- `depo_procurement_documents` - Generated documents
+- `approval_flows` - Approval signatures
+
+### Status Flow
+- **Pending** (0) - Not signed, can edit
+- **Issued** (10) - Signed, cannot edit, can receive stock
+- **Processing** (20) - Receiving in progress
+- **Finished** (30) - All received and QC done
+- **Refused** (40) - Refused
+- **Cancelled** (90) - Cancelled
+
+### Key Logic
+```typescript
+// canEdit() in ProcurementDetailPage
+const orderStatus = order.status?.toLowerCase();
+if (orderStatus && orderStatus !== 'pending') {
+  return false; // Cannot edit after signing
+}
+```
+
+### Signature Validation
+```typescript
+// In DetailsTab confirmSign()
+if (itemsCount === 0) {
+  notifications.show({
+    message: t('Add some items before approving the order.'),
+    color: 'red'
+  });
+  return;
+}
+```
+
+## Git Commits (Session Total: 5)
+1. `2a6e74b` - Hide currency field in New Purchase Order
+2. `7c3e33b` - Use _id for supplier selection
+3. `56db14c` - Use _id for new supplier
+4. `e87eeb7` - Add debug logging to document download
+5. `1d39a84` - Move signature from Approvals to Details tab
+
+## Files Modified (Session Total: 6)
+1. ✅ `src/frontend/src/pages/LocationsPage.tsx`
+2. ✅ `src/frontend/src/pages/ProcurementPage.tsx`
+3. ✅ `src/backend/routes/documents.py`
+4. ✅ `src/frontend/src/components/Procurement/DetailsTab.tsx`
+5. ✅ `src/frontend/src/pages/ProcurementDetailPage.tsx`
+6. ⏳ `src/frontend/src/components/Procurement/ItemsTab.tsx` (next)
+
+## Current Status
+- ✅ 5 of 6 tasks completed
+- ⏳ ItemsTab modifications in progress
+- All commits pushed successfully
+- Frontend build successful
+- Backend logging enhanced
+
+## Next Session
+Continue with ItemsTab modifications:
+- Hide currency select
+- Show currency in Purchase price label
+- Reorganize form layout
+- Add UM to Quantity label
