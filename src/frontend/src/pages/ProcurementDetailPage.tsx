@@ -242,6 +242,11 @@ export function ProcurementDetailPage() {
 
     // ✅ Use state_id: Once order is signed (state_id is ISSUED or beyond), cannot edit
     // PENDING state = can edit, ISSUED/PROCESSING/FINISHED = signed = cannot edit
+    if (!order.state_id) {
+      console.log('[canEdit] No state_id, assuming can edit');
+      return isAdmin || (!approvalFlow || approvalFlow.signatures.length === 0);
+    }
+
     if (order.state_id !== PURCHASE_ORDER_STATES.PENDING) {
       console.log('[canEdit] Order is signed (state_id:', order.state_id, ') - CANNOT EDIT');
       return false;
