@@ -278,20 +278,18 @@ export function StocksPage() {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Batch Code</Table.Th>
-              <Table.Th>Batch Date</Table.Th>
-              <Table.Th>Product</Table.Th>
-              <Table.Th>IPN</Table.Th>
+              <Table.Th>Batch</Table.Th>
               <Table.Th>Status</Table.Th>
+              <Table.Th>Supplier</Table.Th>
               <Table.Th>Location</Table.Th>
               <Table.Th>Quantity</Table.Th>
-              <Table.Th>Supplier</Table.Th>
+              <Table.Th>Product</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {stocks.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={8}>
+                <Table.Td colSpan={6}>
                   <Text ta="center" c="dimmed">
                     No stocks found
                   </Text>
@@ -304,16 +302,37 @@ export function StocksPage() {
                   onClick={() => navigate(`/inventory/stocks/${stock._id}`)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <Table.Td>{stock.batch_code || '-'}</Table.Td>
-                  <Table.Td>{formatDate(stock.batch_date || stock.received_date)}</Table.Td>
-                  <Table.Td>{stock.part_detail?.name || '-'}</Table.Td>
-                  <Table.Td>{stock.part_detail?.ipn || '-'}</Table.Td>
+                  {/* Batch: Batch Code (bold) + Batch Date (smaller below) */}
+                  <Table.Td>
+                    <Stack gap={2}>
+                      <Text fw={700}>{stock.batch_code || '-'}</Text>
+                      <Text size="xs" c="dimmed">
+                        {formatDate(stock.batch_date || stock.received_date)}
+                      </Text>
+                    </Stack>
+                  </Table.Td>
+                  
+                  {/* Status */}
                   <Table.Td>{getStatusBadge(stock)}</Table.Td>
+                  
+                  {/* Supplier */}
+                  <Table.Td>{stock.supplier_name || '-'}</Table.Td>
+                  
+                  {/* Location */}
                   <Table.Td>{stock.location_detail?.name || '-'}</Table.Td>
+                  
+                  {/* Quantity */}
                   <Table.Td>
                     {stock.quantity} {stock.part_detail?.um || 'buc'}
                   </Table.Td>
-                  <Table.Td>{stock.supplier_name || '-'}</Table.Td>
+                  
+                  {/* Product: Name + IPN in parentheses */}
+                  <Table.Td>
+                    {stock.part_detail?.name || '-'}
+                    {stock.part_detail?.ipn && (
+                      <Text span c="dimmed"> ({stock.part_detail.ipn})</Text>
+                    )}
+                  </Table.Td>
                 </Table.Tr>
               ))
             )}
