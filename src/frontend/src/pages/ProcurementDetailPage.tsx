@@ -26,6 +26,7 @@ import {
   ReceivedStockTab,
   ItemsTab,
   AttachmentsTab,
+  JournalTab,
 } from '../components/Procurement';
 interface PurchaseOrder {
   _id: string;
@@ -378,9 +379,10 @@ export function ProcurementDetailPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="journal" pt="md">
-          <Text c="dimmed">{t('Journal functionality coming soon...')}</Text>
-          {/* TODO: Implement JournalTab component */}
-          {/* Will show: signatures, state changes, stock movements, QC results */}
+          <JournalTab
+            orderId={id!}
+            approvalFlow={approvalFlow || undefined}
+          />
         </Tabs.Panel>
       </Tabs>
     </Container>

@@ -4,3 +4,4 @@ export { ReceivedStockTab } from './ReceivedStockTab';
 export { ItemsTab } from './ItemsTab';
 export { QualityControlTab } from './QualityControlTab';
 export { AttachmentsTab } from './AttachmentsTab';
+export { JournalTab } from './JournalTab';
