@@ -343,6 +343,7 @@ export function ProcurementDetailPage() {
             stockLocations={stockLocations}
             canEdit={isEditable}
             onUpdate={handleUpdateOrder}
+            onOrderUpdate={loadPurchaseOrder}
           />
         </Tabs.Panel>
 

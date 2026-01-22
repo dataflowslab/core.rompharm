@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Paper, Group, Title } from '@mantine/core';
+import { Grid, TextInput, Textarea, Select, Button, Paper, Group, Title, Stack, Badge, Text, Modal, Alert, Table } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
-import { IconDeviceFloppy } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react';
 import { DocumentManager } from '../Common/DocumentManager';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-import { formatDate } from '../../utils/dateFormat';
+import { procurementApi } from '../../services/procurement';
+import { formatDateTime } from '../../utils/dateFormat';
 
 interface Supplier {
   _id: string;
@@ -31,12 +33,29 @@ interface PurchaseOrder {
   order_currency: string;
   issue_date: string;
   target_date: string;
-  destination_id?: string;  // MongoDB ObjectId
+  destination_id?: string;
   destination_detail?: {
     name: string;
   };
   notes: string;
-  status: string;  // Status name from state
+  status: string;
+}
+
+interface ApprovalSignature {
+  user_id: string;
+  username: string;
+  user_name?: string;
+  signed_at: string;
+  signature_hash: string;
+  ip_address?: string;
+}
+
+interface ApprovalFlow {
+  _id: string;
+  signatures: ApprovalSignature[];
+  status: string;
+  required_officers: any[];
+  optional_officers: any[];
 }
 
 interface DetailsTabProps {
@@ -45,12 +64,20 @@ interface DetailsTabProps {
   stockLocations: StockLocation[];
   canEdit: boolean;
   onUpdate?: (data: any) => Promise<void>;
+  onOrderUpdate?: () => void;
 }
 
-export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: DetailsTabProps) {
+export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUpdate }: DetailsTabProps) {
   const { t } = useTranslation();
+  const { username, isStaff } = useAuth();
   const [saving, setSaving] = useState(false);
   const [documentTemplates, setDocumentTemplates] = useState<Array<{code: string; name: string; label: string}>>([]);
+  const [flow, setFlow] = useState<ApprovalFlow | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [signModalOpened, setSignModalOpened] = useState(false);
+  const [removeModalOpened, setRemoveModalOpened] = useState(false);
+  const [userToRemove, setUserToRemove] = useState<string | null>(null);
+  const [itemsCount, setItemsCount] = useState(0);
   
   // Editable state
   const [formData, setFormData] = useState({
@@ -73,7 +100,6 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
         const response = await api.get('/modules/depo_procurement/api/document-templates');
         const templatesObj = response.data.templates || {};
         
-        // Convert object {code: name} to array of template objects
         const templates = Object.entries(templatesObj).map(([code, name]) => ({
           code,
           name: name as string,
@@ -88,7 +114,40 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
     };
     
     loadTemplates();
+    loadApprovalFlow();
+    loadItemsCount();
   }, []);
+
+  const loadApprovalFlow = async () => {
+    try {
+      const response = await api.get(`${procurementApi.getPurchaseOrder(order._id)}/approval-flow`);
+      
+      if (!response.data.flow) {
+        try {
+          const createResponse = await api.post(`${procurementApi.getPurchaseOrder(order._id)}/approval-flow`);
+          setFlow(createResponse.data);
+        } catch (createError: any) {
+          console.error('Failed to create approval flow:', createError);
+          setFlow(null);
+        }
+      } else {
+        setFlow(response.data.flow);
+      }
+    } catch (error) {
+      console.error('Failed to load approval flow:', error);
+      setFlow(null);
+    }
+  };
+
+  const loadItemsCount = async () => {
+    try {
+      const response = await api.get(procurementApi.getOrderItems(order._id));
+      const items = response.data.results || response.data || [];
+      setItemsCount(items.length);
+    } catch (error) {
+      console.error('Failed to load items count:', error);
+    }
+  };
 
   const handleSave = async () => {
     if (!onUpdate) return;
@@ -126,6 +185,106 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
     }
   };
 
+  const confirmSign = async () => {
+    // Check if there are items
+    if (itemsCount === 0) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Add some items before approving the order.'),
+        color: 'red'
+      });
+      setSignModalOpened(false);
+      return;
+    }
+
+    setSignModalOpened(false);
+    setSubmitting(true);
+    try {
+      const response = await api.post(`${procurementApi.getPurchaseOrder(order._id)}/sign`);
+      setFlow(response.data);
+      
+      notifications.show({
+        title: t('Success'),
+        message: t('Order signed successfully'),
+        color: 'green'
+      });
+
+      if (onOrderUpdate) {
+        onOrderUpdate();
+      }
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error: any) {
+      console.error('Failed to sign order:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to sign order'),
+        color: 'red'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmRemoveSignature = async () => {
+    if (!userToRemove) return;
+    
+    setRemoveModalOpened(false);
+    try {
+      await api.delete(`${procurementApi.getPurchaseOrder(order._id)}/signatures/${userToRemove}`);
+      
+      notifications.show({
+        title: t('Success'),
+        message: t('Signature removed successfully'),
+        color: 'green'
+      });
+
+      loadApprovalFlow();
+      if (onOrderUpdate) {
+        onOrderUpdate();
+      }
+    } catch (error: any) {
+      console.error('Failed to remove signature:', error);
+      notifications.show({
+        title: t('Error'),
+        message: error.response?.data?.detail || t('Failed to remove signature'),
+        color: 'red'
+      });
+    } finally {
+      setUserToRemove(null);
+    }
+  };
+
+  const canUserSign = (): boolean => {
+    if (!flow || !username) return false;
+    
+    const alreadySigned = flow.signatures.some(s => s.username === username);
+    if (alreadySigned) return false;
+
+    const allOfficers = [...flow.required_officers, ...flow.optional_officers];
+    return allOfficers.length > 0;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'gray';
+      case 'in_progress': return 'blue';
+      case 'approved': return 'green';
+      default: return 'gray';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return t('Pending');
+      case 'in_progress': return t('In Progress');
+      case 'approved': return t('Approved');
+      default: return status;
+    }
+  };
+
   const hasChanges = () => {
     return (
       formData.reference !== (order.reference || '') ||
@@ -141,14 +300,75 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
     <Grid gutter="md">
       {/* Document Sidebar - 1/3 width */}
       <Grid.Col span={4}>
-        <DocumentManager
-          entityId={order._id}
-          entityType="procurement-order"
-          templates={documentTemplates}
-          onDocumentGenerated={() => {
-            console.log('Document generated for order:', order._id);
-          }}
-        />
+        <Stack gap="md">
+          <DocumentManager
+            entityId={order._id}
+            entityType="procurement-order"
+            templates={documentTemplates}
+            onDocumentGenerated={() => {
+              console.log('Document generated for order:', order._id);
+            }}
+          />
+
+          {/* Signature Section */}
+          {flow && (
+            <Paper p="md" withBorder>
+              <Stack gap="sm">
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>{t('Approval')}</Text>
+                  <Badge color={getStatusColor(flow.status)} size="sm">
+                    {getStatusLabel(flow.status)}
+                  </Badge>
+                </Group>
+
+                {canUserSign() && flow.status !== 'approved' && (
+                  <Button 
+                    onClick={() => setSignModalOpened(true)} 
+                    loading={submitting}
+                    leftSection={<IconCheck size={16} />}
+                    fullWidth
+                    size="sm"
+                  >
+                    {t('Sign Order')}
+                  </Button>
+                )}
+
+                {flow.signatures.length > 0 && (
+                  <div>
+                    <Text size="xs" c="dimmed" mb="xs">{t('Signatures')}</Text>
+                    <Table withTableBorder withColumnBorders size="xs">
+                      <Table.Tbody>
+                        {flow.signatures.map((signature, index) => (
+                          <Table.Tr key={index}>
+                            <Table.Td>
+                              <Text size="xs">{signature.user_name || signature.username}</Text>
+                              <Text size="xs" c="dimmed">{formatDateTime(signature.signed_at)}</Text>
+                            </Table.Td>
+                            {isStaff && (
+                              <Table.Td style={{ width: '60px' }}>
+                                <Button 
+                                  size="xs" 
+                                  color="red" 
+                                  variant="subtle"
+                                  onClick={() => {
+                                    setUserToRemove(signature.user_id);
+                                    setRemoveModalOpened(true);
+                                  }}
+                                >
+                                  {t('Remove')}
+                                </Button>
+                              </Table.Td>
+                            )}
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </div>
+                )}
+              </Stack>
+            </Paper>
+          )}
+        </Stack>
       </Grid.Col>
 
       {/* Order Details Form - 2/3 width */}
@@ -265,6 +485,59 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate }: Details
           </Grid>
         </Paper>
       </Grid.Col>
+
+      {/* Sign Confirmation Modal */}
+      <Modal
+        opened={signModalOpened}
+        onClose={() => setSignModalOpened(false)}
+        title={t('Confirm Signature')}
+        centered
+      >
+        <Stack>
+          <Text>
+            {t('Are you sure you want to sign this order? This action will be recorded with a digital signature.')}
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setSignModalOpened(false)}>
+              {t('Cancel')}
+            </Button>
+            <Button color="green" onClick={confirmSign} loading={submitting}>
+              {t('Sign')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Remove Signature Confirmation Modal */}
+      <Modal
+        opened={removeModalOpened}
+        onClose={() => {
+          setRemoveModalOpened(false);
+          setUserToRemove(null);
+        }}
+        title={t('Remove Signature')}
+        centered
+      >
+        <Stack>
+          <Text>
+            {t('Are you sure you want to remove this signature?')}
+          </Text>
+          <Group justify="flex-end">
+            <Button 
+              variant="default" 
+              onClick={() => {
+                setRemoveModalOpened(false);
+                setUserToRemove(null);
+              }}
+            >
+              {t('Cancel')}
+            </Button>
+            <Button color="red" onClick={confirmRemoveSignature}>
+              {t('Remove')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Grid>
   );
 }
