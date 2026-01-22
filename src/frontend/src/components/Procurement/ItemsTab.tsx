@@ -104,6 +104,8 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
     notes: ''
   });
 
+  const [selectedPartUM, setSelectedPartUM] = useState<string>('');
+
   const handleAddItem = async () => {
     if (!newItemData.part) {
       notifications.show({
@@ -422,7 +424,10 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
       {/* Add Item Modal */}
       <Modal
         opened={itemModalOpened}
-        onClose={() => setItemModalOpened(false)}
+        onClose={() => {
+          setItemModalOpened(false);
+          setSelectedPartUM('');
+        }}
         title={t('Add Item')}
         size="lg"
         centered
@@ -433,7 +438,15 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
               label={t('Part')}
               endpoint={supplierId ? `${procurementApi.getParts()}?supplier_id=${supplierId}` : procurementApi.getParts()}
               value={newItemData.part}
-              onChange={(value) => setNewItemData({ ...newItemData, part: value || '' })}
+              onChange={(value, selectedItem) => {
+                setNewItemData({ ...newItemData, part: value || '' });
+                // Update UM when part is selected
+                if (selectedItem && (selectedItem as any).um) {
+                  setSelectedPartUM((selectedItem as any).um);
+                } else {
+                  setSelectedPartUM('');
+                }
+              }}
               valueField="_id"
               labelFormat={(item) => `${item.name} ${(item.IPN || item.ipn) ? `(${item.IPN || item.ipn})` : ''}`}
               searchable
@@ -446,7 +459,7 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
 
           <Grid.Col span={6}>
             <NumberInput
-              label={t('Quantity')}
+              label={selectedPartUM ? `${t('Quantity')} (${selectedPartUM})` : t('Quantity')}
               placeholder="1"
               value={newItemData.quantity}
               onChange={(value) => setNewItemData({ ...newItemData, quantity: Number(value) || 1 })}
