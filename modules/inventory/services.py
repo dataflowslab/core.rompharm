@@ -261,20 +261,11 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location
     # Execute aggregation
     stocks = list(db['depo_stocks'].aggregate(pipeline))
     
-    # Serialize ObjectIds
-    for stock in stocks:
-        stock['_id'] = str(stock['_id'])
-        if 'part_id' in stock:
-            stock['part_id'] = str(stock['part_id'])
-        if 'location_id' in stock:
-            stock['location_id'] = str(stock['location_id'])
-        if 'supplier_id' in stock:
-            stock['supplier_id'] = str(stock['supplier_id'])
-        if 'state_id' in stock:
-            stock['state_id'] = str(stock['state_id'])
+    # Serialize ObjectIds using helper function
+    from .routes.utils import serialize_doc
     
     return {
-        'results': stocks,
+        'results': serialize_doc(stocks),
         'total': total,
         'skip': skip,
         'limit': limit
