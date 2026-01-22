@@ -141,6 +141,26 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location
     query = {}
     
     # Filter by part_id if provided
+    
+    # Filter by location_id if provided
+    if location_id:
+        query['location_id'] = ObjectId(location_id)
+    
+    # Filter by state_id if provided
+    if state_id:
+        query['state_id'] = ObjectId(state_id)
+    
+    # Filter by date range if provided
+    if start_date or end_date:
+        date_query = {}
+        if start_date:
+            from datetime import datetime
+            date_query['$gte'] = datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
+        if end_date:
+            from datetime import datetime
+            date_query['$lte'] = datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
+        query['received_date'] = date_query
+    
     if part_id:
         query['part_id'] = ObjectId(part_id)
     
