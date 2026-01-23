@@ -1,4 +1,4 @@
--aimport { Button, LoadingOverlay, Table, Text, Group, ActionIcon, Anchor } from '@mantine/core';
+import { Button, LoadingOverlay, Table, Text, Group, ActionIcon, Anchor } from '@mantine/core';
 import { IconPlus, IconEdit, IconTrash, IconExternalLink } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 
