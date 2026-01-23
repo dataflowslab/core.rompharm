@@ -84,56 +84,105 @@ async def get_articles(
     sort_order: Optional[str] = Query("asc"),
     current_user: dict = Depends(verify_token)
 ):
-    """Get list of articles"""
+    """Get list of articles with optimized aggregation"""
     db = get_db()
     collection = db['depo_parts']
     
-    query = {}
+    # Build match stage
+    match_stage = {}
     if search:
-        query['$or'] = [
+        match_stage['$or'] = [
             {'name': {'$regex': search, '$options': 'i'}},
             {'ipn': {'$regex': search, '$options': 'i'}},
             {'description': {'$regex': search, '$options': 'i'}}
         ]
     
     if category:
-        query['category_id'] = ObjectId(category)
+        match_stage['category_id'] = ObjectId(category)
     
     sort_direction = 1 if sort_order == 'asc' else -1
-    sort = [(sort_by, sort_direction)]
     
     try:
-        total = collection.count_documents(query)
-        cursor = collection.find(query).sort(sort).skip(skip).limit(limit)
-        articles = list(cursor)
+        # Count total documents
+        total = collection.count_documents(match_stage) if match_stage else collection.count_documents({})
         
-        # Enrich with System UM, Category details, and Total Stock
-        ums_collection = db['depo_ums']
-        categories_collection = db['depo_categories']
-        stocks_collection = db['depo_stocks']
+        # Build aggregation pipeline
+        pipeline = []
         
-        for article in articles:
-            if article.get('system_um_id'):
-                um = ums_collection.find_one({'_id': article['system_um_id']})
-                if um:
-                    article['system_um_detail'] = {
-                        'name': um.get('name', ''),
-                        'abrev': um.get('abrev', ''),
-                        'symbol': um.get('symbol', '')
-                    }
-            
-            if article.get('category_id'):
-                category = categories_collection.find_one({'_id': article['category_id']})
-                if category:
-                    article['category_detail'] = {'name': category.get('name', '')}
-            
-            # Calculate total stock
-            total_stock_pipeline = [
-                {'$match': {'part_id': article['_id']}},
-                {'$group': {'_id': None, 'total': {'$sum': '$quantity'}}}
-            ]
-            total_stock_result = list(stocks_collection.aggregate(total_stock_pipeline))
-            article['total_stock'] = total_stock_result[0]['total'] if total_stock_result else 0
+        if match_stage:
+            pipeline.append({'$match': match_stage})
+        
+        # Lookup System UM
+        pipeline.append({
+            '$lookup': {
+                'from': 'depo_ums',
+                'localField': 'system_um_id',
+                'foreignField': '_id',
+                'as': 'system_um_detail'
+            }
+        })
+        pipeline.append({
+            '$unwind': {
+                'path': '$system_um_detail',
+                'preserveNullAndEmptyArrays': True
+            }
+        })
+        
+        # Lookup Category
+        pipeline.append({
+            '$lookup': {
+                'from': 'depo_categories',
+                'localField': 'category_id',
+                'foreignField': '_id',
+                'as': 'category_detail'
+            }
+        })
+        pipeline.append({
+            '$unwind': {
+                'path': '$category_detail',
+                'preserveNullAndEmptyArrays': True
+            }
+        })
+        
+        # Lookup Total Stock
+        pipeline.append({
+            '$lookup': {
+                'from': 'depo_stocks',
+                'localField': '_id',
+                'foreignField': 'part_id',
+                'as': 'stocks'
+            }
+        })
+        pipeline.append({
+            '$addFields': {
+                'total_stock': {'$sum': '$stocks.quantity'}
+            }
+        })
+        
+        # Project only needed fields
+        pipeline.append({
+            '$project': {
+                'stocks': 0,  # Remove stocks array, keep only total
+                'system_um_detail': {
+                    'name': 1,
+                    'abrev': 1,
+                    'symbol': 1
+                },
+                'category_detail': {
+                    'name': 1
+                }
+            }
+        })
+        
+        # Sort
+        pipeline.append({'$sort': {sort_by: sort_direction}})
+        
+        # Pagination
+        pipeline.append({'$skip': skip})
+        pipeline.append({'$limit': limit})
+        
+        # Execute aggregation
+        articles = list(collection.aggregate(pipeline))
         
         return {
             'results': serialize_doc(articles),
