@@ -412,454 +412,87 @@ async def delete_attachment(
 
 
 @router.get("/purchase-orders/{order_id}/qc-records")
-async def get_qc_records(
+async def get_qc_records_endpoint(
     request: Request,
     order_id: str,
     current_user: dict = Depends(verify_token)
 ):
     """Get QC records for a purchase order"""
-    db = get_db()
-    collection = db['depo_procurement_qc']
-    
-    try:
-        # Convert order_id string to ObjectId for MongoDB query
-        order_obj_id = ObjectId(order_id)
-        cursor = collection.find({'order_id': order_obj_id}).sort('created_at', -1)
-        qc_records = list(cursor)
-        return {"results": serialize_doc(qc_records)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch QC records: {str(e)}")
+    from modules.depo_procurement.services import get_qc_records
+    return await get_qc_records(order_id)
 
 
 @router.post("/purchase-orders/{order_id}/qc-records")
-async def create_qc_record(
+async def create_qc_record_endpoint(
     request: Request,
     order_id: str,
     current_user: dict = Depends(verify_token)
 ):
     """Create a new QC record for a purchase order"""
-    db = get_db()
-    
-    try:
-        # Get JSON body
-        body = await request.json()
-        
-        # Validate required fields
-        if not body.get('batch_code') or not body.get('part_id'):
-            raise HTTPException(status_code=400, detail="batch_code and part_id are required")
-        
-        # Get part details
-        part_id = body.get('part_id')
-        part = db.depo_parts.find_one({'_id': ObjectId(part_id)})
-        if not part:
-            raise HTTPException(status_code=404, detail="Part not found")
-        
-        # Create QC record
-        qc_record = {
-            'order_id': ObjectId(order_id),
-            'batch_code': body.get('batch_code'),
-            'part_id': ObjectId(part_id),
-            'part_name': part.get('name', ''),
-            'prelevation_date': body.get('prelevation_date'),
-            'prelevated_quantity': body.get('prelevated_quantity', 0),
-            'ba_rompharm_no': body.get('ba_rompharm_no', ''),
-            'ba_rompharm_date': body.get('ba_rompharm_date'),
-            'test_result': body.get('test_result', ''),
-            'transactionable': body.get('transactionable', False),
-            'comment': body.get('comment', ''),
-            'confirmed': body.get('confirmed', False),
-            'created_at': datetime.utcnow(),
-            'created_by': current_user.get('username'),
-            'updated_at': datetime.utcnow()
-        }
-        
-        result = db.depo_procurement_qc.insert_one(qc_record)
-        qc_record['_id'] = result.inserted_id
-        
-        # If confirmed and conform, update stock status to OK
-        if qc_record['confirmed'] and qc_record['test_result'] == 'conform':
-            # Find stock items with this batch_code and part_id
-            stocks = db.depo_stocks.find({
-                'purchase_order_id': ObjectId(order_id),
-                'part_id': ObjectId(part_id),
-                'batch_code': body.get('batch_code')
-            })
-            
-            # Get OK state
-            ok_state = db.depo_stocks_states.find_one({'_id': ObjectId('694321db8728e4d75ae72789')})
-            if not ok_state:
-                ok_state = db.depo_stocks_states.find_one({'name': 'OK'})
-            
-            if ok_state:
-                # Update all matching stocks to OK status
-                db.depo_stocks.update_many(
-                    {
-                        'purchase_order_id': ObjectId(order_id),
-                        'part_id': ObjectId(part_id),
-                        'batch_code': body.get('batch_code')
-                    },
-                    {
-                        '$set': {
-                            'state_id': ok_state['_id'],
-                            'updated_at': datetime.utcnow()
-                        }
-                    }
-                )
-        
-        return serialize_doc(qc_record)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create QC record: {str(e)}")
+    from modules.depo_procurement.services import create_qc_record
+    body = await request.json()
+    return await create_qc_record(order_id, body, current_user)
 
 
 @router.patch("/purchase-orders/{order_id}/qc-records/{qc_id}")
-async def update_qc_record(
+async def update_qc_record_endpoint(
     request: Request,
     order_id: str,
     qc_id: str,
     current_user: dict = Depends(verify_token)
 ):
     """Update a QC record"""
-    db = get_db()
-    
-    try:
-        # Get JSON body
-        body = await request.json()
-        
-        # Get existing record
-        qc_record = db.depo_procurement_qc.find_one({'_id': ObjectId(qc_id)})
-        if not qc_record:
-            raise HTTPException(status_code=404, detail="QC record not found")
-        
-        # Update fields
-        update_data = {
-            'ba_rompharm_no': body.get('ba_rompharm_no', qc_record.get('ba_rompharm_no')),
-            'ba_rompharm_date': body.get('ba_rompharm_date', qc_record.get('ba_rompharm_date')),
-            'test_result': body.get('test_result', qc_record.get('test_result')),
-            'transactionable': body.get('transactionable', qc_record.get('transactionable')),
-            'comment': body.get('comment', qc_record.get('comment')),
-            'confirmed': body.get('confirmed', qc_record.get('confirmed')),
-            'updated_at': datetime.utcnow(),
-            'updated_by': current_user.get('username')
-        }
-        
-        db.depo_procurement_qc.update_one(
-            {'_id': ObjectId(qc_id)},
-            {'$set': update_data}
-        )
-        
-        # If confirmed and conform, update stock status to OK
-        if update_data['confirmed'] and update_data['test_result'] == 'conform':
-            # Get OK state
-            ok_state = db.depo_stocks_states.find_one({'_id': ObjectId('694321db8728e4d75ae72789')})
-            if not ok_state:
-                ok_state = db.depo_stocks_states.find_one({'name': 'OK'})
-            
-            if ok_state:
-                # Update all matching stocks to OK status
-                db.depo_stocks.update_many(
-                    {
-                        'purchase_order_id': ObjectId(order_id),
-                        'part_id': qc_record['part_id'],
-                        'batch_code': qc_record['batch_code']
-                    },
-                    {
-                        '$set': {
-                            'state_id': ok_state['_id'],
-                            'updated_at': datetime.utcnow()
-                        }
-                    }
-                )
-        
-        # Return updated record
-        updated_record = db.depo_procurement_qc.find_one({'_id': ObjectId(qc_id)})
-        return serialize_doc(updated_record)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update QC record: {str(e)}")
+    from modules.depo_procurement.services import update_qc_record
+    body = await request.json()
+    return await update_qc_record(order_id, qc_id, body, current_user)
     
 # ==================== APPROVAL FLOW ENDPOINTS ====================
 
 @router.get("/purchase-orders/{order_id}/approval-flow")
-async def get_order_approval_flow(
+async def get_approval_flow_endpoint(
     request: Request,
     order_id: str,
     current_user: dict = Depends(verify_token)
 ):
     """Get approval flow for a purchase order"""
-    db = get_db()
-    
-    # ✅ FIX: Convert order_id to ObjectId for proper filtering
-    flow = db.approval_flows.find_one({
-        "object_type": "procurement_order",
-        "object_id": ObjectId(order_id)
-    })
-    
-    if not flow:
-        return {"flow": None}
-    
-    flow["_id"] = str(flow["_id"])
-    
-    for signature in flow.get("signatures", []):
-        user = db.users.find_one({"_id": ObjectId(signature["user_id"])})
-        if user:
-            signature["user_name"] = user.get("name") or user.get("username")
-    
-    return {"flow": serialize_doc(flow)}
+    from modules.depo_procurement.services import get_order_approval_flow
+    return await get_order_approval_flow(order_id)
 
 
 @router.post("/purchase-orders/{order_id}/approval-flow")
-async def create_order_approval_flow(
+async def create_approval_flow_endpoint(
     request: Request,
     order_id: str,
     current_user: dict = Depends(verify_token)
 ):
     """Create approval flow for a purchase order using approval_templates"""
-    db = get_db()
-    
-    # ✅ FIX: Convert order_id to ObjectId for proper filtering
-    existing = db.approval_flows.find_one({
-        "object_type": "procurement_order",
-        "object_id": ObjectId(order_id)
-    })
-    
-    if existing:
-        raise HTTPException(status_code=400, detail="Approval flow already exists for this order")
-    
-    # Get approval template
-    templates_collection = db['approval_templates']
-    approval_template = templates_collection.find_one({
-        'object_type': 'procurement_order',
-        'active': True
-    })
-    
-    if not approval_template:
-        raise HTTPException(status_code=404, detail="No active approval template found for procurement orders")
-    
-    officers = approval_template.get('officers', [])
-    
-    # Separate officers by action type
-    required_officers = []
-    optional_officers = []
-    
-    for officer in officers:
-        officer_data = {
-            "type": officer.get('type'),
-            "reference": officer.get('reference'),
-            "action": officer.get('action'),
-            "order": officer.get('order', 0)
-        }
-        
-        if officer.get('action') == 'must_sign':
-            required_officers.append(officer_data)
-        elif officer.get('action') == 'can_sign':
-            optional_officers.append(officer_data)
-    
-    # Sort by order
-    required_officers.sort(key=lambda x: x.get('order', 0))
-    optional_officers.sort(key=lambda x: x.get('order', 0))
-    
-    # Count minimum signatures (number of must_sign officers)
-    min_signatures = len(required_officers)
-    
-    flow_data = {
-        "object_type": "procurement_order",
-        "object_source": "depo_procurement",
-        "object_id": ObjectId(order_id),  # ✅ FIX: Store as ObjectId
-        "template_id": str(approval_template['_id']),
-        "template_name": approval_template.get('name'),
-        "min_signatures": min_signatures,
-        "required_officers": required_officers,
-        "optional_officers": optional_officers,
-        "signatures": [],
-        "status": "pending",
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
-    }
-    
-    result = db.approval_flows.insert_one(flow_data)
-    flow_data["_id"] = str(result.inserted_id)
-    
-    return serialize_doc(flow_data)
+    from modules.depo_procurement.services import create_order_approval_flow
+    return await create_order_approval_flow(order_id)
 
 
 @router.post("/purchase-orders/{order_id}/sign")
-async def sign_purchase_order(
+async def sign_order_endpoint(
     request: Request,
     order_id: str,
     current_user: dict = Depends(verify_token)
 ):
     """Sign a purchase order approval flow"""
-    from src.backend.models.approval_flow_model import ApprovalFlowModel
-    from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
-
-    db = get_db()
-    
-    # Get action from request body (issue or cancel)
+    from modules.depo_procurement.services import sign_purchase_order
     body = await request.json()
-    action = body.get('action', 'issue')  # Default to 'issue'
-
-    # ✅ FIX: Convert order_id to ObjectId for proper filtering
-    flow = db.approval_flows.find_one({
-        "object_type": "procurement_order",
-        "object_id": ObjectId(order_id)
-    })
-    
-    if not flow:
-        raise HTTPException(status_code=404, detail="No approval flow found for this order")
-    
-    user_id = str(current_user["_id"])
-    existing_signature = next(
-        (s for s in flow.get("signatures", []) if s["user_id"] == user_id),
-        None
+    action = body.get('action', 'issue')
+    return await sign_purchase_order(
+        order_id, action, current_user, 
+        request.client.host, request.headers.get("user-agent")
     )
-    
-    if existing_signature:
-        raise HTTPException(status_code=400, detail="You have already signed this order")
-    
-    username = current_user["username"]
-    user_role_id = current_user.get("role")
-    
-    # ✅ Use global helper function
-    can_sign = check_user_can_sign(
-        db,
-        user_id,
-        user_role_id,
-        flow.get("required_officers", []),
-        flow.get("optional_officers", [])
-    )
-    
-    if not can_sign:
-        raise HTTPException(status_code=403, detail="You are not authorized to sign this order")
-    
-    timestamp = datetime.utcnow()
-    signature_hash = ApprovalFlowModel.generate_signature_hash(
-        user_id=user_id,
-        object_type="procurement_order",
-        object_id=order_id,
-        timestamp=timestamp
-    )
-    
-    signature = {
-        "user_id": user_id,
-        "username": username,
-        "signed_at": timestamp,
-        "signature_hash": signature_hash,
-        "ip_address": request.client.host,
-        "user_agent": request.headers.get("user-agent")
-    }
-    
-    db.approval_flows.update_one(
-        {"_id": ObjectId(flow["_id"])},
-        {
-            "$push": {"signatures": signature},
-            "$set": {
-                "status": "in_progress",
-                "updated_at": timestamp
-            }
-        }
-    )
-    
-    updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
-    required_officers = updated_flow.get("required_officers", [])
-    signatures = updated_flow.get("signatures", [])
-    
-    # ✅ Use global helper function
-    is_complete, required_signed, required_count = check_approval_completion(
-        db,
-        required_officers,
-        signatures
-    )
-    
-    # ✅ Change order state based on action (immediately after first signature)
-    if action == 'issue':
-        # ISSUED state: 6943a4a6451609dd8a618cdf
-        target_state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId('6943a4a6451609dd8a618cdf')})
-        if not target_state:
-            target_state = db['depo_purchase_orders_states'].find_one({'name': 'Issued'})
-    elif action == 'cancel':
-        # CANCELLED state: 6943a4a6451609dd8a618ce2
-        target_state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId('6943a4a6451609dd8a618ce2')})
-        if not target_state:
-            target_state = db['depo_purchase_orders_states'].find_one({'name': 'Cancelled'})
-    else:
-        target_state = None
-    
-    if target_state:
-        db['depo_purchase_orders'].update_one(
-            {'_id': ObjectId(order_id)},
-            {
-                '$set': {
-                    'state_id': target_state['_id'],
-                    'updated_at': timestamp,
-                    'signed_at': timestamp,
-                    'signed_by': username,
-                    'sign_action': action
-                },
-                '$unset': {
-                    'status': ''  # Remove old status field
-                }
-            }
-        )
-    
-    # Update approval flow status
-    if is_complete:
-        db.approval_flows.update_one(
-            {"_id": ObjectId(flow["_id"])},
-            {
-                "$set": {
-                    "status": "approved",
-                    "completed_at": timestamp,
-                    "updated_at": timestamp
-                }
-            }
-        )
-    
-    flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
-    return serialize_doc(flow)
 
 
 @router.delete("/purchase-orders/{order_id}/signatures/{user_id}")
-async def remove_order_signature(
+async def remove_signature_endpoint(
     request: Request,
     order_id: str,
     user_id: str,
     current_user: dict = Depends(verify_token)
 ):
     """Remove signature from purchase order approval flow (admin only)"""
-    db = get_db()
-    
-    is_admin = current_user.get('is_staff', False) or current_user.get('is_superuser', False)
-    if not is_admin:
-        raise HTTPException(status_code=403, detail="Only admin can remove signatures")
-    
-    # ✅ FIX: Convert order_id to ObjectId for proper filtering
-    flow = db.approval_flows.find_one({
-        "object_type": "procurement_order",
-        "object_id": ObjectId(order_id)
-    })
-    
-    if not flow:
-        raise HTTPException(status_code=404, detail="No approval flow found for this order")
-    
-    result = db.approval_flows.update_one(
-        {"_id": ObjectId(flow["_id"])},
-        {
-            "$pull": {"signatures": {"user_id": user_id}},
-            "$set": {"updated_at": datetime.utcnow()}
-        }
-    )
-    
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Signature not found")
-    
-    updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
-    if len(updated_flow.get("signatures", [])) == 0:
-        db.approval_flows.update_one(
-            {"_id": ObjectId(flow["_id"])},
-            {"$set": {"status": "pending"}}
-        )
-    
-    return {"message": "Signature removed successfully"}
+    from modules.depo_procurement.services import remove_order_signature
+    return await remove_order_signature(order_id, user_id, current_user)

@@ -27,6 +27,17 @@ from .order_state import (
     change_order_state,
     check_and_auto_finish_order
 )
+from .approval_flow import (
+    get_order_approval_flow,
+    create_order_approval_flow,
+    sign_purchase_order,
+    remove_order_signature
+)
+from .qc_records import (
+    get_qc_records,
+    create_qc_record,
+    update_qc_record
+)
 
 __all__ = [
     # Purchase Orders
@@ -50,4 +61,13 @@ __all__ = [
     # Order State
     'change_order_state',
     'check_and_auto_finish_order',
+    # Approval Flow
+    'get_order_approval_flow',
+    'create_order_approval_flow',
+    'sign_purchase_order',
+    'remove_order_signature',
+    # QC Records
+    'get_qc_records',
+    'create_qc_record',
+    'update_qc_record',
 ]
