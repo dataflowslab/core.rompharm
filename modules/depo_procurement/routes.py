@@ -687,25 +687,25 @@ async def create_order_approval_flow(
 
 @router.post("/purchase-orders/{order_id}/sign")
 async def sign_purchase_order(
-request: Request,
-order_id: str,
-current_user: dict = Depends(verify_token)
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
 ):
-"""Sign a purchase order approval flow"""
-from src.backend.models.approval_flow_model import ApprovalFlowModel
-from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
+    """Sign a purchase order approval flow"""
+    from src.backend.models.approval_flow_model import ApprovalFlowModel
+    from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
 
-db = get_db()
+    db = get_db()
+    
+    # Get action from request body (issue or cancel)
+    body = await request.json()
+    action = body.get('action', 'issue')  # Default to 'issue'
 
-# Get action from request body (issue or cancel)
-body = await request.json()
-action = body.get('action', 'issue')  # Default to 'issue'
-
-# ✅ FIX: Convert order_id to ObjectId for proper filtering
-flow = db.approval_flows.find_one({
-"object_type": "procurement_order",
-"object_id": ObjectId(order_id)
-})
+    # ✅ FIX: Convert order_id to ObjectId for proper filtering
+    flow = db.approval_flows.find_one({
+        "object_type": "procurement_order",
+        "object_id": ObjectId(order_id)
+    })
     
     if not flow:
         raise HTTPException(status_code=404, detail="No approval flow found for this order")
