@@ -253,8 +253,67 @@ export function ReceiveStockForm({
         />
       </Grid.Col>
 
-      {/* Row 2: Location, Transferable checkbox */}
-      <Grid.Col span={9}>
+      {/* Row 2: Batch Code, Supplier Batch Code, Manufacturing Date (3 columns) */}
+      <Grid.Col span={4}>
+        <TextInput
+          label={t('Batch Code')}
+          placeholder={t('Enter batch code')}
+          value={formData.batch_code}
+          onChange={(e) => updateField('batch_code', e.target.value)}
+        />
+      </Grid.Col>
+
+      <Grid.Col span={4}>
+        <TextInput
+          label={t('Supplier Batch Code')}
+          placeholder={t('Enter supplier batch code')}
+          value={formData.supplier_batch_code}
+          onChange={(e) => updateField('supplier_batch_code', e.target.value)}
+        />
+      </Grid.Col>
+
+      <Grid.Col span={4}>
+        <DateInput
+          label={t('Manufacturing Date')}
+          placeholder={t('Select date')}
+          value={formData.manufacturing_date}
+          onChange={(value) => updateField('manufacturing_date', value)}
+          clearable
+        />
+      </Grid.Col>
+
+      {/* Row 3: Use Expiry checkbox + Expiry/Reset Date (1/2 + 1/2) */}
+      <Grid.Col span={6}>
+        <Checkbox
+          label={t('Use Expiry Date (uncheck for Reset Date)')}
+          checked={formData.use_expiry}
+          onChange={(e) => updateField('use_expiry', e.currentTarget.checked)}
+          mt="md"
+        />
+      </Grid.Col>
+
+      <Grid.Col span={6}>
+        {formData.use_expiry ? (
+          <DateInput
+            label={t('Expiry Date')}
+            placeholder={t('Select expiry date')}
+            value={formData.expiry_date}
+            onChange={(value) => updateField('expiry_date', value)}
+            clearable
+          />
+        ) : (
+          <DateInput
+            label={t('Reset Date')}
+            placeholder={t('Select reset date')}
+            value={formData.reset_date}
+            onChange={(value) => updateField('reset_date', value)}
+            clearable
+          />
+        )}
+      </Grid.Col>
+
+      {/* Row 4: Location (2/3) + Transferable (1/3) */}
+      <Grid.Col span={8}>
         <Select
           label={t('Location')}
           placeholder={t('Select location')}
@@ -266,7 +325,7 @@ export function ReceiveStockForm({
         />
       </Grid.Col>
 
-      <Grid.Col span={3}>
+      <Grid.Col span={4}>
         <Checkbox
           label={t('Transferable')}
           description={t('Stock can be transferred while in quarantine')}
@@ -275,67 +334,6 @@ export function ReceiveStockForm({
           mt="md"
         />
       </Grid.Col>
-
-      {/* Batch Codes */}
-      <Grid.Col span={6}>
-        <TextInput
-          label={t('Batch Code')}
-          placeholder={t('Enter batch code')}
-          value={formData.batch_code}
-          onChange={(e) => updateField('batch_code', e.target.value)}
-        />
-      </Grid.Col>
-
-      <Grid.Col span={6}>
-        <TextInput
-          label={t('Supplier Batch Code')}
-          placeholder={t('Enter supplier batch code')}
-          value={formData.supplier_batch_code}
-          onChange={(e) => updateField('supplier_batch_code', e.target.value)}
-        />
-      </Grid.Col>
-
-      {/* Manufacturing Date */}
-      <Grid.Col span={12}>
-        <DateInput
-          label={t('Manufacturing Date')}
-          placeholder={t('Select date')}
-          value={formData.manufacturing_date}
-          onChange={(value) => updateField('manufacturing_date', value)}
-          clearable
-        />
-      </Grid.Col>
-
-      {/* Expiry/Reset Date Section */}
-      <Grid.Col span={12}>
-        <Checkbox
-          label={t('Use Expiry Date (uncheck for Reset Date)')}
-          checked={formData.use_expiry}
-          onChange={(e) => updateField('use_expiry', e.currentTarget.checked)}
-        />
-      </Grid.Col>
-
-      {formData.use_expiry ? (
-        <Grid.Col span={12}>
-          <DateInput
-            label={t('Expiry Date')}
-            placeholder={t('Select expiry date')}
-            value={formData.expiry_date}
-            onChange={(value) => updateField('expiry_date', value)}
-            clearable
-          />
-        </Grid.Col>
-      ) : (
-        <Grid.Col span={12}>
-          <DateInput
-            label={t('Reset Date')}
-            placeholder={t('Select reset date')}
-            value={formData.reset_date}
-            onChange={(value) => updateField('reset_date', value)}
-            clearable
-          />
-        </Grid.Col>
-      )}
 
       {/* Containers Section */}
       <Grid.Col span={12}>
@@ -360,7 +358,6 @@ export function ReceiveStockForm({
               <Table.Tr>
                 <Table.Th>{t('Num')}</Table.Th>
                 <Table.Th>{t('Products/Container')}</Table.Th>
-                <Table.Th>{t('Unit')}</Table.Th>
                 <Table.Th>{t('Damaged')}</Table.Th>
                 <Table.Th>{t('Unsealed')}</Table.Th>
                 <Table.Th>{t('Mislabeled')}</Table.Th>
@@ -384,14 +381,6 @@ export function ReceiveStockForm({
                       value={container.products_per_container}
                       onChange={(val) => updateContainerRow(container.id, 'products_per_container', Number(val) || 1)}
                       min={1}
-                      size="xs"
-                      styles={{ input: { width: '60px' } }}
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <TextInput
-                      value={container.unit}
-                      onChange={(e) => updateContainerRow(container.id, 'unit', e.target.value)}
                       size="xs"
                       styles={{ input: { width: '60px' } }}
                     />
