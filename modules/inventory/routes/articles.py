@@ -275,9 +275,9 @@ async def update_article(
     
     # Simple fields
     for field in ['name', 'ipn', 'um', 'description', 'notes', 'keywords', 'link', 
-                  'minimum_stock', 'is_component', 'is_assembly', 'is_testable', 
-                  'is_salable', 'is_active', 'storage_conditions', 'regulated', 
-                  'lotallexp', 'selection_method', 'manufacturer_ipn', 
+                  'minimum_stock', 'conversion_modifier', 'is_component', 'is_assembly', 
+                  'is_testable', 'is_salable', 'is_active', 'storage_conditions', 
+                  'regulated', 'lotallexp', 'selection_method', 'manufacturer_ipn', 
                   'total_delivery_time', 'payment_condition']:
         value = getattr(article_data, field, None)
         if value is not None:

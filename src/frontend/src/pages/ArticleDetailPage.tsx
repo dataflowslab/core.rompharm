@@ -38,6 +38,7 @@ interface Article {
   link?: string;
   default_expiry?: number;
   minimum_stock?: number;
+  conversion_modifier?: number;
   is_component: boolean;
   is_assembly: boolean;
   is_testable: boolean;
@@ -426,6 +427,9 @@ export function ArticleDetailPage() {
             <Tabs.Tab value="details" leftSection={<IconPackage size={16} />}>
               Part Details
             </Tabs.Tab>
+            <Tabs.Tab value="suppliers" leftSection={<IconTruckDelivery size={16} />}>
+              Suppliers
+            </Tabs.Tab>
             <Tabs.Tab value="stock" leftSection={<IconBoxSeam size={16} />}>
               Stock
             </Tabs.Tab>
@@ -434,9 +438,6 @@ export function ArticleDetailPage() {
             </Tabs.Tab>
             <Tabs.Tab value="recipes" leftSection={<IconChefHat size={16} />}>
               Recipes
-            </Tabs.Tab>
-            <Tabs.Tab value="suppliers" leftSection={<IconTruckDelivery size={16} />}>
-              Suppliers
             </Tabs.Tab>
             <Tabs.Tab value="attachments" leftSection={<IconPaperclip size={16} />}>
               Attachments
@@ -485,6 +486,8 @@ export function ArticleDetailPage() {
             <SuppliersTab
               articleSuppliers={articleSuppliers}
               loadingSuppliers={loadingSuppliers}
+              article={article}
+              systemUMs={systemUMs}
               onAddSupplier={handleAddSupplier}
               onEditSupplier={handleEditSupplier}
               onDeleteSupplier={handleDeleteSupplier}
