@@ -105,19 +105,21 @@ src/frontend/src/components/Procurement/
 - **Build-uri:** 5+ successful
 - **Toate fișiere sub 700 linii:** ✅
 
-### Task-uri În Progres
+### Task-uri Completate
 
-#### Task 1: Auto-finish după recepție
+#### Task 1: Auto-finish după recepție ✅
 - Logica există în `check_and_auto_finish_order()`
 - Se apelează automat după receive stock
 - Schimbă state la FINISHED când toate itemurile sunt recepționate
+- **Status:** Funcțional, nu necesită modificări
 
-#### Task 2: Reorganizare ReceiveStockForm
-**Cerințe:**
-- [ ] Batch code, Supplier batch code, Manufacturing date pe același rând (3 coloane)
-- [ ] Use expiry date checkbox și Expiry/Reset date pe același rând (1/2 + 1/2)
-- [ ] Elimină coloana Unit din container table
-- [ ] Location 2/3, Transferable 1/3 pe același rând
+#### Task 2: Reorganizare ReceiveStockForm ✅
+**Implementat:**
+- ✅ Batch code, Supplier batch code, Manufacturing date pe același rând (3 coloane)
+- ✅ Use expiry date checkbox și Expiry/Reset date pe același rând (1/2 + 1/2)
+- ✅ Eliminat coloana Unit din container table
+- ✅ Location 2/3, Transferable 1/3 pe același rând
+- **Commit:** a9b3d28
 
 #### Task 3: Mută Stocks în meniul principal
 - [ ] Modifică navigația pentru a muta Stocks din Inventory la nivel 1

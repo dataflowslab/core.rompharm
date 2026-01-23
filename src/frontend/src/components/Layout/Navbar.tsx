@@ -14,6 +14,7 @@ import {
   IconTemplate,
   IconChefHat,
   IconPackage,
+  IconStack2,
 } from '@tabler/icons-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -80,6 +81,14 @@ export function Navbar() {
       />
 
       <NavLink
+        label={t('Stocks')}
+        leftSection={<IconStack2 size={20} />}
+        rightSection={<IconChevronRight size={14} />}
+        active={isActive('/inventory/stocks')}
+        onClick={() => navigate('/inventory/stocks')}
+      />
+
+      <NavLink
         label={t('Inventory')}
         leftSection={<IconPackage size={20} />}
         childrenOffset={28}
@@ -91,12 +100,6 @@ export function Navbar() {
           active={isActive('/inventory/articles')}
           onClick={() => navigate('/inventory/articles')}
           style={{ fontWeight: isActive('/inventory/articles') ? 'bold' : 'normal' }}
-        />
-        <NavLink
-          label={t('Stocks')}
-          active={isActive('/inventory/stocks')}
-          onClick={() => navigate('/inventory/stocks')}
-          style={{ fontWeight: isActive('/inventory/stocks') ? 'bold' : 'normal' }}
         />
         <NavLink
           label={t('Suppliers')}

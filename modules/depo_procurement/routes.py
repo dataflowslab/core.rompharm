@@ -30,11 +30,14 @@ router = APIRouter(prefix="/modules/depo_procurement/api", tags=["depo_procureme
 async def get_purchase_orders(
     request: Request,
     search: Optional[str] = Query(None),
+    state_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     current_user: dict = Depends(verify_token)
 ):
-    """Get list of purchase orders from MongoDB"""
+    """Get list of purchase orders from MongoDB with filters"""
     from modules.depo_procurement.services import get_purchase_orders_list
-    return await get_purchase_orders_list(search)
+    return await get_purchase_orders_list(search, state_id, date_from, date_to)
 
 
 @router.get("/purchase-orders/{order_id}")

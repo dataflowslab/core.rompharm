@@ -11,12 +11,14 @@ from src.backend.utils.db import get_db
 from ..utils import serialize_doc
 
 
-async def get_purchase_orders_list(search=None):
-    """Get list of purchase orders with supplier details"""
+async def get_purchase_orders_list(search=None, state_id=None, date_from=None, date_to=None):
+    """Get list of purchase orders with supplier and state details"""
     db = get_db()
     collection = db['depo_purchase_orders']
     
     query = {}
+    
+    # Search filter
     if search:
         query['$or'] = [
             {'reference': {'$regex': search, '$options': 'i'}},
@@ -24,16 +26,46 @@ async def get_purchase_orders_list(search=None):
             {'supplier_reference': {'$regex': search, '$options': 'i'}}
         ]
     
+    # State filter
+    if state_id:
+        query['state_id'] = ObjectId(state_id)
+    
+    # Date range filter
+    if date_from or date_to:
+        query['issue_date'] = {}
+        if date_from:
+            query['issue_date']['$gte'] = date_from
+        if date_to:
+            query['issue_date']['$lte'] = date_to
+    
     try:
         cursor = collection.find(query).sort('created_at', -1)
         orders = list(cursor)
         
-        # Enrich with supplier details
+        # Enrich with supplier and state details
         for order in orders:
+            # Supplier details
             if order.get('supplier_id'):
                 supplier = db['depo_companies'].find_one({'_id': ObjectId(order['supplier_id'])})
                 if supplier:
                     order['supplier_detail'] = serialize_doc(supplier)
+            
+            # State details
+            if order.get('state_id'):
+                state = db['depo_purchase_orders_states'].find_one({'_id': order['state_id']})
+                if state:
+                    order['state_detail'] = {
+                        'name': state.get('name'),
+                        'color': state.get('color', 'gray'),
+                        'value': state.get('value', 0)
+                    }
+            else:
+                # No state_id - default to Pending
+                order['state_detail'] = {
+                    'name': 'Pending',
+                    'color': 'gray',
+                    'value': 0
+                }
         
         return serialize_doc(orders)
     except Exception as e:
