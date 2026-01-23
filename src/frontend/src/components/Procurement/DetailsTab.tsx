@@ -521,30 +521,15 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
       {/* Sign Confirmation Modal */}
       <Modal
         opened={signModalOpened}
-        onClose={() => {
-          setSignModalOpened(false);
-          setSignAction('issue'); // Reset to default
-        }}
+        onClose={() => setSignModalOpened(false)}
         title={t('Sign Order')}
         centered
       >
         <Stack gap="md">
-          <Select
-            label={t('Action')}
-            description={t('Select the action to perform when signing')}
-            value={signAction}
-            onChange={(value) => setSignAction(value as 'issue' | 'cancel')}
-            data={[
-              { value: 'issue', label: t('Issue Order') },
-              { value: 'cancel', label: t('Cancel Order') }
-            ]}
-            required
-          />
-          
           <Alert color={signAction === 'cancel' ? 'red' : 'blue'} icon={<IconAlertCircle />}>
             {signAction === 'issue' 
-              ? t('The order will be issued and ready for receiving items.')
-              : t('The order will be cancelled and cannot be processed further.')
+              ? t('Are you sure you want to issue this order? The order will be ready for receiving items.')
+              : t('Are you sure you want to cancel this order? This action cannot be undone.')
             }
           </Alert>
 
@@ -555,12 +540,9 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
           <Group justify="flex-end">
             <Button 
               variant="default" 
-              onClick={() => {
-                setSignModalOpened(false);
-                setSignAction('issue');
-              }}
+              onClick={() => setSignModalOpened(false)}
             >
-              {t('Cancel')}
+              {t('No, go back')}
             </Button>
             <Button 
               color={signAction === 'cancel' ? 'red' : 'green'} 
@@ -568,7 +550,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
               loading={submitting}
               leftSection={<IconCheck size={16} />}
             >
-              {t('Sign')}
+              {t('Yes, sign')}
             </Button>
           </Group>
         </Stack>
