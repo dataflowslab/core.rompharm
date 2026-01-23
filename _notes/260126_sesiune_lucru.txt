@@ -127,17 +127,19 @@ src/frontend/src/components/Procurement/
 - ✅ Icon: IconStack2
 - **Commit:** 1ae1978
 
-#### Task 4: Filtrare tabel Procurement (În Progres)
-**Backend Completat:**
+#### Task 4: Filtrare tabel Procurement ✅
+**Backend:**
 - ✅ `get_purchase_orders_list()` acceptă parametri: search, state_id, date_from, date_to
 - ✅ Agregare state_detail pentru toate comenzile
 - ✅ Endpoint actualizat cu Query parameters
 
-**Frontend Rămâne:**
-- [ ] Adăugare filtre UI (status select, date range)
-- [ ] Modificare loadPurchaseOrders() pentru a trimite parametrii
-- [ ] Afișare Badge cu state_detail.color în tabel
-- [ ] Căutare după furnizori (deja funcțional prin supplier_detail)
+**Frontend:**
+- ✅ Adăugat filtre UI (status select, date range)
+- ✅ Modificat loadPurchaseOrders() pentru a trimite parametrii
+- ✅ Afișare Badge cu state_detail.color în tabel
+- ✅ Căutare după furnizori (funcțional prin supplier_detail)
+- ✅ Auto-reload când se schimbă filtrele
+- **Commit:** 740f511
 
 ### Observații Tehnice
 
