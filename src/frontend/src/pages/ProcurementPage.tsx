@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Container, Group, Table, Title, Modal, Select, TextInput, Textarea, Grid, Checkbox, Progress, Text } from '@mantine/core';
+import { Button, Container, Group, Table, Title, Modal, Select, TextInput, Textarea, Grid, Checkbox, Progress, Text, Badge } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { IconPlus, IconSearch, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,11 @@ interface PurchaseOrder {
     name: string;
     pk?: string;
     _id?: string;
+  };
+  state_detail?: {
+    name: string;
+    color: string;
+    value: number;
   };
   status: number;
   status_text: string;
@@ -100,12 +105,24 @@ export function ProcurementPage() {
     loadPurchaseOrders();
     loadSuppliers();
     loadStockLocations();
+    loadOrderStates();
   }, []);
+
+  useEffect(() => {
+    loadPurchaseOrders();
+  }, [searchQuery, statusFilter, dateFrom, dateTo]);
 
   const loadPurchaseOrders = async () => {
     setLoading(true);
     try {
-      const response = await api.get(procurementApi.getPurchaseOrders());
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      if (statusFilter) params.append('state_id', statusFilter);
+      if (dateFrom) params.append('date_from', dateFrom.toISOString().split('T')[0]);
+      if (dateTo) params.append('date_to', dateTo.toISOString().split('T')[0]);
+      
+      const url = `${procurementApi.getPurchaseOrders()}${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await api.get(url);
       setOrders(response.data.results || response.data || []);
     } catch (error) {
       console.error('Failed to load purchase orders:', error);
@@ -134,6 +151,15 @@ export function ProcurementPage() {
       setStockLocations(response.data.results || response.data || []);
     } catch (error) {
       console.error('Failed to load stock locations:', error);
+    }
+  };
+
+  const loadOrderStates = async () => {
+    try {
+      const response = await api.get(procurementApi.getOrderStatuses());
+      setOrderStates(response.data.statuses || []);
+    } catch (error) {
+      console.error('Failed to load order states:', error);
     }
   };
 
@@ -360,13 +386,47 @@ export function ProcurementPage() {
         </Button>
       </Group>
 
-      <TextInput
-        placeholder={t('Search by reference, supplier, description, or status...')}
-        leftSection={<IconSearch size={16} />}
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        mb="md"
-      />
+      <Grid mb="md">
+        <Grid.Col span={12}>
+          <TextInput
+            placeholder={t('Search by reference, supplier, description, or status...')}
+            leftSection={<IconSearch size={16} />}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </Grid.Col>
+        
+        <Grid.Col span={4}>
+          <Select
+            label={t('Status')}
+            placeholder={t('All statuses')}
+            data={orderStates.map(s => ({ value: s._id, label: s.name }))}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            clearable
+          />
+        </Grid.Col>
+
+        <Grid.Col span={4}>
+          <DatePickerInput
+            label={t('From Date')}
+            placeholder={t('Select start date')}
+            value={dateFrom}
+            onChange={setDateFrom}
+            clearable
+          />
+        </Grid.Col>
+
+        <Grid.Col span={4}>
+          <DatePickerInput
+            label={t('To Date')}
+            placeholder={t('Select end date')}
+            value={dateTo}
+            onChange={setDateTo}
+            clearable
+          />
+        </Grid.Col>
+      </Grid>
 
       <Table striped withTableBorder withColumnBorders highlightOnHover>
         <Table.Thead>
@@ -448,7 +508,20 @@ export function ProcurementPage() {
                       />
                     </div>
                   </Table.Td>
-                  <Table.Td>{order.status_text || '-'}</Table.Td>
+                  <Table.Td>
+                    {order.state_detail ? (
+                      <Badge
+                        style={{
+                          backgroundColor: order.state_detail.color || 'gray',
+                          color: '#fff',
+                        }}
+                      >
+                        {order.state_detail.name}
+                      </Badge>
+                    ) : (
+                      <Badge color="gray">{order.status_text || '-'}</Badge>
+                    )}
+                  </Table.Td>
                   <Table.Td>{formatDate(order.issue_date)}</Table.Td>
                   <Table.Td>{formatDate(order.target_date)}</Table.Td>
                 </Table.Tr>
