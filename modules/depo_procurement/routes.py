@@ -687,21 +687,25 @@ async def create_order_approval_flow(
 
 @router.post("/purchase-orders/{order_id}/sign")
 async def sign_purchase_order(
-    request: Request,
-    order_id: str,
-    current_user: dict = Depends(verify_token)
+request: Request,
+order_id: str,
+current_user: dict = Depends(verify_token)
 ):
-    """Sign a purchase order approval flow"""
-    from src.backend.models.approval_flow_model import ApprovalFlowModel
-    from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
-    
-    db = get_db()
-    
-    # ✅ FIX: Convert order_id to ObjectId for proper filtering
-    flow = db.approval_flows.find_one({
-        "object_type": "procurement_order",
-        "object_id": ObjectId(order_id)
-    })
+"""Sign a purchase order approval flow"""
+from src.backend.models.approval_flow_model import ApprovalFlowModel
+from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
+
+db = get_db()
+
+# Get action from request body (issue or cancel)
+body = await request.json()
+action = body.get('action', 'issue')  # Default to 'issue'
+
+# ✅ FIX: Convert order_id to ObjectId for proper filtering
+flow = db.approval_flows.find_one({
+"object_type": "procurement_order",
+"object_id": ObjectId(order_id)
+})
     
     if not flow:
         raise HTTPException(status_code=404, detail="No approval flow found for this order")
@@ -769,6 +773,38 @@ async def sign_purchase_order(
         signatures
     )
     
+    # ✅ Change order state based on action (immediately after first signature)
+    if action == 'issue':
+        # ISSUED state: 6943a4a6451609dd8a618cdf
+        target_state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId('6943a4a6451609dd8a618cdf')})
+        if not target_state:
+            target_state = db['depo_purchase_orders_states'].find_one({'name': 'Issued'})
+    elif action == 'cancel':
+        # CANCELLED state: 6943a4a6451609dd8a618ce2
+        target_state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId('6943a4a6451609dd8a618ce2')})
+        if not target_state:
+            target_state = db['depo_purchase_orders_states'].find_one({'name': 'Cancelled'})
+    else:
+        target_state = None
+    
+    if target_state:
+        db['depo_purchase_orders'].update_one(
+            {'_id': ObjectId(order_id)},
+            {
+                '$set': {
+                    'state_id': target_state['_id'],
+                    'updated_at': timestamp,
+                    'signed_at': timestamp,
+                    'signed_by': username,
+                    'sign_action': action
+                },
+                '$unset': {
+                    'status': ''  # Remove old status field
+                }
+            }
+        )
+    
+    # Update approval flow status
     if is_complete:
         db.approval_flows.update_one(
             {"_id": ObjectId(flow["_id"])},
@@ -780,29 +816,6 @@ async def sign_purchase_order(
                 }
             }
         )
-        
-        # ✅ FIX: Change to "Issued" state (value: 10) after signing
-        # State ID: 6943a4a6451609dd8a618cdf
-        issued_state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId('6943a4a6451609dd8a618cdf')})
-        if not issued_state:
-            # Fallback: find by name
-            issued_state = db['depo_purchase_orders_states'].find_one({'name': 'Issued'})
-        
-        if issued_state:
-            db['depo_purchase_orders'].update_one(
-                {'_id': ObjectId(order_id)},
-                {
-                    '$set': {
-                        'state_id': issued_state['_id'],
-                        'updated_at': timestamp,
-                        'approved_at': timestamp,
-                        'approved_by': username
-                    },
-                    '$unset': {
-                        'status': ''  # Remove old status field
-                    }
-                }
-            )
     
     flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
     return serialize_doc(flow)

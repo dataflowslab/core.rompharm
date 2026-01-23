@@ -288,6 +288,11 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
   };
 
   const getStatusLabel = (status: string) => {
+    // If there are signatures, show "Signed" instead of "In Progress"
+    if (status === 'in_progress' && flow && flow.signatures.length > 0) {
+      return t('Signed');
+    }
+    
     switch (status) {
       case 'pending': return t('Pending');
       case 'in_progress': return t('In Progress');
@@ -333,15 +338,31 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
                 </Group>
 
                 {canUserSign() && flow.status !== 'approved' && (
-                  <Button 
-                    onClick={() => setSignModalOpened(true)} 
-                    loading={submitting}
-                    leftSection={<IconCheck size={16} />}
-                    fullWidth
-                    size="sm"
-                  >
-                    {t('Sign Order')}
-                  </Button>
+                  <>
+                    <Select
+                      label={t('Action')}
+                      description={t('Select action when signing')}
+                      value={signAction}
+                      onChange={(value) => setSignAction(value as 'issue' | 'cancel')}
+                      data={[
+                        { value: 'issue', label: t('Issue Order') },
+                        { value: 'cancel', label: t('Cancel Order') }
+                      ]}
+                      size="sm"
+                      required
+                    />
+                    
+                    <Button 
+                      onClick={() => setSignModalOpened(true)} 
+                      loading={submitting}
+                      leftSection={<IconCheck size={16} />}
+                      fullWidth
+                      size="sm"
+                      color={signAction === 'cancel' ? 'red' : 'green'}
+                    >
+                      {t('Sign Order')}
+                    </Button>
+                  </>
                 )}
 
                 {flow.signatures.length > 0 && (
