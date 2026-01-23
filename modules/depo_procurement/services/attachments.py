@@ -19,6 +19,17 @@ async def get_order_attachments(order_id: str):
     try:
         cursor = collection.find({'order_id': ObjectId(order_id)}).sort('created_at', -1)
         attachments = list(cursor)
+        
+        # Add attachment URL for each file
+        for attachment in attachments:
+            if attachment.get('file_path'):
+                # Convert file_path to URL path (replace backslashes with forward slashes)
+                url_path = attachment['file_path'].replace('\\', '/')
+                # Ensure it starts with /
+                if not url_path.startswith('/'):
+                    url_path = '/' + url_path
+                attachment['attachment'] = url_path
+        
         return serialize_doc(attachments)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch attachments: {str(e)}")
