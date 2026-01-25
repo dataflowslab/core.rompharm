@@ -290,12 +290,13 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
   const handleLineItemChange = (value: string | null) => {
     setFormData({ ...formData, line_item: value || '' });
     
-    // Auto-set max quantity based on selected item
+    // Auto-set expected quantity based on selected item (but allow user to receive more)
     if (value) {
       const item = items.find(i => i._id === value);
       if (item) {
         const remaining = item.quantity - (item.received || 0);
-        setFormData(prev => ({ ...prev, quantity: remaining, expected_quantity: remaining }));
+        // Only set expected_quantity, not the actual quantity (user can enter any amount)
+        setFormData(prev => ({ ...prev, expected_quantity: remaining }));
       }
     }
   };

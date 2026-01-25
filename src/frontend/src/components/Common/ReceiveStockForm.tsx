@@ -13,9 +13,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Grid, Select, NumberInput, TextInput, Textarea, Checkbox, Divider, Button, Table, ActionIcon } from '@mantine/core';
+import { Grid, Select, NumberInput, TextInput, Textarea, Checkbox, Divider, Button, Table, ActionIcon, Alert } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconAlertTriangle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 
 interface ContainerRow {
@@ -252,6 +252,21 @@ export function ReceiveStockForm({
           searchable
         />
       </Grid.Col>
+
+      {/* Warning when received > expected */}
+      {formData.quantity > 0 && formData.expected_quantity > 0 && formData.quantity > formData.expected_quantity && (
+        <Grid.Col span={12}>
+          <Alert 
+            icon={<IconAlertTriangle size={16} />} 
+            title={t('Quantity Exceeds Expected')} 
+            color="yellow"
+            variant="light"
+          >
+            {t('Received quantity')} ({formData.quantity}) {t('is greater than expected quantity')} ({formData.expected_quantity}). 
+            {' '}{t('You can still save this stock entry.')}
+          </Alert>
+        </Grid.Col>
+      )}
 
       {/* Row 2: Batch Code, Supplier Batch Code, Manufacturing Date (3 columns) */}
       <Grid.Col span={4}>
