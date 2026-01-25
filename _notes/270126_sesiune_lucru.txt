@@ -1,230 +1,279 @@
-# Sesiune de Lucru - 27.01.2026
+# Sesiune de Lucru - 27.01.2026 (Final)
 
-## Rezumat Sesiune
+## Rezumat Complet Sesiune
 
-### Context Inițial
-- Analizat ultima sesiune (26.01.2026) din _notes
-- Identificat task-uri completate anterior: optimizare articles aggregation, reorganizare Part Details, supplier conversion info
+### Task-uri Completate
 
-### Task-uri Completate (Sesiunea Curentă)
-
-#### Task 1: Fix MongoDB Aggregation Error ✅
-**Problema:** Eroare la endpoint-ul `/modules/inventory/api/articles`
-```
-Invalid $project :: caused by :: Cannot do inclusion on field name in exclusion projection
-```
-
-**Cauză:** În pipeline-ul de agregare MongoDB, se amesteca exclusion (`'stocks': 0`) cu inclusion (specificarea câmpurilor pentru `system_um_detail` și `category_detail`) în același stage `$project`.
-
-**Soluție:**
-- Eliminat proiecția complexă care amesteca inclusion/exclusion
-- Păstrat doar exclusion simplă: `{'stocks': 0}`
-- MongoDB permite acum să returneze toate câmpurile minus `stocks`
-
-**Fișier modificat:** `modules/inventory/routes/articles.py`
-**Commit:** 40a07bd - "fix: MongoDB aggregation projection error in articles endpoint"
+#### Task 0: Moneda implicită la recepție ✅
+**Status:** COMPLETAT (nu necesită modificări)
+- Moneda este deja setată la nivel de purchase order
+- Se pasează ca `supplierCurrency` la `ReceivedStockTab`
+- Backend folosește moneda de la comandă
 
 ---
 
-#### Task 2: Permite Primirea de Cantități Mai Mari decât Cele Așteptate ✅
+#### Task 1: Filtrare locații type=Depozit ✅
+**Status:** COMPLETAT
 
-**Cerință:** La procurement > receive stock, să poți primi cantități de stoc mai mari decât cele așteptate, cu un warning vizual dar permițând salvarea.
+**Backend:**
+- Adăugat parametru `type_filter` în `/modules/inventory/api/locations`
+- Query filter: `if type_filter: query['type'] = type_filter`
 
-**Analiză Inițială:**
-1. **Backend:** NU există validări care să blocheze cantități mai mari
-2. **Frontend:** Auto-completare sugerează că nu ar trebui să depășești
-3. **Model:** `ReceiveStockRequest` nu are restricții de cantitate
+**Frontend:**
+- Modificat `ProcurementDetailPage.tsx`
+- Call API cu filtru: `?type=Depozit`
+- Doar locațiile de tip "Depozit" apar în receive stock
+
+**Fișiere modificate:**
+- `modules/inventory/routes/locations.py`
+- `src/frontend/src/pages/ProcurementDetailPage.tsx`
+
+**Commit:** 884ca62 - "feat: Filter stock locations by type=Depozit for procurement receive stock"
+
+---
+
+#### Task 2: UM (Unitatea de Măsură) - Read-only ✅
+**Status:** COMPLETAT
+
+**Cerință:** UM stabilită la nivel de article, afișată informativ la recepție
 
 **Implementare:**
 
-##### 1. Warning Vizual în ReceiveStockForm.tsx
-- Adăugat import pentru `Alert` și `IconAlertTriangle`
-- Adăugat secțiune de warning după câmpurile de cantitate
-- Warning apare când: `quantity > 0 AND expected_quantity > 0 AND quantity > expected_quantity`
-- Mesaj: "Received quantity (X) is greater than expected quantity (Y). You can still save this stock entry."
-- Culoare: yellow (avertisment, nu eroare)
-- Varianta: light (mai puțin intruziv)
+**Backend:**
+- `order_items.py` returnează deja `part_detail.um`
+- Nu necesită modificări backend
 
-##### 2. Eliminat Auto-completarea Restrictivă în ReceivedStockTab.tsx
-**Înainte:**
-```typescript
-const remaining = item.quantity - (item.received || 0);
-setFormData(prev => ({ ...prev, quantity: remaining, expected_quantity: remaining }));
-```
+**Frontend:**
+1. **ReceivedStockTab.tsx:**
+   - Adăugat `um` în interface `PurchaseOrderItem`
+   - Pasat `articleUm={selectedItem?.part_detail?.um}` la ReceiveStockForm
 
-**După:**
-```typescript
-const remaining = item.quantity - (item.received || 0);
-// Only set expected_quantity, not the actual quantity (user can enter any amount)
-setFormData(prev => ({ ...prev, expected_quantity: remaining }));
-```
-
-**Beneficii:**
-- User poate introduce orice cantitate
-- `expected_quantity` se setează automat cu cantitatea rămasă (pentru referință)
-- Warning apare automat dacă depășește
-- Salvarea funcționează normal
+2. **ReceiveStockForm.tsx:**
+   - Adăugat prop `articleUm?: string`
+   - Înlocuit Select cu TextInput disabled când `articleUm` există
+   - Label: "Unit of Measure"
+   - Description: "Unit is defined at article level"
 
 **Fișiere modificate:**
-- `src/frontend/src/components/Common/ReceiveStockForm.tsx` (494 linii)
-- `src/frontend/src/components/Procurement/ReceivedStockTab.tsx` (405 linii)
+- `src/frontend/src/components/Procurement/ReceivedStockTab.tsx` (407 linii)
+- `src/frontend/src/components/Common/ReceiveStockForm.tsx` (507 linii)
 
-**Commit:** 9df9b63 - "feat: Allow receiving quantities greater than expected with warning"
+**Commit:** c831a7f - "feat: Display article UM as read-only in receive stock form"
 
 ---
 
-## Structură Fișiere Modificate
+#### Task 3: Locations - Câmp `code` cu validare ✅
+**Status:** COMPLETAT (Backend)
 
-### Backend
-```
-modules/inventory/routes/articles.py (596 linii)
-- Fixed MongoDB aggregation $project stage
-- Eliminat mixing de inclusion/exclusion
-```
+**Cerințe:**
+- Adăugare câmp `code` în locations
+- Validare unicitate la create/update
 
-### Frontend
-```
-src/frontend/src/components/Common/ReceiveStockForm.tsx (494 linii)
-├── Import Alert, IconAlertTriangle
-├── Warning section după quantity fields
-└── Conditional rendering: quantity > expected_quantity
+**Implementare Backend:**
 
-src/frontend/src/components/Procurement/ReceivedStockTab.tsx (405 linii)
-└── Modified handleLineItemChange()
-    └── Only auto-fill expected_quantity, not quantity
-```
+1. **utils.py:**
+   - Adăugat `code: Optional[str] = None` în `LocationCreateRequest`
+   - Adăugat `code: Optional[str] = None` în `LocationUpdateRequest`
+
+2. **locations.py - create_location():**
+   - Validare: verifică dacă `code` există deja
+   - Raise HTTPException 400 dacă există duplicat
+   - Salvează `code` în document
+
+3. **locations.py - update_location():**
+   - Validare: verifică dacă `code` există (exclus locația curentă)
+   - Query: `{'code': location_data.code, '_id': {'$ne': ObjectId(location_id)}}`
+   - Raise HTTPException 400 dacă există duplicat
+
+**Fișiere modificate:**
+- `modules/inventory/routes/utils.py`
+- `modules/inventory/routes/locations.py` (221 linii)
+
+**Frontend:** ⏳ Rămâne de implementat (tabel + formular)
+
+**Commit:** f0a39c2 - "feat: Add code field to locations with uniqueness validation"
+
+---
+
+#### Task 4: Stocks - Filtrare verificat/neverificat + lotexp ⏳
+**Status:** PLANIFICAT (nu a fost implementat în această sesiune)
+
+**Cerințe:**
+- Filtrare după verificat/neverificat (prelevate cant pentru QC sau nu)
+- Filtrare după lotexp (lot/expiry)
+
+**Plan implementare:**
+- Backend: Adăugare parametri în endpoint stocks
+- Frontend: Adăugare filtre în pagina stocks
+
+---
+
+## Statistici Sesiune
+
+### Commits
+1. **884ca62** - feat: Filter stock locations by type=Depozit for procurement receive stock
+2. **c831a7f** - feat: Display article UM as read-only in receive stock form
+3. **f0a39c2** - feat: Add code field to locations with uniqueness validation
+
+**Total commits:** 3
+
+### Fișiere Modificate
+**Backend:**
+- `modules/inventory/routes/locations.py` (221 linii) ✅
+- `modules/inventory/routes/utils.py` (234 linii) ✅
+- `modules/depo_procurement/services/order_items.py` (nu modificat, doar verificat)
+
+**Frontend:**
+- `src/frontend/src/pages/ProcurementDetailPage.tsx` (370 linii) ✅
+- `src/frontend/src/components/Procurement/ReceivedStockTab.tsx` (407 linii) ✅
+- `src/frontend/src/components/Common/ReceiveStockForm.tsx` (507 linii) ✅
+
+**Toate fișierele sub 700 linii** ✅
+
+### Task-uri Completate
+- **Task 0:** ✅ Moneda implicită (nu necesită modificări)
+- **Task 1:** ✅ Filtrare locații Depozit
+- **Task 2:** ✅ UM read-only
+- **Task 3:** ✅ Câmp code locations (backend)
+- **Task 4:** ⏳ Filtrare stocks (planificat)
+
+**Progres:** 3.5/5 task-uri (70%)
 
 ---
 
 ## Detalii Tehnice
 
-### MongoDB Aggregation Fix
-**Problema:**
-```javascript
-{
-  '$project': {
-    'stocks': 0,  // Exclusion
-    'system_um_detail': {  // Inclusion
-      'name': 1,
-      'abrev': 1
-    }
-  }
-}
+### Task 1: Filtrare Locații
+```python
+# Backend - locations.py
+type_filter: Optional[str] = Query(None, alias="type")
+if type_filter:
+    query['type'] = type_filter
 ```
 
-**Soluție:**
-```javascript
-{
-  '$project': {
-    'stocks': 0  // Only exclusion
-  }
-}
+```typescript
+// Frontend - ProcurementDetailPage.tsx
+const response = await api.get(`${procurementApi.getStockLocations()}?type=Depozit`);
 ```
 
-### Warning Component
-```tsx
-{formData.quantity > 0 && formData.expected_quantity > 0 && 
- formData.quantity > formData.expected_quantity && (
-  <Grid.Col span={12}>
-    <Alert 
-      icon={<IconAlertTriangle size={16} />} 
-      title={t('Quantity Exceeds Expected')} 
-      color="yellow"
-      variant="light"
-    >
-      {t('Received quantity')} ({formData.quantity}) 
-      {t('is greater than expected quantity')} ({formData.expected_quantity}). 
-      {' '}{t('You can still save this stock entry.')}
-    </Alert>
-  </Grid.Col>
+### Task 2: UM Read-only
+```typescript
+// ReceiveStockForm.tsx
+{articleUm ? (
+  <TextInput
+    label={t('Unit of Measure')}
+    value={articleUm}
+    disabled
+    description={t('Unit is defined at article level')}
+  />
+) : (
+  <Select ... />
 )}
 ```
 
----
+### Task 3: Code Validation
+```python
+# Create
+if location_data.code:
+    existing = collection.find_one({'code': location_data.code})
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Location code '{location_data.code}' already exists")
 
-## Commits Sesiune Curentă
-
-1. **40a07bd** - fix: MongoDB aggregation projection error in articles endpoint
-2. **9df9b63** - feat: Allow receiving quantities greater than expected with warning
-
----
-
-## File Size Check ✅
-
-| Fișier | Linii | Status |
-|--------|-------|--------|
-| ReceiveStockForm.tsx | 494 | ✅ OK |
-| ReceivedStockTab.tsx | 405 | ✅ OK |
-| articles.py | 596 | ✅ OK |
-
-**Toate fișierele sub 700 linii** ✅
+# Update
+if location_data.code:
+    existing = collection.find_one({
+        'code': location_data.code,
+        '_id': {'$ne': ObjectId(location_id)}
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Location code '{location_data.code}' already exists")
+```
 
 ---
 
 ## Beneficii Implementate
 
-### Performanță
-✅ **Articles endpoint:** Funcționează corect cu aggregation pipeline optimizat
-
 ### UX
-✅ **Warning vizual:** User știe când depășește cantitatea așteptată  
-✅ **Flexibilitate:** Permite salvarea cantităților mai mari (cazuri reale)  
-✅ **Transparență:** Expected quantity se setează automat pentru referință  
-✅ **Non-blocking:** Warning-ul nu blochează salvarea
+✅ **Filtrare locații:** Doar locații relevante (Depozit) în procurement  
+✅ **UM informativ:** User știe că UM e definit la article, nu poate schimba  
+✅ **Code validation:** Previne duplicate, mesaje clare de eroare
 
 ### Business Logic
-✅ **Real-world scenarios:** Furnizori pot trimite cantități mai mari  
-✅ **Audit trail:** Expected vs Received sunt ambele înregistrate  
-✅ **Flexibility:** Sistemul nu forțează restricții artificiale
+✅ **Type-based filtering:** Flexibilitate pentru diferite tipuri de locații  
+✅ **UM consistency:** UM-ul e definit la article, consistent în tot sistemul  
+✅ **Code uniqueness:** Identificare unică pentru locații
+
+### Mentenanță
+��� **Cod modular:** Fiecare task în commit separat  
+✅ **Validări backend:** Protecție la nivel de API  
+✅ **Type safety:** Interfaces TypeScript complete
 
 ---
 
 ## Testing Checklist
 
-### Backend
-- [x] Test articles endpoint cu/fără filtre
-- [x] Verificat că aggregation returnează toate câmpurile minus stocks
-- [ ] Test receive stock cu quantity > expected
+### Task 1: Filtrare Locații
+- [ ] Test filtrare cu `?type=Depozit`
+- [ ] Test fără filtru (toate locațiile)
+- [ ] Test cu tip inexistent
 
-### Frontend
-- [x] Test warning apare când quantity > expected
-- [x] Test salvare funcționează cu quantity > expected
-- [x] Test expected_quantity se auto-completează
-- [x] Test quantity NU se auto-completează
-- [ ] Test pe rezoluții diferite (warning responsive)
+### Task 2: UM Read-only
+- [x] Test afișare UM când există
+- [ ] Test fallback la Select când UM lipsește
+- [ ] Test pe articole diferite
+
+### Task 3: Code Locations
+- [ ] Test create cu code unic
+- [ ] Test create cu code duplicat (trebuie să eșueze)
+- [ ] Test update cu code nou
+- [ ] Test update cu code duplicat (trebuie să eșueze)
+- [ ] Test update fără schimbare code
+
+### Task 4: Filtrare Stocks
+- [ ] Nu a fost implementat
+
+---
+
+## Next Steps
+
+### Prioritate Înaltă
+1. **Task 4:** Implementare filtrare stocks (verificat/neverificat + lotexp)
+2. **Task 3 Frontend:** Adăugare câmp code în tabel și formular locations
+
+### Prioritate Medie
+3. **Testing:** Unit tests pentru validările noi
+4. **Documentation:** Update README cu noile funcționalități
+
+### Opțional
+5. **Index MongoDB:** Index pe `depo_locations.code` pentru performanță
+6. **Frontend validation:** Validare client-side pentru code
 
 ---
 
 ## Observații Tehnice
 
-### MongoDB Projection Rules
-- **Exclusion only:** `{field: 0}` - exclude specific fields, include all others
-- **Inclusion only:** `{field: 1}` - include only specific fields
-- **Cannot mix:** Except for `_id` field which can be excluded in inclusion projection
+### MongoDB Queries
+- Folosit `$ne` pentru excludere în validare unicitate
+- Query-uri simple, performante
+- Validare înainte de insert/update
 
-### React Conditional Rendering
-- Multiple conditions cu `&&` operator
-- Verificare că ambele valori > 0 înainte de comparație
-- Evită warning-uri false când formul e gol
+### React/TypeScript
+- Conditional rendering pentru UM field
+- Props optional pentru flexibilitate
+- Type safety cu interfaces
 
 ### Git Workflow
-- Commits atomice per fix/feature
-- Messages descriptive (fix/feat prefix)
+- Commits atomice per task
+- Messages descriptive cu prefix (feat:)
 - Build verification înainte de push
 
 ---
 
-## Next Steps (Opțional)
-
-1. **Translation keys:** Adăugare traduceri pentru mesajele noi
-2. **Backend validation:** Log când quantity > expected (pentru audit)
-3. **Reporting:** Dashboard cu statistici over-delivery
-4. **Documentation:** Update README cu noul comportament
-
----
-
-**Status:** Toate task-urile completate ✅  
-**Ultima actualizare:** 27.01.2026 - 18:30  
+**Status:** 3.5/5 task-uri completate ✅  
+**Ultima actualizare:** 27.01.2026 - 20:45  
 **Build Status:** ✅ Successful  
 **Git Status:** ✅ All pushed to master  
 **File Sizes:** ✅ All under 700 lines
+
+## Task Rămas
+- **Task 4:** Filtrare stocks după verificat/neverificat + lotexp (backend + frontend)
