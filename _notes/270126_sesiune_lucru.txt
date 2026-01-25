@@ -1,0 +1,230 @@
+# Sesiune de Lucru - 27.01.2026
+
+## Rezumat Sesiune
+
+### Context Inițial
+- Analizat ultima sesiune (26.01.2026) din _notes
+- Identificat task-uri completate anterior: optimizare articles aggregation, reorganizare Part Details, supplier conversion info
+
+### Task-uri Completate (Sesiunea Curentă)
+
+#### Task 1: Fix MongoDB Aggregation Error ✅
+**Problema:** Eroare la endpoint-ul `/modules/inventory/api/articles`
+```
+Invalid $project :: caused by :: Cannot do inclusion on field name in exclusion projection
+```
+
+**Cauză:** În pipeline-ul de agregare MongoDB, se amesteca exclusion (`'stocks': 0`) cu inclusion (specificarea câmpurilor pentru `system_um_detail` și `category_detail`) în același stage `$project`.
+
+**Soluție:**
+- Eliminat proiecția complexă care amesteca inclusion/exclusion
+- Păstrat doar exclusion simplă: `{'stocks': 0}`
+- MongoDB permite acum să returneze toate câmpurile minus `stocks`
+
+**Fișier modificat:** `modules/inventory/routes/articles.py`
+**Commit:** 40a07bd - "fix: MongoDB aggregation projection error in articles endpoint"
+
+---
+
+#### Task 2: Permite Primirea de Cantități Mai Mari decât Cele Așteptate ✅
+
+**Cerință:** La procurement > receive stock, să poți primi cantități de stoc mai mari decât cele așteptate, cu un warning vizual dar permițând salvarea.
+
+**Analiză Inițială:**
+1. **Backend:** NU există validări care să blocheze cantități mai mari
+2. **Frontend:** Auto-completare sugerează că nu ar trebui să depășești
+3. **Model:** `ReceiveStockRequest` nu are restricții de cantitate
+
+**Implementare:**
+
+##### 1. Warning Vizual în ReceiveStockForm.tsx
+- Adăugat import pentru `Alert` și `IconAlertTriangle`
+- Adăugat secțiune de warning după câmpurile de cantitate
+- Warning apare când: `quantity > 0 AND expected_quantity > 0 AND quantity > expected_quantity`
+- Mesaj: "Received quantity (X) is greater than expected quantity (Y). You can still save this stock entry."
+- Culoare: yellow (avertisment, nu eroare)
+- Varianta: light (mai puțin intruziv)
+
+##### 2. Eliminat Auto-completarea Restrictivă în ReceivedStockTab.tsx
+**Înainte:**
+```typescript
+const remaining = item.quantity - (item.received || 0);
+setFormData(prev => ({ ...prev, quantity: remaining, expected_quantity: remaining }));
+```
+
+**După:**
+```typescript
+const remaining = item.quantity - (item.received || 0);
+// Only set expected_quantity, not the actual quantity (user can enter any amount)
+setFormData(prev => ({ ...prev, expected_quantity: remaining }));
+```
+
+**Beneficii:**
+- User poate introduce orice cantitate
+- `expected_quantity` se setează automat cu cantitatea rămasă (pentru referință)
+- Warning apare automat dacă depășește
+- Salvarea funcționează normal
+
+**Fișiere modificate:**
+- `src/frontend/src/components/Common/ReceiveStockForm.tsx` (494 linii)
+- `src/frontend/src/components/Procurement/ReceivedStockTab.tsx` (405 linii)
+
+**Commit:** 9df9b63 - "feat: Allow receiving quantities greater than expected with warning"
+
+---
+
+## Structură Fișiere Modificate
+
+### Backend
+```
+modules/inventory/routes/articles.py (596 linii)
+- Fixed MongoDB aggregation $project stage
+- Eliminat mixing de inclusion/exclusion
+```
+
+### Frontend
+```
+src/frontend/src/components/Common/ReceiveStockForm.tsx (494 linii)
+├── Import Alert, IconAlertTriangle
+├── Warning section după quantity fields
+└── Conditional rendering: quantity > expected_quantity
+
+src/frontend/src/components/Procurement/ReceivedStockTab.tsx (405 linii)
+└── Modified handleLineItemChange()
+    └── Only auto-fill expected_quantity, not quantity
+```
+
+---
+
+## Detalii Tehnice
+
+### MongoDB Aggregation Fix
+**Problema:**
+```javascript
+{
+  '$project': {
+    'stocks': 0,  // Exclusion
+    'system_um_detail': {  // Inclusion
+      'name': 1,
+      'abrev': 1
+    }
+  }
+}
+```
+
+**Soluție:**
+```javascript
+{
+  '$project': {
+    'stocks': 0  // Only exclusion
+  }
+}
+```
+
+### Warning Component
+```tsx
+{formData.quantity > 0 && formData.expected_quantity > 0 && 
+ formData.quantity > formData.expected_quantity && (
+  <Grid.Col span={12}>
+    <Alert 
+      icon={<IconAlertTriangle size={16} />} 
+      title={t('Quantity Exceeds Expected')} 
+      color="yellow"
+      variant="light"
+    >
+      {t('Received quantity')} ({formData.quantity}) 
+      {t('is greater than expected quantity')} ({formData.expected_quantity}). 
+      {' '}{t('You can still save this stock entry.')}
+    </Alert>
+  </Grid.Col>
+)}
+```
+
+---
+
+## Commits Sesiune Curentă
+
+1. **40a07bd** - fix: MongoDB aggregation projection error in articles endpoint
+2. **9df9b63** - feat: Allow receiving quantities greater than expected with warning
+
+---
+
+## File Size Check ✅
+
+| Fișier | Linii | Status |
+|--------|-------|--------|
+| ReceiveStockForm.tsx | 494 | ✅ OK |
+| ReceivedStockTab.tsx | 405 | ✅ OK |
+| articles.py | 596 | ✅ OK |
+
+**Toate fișierele sub 700 linii** ✅
+
+---
+
+## Beneficii Implementate
+
+### Performanță
+✅ **Articles endpoint:** Funcționează corect cu aggregation pipeline optimizat
+
+### UX
+✅ **Warning vizual:** User știe când depășește cantitatea așteptată  
+✅ **Flexibilitate:** Permite salvarea cantităților mai mari (cazuri reale)  
+✅ **Transparență:** Expected quantity se setează automat pentru referință  
+✅ **Non-blocking:** Warning-ul nu blochează salvarea
+
+### Business Logic
+✅ **Real-world scenarios:** Furnizori pot trimite cantități mai mari  
+✅ **Audit trail:** Expected vs Received sunt ambele înregistrate  
+✅ **Flexibility:** Sistemul nu forțează restricții artificiale
+
+---
+
+## Testing Checklist
+
+### Backend
+- [x] Test articles endpoint cu/fără filtre
+- [x] Verificat că aggregation returnează toate câmpurile minus stocks
+- [ ] Test receive stock cu quantity > expected
+
+### Frontend
+- [x] Test warning apare când quantity > expected
+- [x] Test salvare funcționează cu quantity > expected
+- [x] Test expected_quantity se auto-completează
+- [x] Test quantity NU se auto-completează
+- [ ] Test pe rezoluții diferite (warning responsive)
+
+---
+
+## Observații Tehnice
+
+### MongoDB Projection Rules
+- **Exclusion only:** `{field: 0}` - exclude specific fields, include all others
+- **Inclusion only:** `{field: 1}` - include only specific fields
+- **Cannot mix:** Except for `_id` field which can be excluded in inclusion projection
+
+### React Conditional Rendering
+- Multiple conditions cu `&&` operator
+- Verificare că ambele valori > 0 înainte de comparație
+- Evită warning-uri false când formul e gol
+
+### Git Workflow
+- Commits atomice per fix/feature
+- Messages descriptive (fix/feat prefix)
+- Build verification înainte de push
+
+---
+
+## Next Steps (Opțional)
+
+1. **Translation keys:** Adăugare traduceri pentru mesajele noi
+2. **Backend validation:** Log când quantity > expected (pentru audit)
+3. **Reporting:** Dashboard cu statistici over-delivery
+4. **Documentation:** Update README cu noul comportament
+
+---
+
+**Status:** Toate task-urile completate ✅  
+**Ultima actualizare:** 27.01.2026 - 18:30  
+**Build Status:** ✅ Successful  
+**Git Status:** ✅ All pushed to master  
+**File Sizes:** ✅ All under 700 lines
