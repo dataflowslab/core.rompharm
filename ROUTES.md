@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-01-23 23:28:41
+**Last Updated:** 2026-01-25 23:02:30
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -144,7 +144,7 @@
 - `GET /modules/depo_procurement/api/parts` - Get list of parts from MongoDB
 
 **Purchase Orders**
-- `GET /modules/depo_procurement/api/purchase-orders` - Get list of purchase orders from MongoDB
+- `GET /modules/depo_procurement/api/purchase-orders` - Get list of purchase orders from MongoDB with filters
 - `POST /modules/depo_procurement/api/purchase-orders` - Create a new purchase order in MongoDB
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}` - Get a specific purchase order from MongoDB
 - `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}` - Update a purchase order in MongoDB

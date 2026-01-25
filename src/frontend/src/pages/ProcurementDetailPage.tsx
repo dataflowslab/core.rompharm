@@ -198,7 +198,8 @@ export function ProcurementDetailPage() {
 
   const loadStockLocations = async () => {
     try {
-      const response = await api.get(procurementApi.getStockLocations());
+      // Filter only "Depozit" type locations for procurement
+      const response = await api.get(`${procurementApi.getStockLocations()}?type=Depozit`);
       setStockLocations(response.data.results || response.data || []);
     } catch (error) {
       console.error('Failed to load stock locations:', error);
@@ -361,6 +362,7 @@ export function ProcurementDetailPage() {
             onReload={loadItems}
             supplierName={order.supplier_detail?.name}
             supplierId={order.supplier_id}
+            supplierCurrency={order.order_currency || order.currency || 'EUR'}
           />
         </Tabs.Panel>
 

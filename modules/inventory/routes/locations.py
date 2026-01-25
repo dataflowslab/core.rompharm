@@ -17,6 +17,7 @@ router = APIRouter()
 async def get_locations(
     request: Request,
     search: Optional[str] = Query(None),
+    type_filter: Optional[str] = Query(None, alias="type"),
     current_user: dict = Depends(verify_token)
 ):
     """Get list of locations with parent details populated"""
@@ -29,6 +30,10 @@ async def get_locations(
             {'name': {'$regex': search, '$options': 'i'}},
             {'description': {'$regex': search, '$options': 'i'}}
         ]
+    
+    # Filter by type if specified (e.g., "Depozit" for procurement)
+    if type_filter:
+        query['type'] = type_filter
     
     try:
         cursor = collection.find(query).sort('name', 1)
