@@ -159,18 +159,10 @@ async def get_articles(
             }
         })
         
-        # Project only needed fields
+        # Remove stocks array (keep only total_stock)
         pipeline.append({
             '$project': {
-                'stocks': 0,  # Remove stocks array, keep only total
-                'system_um_detail': {
-                    'name': 1,
-                    'abrev': 1,
-                    'symbol': 1
-                },
-                'category_detail': {
-                    'name': 1
-                }
+                'stocks': 0
             }
         })
         
