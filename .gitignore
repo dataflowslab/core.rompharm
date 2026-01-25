@@ -61,13 +61,5 @@ htmlcov/
 *.bak
 *.cache
 
-# Utils folder (test/fix/check scripts)
+# Utils folder (local scripts only, not for git)
 utils/
-# But keep important files
-!utils/README.md
-!utils/*.md
-!utils/*.json
-!utils/*.html
-!utils/init_jobs.py
-!utils/init_procurement_approval_template.py
-!utils/import_requests_states.py
