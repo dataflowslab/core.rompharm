@@ -61,8 +61,15 @@ async def create_location(
     db = get_db()
     collection = db['depo_locations']
     
+    # Check if code already exists (if provided)
+    if location_data.code:
+        existing = collection.find_one({'code': location_data.code})
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Location code '{location_data.code}' already exists")
+    
     doc = {
         'name': location_data.name,
+        'code': location_data.code or '',
         'description': location_data.description or '',
         'created_at': datetime.utcnow(),
         'updated_at': datetime.utcnow(),
@@ -108,6 +115,17 @@ async def update_location(
     
     if location_data.name is not None:
         update_doc['name'] = location_data.name
+    
+    if location_data.code is not None:
+        # Check if code already exists (excluding current location)
+        if location_data.code:
+            existing = collection.find_one({
+                'code': location_data.code,
+                '_id': {'$ne': ObjectId(location_id)}
+            })
+            if existing:
+                raise HTTPException(status_code=400, detail=f"Location code '{location_data.code}' already exists")
+        update_doc['code'] = location_data.code
     
     if location_data.description is not None:
         update_doc['description'] = location_data.description

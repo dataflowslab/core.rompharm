@@ -92,12 +92,14 @@ class ArticleSupplierUpdateRequest(BaseModel):
 # Location models
 class LocationCreateRequest(BaseModel):
     name: str
+    code: Optional[str] = None
     description: Optional[str] = None
     parent_id: Optional[str] = None
 
 
 class LocationUpdateRequest(BaseModel):
     name: Optional[str] = None
+    code: Optional[str] = None
     description: Optional[str] = None
     parent_id: Optional[str] = None
 
