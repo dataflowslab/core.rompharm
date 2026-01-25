@@ -133,7 +133,7 @@ def serialize_doc(doc):
     return doc
 
 
-async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location_id=None, state_id=None, start_date=None, end_date=None):
+async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location_id=None, state_id=None, start_date=None, end_date=None, qc_verified=None, has_batch=None, has_expiry=None):
     """Get list of stocks with enriched data using aggregation pipeline"""
     from datetime import datetime
     db = get_db()
@@ -158,6 +158,39 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location
         if end_date:
             date_query['$lte'] = datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
         match_stage['received_date'] = date_query
+    
+    # QC Verified filter (has rompharm_ba_no = verified)
+    if qc_verified is not None:
+        if qc_verified:
+            match_stage['rompharm_ba_no'] = {'$exists': True, '$ne': '', '$ne': None}
+        else:
+            match_stage['$or'] = [
+                {'rompharm_ba_no': {'$exists': False}},
+                {'rompharm_ba_no': ''},
+                {'rompharm_ba_no': None}
+            ]
+    
+    # Has batch/lot filter
+    if has_batch is not None:
+        if has_batch:
+            match_stage['batch_code'] = {'$exists': True, '$ne': '', '$ne': None}
+        else:
+            match_stage['$or'] = [
+                {'batch_code': {'$exists': False}},
+                {'batch_code': ''},
+                {'batch_code': None}
+            ]
+    
+    # Has expiry date filter
+    if has_expiry is not None:
+        if has_expiry:
+            match_stage['expiry_date'] = {'$exists': True, '$ne': '', '$ne': None}
+        else:
+            match_stage['$or'] = [
+                {'expiry_date': {'$exists': False}},
+                {'expiry_date': ''},
+                {'expiry_date': None}
+            ]
     
     # Build aggregation pipeline
     pipeline = []

@@ -22,6 +22,9 @@ async def get_stocks(
     state_id: Optional[str] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    qc_verified: Optional[bool] = Query(None),  # Filter by QC verification status
+    has_batch: Optional[bool] = Query(None),  # Filter by batch/lot existence
+    has_expiry: Optional[bool] = Query(None),  # Filter by expiry date existence
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     current_user: dict = Depends(verify_token),
@@ -37,7 +40,10 @@ async def get_stocks(
         location_id=location_id,
         state_id=state_id,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        qc_verified=qc_verified,
+        has_batch=has_batch,
+        has_expiry=has_expiry
     )
 
 
