@@ -85,6 +85,9 @@ interface ReceiveStockFormProps {
     id: string;
     name: string;
   };
+  
+  // Article UM (read-only, informative)
+  articleUm?: string;
 }
 
 export function ReceiveStockForm({
@@ -99,6 +102,7 @@ export function ReceiveStockForm({
   systemUms,
   suppliers,
   fixedSupplier,
+  articleUm,
 }: ReceiveStockFormProps) {
   const { t } = useTranslation();
   const [isFirstContainer, setIsFirstContainer] = useState(true);
@@ -243,14 +247,23 @@ export function ReceiveStockForm({
       </Grid.Col>
 
       <Grid.Col span={4}>
-        <Select
-          label={t('Supplier U.M.')}
-          placeholder={t('Select unit')}
-          data={systemUms}
-          value={formData.supplier_um_id}
-          onChange={(value) => updateField('supplier_um_id', value || '694813b6297c9dde6d7065b7')}
-          searchable
-        />
+        {articleUm ? (
+          <TextInput
+            label={t('Unit of Measure')}
+            value={articleUm}
+            disabled
+            description={t('Unit is defined at article level')}
+          />
+        ) : (
+          <Select
+            label={t('Supplier U.M.')}
+            placeholder={t('Select unit')}
+            data={systemUms}
+            value={formData.supplier_um_id}
+            onChange={(value) => updateField('supplier_um_id', value || '694813b6297c9dde6d7065b7')}
+            searchable
+          />
+        )}
       </Grid.Col>
 
       {/* Warning when received > expected */}

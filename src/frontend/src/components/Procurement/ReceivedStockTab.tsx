@@ -40,6 +40,7 @@ interface PurchaseOrderItem {
   part_detail?: {
     name: string;
     ipn: string;
+    um?: string;
   };
   quantity: number;
   received: number;
@@ -416,6 +417,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
             id: supplierId,
             name: supplierName
           } : undefined}
+          articleUm={selectedItem?.part_detail?.um}
         />
 
         <Group justify="flex-end" mt="md">

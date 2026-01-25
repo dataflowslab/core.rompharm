@@ -1,0 +1,81 @@
+# Sesiune de Lucru - 27.01.2026 (Continuare)
+
+## Task-uri în Progres
+
+### Task 0: Moneda implicită la recepție ✅
+**Status:** COMPLETAT (nu necesită modificări)
+- Moneda este deja setată la nivel de purchase order
+- Se pasează ca `supplierCurrency` la `ReceivedStockTab`
+- Backend folosește moneda de la comandă, nu la nivel de stock individual
+
+### Task 1: Filtrare locații type=Depozit ✅
+**Status:** COMPLETAT
+
+**Backend:**
+- Adăugat parametru `type_filter` în `/modules/inventory/api/locations`
+- Query filter: `if type_filter: query['type'] = type_filter`
+
+**Frontend:**
+- Modificat `ProcurementDetailPage.tsx`
+- Call API cu filtru: `?type=Depozit`
+- Doar locațiile de tip "Depozit" apar în receive stock
+
+**Commit:** 884ca62
+
+---
+
+### Task 2: UM (Unitatea de Măsură) ⏳
+**Status:** ÎN LUCRU
+
+**Cerință:**
+- UM stabilită la nivel de inventory/articles
+- La recepție, UM nu poate fi selectată (read-only sau informativ)
+- Fie apare doar ea în select, fie nu apare deloc și e afișată informativ
+
+**Plan:**
+1. Obține UM-ul articolului din backend (system_um_id)
+2. Modifică ReceiveStockForm să afișeze UM read-only
+3. Elimină Select-ul pentru Supplier UM, înlocuiește cu TextInput disabled
+
+---
+
+### Task 3: Locations - Adăugare câmp `code` ⏳
+**Status:** PLANIFICAT
+
+**Cerințe:**
+- Tabel: Adăugare coloană `code`
+- Add/Edit: Adăugare câmp `code`
+- Validare: `code` unic (nu se dublează)
+
+**Fișiere de modificat:**
+- Backend: `modules/inventory/routes/locations.py`
+- Backend: `modules/inventory/routes/utils.py` (LocationCreateRequest, LocationUpdateRequest)
+- Frontend: Pagina de locations (trebuie identificată)
+
+---
+
+### Task 4: Stocks - Filtrare verificat/neverificat + lotexp ⏳
+**Status:** PLANIFICAT
+
+**Cerințe:**
+- Filtrare după verificat/neverificat (prelevate cant pentru QC sau nu)
+- Filtrare după lotexp (lot/expiry)
+
+**Fișiere de modificat:**
+- Backend: Endpoint stocks cu parametri noi
+- Frontend: Pagina stocks cu filtre noi
+
+---
+
+## Progres Sesiune
+
+**Completate:** 2/5 task-uri (40%)
+**În lucru:** 1/5 task-uri
+**Rămase:** 2/5 task-uri
+
+**Commits:** 1
+- 884ca62 - feat: Filter stock locations by type=Depozit for procurement receive stock
+
+---
+
+**Ultima actualizare:** 27.01.2026 - 19:15
