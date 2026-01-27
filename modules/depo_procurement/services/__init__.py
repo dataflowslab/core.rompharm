@@ -38,6 +38,12 @@ from .qc_records import (
     create_qc_record,
     update_qc_record
 )
+from .received_stock_approval import (
+    get_received_stock_approval_flow,
+    create_received_stock_approval_flow,
+    sign_received_stock,
+    remove_received_stock_signature
+)
 
 __all__ = [
     # Purchase Orders
@@ -66,6 +72,11 @@ __all__ = [
     'create_order_approval_flow',
     'sign_purchase_order',
     'remove_order_signature',
+    # Received Stock Approval Flow
+    'get_received_stock_approval_flow',
+    'create_received_stock_approval_flow',
+    'sign_received_stock',
+    'remove_received_stock_signature',
     # QC Records
     'get_qc_records',
     'create_qc_record',

@@ -34,6 +34,14 @@ interface Article {
     abrev: string;
     symbol?: string;
   };
+  manufacturer_um_detail?: {
+    name: string;
+    abrev: string;
+    symbol?: string;
+  };
+  manufacturer_detail?: {
+    name: string;
+  };
   category_detail?: {
     name: string;
   };
@@ -290,12 +298,11 @@ export function ArticlesPage() {
               <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('name')}>
                 Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
               </Table.Th>
-              <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('um')}>
-                MU {sortBy === 'um' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </Table.Th>
               <Table.Th>Description</Table.Th>
               <Table.Th>Category</Table.Th>
               <Table.Th>Total Stock</Table.Th>
+              <Table.Th>UM</Table.Th>
+              <Table.Th>Manufacturer</Table.Th>
               <Table.Th>Status</Table.Th>
               <Table.Th>Actions</Table.Th>
             </Table.Tr>
@@ -305,10 +312,11 @@ export function ArticlesPage() {
               <Table.Tr key={article._id}>
                 <Table.Td>{article.ipn}</Table.Td>
                 <Table.Td>{article.name}</Table.Td>
-                <Table.Td>{article.system_um_detail?.abrev || article.um || '-'}</Table.Td>
                 <Table.Td>{article.description || '-'}</Table.Td>
                 <Table.Td>{article.category_detail?.name || '-'}</Table.Td>
                 <Table.Td>{article.total_stock || 0}</Table.Td>
+                <Table.Td>{article.system_um_detail?.abrev || article.um || '-'}</Table.Td>
+                <Table.Td>{article.manufacturer_detail?.name || '-'}</Table.Td>
                 <Table.Td>
                   <Badge color={article.is_active ? 'green' : 'gray'}>
                     {article.is_active ? 'Active' : 'Inactive'}

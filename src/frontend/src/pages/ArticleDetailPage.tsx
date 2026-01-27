@@ -52,6 +52,7 @@ interface Article {
   manufacturer_id?: string;
   manufacturer_ipn?: string;
   system_um_id?: string;
+  manufacturer_um_id?: string;
   total_delivery_time?: string;
 }
 
@@ -108,7 +109,6 @@ export function ArticleDetailPage() {
   const [supplierFormData, setSupplierFormData] = useState({
     supplier_id: '',
     supplier_code: '',
-    um: '',
     notes: '',
     price: 0,
     currency: 'EUR',
@@ -282,7 +282,6 @@ export function ArticleDetailPage() {
     setSupplierFormData({
       supplier_id: '',
       supplier_code: '',
-      um: article?.um || '',
       notes: '',
       price: 0,
       currency: 'EUR',
@@ -295,7 +294,6 @@ export function ArticleDetailPage() {
     setSupplierFormData({
       supplier_id: supplier.supplier_id,
       supplier_code: supplier.supplier_code || '',
-      um: supplier.um || '',
       notes: supplier.notes || '',
       price: supplier.price || 0,
       currency: supplier.currency || 'EUR',

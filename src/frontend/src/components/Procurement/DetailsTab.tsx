@@ -65,11 +65,18 @@ interface DetailsTabProps {
   canEdit: boolean;
   onUpdate?: (data: any) => Promise<void>;
   onOrderUpdate?: () => void;
+  orderStateId?: string;
 }
 
-export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUpdate }: DetailsTabProps) {
+export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUpdate, orderStateId }: DetailsTabProps) {
   const { t } = useTranslation();
   const { username, isStaff } = useAuth();
+  
+  // Check if order is in FINISHED or CANCELLED state (cannot modify signatures)
+  const FINISHED_STATE = '6943a4a6451609dd8a618ce3';
+  const CANCELLED_STATE = '6943a4a6451609dd8a618ce2';
+  const isOrderLocked = orderStateId === FINISHED_STATE || orderStateId === CANCELLED_STATE;
+  const canRemoveSignatures = isStaff && !isOrderLocked;
   const [saving, setSaving] = useState(false);
   const [documentTemplates, setDocumentTemplates] = useState<Array<{code: string; name: string; label: string}>>([]);
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
@@ -376,7 +383,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
                               <Text size="xs">{signature.user_name || signature.username}</Text>
                               <Text size="xs" c="dimmed">{formatDateTime(signature.signed_at)}</Text>
                             </Table.Td>
-                            {isStaff && (
+                            {canRemoveSignatures && (
                               <Table.Td style={{ width: '60px' }}>
                                 <Button 
                                   size="xs" 
@@ -389,7 +396,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
                                 >
                                   {t('Remove')}
                                 </Button>
-                              </Table.Td>
+              </Table.Td>
                             )}
                           </Table.Tr>
                         ))}

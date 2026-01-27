@@ -35,7 +35,6 @@ class PurchaseOrderItemRequest(BaseModel):
     quantity: float
     purchase_price: Optional[float] = None
     reference: Optional[str] = None
-    destination_id: Optional[str] = None
     purchase_price_currency: Optional[str] = None
     notes: Optional[str] = None
 
@@ -44,7 +43,6 @@ class PurchaseOrderItemUpdateRequest(BaseModel):
     quantity: Optional[float] = None
     purchase_price: Optional[float] = None
     reference: Optional[str] = None
-    destination_id: Optional[str] = None
     purchase_price_currency: Optional[str] = None
     notes: Optional[str] = None
 

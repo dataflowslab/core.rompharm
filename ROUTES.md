@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-01-25 23:02:30
+**Last Updated:** 2026-01-28 00:14:31
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -158,12 +158,17 @@
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/items` - Add an item to a purchase order
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_id}` - Delete an item from a purchase order by item _id
 - `PUT /modules/depo_procurement/api/purchase-orders/{order_id}/items/{item_id}` - Update an item in a purchase order by item _id
+- `GET /modules/depo_procurement/api/purchase-orders/{order_id}/journal` - Get activity journal for purchase order
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/qc-records` - Get QC records for a purchase order
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/qc-records` - Create a new QC record for a purchase order
 - `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}/qc-records/{qc_id}` - Update a QC record
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/receive-stock` - Receive stock items for a purchase order line
 - `GET /modules/depo_procurement/api/purchase-orders/{order_id}/received-items` - Get received stock items for a purchase order
+- `GET /modules/depo_procurement/api/purchase-orders/{order_id}/received-stock-approval-flow` - Get approval flow for received stock
+- `POST /modules/depo_procurement/api/purchase-orders/{order_id}/received-stock-approval-flow` - Create approval flow for received stock
+- `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/received-stock-signatures/{user_id}` - Remove signature from received stock approval flow
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/sign` - Sign a purchase order approval flow
+- `POST /modules/depo_procurement/api/purchase-orders/{order_id}/sign-received-stock` - Sign received stock approval flow
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/signatures/{user_id}` - Remove signature from purchase order approval flow (admin only)
 - `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}/state` - Update purchase order state
 

@@ -10,6 +10,7 @@ import { notifications } from '@mantine/notifications';
 import { ComponentsTable } from '../components/Requests/ComponentsTable';
 import { debounce } from '../utils/selectHelpers';
 import { sanitizeSelectOptions } from '../utils/selectHelpers';
+import { formatDate } from '../utils/dateFormat';
 
 interface StockLocation {
   _id: string;
@@ -322,12 +323,6 @@ export function RequestsPage() {
       case 'Canceled': return 'orange';
       default: return 'blue';
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
   };
 
   return (

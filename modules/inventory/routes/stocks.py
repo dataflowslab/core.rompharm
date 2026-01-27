@@ -154,6 +154,20 @@ async def update_stock(
     if stock_data.rompharm_ba_date is not None:
         update_doc['rompharm_ba_date'] = stock_data.rompharm_ba_date
     
+    # Store test_result if provided
+    if stock_data.test_result is not None:
+        update_doc['test_result'] = stock_data.test_result
+    
+    # Auto-set state_id based on test_result when BA is signed
+    if stock_data.rompharm_ba_no and stock_data.test_result:
+        if stock_data.test_result == 'conform':
+            # Set to OK status
+            update_doc['state_id'] = ObjectId('694321db8728e4d75ae72789')
+        elif stock_data.test_result == 'neconform':
+            # Set to Quarantined Not OK status
+            update_doc['state_id'] = ObjectId('6979211af8165bc859d6f2d2')
+    
+    # Allow manual state_id override if provided explicitly
     if stock_data.state_id is not None:
         update_doc['state_id'] = ObjectId(stock_data.state_id) if stock_data.state_id else None
     
@@ -189,3 +203,76 @@ async def get_stock_states(
         return serialize_doc(states)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock states: {str(e)}")
+
+
+# Approval Flow Endpoints
+
+@router.get("/stocks/{stock_id}/approval-flow")
+async def get_stock_approval_flow_endpoint(
+    request: Request,
+    stock_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Get approval flow for a stock item"""
+    from modules.inventory.services import get_stock_approval_flow
+    return await get_stock_approval_flow(stock_id)
+
+
+@router.post("/stocks/{stock_id}/approval-flow")
+async def create_stock_approval_flow_endpoint(
+    request: Request,
+    stock_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Create approval flow for a stock item"""
+    from modules.inventory.services import create_stock_approval_flow
+    return await create_stock_approval_flow(stock_id)
+
+
+@router.post("/stocks/{stock_id}/sign")
+async def sign_stock_qc_endpoint(
+    request: Request,
+    stock_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Sign BA Rompharm for a stock item"""
+    from modules.inventory.services import sign_stock_qc
+    
+    body = await request.json()
+    qc_data = {
+        'rompharm_ba_no': body.get('rompharm_ba_no'),
+        'rompharm_ba_date': body.get('rompharm_ba_date'),
+        'test_result': body.get('test_result')
+    }
+    
+    client_host = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
+    return await sign_stock_qc(stock_id, qc_data, current_user, client_host, user_agent)
+
+
+@router.delete("/stocks/{stock_id}/signatures/{user_id}")
+async def remove_stock_signature_endpoint(
+    request: Request,
+    stock_id: str,
+    user_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Remove signature from stock QC approval flow"""
+    from modules.inventory.services import remove_stock_signature
+    return await remove_stock_signature(stock_id, user_id, current_user)
+
+
+@router.put("/stocks/{stock_id}/transactionable")
+async def update_stock_transactionable_endpoint(
+    request: Request,
+    stock_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Update transactionable status for stock in quarantine"""
+    from modules.inventory.services import update_stock_transactionable
+    
+    body = await request.json()
+    transactionable = body.get('transactionable', False)
+    
+    return await update_stock_transactionable(stock_id, transactionable, current_user)

@@ -55,6 +55,7 @@ class ArticleUpdateRequest(BaseModel):
     keywords: Optional[List[str]] = None
     link: Optional[str] = None
     minimum_stock: Optional[float] = None
+    conversion_modifier: Optional[float] = None
     is_component: Optional[bool] = None
     is_assembly: Optional[bool] = None
     is_testable: Optional[bool] = None
@@ -68,6 +69,7 @@ class ArticleUpdateRequest(BaseModel):
     manufacturer_id: Optional[str] = None
     manufacturer_ipn: Optional[str] = None
     system_um_id: Optional[str] = None
+    manufacturer_um_id: Optional[str] = None
     total_delivery_time: Optional[int] = None
     payment_condition: Optional[int] = None
 
@@ -75,7 +77,6 @@ class ArticleUpdateRequest(BaseModel):
 class ArticleSupplierRequest(BaseModel):
     supplier_id: str
     supplier_code: Optional[str] = ""
-    um: Optional[str] = ""
     notes: Optional[str] = ""
     price: Optional[float] = 0
     currency: Optional[str] = "EUR"
@@ -83,7 +84,6 @@ class ArticleSupplierRequest(BaseModel):
 
 class ArticleSupplierUpdateRequest(BaseModel):
     supplier_code: Optional[str] = None
-    um: Optional[str] = None
     notes: Optional[str] = None
     price: Optional[float] = None
     currency: Optional[str] = None
@@ -146,6 +146,7 @@ class StockCreateRequest(BaseModel):
 class StockUpdateRequest(BaseModel):
     rompharm_ba_no: Optional[str] = None
     rompharm_ba_date: Optional[str] = None
+    test_result: Optional[str] = None  # "conform" or "neconform"
     state_id: Optional[str] = None
 
 

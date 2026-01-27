@@ -38,14 +38,6 @@ async def get_order_items(order_id: str):
                         'ipn': part.get('ipn'),
                         'um': part.get('um')
                     }
-            
-            # Enrich with destination details
-            if item.get('destination_id'):
-                location = db['depo_locations'].find_one({'_id': ObjectId(item['destination_id'])})
-                if location:
-                    item['destination_detail'] = {
-                        'name': location.get('name')
-                    }
         
         # Update items in database if any _id was added
         if any('_id' not in item for item in order.get('items', [])):
@@ -77,6 +69,21 @@ async def add_order_item(order_id: str, item_data):
         if not part:
             raise HTTPException(status_code=404, detail="Part not found")
         
+        # Determine currency: use provided currency, or get from article supplier, or use order currency
+        item_currency = item_data.purchase_price_currency
+        if not item_currency and order.get('supplier_id'):
+            # Try to get currency from article supplier relationship
+            article_supplier = db['depo_parts_suppliers'].find_one({
+                'part_id': ObjectId(item_data.part_id),
+                'supplier_id': ObjectId(order['supplier_id'])
+            })
+            if article_supplier and article_supplier.get('currency'):
+                item_currency = article_supplier['currency']
+        
+        # Fallback to order currency
+        if not item_currency:
+            item_currency = order.get('currency', 'EUR')
+        
         # Create item with unique _id
         item = {
             '_id': str(ObjectId()),  # Generate unique ID for the item
@@ -85,8 +92,7 @@ async def add_order_item(order_id: str, item_data):
             'received': 0,
             'purchase_price': item_data.purchase_price,
             'reference': item_data.reference or '',
-            'destination_id': item_data.destination_id,
-            'purchase_price_currency': item_data.purchase_price_currency or order.get('currency', 'EUR'),
+            'purchase_price_currency': item_currency,
             'notes': item_data.notes or '',
             'part_detail': {
                 'name': part.get('name'),
@@ -139,8 +145,6 @@ async def update_order_item(order_id: str, item_index: int, item_data):
             items[item_index]['purchase_price'] = item_data.purchase_price
         if item_data.reference is not None:
             items[item_index]['reference'] = item_data.reference
-        if item_data.destination_id is not None:
-            items[item_index]['destination_id'] = item_data.destination_id
         if item_data.purchase_price_currency is not None:
             items[item_index]['purchase_price_currency'] = item_data.purchase_price_currency
         if item_data.notes is not None:
@@ -193,8 +197,6 @@ async def update_order_item_by_id(order_id: str, item_id: str, item_data):
             items[item_index]['purchase_price'] = item_data.purchase_price
         if item_data.reference is not None:
             items[item_index]['reference'] = item_data.reference
-        if item_data.destination_id is not None:
-            items[item_index]['destination_id'] = item_data.destination_id
         if item_data.purchase_price_currency is not None:
             items[item_index]['purchase_price_currency'] = item_data.purchase_price_currency
         if item_data.notes is not None:

@@ -145,6 +145,25 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         # Check if all items are received and auto-finish
         await check_and_auto_finish_order(order_id)
         
+        # Log the stock receipt
+        part_name = part.get('name', 'Unknown')
+        db.logs.insert_one({
+            'collection': 'depo_purchase_orders',
+            'object_id': order_id,
+            'action': 'stock_received',
+            'user': current_user.get('username'),
+            'timestamp': datetime.utcnow(),
+            'description': f'Stock received: {part_name} - Quantity: {stock_data.quantity}',
+            'details': {
+                'part_id': item['part_id'],
+                'part_name': part_name,
+                'quantity': stock_data.quantity,
+                'location_id': stock_data.location_id,
+                'batch_code': stock_data.batch_code or '',
+                'stock_id': str(stock_id)
+            }
+        })
+        
         stock_doc['_id'] = stock_id
         return serialize_doc(stock_doc)
     except HTTPException:
@@ -155,7 +174,7 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
 
 
 async def get_received_stock_items(order_id: str):
-    """Get received stock items for a purchase order"""
+    """Get received stock items for a purchase order with System UM and converted quantities"""
     db = get_db()
     collection = db['depo_stocks']
     
@@ -163,7 +182,7 @@ async def get_received_stock_items(order_id: str):
         cursor = collection.find({'purchase_order_id': ObjectId(order_id)}).sort('received_date', -1)
         stocks = list(cursor)
         
-        # Enrich with part details and status details
+        # Enrich with part details, status details, and System UM
         for stock in stocks:
             # Get part details
             if stock.get('part_id'):
@@ -174,6 +193,32 @@ async def get_received_stock_items(order_id: str):
                         'ipn': part.get('ipn'),
                         'um': part.get('um')
                     }
+                    
+                    # Get System UM details
+                    if part.get('system_um_id'):
+                        system_um = db['depo_ums'].find_one({'_id': ObjectId(part['system_um_id'])})
+                        if system_um:
+                            stock['system_um_detail'] = {
+                                'name': system_um.get('name'),
+                                'abrev': system_um.get('abrev'),
+                                'symbol': system_um.get('symbol', '')
+                            }
+                    
+                    # Get Manufacturer UM details
+                    if part.get('manufacturer_um_id'):
+                        manufacturer_um = db['depo_ums'].find_one({'_id': ObjectId(part['manufacturer_um_id'])})
+                        if manufacturer_um:
+                            stock['manufacturer_um_detail'] = {
+                                'name': manufacturer_um.get('name'),
+                                'abrev': manufacturer_um.get('abrev'),
+                                'symbol': manufacturer_um.get('symbol', '')
+                            }
+                    
+                    # Calculate converted quantity (Manufacturer UM * Conversion Modifier = System UM)
+                    conversion_modifier = part.get('conversion_modifier', 1.0) or 1.0
+                    stock['quantity_received'] = stock.get('quantity', 0)  # Original quantity in Manufacturer UM
+                    stock['quantity_system_um'] = stock.get('quantity', 0) * conversion_modifier  # Converted to System UM
+                    stock['conversion_modifier'] = conversion_modifier
             
             # Get location details
             if stock.get('location_id'):

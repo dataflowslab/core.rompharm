@@ -4,7 +4,7 @@ Main entry point - imports from specialized service modules
 """
 
 # Import company-related functions
-from .services.companies_service import (
+from modules.inventory.services.companies_service import (
     generate_company_pk,
     generate_company_code,
     generate_company_id_str,
@@ -104,6 +104,17 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location
     })
     pipeline.append({'$unwind': {'path': '$part_detail', 'preserveNullAndEmptyArrays': True}})
     
+    # Lookup System UM from part
+    pipeline.append({
+        '$lookup': {
+            'from': 'depo_ums',
+            'localField': 'part_detail.system_um_id',
+            'foreignField': '_id',
+            'as': 'system_um_detail'
+        }
+    })
+    pipeline.append({'$unwind': {'path': '$system_um_detail', 'preserveNullAndEmptyArrays': True}})
+    
     # Lookup location details
     pipeline.append({
         '$lookup': {
@@ -161,6 +172,11 @@ async def get_stocks_list(search=None, skip=0, limit=100, part_id=None, location
                 'name': '$part_detail.name',
                 'ipn': '$part_detail.ipn',
                 'um': '$part_detail.um'
+            },
+            'system_um_detail': {
+                'name': '$system_um_detail.name',
+                'abrev': '$system_um_detail.abrev',
+                'symbol': '$system_um_detail.symbol'
             },
             'location_detail': {
                 'name': '$location_detail.name',

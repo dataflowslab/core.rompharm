@@ -128,6 +128,38 @@ async def get_articles(
             }
         })
         
+        # Lookup Manufacturer UM
+        pipeline.append({
+            '$lookup': {
+                'from': 'depo_ums',
+                'localField': 'manufacturer_um_id',
+                'foreignField': '_id',
+                'as': 'manufacturer_um_detail'
+            }
+        })
+        pipeline.append({
+            '$unwind': {
+                'path': '$manufacturer_um_detail',
+                'preserveNullAndEmptyArrays': True
+            }
+        })
+        
+        # Lookup Manufacturer
+        pipeline.append({
+            '$lookup': {
+                'from': 'depo_companies',
+                'localField': 'manufacturer_id',
+                'foreignField': '_id',
+                'as': 'manufacturer_detail'
+            }
+        })
+        pipeline.append({
+            '$unwind': {
+                'path': '$manufacturer_detail',
+                'preserveNullAndEmptyArrays': True
+            }
+        })
+        
         # Lookup Category
         pipeline.append({
             '$lookup': {
@@ -276,7 +308,7 @@ async def update_article(
             update_doc[field] = value
     
     # ObjectId fields
-    for field in ['default_location_id', 'category_id', 'manufacturer_id', 'system_um_id']:
+    for field in ['default_location_id', 'category_id', 'manufacturer_id', 'system_um_id', 'manufacturer_um_id']:
         value = getattr(article_data, field, None)
         if value is not None:
             update_doc[field] = ObjectId(value) if value else None
@@ -530,7 +562,6 @@ async def add_article_supplier(
         'part_id': ObjectId(article_id),
         'supplier_id': ObjectId(supplier_data.supplier_id),
         'supplier_code': supplier_data.supplier_code or '',
-        'um': supplier_data.um or '',
         'notes': supplier_data.notes or '',
         'price': supplier_data.price or 0,
         'currency': supplier_data.currency or 'EUR',
@@ -566,7 +597,7 @@ async def update_article_supplier(
         'updated_by': current_user.get('username', 'system')
     }
     
-    for field in ['supplier_code', 'um', 'notes', 'price', 'currency']:
+    for field in ['supplier_code', 'notes', 'price', 'currency']:
         value = getattr(supplier_data, field, None)
         if value is not None:
             update_doc[field] = value

@@ -30,6 +30,15 @@ remove_supplier_part = services_module.remove_supplier_part
 get_stock_by_id = services_module.get_stock_by_id
 get_stocks_list = services_module.get_stocks_list
 
+# Import stock approval flow functions
+from .stock_approval_flow import (
+    get_stock_approval_flow,
+    create_stock_approval_flow,
+    sign_stock_qc,
+    remove_stock_signature,
+    update_stock_transactionable
+)
+
 __all__ = [
     'get_suppliers_list',
     'get_manufacturers_list',
@@ -44,4 +53,9 @@ __all__ = [
     'remove_supplier_part',
     'get_stock_by_id',
     'get_stocks_list',
+    'get_stock_approval_flow',
+    'create_stock_approval_flow',
+    'sign_stock_qc',
+    'remove_stock_signature',
+    'update_stock_transactionable',
 ]

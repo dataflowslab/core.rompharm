@@ -19,6 +19,7 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../../../src/frontend/src/services/api';
+import { formatDate } from '../../../../src/frontend/src/utils/dateFormat';
 
 interface Supplier {
   _id: string;
@@ -157,11 +158,6 @@ export function SuppliersPage() {
   const openCreateModal = () => {
     resetForm();
     open();
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString();
   };
 
   const getCountry = (supplier: Supplier) => {

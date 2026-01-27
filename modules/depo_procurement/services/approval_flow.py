@@ -219,6 +219,21 @@ async def sign_purchase_order(order_id: str, action: str, current_user: dict, re
             }
         )
     
+    # Log the signature
+    db.logs.insert_one({
+        'collection': 'depo_purchase_orders',
+        'object_id': order_id,
+        'action': 'order_signed',
+        'user': username,
+        'timestamp': timestamp,
+        'description': f'Order signed by {username} - Action: {action}',
+        'details': {
+            'action': action,
+            'state_name': target_state.get('name') if target_state else 'Unknown',
+            'signature_hash': signature_hash
+        }
+    })
+    
     flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
     return serialize_doc(flow)
 
@@ -252,9 +267,74 @@ async def remove_order_signature(order_id: str, user_id: str, current_user: dict
     
     updated_flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
     if len(updated_flow.get("signatures", [])) == 0:
+        # No more signatures - reset approval flow status
         db.approval_flows.update_one(
             {"_id": ObjectId(flow["_id"])},
             {"$set": {"status": "pending"}}
         )
+        
+        # Reset order state to Pending (6943a4a6451609dd8a618ce0)
+        pending_state = db['depo_purchase_orders_states'].find_one({'_id': ObjectId('6943a4a6451609dd8a618ce0')})
+        if not pending_state:
+            pending_state = db['depo_purchase_orders_states'].find_one({'name': 'Pending'})
+        
+        if pending_state:
+            db['depo_purchase_orders'].update_one(
+                {'_id': ObjectId(order_id)},
+                {
+                    '$set': {
+                        'state_id': pending_state['_id'],
+                        'updated_at': datetime.utcnow()
+                    },
+                    '$unset': {
+                        'signed_at': '',
+                        'signed_by': '',
+                        'sign_action': ''
+                    }
+                }
+            )
+        
+        # Delete all received stocks for this purchase order
+        stocks_collection = db['depo_stocks']
+        stocks_to_delete = list(stocks_collection.find({'purchase_order_id': ObjectId(order_id)}))
+        
+        if stocks_to_delete:
+            # Delete the stocks
+            stocks_collection.delete_many({'purchase_order_id': ObjectId(order_id)})
+            
+            # Reset received quantities in order items
+            order = db['depo_purchase_orders'].find_one({'_id': ObjectId(order_id)})
+            if order and order.get('items'):
+                items = order['items']
+                for item in items:
+                    item['received'] = 0
+                    item['stocks'] = []
+                
+                db['depo_purchase_orders'].update_one(
+                    {'_id': ObjectId(order_id)},
+                    {
+                        '$set': {
+                            'items': items,
+                            'updated_at': datetime.utcnow()
+                        }
+                    }
+                )
+    
+    # Log the signature removal
+    removed_user = db.users.find_one({'_id': ObjectId(user_id)})
+    removed_username = removed_user.get('username') if removed_user else user_id
+    
+    db.logs.insert_one({
+        'collection': 'depo_purchase_orders',
+        'object_id': order_id,
+        'action': 'signature_removed',
+        'user': current_user.get('username'),
+        'timestamp': datetime.utcnow(),
+        'description': f'Signature removed from {removed_username} by {current_user.get("username")}',
+        'details': {
+            'removed_user_id': user_id,
+            'removed_username': removed_username
+        }
+    })
     
     return {"message": "Signature removed successfully"}

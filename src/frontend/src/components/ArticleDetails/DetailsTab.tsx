@@ -62,6 +62,7 @@ interface Article {
   manufacturer_id?: string;
   manufacturer_ipn?: string;
   system_um_id?: string;
+  manufacturer_um_id?: string;
   total_delivery_time?: string;
 }
 
@@ -238,6 +239,21 @@ export function DetailsTab({
                 style={{ flex: 1 }}
               />
             </Group>
+            
+            <div style={{ width: '50%' }}>
+              <Select
+                label="Manufacturer UM"
+                placeholder="Select unit"
+                data={systemUMs.map((um) => ({ 
+                  value: um._id, 
+                  label: `${um.name} (${um.abrev})` 
+                }))}
+                value={article.manufacturer_um_id || ''}
+                onChange={(value) => setArticle({ ...article, manufacturer_um_id: value || undefined })}
+                searchable
+                clearable
+              />
+            </div>
             
             <NumberInput
               label="Total Delivery Time"

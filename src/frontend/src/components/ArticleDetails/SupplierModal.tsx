@@ -19,7 +19,6 @@ interface SupplierModalProps {
   supplierFormData: {
     supplier_id: string;
     supplier_code: string;
-    um: string;
     notes: string;
     price: number;
     currency: string;
@@ -66,20 +65,6 @@ export function SupplierModal({
         placeholder="Supplier's part number"
         value={supplierFormData.supplier_code}
         onChange={(e) => setSupplierFormData({ ...supplierFormData, supplier_code: e.target.value })}
-        mb="sm"
-      />
-
-      <Select
-        label="U.M."
-        placeholder="Select unit of measure"
-        data={systemUMs.map((um) => ({ 
-          value: um.abrev, 
-          label: `${um.name} (${um.abrev})` 
-        }))}
-        value={supplierFormData.um}
-        onChange={(value) => setSupplierFormData({ ...supplierFormData, um: value || '' })}
-        searchable
-        clearable
         mb="sm"
       />
 

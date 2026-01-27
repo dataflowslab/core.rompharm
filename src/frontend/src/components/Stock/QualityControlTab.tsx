@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Grid,
   Paper,
@@ -13,18 +13,36 @@ import {
   Text,
   Badge,
   Group,
+  Select,
+  ActionIcon,
+  Alert,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { IconDeviceFloppy } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconSignature, IconTrash, IconAlertCircle } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
-import { formatDate } from '../../utils/dateFormat';
+import { formatDate, formatDateTime } from '../../utils/dateFormat';
 
 interface QualityControlTabProps {
   stockId: string;
   stock: any;
   onUpdate: () => void;
+}
+
+interface ApprovalFlow {
+  _id: string;
+  signatures: Array<{
+    user_id: string;
+    username: string;
+    user_name?: string;
+    signed_at: string;
+    signature_hash: string;
+  }>;
+  status: string;
+  required_officers: any[];
+  optional_officers: any[];
 }
 
 export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTabProps) {
@@ -39,9 +57,52 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
   const [baDate, setBaDate] = useState<Date | null>(null);
   const [baNo, setBaNo] = useState('');
   const [testResult, setTestResult] = useState<'conform' | 'neconform' | ''>('');
+  const [signing, setSigning] = useState(false);
+
+  // Transactionable
   const [transactionable, setTransactionable] = useState(false);
-  const [comments, setComments] = useState('');
-  const [savingBA, setSavingBA] = useState(false);
+  const [savingTransactionable, setSavingTransactionable] = useState(false);
+
+  // Approval flow
+  const [approvalFlow, setApprovalFlow] = useState<ApprovalFlow | null>(null);
+  const [loadingFlow, setLoadingFlow] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+
+  useEffect(() => {
+    loadApprovalFlow();
+    loadCurrentUser();
+    
+    // Load transactionable status from stock
+    if (stock.transactionable !== undefined) {
+      setTransactionable(stock.transactionable);
+    }
+    
+    // Check if stock state is Quarantined Transactionable
+    if (stock.state_id === '694322878728e4d75ae72790') {
+      setTransactionable(true);
+    }
+  }, [stockId, stock]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const response = await api.get('/api/auth/me');
+      setCurrentUserId(response.data._id);
+    } catch (error) {
+      console.error('Failed to load current user:', error);
+    }
+  };
+
+  const loadApprovalFlow = async () => {
+    setLoadingFlow(true);
+    try {
+      const response = await api.get(`/modules/inventory/api/stocks/${stockId}/approval-flow`);
+      setApprovalFlow(response.data.flow);
+    } catch (error) {
+      console.error('Failed to load approval flow:', error);
+    } finally {
+      setLoadingFlow(false);
+    }
+  };
 
   const handleSavePrelevation = async () => {
     if (!prelevationDate || prelevationQuantity <= 0) {
@@ -95,7 +156,7 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
     }
   };
 
-  const handleSaveBA = async () => {
+  const handleSignBA = async () => {
     if (!baDate || !baNo || !testResult) {
       notifications.show({
         title: 'Validation Error',
@@ -106,26 +167,82 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
     }
 
     try {
-      setSavingBA(true);
+      setSigning(true);
 
-      // Determine state_id based on test result
-      const stateId = testResult === 'conform' 
-        ? '694321db8728e4d75ae72789'  // Conform
-        : '694322758728e4d75ae7278f';  // Neconform (Quarantine)
-
-      // Update stock with BA information
-      await api.put(`/modules/inventory/api/stocks/${stockId}`, {
+      // Sign BA Rompharm
+      await api.post(`/modules/inventory/api/stocks/${stockId}/sign`, {
         rompharm_ba_no: baNo,
         rompharm_ba_date: baDate.toISOString().split('T')[0],
-        state_id: stateId,
-        qc_test_result: testResult,
-        qc_transactionable: transactionable,
-        qc_comments: comments,
+        test_result: testResult,
       });
 
       notifications.show({
         title: 'Success',
-        message: 'BA Rompharm information saved successfully',
+        message: 'BA Rompharm signed successfully',
+        color: 'green',
+      });
+
+      // Reset form
+      setBaDate(null);
+      setBaNo('');
+      setTestResult('');
+      
+      // Reload approval flow and stock
+      await loadApprovalFlow();
+      onUpdate();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.detail || 'Failed to sign BA Rompharm',
+        color: 'red',
+      });
+    } finally {
+      setSigning(false);
+    }
+  };
+
+  const handleRemoveSignature = (userId: string, username: string) => {
+    modals.openConfirmModal({
+      title: 'Remove Signature',
+      children: (
+        <Text size="sm">
+          Are you sure you want to remove the signature from <strong>{username}</strong>?
+        </Text>
+      ),
+      labels: { confirm: 'Remove', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          await api.delete(`/modules/inventory/api/stocks/${stockId}/signatures/${userId}`);
+          notifications.show({
+            title: 'Success',
+            message: 'Signature removed successfully',
+            color: 'green',
+          });
+          await loadApprovalFlow();
+          onUpdate();
+        } catch (error: any) {
+          notifications.show({
+            title: 'Error',
+            message: error.response?.data?.detail || 'Failed to remove signature',
+            color: 'red',
+          });
+        }
+      },
+    });
+  };
+
+  const handleSaveTransactionable = async () => {
+    try {
+      setSavingTransactionable(true);
+      
+      await api.put(`/modules/inventory/api/stocks/${stockId}/transactionable`, {
+        transactionable: transactionable,
+      });
+
+      notifications.show({
+        title: 'Success',
+        message: 'Transactionable status updated successfully',
         color: 'green',
       });
 
@@ -133,13 +250,22 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
     } catch (error: any) {
       notifications.show({
         title: 'Error',
-        message: error.response?.data?.detail || 'Failed to save BA information',
+        message: error.response?.data?.detail || 'Failed to update transactionable status',
         color: 'red',
       });
     } finally {
-      setSavingBA(false);
+      setSavingTransactionable(false);
     }
   };
+
+  const hasSignatures = approvalFlow && approvalFlow.signatures && approvalFlow.signatures.length > 0;
+  const isApproved = approvalFlow && approvalFlow.status === 'approved';
+  const isQuarantinedTransactionable = stock.state_id === '694322878728e4d75ae72790';
+  
+  // Show transactionable checkbox only if:
+  // 1. Not signed yet (no signatures), OR
+  // 2. Has Quarantined Transactionable state
+  const showTransactionable = !hasSignatures || isQuarantinedTransactionable;
 
   return (
     <Grid>
@@ -180,54 +306,132 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
             </Stack>
           </Paper>
 
-          {/* BA Rompharm Form */}
-          <Paper shadow="xs" p="md" withBorder>
-            <Title order={5} mb="md">{t('BA Rompharm')}</Title>
-            <Stack gap="sm">
-              <DatePickerInput
-                label={t('Date')}
-                placeholder={t('Select date')}
-                value={baDate}
-                onChange={setBaDate}
-                required
-              />
-              <TextInput
-                label={t('No')}
-                placeholder={t('BA Number')}
-                value={baNo}
-                onChange={(e) => setBaNo(e.currentTarget.value)}
-                required
-              />
-              <TextInput
-                label={t('Test Result')}
-                placeholder={t('Conform/Neconform')}
-                value={testResult}
-                onChange={(e) => setTestResult(e.currentTarget.value as any)}
-                required
-                description={t('Enter "conform" or "neconform"')}
-              />
-              <Checkbox
-                label={t('Transactionable (În carantină tranzacționabil)')}
-                checked={transactionable}
-                onChange={(e) => setTransactionable(e.currentTarget.checked)}
-              />
-              <Textarea
-                label={t('Comments')}
-                placeholder={t('Additional comments')}
-                value={comments}
-                onChange={(e) => setComments(e.currentTarget.value)}
-                minRows={3}
-              />
-              <Button
-                leftSection={<IconDeviceFloppy size={16} />}
-                onClick={handleSaveBA}
-                loading={savingBA}
-                fullWidth
-              >
-                {t('Save BA Information')}
-              </Button>
-            </Stack>
-          </Paper>
+          {/* Transactionable Checkbox - Only show if not signed OR has transactionable state */}
+          {showTransactionable && (
+            <Paper shadow="xs" p="md" withBorder>
+              <Stack gap="sm">
+                <Checkbox
+                  label={t('Transactionable (În carantină tranzacționabil)')}
+                  checked={transactionable}
+                  onChange={(e) => setTransactionable(e.currentTarget.checked)}
+                />
+                <Button
+                  leftSection={<IconDeviceFloppy size={16} />}
+                  onClick={handleSaveTransactionable}
+                  loading={savingTransactionable}
+                  fullWidth
+                  variant="light"
+                >
+                  {t('Save Transactionable Status')}
+                </Button>
+              </Stack>
+            </Paper>
+          )}
+
+          {/* BA Rompharm Form - Only show if not signed */}
+          {!hasSignatures && (
+            <Paper shadow="xs" p="md" withBorder>
+              <Title order={5} mb="md">{t('BA Rompharm')}</Title>
+              <Stack gap="sm">
+                <DatePickerInput
+                  label={t('Date')}
+                  placeholder={t('Select date')}
+                  value={baDate}
+                  onChange={setBaDate}
+                  required
+                />
+                <TextInput
+                  label={t('No')}
+                  placeholder={t('BA Number')}
+                  value={baNo}
+                  onChange={(e) => setBaNo(e.currentTarget.value)}
+                  required
+                />
+                <Select
+                  label={t('Test Result')}
+                  placeholder={t('Select result')}
+                  value={testResult}
+                  onChange={(value) => setTestResult(value as 'conform' | 'neconform' | '')}
+                  data={[
+                    { value: 'conform', label: t('Conform') },
+                    { value: 'neconform', label: t('Neconform') }
+                  ]}
+                  required
+                  clearable
+                />
+                <Button
+                  leftSection={<IconSignature size={16} />}
+                  onClick={handleSignBA}
+                  loading={signing}
+                  fullWidth
+                  color="blue"
+                >
+                  {t('Sign BA Rompharm')}
+                </Button>
+              </Stack>
+            </Paper>
+          )}
+
+          {/* BA Rompharm Data - Show if signed */}
+          {hasSignatures && stock.rompharm_ba_no && (
+            <Paper shadow="xs" p="md" withBorder>
+              <Title order={5} mb="md">{t('BA Rompharm Information')}</Title>
+              <Table>
+                <Table.Tbody>
+                  <Table.Tr>
+                    <Table.Td fw={500}>{t('BA No')}</Table.Td>
+                    <Table.Td>{stock.rompharm_ba_no}</Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Td fw={500}>{t('BA Date')}</Table.Td>
+                    <Table.Td>{formatDate(stock.rompharm_ba_date)}</Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Td fw={500}>{t('Test Result')}</Table.Td>
+                    <Table.Td>
+                      <Badge color={stock.test_result === 'conform' ? 'green' : 'red'}>
+                        {stock.test_result === 'conform' ? t('Conform') : t('Neconform')}
+                      </Badge>
+                    </Table.Td>
+                  </Table.Tr>
+                </Table.Tbody>
+              </Table>
+            </Paper>
+          )}
+
+          {/* Signatures Table */}
+          {hasSignatures && (
+            <Paper shadow="xs" p="md" withBorder>
+              <Title order={5} mb="md">{t('Signatures')}</Title>
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('User')}</Table.Th>
+                    <Table.Th>{t('Signed At')}</Table.Th>
+                    <Table.Th>{t('Actions')}</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {approvalFlow.signatures.map((sig) => (
+                    <Table.Tr key={sig.user_id}>
+                      <Table.Td>{sig.user_name || sig.username}</Table.Td>
+                      <Table.Td>{formatDateTime(sig.signed_at)}</Table.Td>
+                      <Table.Td>
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          onClick={() => handleRemoveSignature(sig.user_id, sig.user_name || sig.username)}
+                          title={t('Remove signature')}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Paper>
+          )}
         </Stack>
       </Grid.Col>
 

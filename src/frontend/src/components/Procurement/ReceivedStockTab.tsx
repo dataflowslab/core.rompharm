@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Table, Button, Group, Modal, ActionIcon, Badge } from '@mantine/core';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { Paper, Title, Text, Table, Button, Group, Modal, ActionIcon, Badge, Grid, Stack, Select, Textarea } from '@mantine/core';
+import { IconPlus, IconTrash, IconSignature } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
 import { ReceiveStockForm, ReceiveStockFormData } from '../Common/ReceiveStockForm';
+import { formatDateTime } from '../../utils/dateFormat';
 
 interface ReceivedItem {
   _id: string;
@@ -17,6 +18,19 @@ interface ReceivedItem {
     IPN: string;
   };
   quantity: number;
+  quantity_received?: number;  // Original quantity in Manufacturer UM
+  quantity_system_um?: number;  // Converted quantity in System UM
+  conversion_modifier?: number;
+  system_um_detail?: {
+    name: string;
+    abrev: string;
+    symbol: string;
+  };
+  manufacturer_um_detail?: {
+    name: string;
+    abrev: string;
+    symbol: string;
+  };
   location: number;
   location_detail?: {
     name: string;
@@ -58,15 +72,46 @@ interface ReceivedStockTabProps {
   onReload: () => void;
   supplierName?: string;
   supplierId?: string;
+  orderStateId?: string;
+  canModify?: boolean;
 }
 
-export function ReceivedStockTab({ orderId, items, stockLocations, onReload, supplierName, supplierId }: ReceivedStockTabProps) {
+interface ApprovalFlow {
+  _id: string;
+  signatures: Array<{
+    user_id: string;
+    username: string;
+    user_name?: string;
+    signed_at: string;
+    signature_hash: string;
+  }>;
+  status: string;
+  required_officers: any[];
+  optional_officers: any[];
+}
+
+export function ReceivedStockTab({ orderId, items, stockLocations, onReload, supplierName, supplierId, orderStateId, canModify = true }: ReceivedStockTabProps) {
   const { t } = useTranslation();
+  
+  // Check if order is in FINISHED or CANCELLED state (cannot modify)
+  const FINISHED_STATE = '6943a4a6451609dd8a618ce3';
+  const CANCELLED_STATE = '6943a4a6451609dd8a618ce2';
+  const isOrderLocked = orderStateId === FINISHED_STATE || orderStateId === CANCELLED_STATE;
+  const canModifyStock = canModify && !isOrderLocked;
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [receiveModalOpened, setReceiveModalOpened] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [stockStatuses, setStockStatuses] = useState<{ value: string; label: string }[]>([]);
   const [systemUms, setSystemUms] = useState<{ value: string; label: string }[]>([]);
+  
+  // Approval flow state
+  const [approvalFlow, setApprovalFlow] = useState<ApprovalFlow | null>(null);
+  const [loadingFlow, setLoadingFlow] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [targetStateId, setTargetStateId] = useState<string>('');
+  const [availableStates, setAvailableStates] = useState<{ value: string; label: string }[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [refusalComments, setRefusalComments] = useState<string>('');
   
   // Form state using ReceiveStockFormData interface
   const [formData, setFormData] = useState<ReceiveStockFormData>({
@@ -101,7 +146,146 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
     loadReceivedItems();
     loadStockStatuses();
     loadSystemUms();
+    loadApprovalFlow();
+    loadCurrentUser();
+    loadAvailableStates();
   }, [orderId]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const response = await api.get('/api/auth/me');
+      setCurrentUserId(response.data._id);
+    } catch (error) {
+      console.error('Failed to load current user:', error);
+    }
+  };
+
+  const loadApprovalFlow = async () => {
+    setLoadingFlow(true);
+    try {
+      const response = await api.get(`/modules/depo_procurement/api/purchase-orders/${orderId}/received-stock-approval-flow`);
+      setApprovalFlow(response.data.flow);
+    } catch (error) {
+      console.error('Failed to load approval flow:', error);
+    } finally {
+      setLoadingFlow(false);
+    }
+  };
+
+  const loadAvailableStates = async () => {
+    try {
+      const response = await api.get('/modules/depo_procurement/api/order-statuses');
+      const allStates = response.data.statuses || [];
+      // Filter states: 6943a4a6451609dd8a618ce3, 6943a4a6451609dd8a618ce4
+      const targetStates = allStates.filter((s: any) => 
+        s._id === '6943a4a6451609dd8a618ce3' || s._id === '6943a4a6451609dd8a618ce4'
+      );
+      setAvailableStates(targetStates.map((s: any) => ({
+        value: s._id,
+        label: s.name
+      })));
+      // Set default to first state
+      if (targetStates.length > 0 && !targetStateId) {
+        setTargetStateId(targetStates[0]._id);
+      }
+    } catch (error) {
+      console.error('Failed to load available states:', error);
+    }
+  };
+
+  const handleSignReceivedStock = () => {
+    if (!targetStateId) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please select a target state'),
+        color: 'red'
+      });
+      return;
+    }
+
+    // Get selected state name
+    const selectedState = availableStates.find(s => s.value === targetStateId);
+    const isRefused = selectedState?.label?.toLowerCase().includes('refused') || 
+                      selectedState?.label?.toLowerCase().includes('refuz');
+
+    // Validate comments for refused state
+    if (isRefused && !refusalComments.trim()) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Comments are required when refusing received stock'),
+        color: 'red'
+      });
+      return;
+    }
+
+    // Show confirmation modal
+    modals.openConfirmModal({
+      title: t('Confirm Signature'),
+      children: (
+        <Text size="sm">
+          {t('Are you sure you want to sign this received stock with state')}: <strong>{selectedState?.label}</strong>?
+        </Text>
+      ),
+      labels: { confirm: t('Sign'), cancel: t('Cancel') },
+      confirmProps: { color: 'blue' },
+      onConfirm: async () => {
+        try {
+          setSigning(true);
+          await api.post(`/modules/depo_procurement/api/purchase-orders/${orderId}/sign-received-stock`, {
+            target_state_id: targetStateId
+          });
+
+          notifications.show({
+            title: t('Success'),
+            message: t('Received stock signed successfully'),
+            color: 'green'
+          });
+
+          await loadApprovalFlow();
+          onReload();
+        } catch (error: any) {
+          notifications.show({
+            title: t('Error'),
+            message: error.response?.data?.detail || t('Failed to sign received stock'),
+            color: 'red'
+          });
+        } finally {
+          setSigning(false);
+        }
+      }
+    });
+  };
+
+  const handleRemoveSignature = (userId: string, username: string) => {
+    modals.openConfirmModal({
+      title: t('Remove Signature'),
+      children: (
+        <Text size="sm">
+          {t('Are you sure you want to remove the signature from')} <strong>{username}</strong>?
+        </Text>
+      ),
+      labels: { confirm: t('Remove'), cancel: t('Cancel') },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          await api.delete(`/modules/depo_procurement/api/purchase-orders/${orderId}/received-stock-signatures/${userId}`);
+          notifications.show({
+            title: t('Success'),
+            message: t('Signature removed successfully'),
+            color: 'green'
+          });
+          await loadApprovalFlow();
+          onReload();
+        } catch (error: any) {
+          notifications.show({
+            title: t('Error'),
+            message: error.response?.data?.detail || t('Failed to remove signature'),
+            color: 'red'
+          });
+        }
+      },
+    });
+  };
 
   const loadStockStatuses = async () => {
     try {
@@ -327,71 +511,182 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
     label: loc.name 
   }));
 
+  const hasReceivedItems = receivedItems.length > 0;
+  const hasSignatures = approvalFlow && approvalFlow.signatures && approvalFlow.signatures.length > 0;
+
   return (
     <Paper p="md" withBorder>
       <Group justify="space-between" mb="md">
         <Title order={4}>{t('Received Stock')}</Title>
-        <Button 
-          leftSection={<IconPlus size={16} />}
-          onClick={() => setReceiveModalOpened(true)}
-          disabled={availableItems.length === 0}
-        >
-          {t('Receive Stock')}
-        </Button>
+        {canModifyStock && (
+          <Button 
+            leftSection={<IconPlus size={16} />}
+            onClick={() => setReceiveModalOpened(true)}
+            disabled={availableItems.length === 0}
+          >
+            {t('Receive Stock')}
+          </Button>
+        )}
       </Group>
 
-      {receivedItems.length === 0 ? (
+      {!hasReceivedItems ? (
         <Text size="sm" c="dimmed">{t('No received items')}</Text>
       ) : (
-        <Table striped withTableBorder withColumnBorders>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('Part')}</Table.Th>
-              <Table.Th>{t('Quantity')}</Table.Th>
-              <Table.Th>{t('Location')}</Table.Th>
-              <Table.Th>{t('Batch')}</Table.Th>
-              <Table.Th>{t('Status')}</Table.Th>
-              <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {receivedItems.map((item) => (
-              <Table.Tr key={item._id || item.pk}>
-                <Table.Td>
-                  {item.part_detail?.name || item.part}
-                  {item.part_detail?.IPN && ` (${item.part_detail.IPN})`}
-                </Table.Td>
-                <Table.Td>{item.quantity}</Table.Td>
-                <Table.Td>{item.location_detail?.name || item.location}</Table.Td>
-                <Table.Td>{item.batch_code || item.batch || '-'}</Table.Td>
-                <Table.Td>
-                  {item.status_detail ? (
-                    <Badge
-                      style={{
-                        backgroundColor: item.status_detail.color || '#gray',
-                        color: '#fff',
-                      }}
-                    >
-                      {item.status_detail.name}
-                    </Badge>
-                  ) : (
-                    <Badge color="gray">{getStatusLabel(item.status)}</Badge>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  <ActionIcon
-                    color="red"
-                    variant="subtle"
-                    onClick={() => handleDeleteStock(item)}
-                    title={t('Delete')}
+        <Grid>
+          {/* Approval Box - 1/4 width */}
+          <Grid.Col span={3}>
+            <Paper p="md" withBorder>
+              <Title order={5} mb="md">{t('Approval')}</Title>
+              
+              {!hasSignatures ? (
+                <Stack gap="sm">
+                  <Select
+                    label={t('Target State')}
+                    placeholder={t('Select state')}
+                    value={targetStateId}
+                    onChange={(value) => {
+                      setTargetStateId(value || '');
+                      // Reset comments when changing state
+                      if (value) {
+                        const selectedState = availableStates.find(s => s.value === value);
+                        const isRefused = selectedState?.label?.toLowerCase().includes('refused') || 
+                                          selectedState?.label?.toLowerCase().includes('refuz');
+                        if (!isRefused) {
+                          setRefusalComments('');
+                        }
+                      }
+                    }}
+                    data={availableStates}
+                    required
+                  />
+                  
+                  {/* Show comments field if Refused is selected */}
+                  {(() => {
+                    const selectedState = availableStates.find(s => s.value === targetStateId);
+                    const isRefused = selectedState?.label?.toLowerCase().includes('refused') || 
+                                      selectedState?.label?.toLowerCase().includes('refuz');
+                    return isRefused ? (
+                      <Textarea
+                        label={t('Comments')}
+                        placeholder={t('Please provide a reason for refusal')}
+                        value={refusalComments}
+                        onChange={(e) => setRefusalComments(e.currentTarget.value)}
+                        required
+                        minRows={3}
+                        error={!refusalComments ? t('Comments are required for refusal') : undefined}
+                      />
+                    ) : null;
+                  })()}
+                  
+                  <Button
+                    leftSection={<IconSignature size={16} />}
+                    onClick={handleSignReceivedStock}
+                    loading={signing}
+                    fullWidth
+                    color="blue"
                   >
-                    <IconTrash size={16} />
-                  </ActionIcon>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+                    {t('Sign')}
+                  </Button>
+                </Stack>
+              ) : (
+                <Stack gap="sm">
+                  <Text size="sm" fw={500}>{t('Signatures')}</Text>
+                  {approvalFlow.signatures.map((sig) => (
+                    <Group key={sig.user_id} justify="space-between">
+                      <div>
+                        <Text size="sm">{sig.user_name || sig.username}</Text>
+                        <Text size="xs" c="dimmed">{formatDateTime(sig.signed_at)}</Text>
+                      </div>
+                      {canModifyStock && (
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          onClick={() => handleRemoveSignature(sig.user_id, sig.user_name || sig.username)}
+                          title={t('Remove')}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      )}
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+            </Paper>
+          </Grid.Col>
+
+          {/* Table - 3/4 width */}
+          <Grid.Col span={9}>
+            <Table striped withTableBorder withColumnBorders>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('Part')}</Table.Th>
+                  <Table.Th>
+                    {t('Quantity')}
+                    {receivedItems[0]?.system_um_detail && (
+                      <Text span size="xs" c="dimmed"> ({receivedItems[0].system_um_detail.abrev})</Text>
+                    )}
+                  </Table.Th>
+                  <Table.Th>{t('Location')}</Table.Th>
+                  <Table.Th>{t('Batch')}</Table.Th>
+                  <Table.Th>{t('Status')}</Table.Th>
+                  {canModifyStock && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {receivedItems.map((item) => (
+                  <Table.Tr key={item._id || item.pk}>
+                    <Table.Td>
+                      {item.part_detail?.name || item.part}
+                      {item.part_detail?.IPN && ` (${item.part_detail.IPN})`}
+                    </Table.Td>
+                    <Table.Td>
+                      {item.quantity_system_um !== undefined ? (
+                        <>
+                          <Text fw={500}>{item.quantity_system_um.toFixed(2)}</Text>
+                          {item.quantity_received !== item.quantity_system_um && (
+                            <Text size="xs" c="dimmed">
+                              ({item.quantity_received} {item.manufacturer_um_detail?.abrev || ''} × {item.conversion_modifier})
+                            </Text>
+                          )}
+                        </>
+                      ) : (
+                        item.quantity
+                      )}
+                    </Table.Td>
+                    <Table.Td>{item.location_detail?.name || item.location}</Table.Td>
+                    <Table.Td>{item.batch_code || item.batch || '-'}</Table.Td>
+                    <Table.Td>
+                      {item.status_detail ? (
+                        <Badge
+                          style={{
+                            backgroundColor: item.status_detail.color || '#gray',
+                            color: '#fff',
+                          }}
+                        >
+                          {item.status_detail.name}
+                        </Badge>
+                      ) : (
+                        <Badge color="gray">{getStatusLabel(item.status)}</Badge>
+                      )}
+                    </Table.Td>
+                    {canModifyStock && (
+                      <Table.Td>
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          onClick={() => handleDeleteStock(item)}
+                          title={t('Delete')}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Table.Td>
+                    )}
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Grid.Col>
+        </Grid>
       )}
 
       {/* Receive Stock Modal - Using ReceiveStockForm */}

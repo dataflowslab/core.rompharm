@@ -499,3 +499,89 @@ async def remove_signature_endpoint(
     """Remove signature from purchase order approval flow (admin only)"""
     from modules.depo_procurement.services import remove_order_signature
     return await remove_order_signature(order_id, user_id, current_user)
+
+# ==================== RECEIVED STOCK APPROVAL FLOW ENDPOINTS ====================
+
+@router.get("/purchase-orders/{order_id}/received-stock-approval-flow")
+async def get_received_stock_approval_flow_endpoint(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Get approval flow for received stock"""
+    from modules.depo_procurement.services import get_received_stock_approval_flow
+    return await get_received_stock_approval_flow(order_id)
+
+
+@router.post("/purchase-orders/{order_id}/received-stock-approval-flow")
+async def create_received_stock_approval_flow_endpoint(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Create approval flow for received stock"""
+    from modules.depo_procurement.services import create_received_stock_approval_flow
+    return await create_received_stock_approval_flow(order_id)
+
+
+@router.post("/purchase-orders/{order_id}/sign-received-stock")
+async def sign_received_stock_endpoint(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Sign received stock approval flow"""
+    from modules.depo_procurement.services import sign_received_stock
+    body = await request.json()
+    target_state_id = body.get('target_state_id')
+    return await sign_received_stock(
+        order_id, target_state_id, current_user,
+        request.client.host, request.headers.get("user-agent")
+    )
+
+
+@router.delete("/purchase-orders/{order_id}/received-stock-signatures/{user_id}")
+async def remove_received_stock_signature_endpoint(
+    request: Request,
+    order_id: str,
+    user_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Remove signature from received stock approval flow"""
+    from modules.depo_procurement.services import remove_received_stock_signature
+    return await remove_received_stock_signature(order_id, user_id, current_user)
+
+
+# ==================== JOURNAL ENDPOINT ====================
+
+@router.get("/purchase-orders/{order_id}/journal")
+async def get_order_journal(
+    request: Request,
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Get activity journal for purchase order"""
+    from src.backend.utils.db import get_db
+    from bson import ObjectId
+    
+    db = get_db()
+    
+    # Get logs for this order
+    logs = list(db.logs.find({
+        'collection': 'depo_purchase_orders',
+        'object_id': order_id
+    }).sort('timestamp', -1))
+    
+    # Format logs
+    journal_entries = []
+    for log in logs:
+        entry = {
+            'type': log.get('action', 'unknown'),
+            'timestamp': log.get('timestamp').isoformat() if log.get('timestamp') else '',
+            'user': log.get('user', 'System'),
+            'description': log.get('description', ''),
+            'details': log.get('details', {})
+        }
+        journal_entries.append(entry)
+    
+    return {'entries': journal_entries}
