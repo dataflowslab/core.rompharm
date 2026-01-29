@@ -100,30 +100,56 @@ async def generate_document(
     raise HTTPException(status_code=404, detail="Object not found")
 
 
-@router.get("/{job_id}/download")
+@router.get("/{doc_id}/download")
 async def download_document(
-    job_id: str,
+    doc_id: str,
     user = Depends(verify_token)
 ):
-    """Download document by job_id"""
-    print(f"[DOCUMENT] Download request for job_id: {job_id}")
+    """Download document by document _id or job_id"""
+    from ..utils.config import load_config
+    
+    config = load_config()
+    debug_mode = config.get('app', {}).get('debug', False)
+    
+    print(f"[DOCUMENT] Download request for doc_id: {doc_id}")
     db = get_db()
     
-    # Search in all document collections by job_id
+    # Search in all document collections by _id first, then by job_id
     collections = ['depo_procurement_documents', 'depo_stock_request_documents']
     
     doc = None
     coll = None
-    for coll_name in collections:
-        doc = db[coll_name].find_one({'job_id': job_id})
-        if doc:
-            coll = db[coll_name]
-            print(f"[DOCUMENT] Found in collection: {coll_name}")
-            break
+    
+    # First try to find by _id (MongoDB ObjectId)
+    try:
+        obj_id = ObjectId(doc_id)
+        for coll_name in collections:
+            doc = db[coll_name].find_one({'_id': obj_id})
+            if doc:
+                coll = db[coll_name]
+                print(f"[DOCUMENT] Found by _id in collection: {coll_name}")
+                break
+    except:
+        pass
+    
+    # If not found by _id, try by job_id
+    if not doc:
+        for coll_name in collections:
+            doc = db[coll_name].find_one({'job_id': doc_id})
+            if doc:
+                coll = db[coll_name]
+                print(f"[DOCUMENT] Found by job_id in collection: {coll_name}")
+                break
     
     if not doc:
-        print(f"[DOCUMENT] ERROR: Document not found for job_id: {job_id}")
+        print(f"[DOCUMENT] ERROR: Document not found for doc_id: {doc_id}")
         raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Get the actual job_id from the document
+    job_id = doc.get('job_id')
+    if not job_id:
+        print(f"[DOCUMENT] ERROR: Document has no job_id")
+        raise HTTPException(status_code=400, detail="Document has no job_id")
     
     print(f"[DOCUMENT] Document status: {doc.get('status')}, has_cache: {doc.get('document_data') is not None}")
     
@@ -144,11 +170,15 @@ async def download_document(
             raise HTTPException(status_code=400, detail=f"Document not ready. Status: {doc.get('status')}")
         
         client = DataFlowsDocuClient()
-        document_bytes = client.download_document(job_id)
+        document_bytes = client.download_document(job_id, debug=debug_mode)
         
         if not document_bytes:
             print(f"[DOCUMENT] ERROR: Failed to download from service")
-            raise HTTPException(status_code=500, detail="Failed to download document")
+            if debug_mode:
+                print(f"[DOCUMENT DEBUG] job_id: {job_id}")
+                print(f"[DOCUMENT DEBUG] doc status in DB: {doc.get('status')}")
+                print(f"[DOCUMENT DEBUG] artifact_path: {doc.get('artifact_path')}")
+            raise HTTPException(status_code=500, detail="Failed to download document from service")
         
         print(f"[DOCUMENT] Downloaded {len(document_bytes)} bytes, caching...")
         

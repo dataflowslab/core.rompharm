@@ -86,8 +86,12 @@ interface ReceiveStockFormProps {
     name: string;
   };
   
-  // Article UM (read-only, informative)
-  articleUm?: string;
+  // Article Manufacturer UM (read-only, shown in Received Quantity label)
+  manufacturerUm?: string;
+  
+  // Article lotallexp flag - if false or missing, stock goes directly to OK state
+  // and Transferable checkbox is hidden
+  articleLotallexp?: boolean;
 }
 
 export function ReceiveStockForm({
@@ -102,7 +106,8 @@ export function ReceiveStockForm({
   systemUms,
   suppliers,
   fixedSupplier,
-  articleUm,
+  manufacturerUm,
+  articleLotallexp,
 }: ReceiveStockFormProps) {
   const { t } = useTranslation();
   const [isFirstContainer, setIsFirstContainer] = useState(true);
@@ -222,10 +227,10 @@ export function ReceiveStockForm({
         )}
       </Grid.Col>
 
-      {/* Row 1: Received Quantity, Expected Quantity, Supplier U.M. (3 columns) */}
-      <Grid.Col span={4}>
+      {/* Row 1: Received Quantity (with Manufacturer UM in label), Expected Quantity (2 columns) */}
+      <Grid.Col span={6}>
         <NumberInput
-          label={t('Received Quantity')}
+          label={manufacturerUm ? `${t('Received Quantity')} (${manufacturerUm})` : t('Received Quantity')}
           placeholder="0"
           value={formData.quantity}
           onChange={(value) => handleQuantityChange(Number(value) || 0)}
@@ -235,35 +240,15 @@ export function ReceiveStockForm({
         />
       </Grid.Col>
 
-      <Grid.Col span={4}>
+      <Grid.Col span={6}>
         <NumberInput
-          label={t('Expected Quantity')}
+          label={manufacturerUm ? `${t('Expected Quantity')} (${manufacturerUm})` : t('Expected Quantity')}
           placeholder="0"
           value={formData.expected_quantity}
           onChange={(value) => updateField('expected_quantity', Number(value) || 0)}
           min={0}
           step={1}
         />
-      </Grid.Col>
-
-      <Grid.Col span={4}>
-        {articleUm ? (
-          <TextInput
-            label={t('Unit of Measure')}
-            value={articleUm}
-            disabled
-            description={t('Unit is defined at article level')}
-          />
-        ) : (
-          <Select
-            label={t('Supplier U.M.')}
-            placeholder={t('Select unit')}
-            data={systemUms}
-            value={formData.supplier_um_id}
-            onChange={(value) => updateField('supplier_um_id', value || '694813b6297c9dde6d7065b7')}
-            searchable
-          />
-        )}
       </Grid.Col>
 
       {/* Warning when received > expected */}
@@ -340,8 +325,8 @@ export function ReceiveStockForm({
         )}
       </Grid.Col>
 
-      {/* Row 4: Location (2/3) + Transferable (1/3) */}
-      <Grid.Col span={8}>
+      {/* Row 4: Location + Transferable (only shown if articleLotallexp is true) */}
+      <Grid.Col span={articleLotallexp ? 8 : 12}>
         <Select
           label={t('Location')}
           placeholder={t('Select location')}
@@ -353,15 +338,18 @@ export function ReceiveStockForm({
         />
       </Grid.Col>
 
-      <Grid.Col span={4}>
-        <Checkbox
-          label={t('Transferable')}
-          description={t('Stock can be transferred while in quarantine')}
-          checked={formData.transferable}
-          onChange={(e) => updateField('transferable', e.currentTarget.checked)}
-          mt="md"
-        />
-      </Grid.Col>
+      {/* Transferable checkbox - only shown if article has lotallexp=true (goes to quarantine) */}
+      {articleLotallexp && (
+        <Grid.Col span={4}>
+          <Checkbox
+            label={t('Transferable')}
+            description={t('Stock can be transferred while in quarantine')}
+            checked={formData.transferable}
+            onChange={(e) => updateField('transferable', e.currentTarget.checked)}
+            mt="md"
+          />
+        </Grid.Col>
+      )}
 
       {/* Containers Section */}
       <Grid.Col span={12}>

@@ -56,6 +56,7 @@ interface ApprovalFlow {
   status: string;
   required_officers: any[];
   optional_officers: any[];
+  min_signatures?: number;
 }
 
 interface DetailsTabProps {
@@ -278,9 +279,20 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
   const canUserSign = (): boolean => {
     if (!flow || !username) return false;
     
+    // Check if user already signed
     const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
 
+    // Check if minimum signatures already reached
+    const minSignatures = flow.min_signatures || 0;
+    const currentSignatures = flow.signatures.length;
+    
+    if (currentSignatures >= minSignatures && minSignatures > 0) {
+      // Minimum signatures reached - no more signing allowed
+      return false;
+    }
+
+    // Check if user is authorized to sign
     const allOfficers = [...flow.required_officers, ...flow.optional_officers];
     return allOfficers.length > 0;
   };

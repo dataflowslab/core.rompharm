@@ -29,14 +29,23 @@ async def get_order_items(order_id: str):
             if '_id' not in item:
                 item['_id'] = str(ObjectId())
             
-            # Enrich with part details
+            # Enrich with part details including manufacturer_um and lotallexp
             if item.get('part_id'):
                 part = db['depo_parts'].find_one({'_id': ObjectId(item['part_id'])})
                 if part:
+                    # Get manufacturer UM name if available
+                    manufacturer_um_name = None
+                    if part.get('manufacturer_um_id'):
+                        manufacturer_um = db['depo_ums'].find_one({'_id': ObjectId(part['manufacturer_um_id'])})
+                        if manufacturer_um:
+                            manufacturer_um_name = manufacturer_um.get('abrev') or manufacturer_um.get('name')
+                    
                     item['part_detail'] = {
                         'name': part.get('name'),
                         'ipn': part.get('ipn'),
-                        'um': part.get('um')
+                        'um': part.get('um'),
+                        'manufacturer_um': manufacturer_um_name,
+                        'lotallexp': part.get('lotallexp', False)
                     }
         
         # Update items in database if any _id was added

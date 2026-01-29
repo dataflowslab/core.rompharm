@@ -191,30 +191,45 @@ class DataFlowsDocuClient:
             print(f"Error getting job status: {e}")
             return None
     
-    def download_document(self, job_id: str) -> Optional[bytes]:
+    def download_document(self, job_id: str, debug: bool = False) -> Optional[bytes]:
         """
         Download generated document
         
         Args:
             job_id: Job ID
+            debug: If True, print detailed debug info
             
         Returns:
             Document bytes or None
         """
         try:
+            url = f"{self.base_url}/download/{job_id}"
+            if debug:
+                print(f"[DOCU DEBUG] Downloading from: {url}")
+                print(f"[DOCU DEBUG] Headers: {self.headers}")
+            
             response = requests.get(
-                f"{self.base_url}/download/{job_id}",
+                url,
                 headers=self.headers,
                 timeout=30
             )
             
             if response.status_code == 200:
+                if debug:
+                    print(f"[DOCU DEBUG] Download successful, {len(response.content)} bytes")
                 return response.content
             else:
                 print(f"Failed to download document: {response.status_code}")
+                if debug:
+                    print(f"[DOCU DEBUG] Response status: {response.status_code}")
+                    print(f"[DOCU DEBUG] Response headers: {dict(response.headers)}")
+                    print(f"[DOCU DEBUG] Response body: {response.text[:500] if response.text else 'empty'}")
                 return None
         except Exception as e:
             print(f"Error downloading document: {e}")
+            if debug:
+                import traceback
+                print(f"[DOCU DEBUG] Exception traceback: {traceback.format_exc()}")
             return None
     
     def health_check(self) -> bool:

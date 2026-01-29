@@ -386,20 +386,19 @@ export function ProcurementPage() {
         </Button>
       </Group>
 
-      <Grid mb="md">
-        <Grid.Col span={12}>
+      <Grid mb="md" align="flex-end">
+        <Grid.Col span={{ base: 12, md: 3.6 }}>
           <TextInput
-            placeholder={t('Search by reference, supplier, description, or status...')}
+            placeholder={t('Search by reference, supplier, description...')}
             leftSection={<IconSearch size={16} />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </Grid.Col>
         
-        <Grid.Col span={4}>
+        <Grid.Col span={{ base: 6, md: 2.4 }}>
           <Select
-            label={t('Status')}
-            placeholder={t('All statuses')}
+            placeholder={t('Choose state...')}
             data={orderStates.map(s => ({ value: s._id, label: s.name }))}
             value={statusFilter}
             onChange={setStatusFilter}
@@ -407,24 +406,26 @@ export function ProcurementPage() {
           />
         </Grid.Col>
 
-        <Grid.Col span={4}>
+        <Grid.Col span={{ base: 6, md: 1.8 }}>
           <DatePickerInput
-            label={t('From Date')}
-            placeholder={t('Select start date')}
+            placeholder={t('From')}
             value={dateFrom}
             onChange={setDateFrom}
             clearable
           />
         </Grid.Col>
 
-        <Grid.Col span={4}>
+        <Grid.Col span={{ base: 6, md: 1.8 }}>
           <DatePickerInput
-            label={t('To Date')}
-            placeholder={t('Select end date')}
+            placeholder={t('To')}
             value={dateTo}
             onChange={setDateTo}
             clearable
           />
+        </Grid.Col>
+
+        <Grid.Col span={{ base: 6, md: 2.4 }}>
+          {/* Reserved for future filters */}
         </Grid.Col>
       </Grid>
 

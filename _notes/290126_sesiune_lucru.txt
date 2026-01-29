@@ -22,141 +22,196 @@ Failed to connect to InvenTree: Unexpected error: InvenTree server error (status
 
 ---
 
+### Task 2: Filtre pe aceeași linie în Procurement ✅
+
+**Cerință:** Filtrele din lista de comenzi să fie pe aceeași linie:
+- Căutare: 30%
+- Stare: 20%
+- From Date: 15%
+- To Date: 15%
+- Spațiu rezervat: 20%
+
+**Implementare:**
+- Modificat Grid layout cu `span={{ base: 12, md: X }}`
+- Eliminat label-urile pentru a economisi spațiu
+- Folosit `align="flex-end"` pentru aliniere
+
+**Fișiere modificate:**
+- `src/frontend/src/pages/ProcurementPage.tsx`
+
+---
+
+### Task 3: Fix buton "Receive Stock" care nu apărea ✅
+
+**Problemă:** La comanda cu starea "Issued", butonul "Receive Stock" nu apărea deși tab-ul era vizibil.
+
+**Cauză:** `canModify` era trimis ca `isEditable` care era `false` pentru comenzi semnate (ISSUED). Logica era greșită - când comanda este ISSUED ar trebui să poți primi stock, dar nu să editezi detaliile.
+
+**Soluție:** Setat `canModify={true}` pentru ReceivedStockTab - logica de blocare este deja în componentă bazată pe `orderStateId` (FINISHED/CANCELLED).
+
+**Fișiere modificate:**
+- `src/frontend/src/pages/ProcurementDetailPage.tsx`
+
+---
+
+### Task 4: Validare cantitate zero sau negativă la Receive Stock ✅
+
+**Cerință:** Să nu fie posibilă primirea de stock cu cantitate zero sau negativă, cu alert modal de informare.
+
+**Implementare:**
+- Adăugat validare `formData.quantity <= 0` în `handleReceiveStock()`
+- Afișare modal informativ cu `modals.open()`
+
+**Fișiere modificate:**
+- `src/frontend/src/components/Procurement/ReceivedStockTab.tsx`
+
+---
+
+### Task 5: Fix document download - 404 Not Found ✅
+
+**Problemă:** La deschiderea documentului `/api/documents/697bc1f01080fe39bc3f1ba8/download` apărea "Document not ready. Status: queued", deși în baza de date status era "done".
+
+**Cauză:** Endpoint-ul căuta după `job_id` dar URL-ul conținea `_id` al documentului din MongoDB.
+
+**Soluție:**
+1. Modificat endpoint-ul să caute mai întâi după `_id` (ObjectId), apoi după `job_id`
+2. Adăugat debug logging când `app.debug` este `true` în config
+3. Adăugat parametru `debug` în `download_document()` din DataFlowsDocuClient
+
+**Fișiere modificate:**
+- `src/backend/routes/documents.py`
+- `src/backend/utils/dataflows_docu.py`
+
+---
+
 ## Detalii Tehnice
 
-### auth.py - verify_admin() 
+### ProcurementPage - Filtre Layout
 
-**Înainte:**
-```python
-async def verify_admin(authorization: Optional[str] = Header(None)):
-    """
-    Dependency to verify user is administrator
-    Also updates staff status from InvenTree if needed
-    """
-    user = await verify_token(authorization)
-    
-    # Check if we need to refresh staff status
-    # Refresh if last update was more than 5 minutes ago or if is_staff is False
-    should_refresh = False
-    if not user.get('is_staff', False):
-        should_refresh = True
-    elif 'updated_at' in user:
-        from datetime import timedelta
-        last_update = user['updated_at']
-        if datetime.utcnow() - last_update > timedelta(minutes=5):
-            should_refresh = True
-    
-    if should_refresh:
-        print(f"Refreshing staff status for user {user['username']}")
-        staff_status = get_user_staff_status(user['token'])  # ❌ APEL INVENTREE
-        # ...
+```tsx
+<Grid mb="md" align="flex-end">
+  <Grid.Col span={{ base: 12, md: 3.6 }}>  {/* Search - 30% */}
+  <Grid.Col span={{ base: 6, md: 2.4 }}>   {/* Status - 20% */}
+  <Grid.Col span={{ base: 6, md: 1.8 }}>   {/* From - 15% */}
+  <Grid.Col span={{ base: 6, md: 1.8 }}>   {/* To - 15% */}
+  <Grid.Col span={{ base: 6, md: 2.4 }}>   {/* Reserved - 20% */}
+</Grid>
 ```
 
-**După:**
-```python
-async def verify_admin(authorization: Optional[str] = Header(None)):
-    """
-    Dependency to verify user is administrator
-    Staff status is determined from local database only (no InvenTree calls)
-    """
-    user = await verify_token(authorization)
-    
-    if not user.get('is_staff', False):
-        print(f"Access denied for user {user['username']}: is_staff={user.get('is_staff')}")
-        raise HTTPException(status_code=403, detail="Administrator access required")
-    
-    return user
-```
+### ReceivedStockTab - Validare cantitate
 
-### auth.py - refresh_status()
-
-**Înainte:**
-```python
-@router.post("/refresh-status")
-async def refresh_status(user = Depends(verify_token)):
-    """
-    Refresh user's staff status from InvenTree
-    """
-    staff_status = get_user_staff_status(user['token'])  # ❌ APEL INVENTREE ÎNTOTDEAUNA
-    # ...
-```
-
-**După:**
-```python
-@router.post("/refresh-status")
-async def refresh_status(user = Depends(verify_token)):
-    """
-    Refresh user's staff status from InvenTree (only works when identity_server is 'inventree')
-    For localhost mode, staff status is managed locally in the database
-    """
-    config = load_config()
-    identity_server = config.get('identity_server', 'inventree')
-    
-    if identity_server == 'localhost':
-        # For localhost mode, just return current status from database
-        return {
-            'username': user['username'],
-            'is_staff': user.get('is_staff', False),
-            'message': 'Staff status is managed locally (localhost mode)'
-        }
-    
-    # InvenTree mode - refresh from InvenTree
-    staff_status = get_user_staff_status(user['token'])
-    # ...
-```
-
-### LoginPage.tsx - Mesaj eroare
-
-**Înainte:**
 ```typescript
-let errorMessage = t('Invalid InvenTree credentials. Please check your username and password.');
+if (formData.quantity <= 0) {
+  modals.open({
+    title: t('Invalid Quantity'),
+    children: (
+      <Text size="sm">
+        {t('Quantity must be greater than zero. Please enter a valid quantity.')}
+      </Text>
+    ),
+  });
+  return;
+}
 ```
 
-**După:**
-```typescript
-let errorMessage = t('Invalid credentials. Please check your username and password.');
+### Documents - Căutare după _id sau job_id
+
+```python
+# First try to find by _id (MongoDB ObjectId)
+try:
+    obj_id = ObjectId(doc_id)
+    for coll_name in collections:
+        doc = db[coll_name].find_one({'_id': obj_id})
+        if doc:
+            break
+except:
+    pass
+
+# If not found by _id, try by job_id
+if not doc:
+    for coll_name in collections:
+        doc = db[coll_name].find_one({'job_id': doc_id})
+        if doc:
+            break
 ```
-
----
-
-## Configurație
-
-**config.yaml:**
-```yaml
-identity_server: "localhost"  # Autentificare locală, fără InvenTree
-```
-
-Când `identity_server` este setat la `localhost`:
-- Login folosește autentificarea locală (JWT tokens)
-- Staff status este gestionat local în baza de date MongoDB
-- Nu se fac apeluri către InvenTree
-
-Când `identity_server` este setat la `inventree`:
-- Login folosește autentificarea InvenTree
-- Staff status poate fi sincronizat de la InvenTree
-- Tokenurile sunt stocate în MongoDB pentru verificare
-
----
-
-## Verificări efectuate
-
-1. ✅ `src/backend/routes/auth.py` - Toate apelurile InvenTree sunt condiționate
-2. ✅ `src/frontend/src/pages/LoginPage.tsx` - Mesaj de eroare generic
-3. ✅ `modules/` - Nu există apeluri directe la InvenTree (doar în teste)
-4. ✅ `config/config.yaml` - `identity_server: "localhost"` confirmat
 
 ---
 
 ## Status
 
-**Progres:** 100% (1/1 task-uri) ✅
+**Progres:** 100% (5/5 task-uri) ✅
 **Build Status:** ⏳ Pending test
 **Git Status:** ⏳ Uncommitted changes
 
 ---
 
+### Task 6: Receive Stock - Eliminare Supplier UM și logică lotallexp ✅
+
+**Cerințe:**
+1. Eliminare select "Supplier U.M." - UM-ul să fie afișat în label-ul de la "Received Quantity"
+2. Dacă articolul are `lotallexp == false` sau lipsește:
+   - Stock intră direct în stoc (state_id = `694321db8728e4d75ae72789` = OK)
+   - Checkbox-ul "Transferable" nu mai apare
+
+**Implementare Frontend:**
+- Modificat `ReceiveStockForm.tsx`:
+  - Eliminat coloana cu selectul "Supplier U.M."
+  - Adăugat `manufacturerUm` în label-ul de la "Received Quantity" și "Expected Quantity"
+  - Checkbox "Transferable" apare doar dacă `articleLotallexp === true`
+  - Layout modificat: 2 coloane (50%/50%) în loc de 3
+
+- Modificat `ReceivedStockTab.tsx`:
+  - Adăugat `manufacturer_um` și `lotallexp` în interfața `PurchaseOrderItem.part_detail`
+  - Trimis noile props către `ReceiveStockForm`
+
+**Implementare Backend:**
+- Modificat `services/order_items.py`:
+  - `get_order_items()` returnează acum `manufacturer_um` și `lotallexp` în `part_detail`
+  - `manufacturer_um` este preluat din `depo_ums` folosind `manufacturer_um_id`
+
+- Modificat `services/stock_receiving.py`:
+  - Logica de determinare a stării stock-ului folosește acum `lotallexp` în loc de `regulated`
+  - Dacă `lotallexp == false` → stock intră direct în OK (nu în carantină)
+  - Dacă `lotallexp == true` și `transferable == true` → Quarantine (transactionable)
+  - Dacă `lotallexp == true` și `transferable == false` → Quarantined
+
+**Fișiere modificate:**
+- `src/frontend/src/components/Common/ReceiveStockForm.tsx`
+- `src/frontend/src/components/Procurement/ReceivedStockTab.tsx`
+- `modules/depo_procurement/services/order_items.py`
+- `modules/depo_procurement/services/stock_receiving.py`
+
+---
+
+---
+
+### Task 7: Blocare semnare după atingerea numărului minim de semnături ✅
+
+**Cerință:** Dacă comanda de procurement e deja semnată de numărul necesar de semnaturi, să nu mai apară posibilitatea să o mai semneze un utilizator. Doar dacă e ștearsă semnătura curentă să se poată semna iar.
+
+**Implementare:**
+- Modificat funcția `canUserSign()` din `DetailsTab.tsx`:
+  - Verifică dacă `currentSignatures >= minSignatures`
+  - Dacă da, returnează `false` (nu mai permite semnare)
+  - Butonul "Sign Order" dispare automat când condiția nu este îndeplinită
+
+- Adăugat `min_signatures` în interfața `ApprovalFlow`
+
+**Logică:**
+1. Utilizatorul nu poate semna dacă a semnat deja
+2. Utilizatorul nu poate semna dacă numărul minim de semnături a fost atins
+3. Când un admin șterge o semnătură, butonul de semnare reapare (dacă utilizatorul este autorizat)
+
+**Fișiere modificate:**
+- `src/frontend/src/components/Procurement/DetailsTab.tsx`
+
+---
+
 ## Observații
 
-- Platforma este acum complet decuplată de InvenTree când `identity_server` este `localhost`
-- Funcționalitatea InvenTree rămâne disponibilă pentru proiecte care o necesită
-- Codul este backward-compatible - nu sunt breaking changes
+- Logica pentru `canModify` în ReceivedStockTab este separată de `canEdit` pentru detalii comandă
+- Debug mode pentru documente se activează cu `app.debug: true` în config.yaml
+- Endpoint-ul de download acceptă acum atât `_id` cât și `job_id`
+- Platforma este complet decuplată de InvenTree când `identity_server` este `localhost`
+- Stock-ul pentru articole fără `lotallexp` intră direct în starea OK (nu în carantină)
+- Butonul de semnare dispare automat când numărul minim de semnături este atins

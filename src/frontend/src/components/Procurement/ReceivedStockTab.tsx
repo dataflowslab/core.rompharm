@@ -55,6 +55,8 @@ interface PurchaseOrderItem {
     name: string;
     ipn: string;
     um?: string;
+    manufacturer_um?: string;
+    lotallexp?: boolean;
   };
   quantity: number;
   received: number;
@@ -241,15 +243,16 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
             color: 'green'
           });
 
-          await loadApprovalFlow();
-          onReload();
+          // Refresh page to update order state and UI
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
         } catch (error: any) {
           notifications.show({
             title: t('Error'),
             message: error.response?.data?.detail || t('Failed to sign received stock'),
             color: 'red'
           });
-        } finally {
           setSigning(false);
         }
       }
@@ -371,6 +374,20 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
         title: t('Error'),
         message: t('Please fill in all required fields'),
         color: 'red'
+      });
+      return;
+    }
+
+    // Validate quantity is positive
+    if (formData.quantity <= 0) {
+      modals.open({
+        title: t('Invalid Quantity'),
+        children: (
+          <Text size="sm">
+            {t('Quantity must be greater than zero. Please enter a valid quantity.')}
+          </Text>
+        ),
+        labels: { confirm: t('OK'), cancel: t('Cancel') },
       });
       return;
     }
@@ -712,7 +729,8 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
             id: supplierId,
             name: supplierName
           } : undefined}
-          articleUm={selectedItem?.part_detail?.um}
+          manufacturerUm={selectedItem?.part_detail?.manufacturer_um}
+          articleLotallexp={selectedItem?.part_detail?.lotallexp ?? false}
         />
 
         <Group justify="flex-end" mt="md">

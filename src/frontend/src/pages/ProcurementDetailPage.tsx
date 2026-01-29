@@ -366,7 +366,7 @@ export function ProcurementDetailPage() {
             supplierName={order.supplier_detail?.name}
             supplierId={order.supplier_id}
             orderStateId={order.state_id}
-            canModify={isEditable}
+            canModify={true}
           />
         </Tabs.Panel>
 

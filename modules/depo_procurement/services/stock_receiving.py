@@ -39,17 +39,19 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         if not item:
             raise HTTPException(status_code=404, detail=f"Item with part_id {stock_data.part_id} not found in order")
         
-        # Get part details to check if regulated
+        # Get part details to check lotallexp flag
         part = db['depo_parts'].find_one({'_id': ObjectId(item['part_id'])})
         if not part:
             raise HTTPException(status_code=404, detail="Part not found")
         
-        # Determine status based on part.regulated and transferable flag
-        is_regulated = part.get('regulated', False)
+        # Determine status based on part.lotallexp and transferable flag
+        # lotallexp = true means article requires lot/batch tracking with expiry -> goes to quarantine
+        # lotallexp = false or missing means article goes directly to OK status
+        has_lotallexp = part.get('lotallexp', False)
         is_transferable = getattr(stock_data, 'transferable', False)
         
-        if is_regulated:
-            # Regulated parts go directly to OK status
+        if not has_lotallexp:
+            # Articles without lotallexp go directly to OK status (no quarantine)
             state = states_collection.find_one({'_id': ObjectId('694321db8728e4d75ae72789')})
             if not state:
                 state = states_collection.find_one({'name': 'OK'})
@@ -172,7 +174,6 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         raise HTTPException(status_code=500, detail=f"Failed to receive stock: {str(e)}")
 
 
-
 async def get_received_stock_items(order_id: str):
     """Get received stock items for a purchase order with System UM and converted quantities"""
     db = get_db()
@@ -243,4 +244,3 @@ async def get_received_stock_items(order_id: str):
         return serialize_doc(stocks)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch received items: {str(e)}")
-
