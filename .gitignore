@@ -63,3 +63,6 @@ htmlcov/
 
 # Utils folder (local scripts only, not for git)
 utils/
+
+# Old/duplicate project folder
+core-main/

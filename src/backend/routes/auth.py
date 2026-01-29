@@ -238,40 +238,9 @@ def _normalize_user_data(user: dict) -> dict:
 async def verify_admin(authorization: Optional[str] = Header(None)):
     """
     Dependency to verify user is administrator
-    Also updates staff status from InvenTree if needed
+    Staff status is determined from local database only (no InvenTree calls)
     """
     user = await verify_token(authorization)
-    
-    # Check if we need to refresh staff status
-    # Refresh if last update was more than 5 minutes ago or if is_staff is False
-    should_refresh = False
-    if not user.get('is_staff', False):
-        should_refresh = True
-    elif 'updated_at' in user:
-        from datetime import timedelta
-        last_update = user['updated_at']
-        if datetime.utcnow() - last_update > timedelta(minutes=5):
-            should_refresh = True
-    
-    if should_refresh:
-        print(f"Refreshing staff status for user {user['username']}")
-        staff_status = get_user_staff_status(user['token'])
-        
-        if staff_status is not None:
-            # Update user in database
-            db = get_db()
-            users_collection = db['users']
-            users_collection.update_one(
-                {'token': user['token']},
-                {
-                    '$set': {
-                        'is_staff': staff_status,
-                        'updated_at': datetime.utcnow()
-                    }
-                }
-            )
-            user['is_staff'] = staff_status
-            print(f"Updated staff status to: {staff_status}")
     
     if not user.get('is_staff', False):
         print(f"Access denied for user {user['username']}: is_staff={user.get('is_staff')}")
@@ -311,8 +280,21 @@ async def get_current_user(user = Depends(verify_token)):
 @router.post("/refresh-status")
 async def refresh_status(user = Depends(verify_token)):
     """
-    Refresh user's staff status from InvenTree
+    Refresh user's staff status from InvenTree (only works when identity_server is 'inventree')
+    For localhost mode, staff status is managed locally in the database
     """
+    config = load_config()
+    identity_server = config.get('identity_server', 'inventree')
+    
+    if identity_server == 'localhost':
+        # For localhost mode, just return current status from database
+        return {
+            'username': user['username'],
+            'is_staff': user.get('is_staff', False),
+            'message': 'Staff status is managed locally (localhost mode)'
+        }
+    
+    # InvenTree mode - refresh from InvenTree
     staff_status = get_user_staff_status(user['token'])
     
     if staff_status is None:

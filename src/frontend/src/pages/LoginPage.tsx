@@ -36,7 +36,7 @@ export function LoginPage() {
     } catch (err: any) {
       console.error('Login error:', err);
       
-      let errorMessage = t('Invalid InvenTree credentials. Please check your username and password.');
+      let errorMessage = t('Invalid credentials. Please check your username and password.');
       
       if (err.response) {
         errorMessage = err.response.data?.detail || err.response.data?.message || `${t('Error')}: ${err.response.status}`;
