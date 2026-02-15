@@ -164,12 +164,28 @@ def download_document(
             raise HTTPException(status_code=500, detail="Failed to decode document")
     else:
         print(f"[DOCUMENT] No cache, downloading from service...")
-        
-        if doc.get('status') not in ['done', 'completed']:
-            print(f"[DOCUMENT] ERROR: Document not ready, status={doc.get('status')}")
-            raise HTTPException(status_code=400, detail=f"Document not ready. Status: {doc.get('status')}")
-        
+
         client = DataFlowsDocuClient()
+        if doc.get('status') not in ['done', 'completed']:
+            job_status = client.get_job_status(job_id)
+            if not job_status:
+                print(f"[DOCUMENT] ERROR: Job status not found for job_id={job_id}")
+                raise HTTPException(status_code=404, detail="Job not found")
+
+            current_status = job_status.get('status')
+            if current_status in ['done', 'completed']:
+                coll.update_one(
+                    {'job_id': job_id},
+                    {'$set': {
+                        'status': current_status,
+                        'updated_at': datetime.utcnow(),
+                        'error': job_status.get('error')
+                    }}
+                )
+            else:
+                print(f"[DOCUMENT] ERROR: Document not ready, status={current_status}")
+                raise HTTPException(status_code=400, detail=f"Document not ready. Status: {current_status}")
+
         document_bytes = client.download_document(job_id, debug=debug_mode)
         
         if not document_bytes:
@@ -338,18 +354,87 @@ def _generate_procurement_order_document(db, order_obj_id, request, user):
         elif isinstance(content, dict):
             company_info = content
     
-    # Get line items with part details
-    line_items = purchase_order.get('items', [])
-    for item in line_items:
-        if item.get('part_id'):
-            part = db['depo_parts'].find_one({'_id': ObjectId(item['part_id'])})
-            if part:
-                item['part_detail'] = {
-                    'name': part.get('name'),
-                    'ipn': part.get('ipn'),
-                    'um': part.get('um'),
-                    'description': part.get('description', '')
-                }
+    def format_date(value):
+        if isinstance(value, datetime):
+            return value.strftime('%Y-%m-%d')
+        if value is None:
+            return ''
+        return str(value)
+
+    def resolve_supplier_contact(supplier_doc):
+        if not supplier_doc:
+            return ''
+        contact = supplier_doc.get('contact') or supplier_doc.get('contact_person')
+        if contact:
+            return contact
+        contacts = supplier_doc.get('contacts') or []
+        if contacts and isinstance(contacts, list):
+            first = contacts[0]
+            if isinstance(first, dict):
+                return first.get('name') or first.get('full_name') or first.get('email') or ''
+        return ''
+
+    def resolve_manufacturer_name(part_doc):
+        if not part_doc:
+            return ''
+        manufacturer_name = part_doc.get('manufacturer_name')
+        if manufacturer_name:
+            return manufacturer_name
+        manufacturer_id = part_doc.get('manufacturer_id')
+        if manufacturer_id:
+            try:
+                manufacturer_doc = db['depo_companies'].find_one({'_id': ObjectId(manufacturer_id)})
+                if manufacturer_doc:
+                    return manufacturer_doc.get('name', '')
+            except Exception:
+                pass
+        return ''
+
+    # Build line items for template
+    raw_items = purchase_order.get('items', [])
+    line_items = []
+    for item in raw_items:
+        part_doc = None
+        part_id = item.get('part_id')
+        if part_id:
+            try:
+                part_doc = db['depo_parts'].find_one({'_id': ObjectId(part_id)})
+            except Exception:
+                part_doc = None
+
+        part_name = (
+            item.get('part_name')
+            or (item.get('part_detail') or {}).get('name')
+            or (part_doc.get('name') if part_doc else '')
+        )
+        part_ipn = (
+            item.get('part_IPN')
+            or item.get('part_ipn')
+            or (item.get('part_detail') or {}).get('ipn')
+            or (part_doc.get('ipn') if part_doc else '')
+        )
+        unit = (
+            item.get('unit')
+            or item.get('um')
+            or (item.get('part_detail') or {}).get('um')
+            or (part_doc.get('um') if part_doc else '')
+        )
+        price = item.get('price')
+        if price is None:
+            price = item.get('purchase_price')
+        manufacturer = (
+            item.get('manufacturer')
+            or resolve_manufacturer_name(part_doc)
+        )
+
+        line_items.append({
+            'part_name': part_name,
+            'part_IPN': part_ipn,
+            'manufacturer': manufacturer,
+            'quantity': item.get('quantity', ''),
+            'unit': unit,
+            'price': price if price is not None else ''
+        })
     
     # Generate QR code
     qr_string = f"{request.object_id}#{purchase_order.get('supplier_id', '')}#{purchase_order.get('issue_date', '')}"
@@ -384,13 +469,33 @@ def _generate_procurement_order_document(db, order_obj_id, request, user):
         'email': company_info.get('email', '')
     }
     
+    purchase_order_payload = {
+        'reference': purchase_order.get('reference', ''),
+        'issue_date': format_date(purchase_order.get('issue_date')),
+        'currency': purchase_order.get('currency', ''),
+        'delivery_terms': purchase_order.get('delivery_terms', purchase_order.get('delivery_term', '')),
+        'target_date': format_date(purchase_order.get('target_date', purchase_order.get('delivery_date'))),
+        'payment_terms': purchase_order.get('payment_terms', purchase_order.get('payment_conditions', '')),
+    }
+
+    supplier_payload = None
+    if supplier_detail:
+        supplier_payload = {
+            'name': supplier_detail.get('name', ''),
+            'contact': resolve_supplier_contact(supplier_detail)
+        }
+
+    user_payload = {
+        'name': user.get('name') or user.get('username', 'System')
+    }
+
     document_data = {
         'company': company_mapped,
-        'purchase_order': serialize(purchase_order),
-        'supplier': serialize(supplier_detail) if supplier_detail else None,
-        'line_items': serialize(line_items),
+        'purchase_order': purchase_order_payload,
+        'supplier': supplier_payload,
+        'line_items': line_items,
         'delivery_address': purchase_order.get('delivery_address', ''),
-        'user': {'name': user.get('username', 'System')},
+        'user': user_payload,
         'qr_code_svg': qr_svg,
         'qr_code_data': qr_string,
         'generated_at': datetime.utcnow().isoformat(),
@@ -448,6 +553,24 @@ def _generate_stock_request_document(db, request_obj_id, request, user):
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
     
+    def serialize(obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {k: serialize(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [serialize(item) for item in obj]
+        return obj
+
+    def format_date(value):
+        if isinstance(value, datetime):
+            return value.strftime('%Y-%m-%d')
+        if value is None:
+            return ''
+        return str(value)
+
     # Get location details from local database
     source_detail = None
     destination_detail = None
@@ -473,7 +596,11 @@ def _generate_stock_request_document(db, request_obj_id, request, user):
         
         if part_id:
             # Get part details from local database
-            depo_part = depo_parts_collection.find_one({'id': part_id})
+            try:
+                depo_part = depo_parts_collection.find_one({'_id': ObjectId(part_id)})
+            except Exception:
+                depo_part = depo_parts_collection.find_one({'id': part_id})
+
             if depo_part:
                 item_data['part_detail'] = {
                     'name': depo_part.get('name'),
@@ -498,28 +625,17 @@ def _generate_stock_request_document(db, request_obj_id, request, user):
     total_price = sum(float(item.get('purchase_price', 0)) * float(item.get('quantity', 0)) for item in items_with_details if item.get('purchase_price'))
     
     document_data = {
-        'data': {
-            'order': {
-                'reference': req.get('reference'),
-                'source': req.get('source'),
-                'destination': req.get('destination'),
-                'status': req.get('status'),
-                'notes': req.get('notes', ''),
-                'batch_codes': req.get('batch_codes', []),
-                'issue_date': req.get('issue_date').isoformat() if isinstance(req.get('issue_date'), datetime) else str(req.get('issue_date', '')),
-                'created_by': req.get('created_by'),
-                'created_at': req.get('created_at').isoformat() if isinstance(req.get('created_at'), datetime) else str(req.get('created_at', '')),
-                'total_price': round(total_price, 2),
-                'order_currency': 'RON'
-            },
-            'source_location': source_detail,
-            'destination_location': destination_detail,
-            'line_items': items_with_details,
-            'qr_code_svg': qr_svg,
-            'qr_code_data': qr_string,
-            'generated_at': datetime.utcnow().isoformat(),
-            'generated_by': user.get('username')
-        }
+        'order': {
+            'reference': req.get('reference', ''),
+            'issue_date': format_date(req.get('issue_date')),
+        },
+        'source_location': serialize(source_detail) if source_detail else None,
+        'destination_location': serialize(destination_detail) if destination_detail else None,
+        'line_items': serialize(items_with_details),
+        'qr_code_svg': qr_svg,
+        'qr_code_data': qr_string,
+        'generated_at': datetime.utcnow().isoformat(),
+        'generated_by': user.get('username')
     }
     
     client = DataFlowsDocuClient()

@@ -1,0 +1,1 @@
+﻿2026-02-15: Stock transfer document payload aligned to P-Distrib-102_F1 template. Removed extra data wrapper, ensured ObjectId serialization, added order.reference/issue_date, and normalized part lookup for part_detail.

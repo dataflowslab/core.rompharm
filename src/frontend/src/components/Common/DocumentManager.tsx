@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Paper, Stack, Group, Title, Text, Button, Badge, ActionIcon } from '@mantine/core';
+import { Paper, Stack, Group, Title, Text, Button, Badge, ActionIcon, Modal, Center, Loader } from '@mantine/core';
 import { IconFileTypePdf, IconDownload, IconRefresh } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
@@ -40,6 +40,7 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
   const [loadingDocs, setLoadingDocs] = useState<Record<string, boolean>>({});
   const [generatingDoc, setGeneratingDoc] = useState<string | null>(null);
   const [checkingStatus, setCheckingStatus] = useState<Record<string, boolean>>({});
+  const [waitingJobs, setWaitingJobs] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadDocuments();
@@ -78,11 +79,29 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
       }));
       
       // If done, try to download automatically
-      if (status.status === 'done' || status.has_document) {
+      if (status.status === 'done' || status.status === 'completed' || status.has_document) {
+        setWaitingJobs(prev => {
+          const updated = { ...prev };
+          delete updated[jobId];
+          return updated;
+        });
         await handleDownloadDocument(templateCode);
+      } else if (status.status === 'failed') {
+        setWaitingJobs(prev => {
+          const updated = { ...prev };
+          delete updated[jobId];
+          return updated;
+        });
+      } else {
+        setTimeout(() => checkDocumentStatus(templateCode, jobId), 2000);
       }
     } catch (error) {
       console.error('Failed to check status:', error);
+      setWaitingJobs(prev => {
+        const updated = { ...prev };
+        delete updated[jobId];
+        return updated;
+      });
     } finally {
       setCheckingStatus(prev => ({ ...prev, [templateCode]: false }));
     }
@@ -110,6 +129,7 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
       });
       
       const jobData = response.data;
+      setWaitingJobs(prev => ({ ...prev, [jobData.job_id]: true }));
       
       notifications.show({
         title: t('Success'),
@@ -134,10 +154,10 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
         }
       }));
       
-      // Check status immediately after 1 second
+      // Check status immediately after 2 seconds
       setTimeout(() => {
         checkDocumentStatus(template.code, jobData.job_id);
-      }, 1000);
+      }, 2000);
       
       if (onDocumentGenerated) {
         onDocumentGenerated();
@@ -205,8 +225,31 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
     }
   };
 
+  const isWaiting =
+    Object.keys(waitingJobs).length > 0 || generatingDoc !== null;
+
   return (
-    <Paper p="md" withBorder style={{ height: '100%' }}>
+    <>
+      <Modal
+        opened={isWaiting}
+        onClose={() => {}}
+        withCloseButton={false}
+        closeOnEscape={false}
+        closeOnClickOutside={false}
+        centered
+      >
+        <Center py="md">
+          <Stack gap="xs" align="center">
+            <Text fw={700}>Document engine working!</Text>
+            <Text size="xs" c="dimmed" ta="center">
+              Please don&apos;t close or refresh this page until it is done.
+            </Text>
+            <Loader size="md" mt="sm" />
+          </Stack>
+        </Center>
+      </Modal>
+
+      <Paper p="md" withBorder style={{ height: '100%' }}>
       <Stack gap="md">
         <Title order={5}>{t('Documents')}</Title>
 
@@ -291,6 +334,7 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
           })}
         </Stack>
       </Stack>
-    </Paper>
+      </Paper>
+    </>
   );
 }

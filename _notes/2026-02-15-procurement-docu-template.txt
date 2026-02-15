@@ -1,0 +1,1 @@
+﻿2026-02-15: Procurement document payload aligned to new template (company/purchase_order/supplier/line_items/delivery_address/user) and line_items normalized to part_name/part_IPN/manufacturer/quantity/unit/price. Added date formatting and supplier contact resolution.

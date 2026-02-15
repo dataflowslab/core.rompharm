@@ -1,0 +1,1 @@
+﻿2026-02-15: Document generation UI now shows blocking modal while jobs are processing. DocumentGenerator/DocumentManager poll job status every 2s and auto-download when done.

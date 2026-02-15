@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Button, Group, Stack, Badge, Text, ActionIcon } from '@mantine/core';
+import { Button, Group, Stack, Badge, Text, ActionIcon, Modal, Center, Loader } from '@mantine/core';
 import { IconFileTypePdf, IconDownload, IconRefresh, IconCheck, IconX } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
@@ -28,6 +28,7 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
   const [templates, setTemplates] = useState<Record<string, { code: string; name: string }>>({});
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   const [checking, setChecking] = useState<Record<string, boolean>>({});
+  const [waitingJobs, setWaitingJobs] = useState<Record<string, boolean>>({});
   const loadedRef = useRef<string | null>(null); // Track last loaded objectId
 
   useEffect(() => {
@@ -144,8 +145,11 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
         template_name: template.name
       });
 
+      const jobId = response.data.job_id;
+      setWaitingJobs(prev => ({ ...prev, [jobId]: true }));
+
       const newDoc: DocumentJob = {
-        job_id: response.data.job_id,
+        job_id: jobId,
         template_code: templateCode,
         template_name: template.name,
         status: response.data.status || 'queued',
@@ -168,7 +172,7 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
       });
 
       // Auto-check after 2 seconds
-      setTimeout(() => checkStatus(templateCode, response.data.job_id), 2000);
+      setTimeout(() => checkStatus(templateCode, jobId), 2000);
     } catch (error: any) {
       console.error('Failed to generate document:', error);
       notifications.show({
@@ -206,14 +210,29 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
         return updated;
       });
 
-      // If still processing, check again after 3 seconds
+      // If still processing, check again after 2 seconds
       if (status.status === 'processing' || status.status === 'queued') {
-        setTimeout(() => checkStatus(templateCode, jobId), 3000);
+        setTimeout(() => checkStatus(templateCode, jobId), 2000);
+      } else {
+        setWaitingJobs(prev => {
+          const updated = { ...prev };
+          delete updated[jobId];
+          return updated;
+        });
+
+        if (status.status === 'done' || status.status === 'completed') {
+          setTimeout(() => downloadDocument(templateCode), 0);
+        }
       }
       
       return status.status;
     } catch (error) {
       console.error('Failed to check status:', error);
+      setWaitingJobs(prev => {
+        const updated = { ...prev };
+        delete updated[jobId];
+        return updated;
+      });
       return null;
     } finally {
       setChecking(prev => ({ ...prev, [templateCode]: false }));
@@ -331,8 +350,31 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
     );
   };
 
+  const isWaiting =
+    Object.keys(waitingJobs).length > 0 || Object.values(generating).some(Boolean);
+
   return (
-    <Stack gap="xs">
+    <>
+      <Modal
+        opened={isWaiting}
+        onClose={() => {}}
+        withCloseButton={false}
+        closeOnEscape={false}
+        closeOnClickOutside={false}
+        centered
+      >
+        <Center py="md">
+          <Stack gap="xs" align="center">
+            <Text fw={700}>Document engine working!</Text>
+            <Text size="xs" c="dimmed" ta="center">
+              Please don&apos;t close or refresh this page until it is done.
+            </Text>
+            <Loader size="md" mt="sm" />
+          </Stack>
+        </Center>
+      </Modal>
+
+      <Stack gap="xs">
       {templateCodes.map(templateCode => {
         const template = templates[templateCode];
         const doc = documents[templateCode];
@@ -408,6 +450,7 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
           </Stack>
         );
       })}
-    </Stack>
+      </Stack>
+    </>
   );
 }

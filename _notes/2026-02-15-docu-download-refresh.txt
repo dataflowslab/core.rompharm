@@ -1,0 +1,1 @@
+﻿2026-02-15: Document download now refreshes job status from Docu if DB status is stale (queued/processing). Updates status then downloads, preventing false "Document not ready" errors.
