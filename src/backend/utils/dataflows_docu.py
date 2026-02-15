@@ -80,7 +80,8 @@ class DataFlowsDocuClient:
         template_code: str,
         data: Dict[str, Any],
         format: str = "pdf",
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Create a document generation job
@@ -103,6 +104,8 @@ class DataFlowsDocuClient:
             
             if filename:
                 payload['filename'] = filename
+            if options:
+                payload['options'] = options
             
             response = requests.post(
                 f"{self.base_url}/jobs",
@@ -125,7 +128,8 @@ class DataFlowsDocuClient:
         template_code: str,
         data: Dict[str, Any],
         format: str = "pdf",
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None
     ) -> Optional[bytes]:
         """
         Create a document generation job and wait for completion (realtime)
@@ -148,6 +152,8 @@ class DataFlowsDocuClient:
             
             if filename:
                 payload['filename'] = filename
+            if options:
+                payload['options'] = options
             
             response = requests.post(
                 f"{self.base_url}/jobs/realtime",

@@ -7,11 +7,11 @@ from typing import Optional, Dict, Any, List
 from bson import ObjectId
 from datetime import datetime
 
-from ..utils.db import get_db
-from ..utils.dataflows_docu import DataFlowsDocuClient
-from ..models.template_model import TemplateModel
-from ..routes.auth import verify_admin
-from ..utils.audit import log_action
+from src.backend.utils.db import get_db
+from src.backend.utils.dataflows_docu import DataFlowsDocuClient
+from src.backend.models.template_model import TemplateModel
+from src.backend.routes.auth import verify_admin
+from src.backend.utils.audit import log_action
 
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
@@ -46,7 +46,7 @@ class TemplateUpdate(BaseModel):
 
 
 @router.get("/")
-async def list_templates(user = Depends(verify_admin)):
+def list_templates(user = Depends(verify_admin)):
     """
     List all templates from DataFlows Docu
     """
@@ -95,7 +95,7 @@ async def list_templates(user = Depends(verify_admin)):
 
 
 @router.post("/")
-async def create_template(
+def create_template(
     template_data: TemplateCreate,
     request: Request,
     user = Depends(verify_admin)
@@ -177,7 +177,7 @@ async def create_template(
 
 
 @router.get("/{template_code}")
-async def get_template(template_code: str, user = Depends(verify_admin)):
+def get_template(template_code: str, user = Depends(verify_admin)):
     """
     Get template bundle with all parts from OfficeClerk
     """
@@ -211,7 +211,7 @@ async def get_template(template_code: str, user = Depends(verify_admin)):
 
 
 @router.put("/{template_code}")
-async def update_template(
+def update_template(
     template_code: str,
     template_data: TemplateUpdate,
     request: Request,
@@ -267,7 +267,7 @@ async def update_template(
 
 
 @router.delete("/{template_code}")
-async def delete_template(
+def delete_template(
     template_code: str,
     request: Request,
     user = Depends(verify_admin)
@@ -318,7 +318,7 @@ async def delete_template(
 
 
 @router.post("/{template_code}/parts")
-async def add_template_part(
+def add_template_part(
     template_code: str,
     part_data: TemplatePartCreate,
     request: Request,
@@ -389,7 +389,7 @@ async def add_template_part(
 
 
 @router.get("/{template_code}/{part_type}")
-async def get_template_part(
+def get_template_part(
     template_code: str,
     part_type: str,
     user = Depends(verify_admin)
@@ -427,7 +427,7 @@ async def get_template_part(
 
 
 @router.get("/{template_code}/{part_type}/raw")
-async def get_template_part_content(
+def get_template_part_content(
     template_code: str,
     part_type: str,
     user = Depends(verify_admin)
@@ -468,7 +468,7 @@ async def get_template_part_content(
 
 
 @router.put("/{template_code}/{part_type}")
-async def update_template_part(
+def update_template_part(
     template_code: str,
     part_type: str,
     part_data: TemplatePartUpdate,
@@ -537,7 +537,7 @@ async def update_template_part(
 
 
 @router.delete("/{template_code}/{part_type}")
-async def delete_template_part(
+def delete_template_part(
     template_code: str,
     part_type: str,
     request: Request,

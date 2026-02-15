@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Table, Select, NumberInput, Text, Paper, Title, Loader, ActionIcon, Group } from '@mantine/core';
+import { Table, NumberInput, Text, Paper, Title, Loader, ActionIcon, Group } from '@mantine/core';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
+import { SafeSelect } from '../Common/SafeSelect';
 
 interface Batch {
   batch_code: string;
@@ -145,7 +146,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
   const handleAlternativeChange = (componentIndex: number, alternativeIndex: number) => {
     const updated = [...components];
     const component = updated[componentIndex];
-    
+
     // Flush batch allocations when changing alternative
     if (component.alternatives) {
       component.alternatives.forEach(alt => {
@@ -153,7 +154,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
         alt.requested_quantity = alt.batches && alt.batches.length > 0 ? 0 : alt.required_quantity;
       });
     }
-    
+
     component.selected_alternative = alternativeIndex;
     setComponents(updated);
     onComponentsChange(updated);
@@ -167,7 +168,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     alternativeIndex?: number
   ) => {
     const updated = [...components];
-    const component = alternativeIndex !== undefined 
+    const component = alternativeIndex !== undefined
       ? updated[componentIndex].alternatives![alternativeIndex]
       : updated[componentIndex];
 
@@ -205,7 +206,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     alternativeIndex?: number
   ) => {
     const updated = [...components];
-    const component = alternativeIndex !== undefined 
+    const component = alternativeIndex !== undefined
       ? updated[componentIndex].alternatives![alternativeIndex]
       : updated[componentIndex];
 
@@ -243,7 +244,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
       const allocatedQty = allocation?.quantity || 0;
 
       return (
-        <Table.Tr 
+        <Table.Tr
           key={`batch-${componentIndex}-${alternativeIndex}-${batchIndex}`}
           style={{ backgroundColor: '#fafafa' }}
         >
@@ -288,7 +289,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
 
     // Main row
     rows.push(
-      <Table.Tr 
+      <Table.Tr
         key={`comp-${componentIndex}`}
         style={{ cursor: hasBatches ? 'pointer' : 'default' }}
         onClick={() => hasBatches && toggleRow(componentIndex)}
@@ -320,8 +321,8 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
         </Table.Td>
         <Table.Td onClick={(e) => e.stopPropagation()}>
           {hasBatches ? (
-            <Text 
-              size="sm" 
+            <Text
+              size="sm"
               fw={isFullyAllocated ? 700 : 400}
               c={isFullyAllocated ? 'green' : 'dimmed'}
             >
@@ -342,7 +343,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
 
     // Batch rows (if expanded)
     if (hasBatches && isExpanded) {
-      rows.push(...renderBatchRows(component, componentIndex));
+      rows.push(...(renderBatchRows(component, componentIndex) || []));
     }
 
     return rows;
@@ -362,7 +363,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
 
     // Main row with alternative selector
     rows.push(
-      <Table.Tr 
+      <Table.Tr
         key={`alt-${componentIndex}`}
         style={{ cursor: hasBatches ? 'pointer' : 'default' }}
         onClick={() => hasBatches && toggleRow(componentIndex)}
@@ -374,7 +375,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
                 {isExpanded ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
               </ActionIcon>
             )}
-            <Select
+            <SafeSelect
               data={component.alternatives.map((alt, idx) => ({
                 value: String(idx),
                 label: `${idx + 1}. ${alt.name} (${alt.IPN})`
@@ -383,8 +384,9 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
               onChange={(value) => handleAlternativeChange(componentIndex, parseInt(value || '0'))}
               size="xs"
               style={{ width: '300px' }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: any) => e.stopPropagation()}
               comboboxProps={{ withinPortal: false }}
+              allowDeselect={false}
             />
           </Group>
         </Table.Td>
@@ -402,8 +404,8 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
         </Table.Td>
         <Table.Td onClick={(e) => e.stopPropagation()}>
           {hasBatches ? (
-            <Text 
-              size="sm" 
+            <Text
+              size="sm"
               fw={isFullyAllocated ? 700 : 400}
               c={isFullyAllocated ? 'green' : 'dimmed'}
             >
@@ -414,8 +416,8 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
               size="xs"
               value={requestedQty}
               onChange={(val) => handleRequestedQuantityChange(
-                componentIndex, 
-                Number(val) || 0, 
+                componentIndex,
+                Number(val) || 0,
                 component.selected_alternative || 0
               )}
               min={0}
@@ -428,7 +430,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
 
     // Batch rows (if expanded)
     if (hasBatches && isExpanded) {
-      rows.push(...renderBatchRows(selectedAlt, componentIndex, component.selected_alternative || 0));
+      rows.push(...(renderBatchRows(selectedAlt, componentIndex, component.selected_alternative || 0) || []));
     }
 
     return rows;
@@ -452,7 +454,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
   return (
     <Paper p="md" withBorder>
       <Title order={5} mb="md">{t('Components & Batch Selection')}</Title>
-      
+
       <Table striped withTableBorder highlightOnHover>
         <Table.Thead>
           <Table.Tr>

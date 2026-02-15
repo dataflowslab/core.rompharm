@@ -25,11 +25,13 @@ import {
   ActionIcon,
   Textarea,
 } from '@mantine/core';
-import { IconPlus, IconEdit, IconTrash, IconSearch, IconList } from '@tabler/icons-react';
+import { IconPlus, IconEdit, IconTrash, IconSearch, IconList, IconPrinter } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
+import { Checkbox } from '@mantine/core';
+import { PrintLabelsModal } from '../components/Common/PrintLabelsModal';
 
 interface Location {
   _id: string;
@@ -60,7 +62,9 @@ export function LocationsPage() {
   const [modalOpened, setModalOpened] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -272,10 +276,10 @@ export function LocationsPage() {
   // Filter and build tree
   const filteredLocations = useMemo(() => {
     let filtered = locations;
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = locations.filter(loc => 
+      filtered = locations.filter(loc =>
         loc.name.toLowerCase().includes(query) ||
         loc.code?.toLowerCase().includes(query) ||
         loc.description?.toLowerCase().includes(query)
@@ -288,11 +292,11 @@ export function LocationsPage() {
   // Get parent options (exclude self and descendants when editing)
   const parentOptions = useMemo(() => {
     let available = locations;
-    
+
     if (editingLocation) {
       // Exclude self
       available = available.filter(c => c._id !== editingLocation._id);
-      
+
       // Exclude descendants
       const descendants = new Set<string>();
       const findDescendants = (parentId: string) => {
@@ -313,14 +317,58 @@ export function LocationsPage() {
     ];
   }, [locations, editingLocation, t]);
 
+  const toggleAll = () => {
+    if (selectedLocations.length === filteredLocations.length) {
+      setSelectedLocations([]);
+    } else {
+      setSelectedLocations(filteredLocations.map((l) => l._id));
+    }
+  };
+
+  const toggleLocation = (id: string) => {
+    if (selectedLocations.includes(id)) {
+      setSelectedLocations(selectedLocations.filter((l) => l !== id));
+    } else {
+      setSelectedLocations([...selectedLocations, id]);
+    }
+  };
+
+  const getSelectedItems = () => {
+    return locations
+      .filter((l) => selectedLocations.includes(l._id))
+      .map((l) => ({
+        id: l._id,
+        name: l.name,
+        code: l.code
+      }));
+  };
+
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
         <Title order={2}>{t('Locations')}</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={handleCreate}>
-          {t('New Location')}
-        </Button>
+        <Group>
+          {selectedLocations.length > 0 && (
+            <Button
+              variant="light"
+              leftSection={<IconPrinter size={16} />}
+              onClick={() => setPrintModalOpen(true)}
+            >
+              {t('Print Labels')} ({selectedLocations.length})
+            </Button>
+          )}
+          <Button leftSection={<IconPlus size={16} />} onClick={handleCreate}>
+            {t('New Location')}
+          </Button>
+        </Group>
       </Group>
+
+      <PrintLabelsModal
+        isOpen={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        items={getSelectedItems()}
+        table="depo_locations"
+      />
 
       <Paper p="md" pos="relative">
         <LoadingOverlay visible={loading} />
@@ -336,6 +384,13 @@ export function LocationsPage() {
         <Table striped withTableBorder withColumnBorders highlightOnHover>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th style={{ width: 40 }}>
+                <Checkbox
+                  onChange={toggleAll}
+                  checked={filteredLocations.length > 0 && selectedLocations.length === filteredLocations.length}
+                  indeterminate={selectedLocations.length > 0 && selectedLocations.length !== filteredLocations.length}
+                />
+              </Table.Th>
               <Table.Th>{t('Name')}</Table.Th>
               <Table.Th>{t('Code')}</Table.Th>
               <Table.Th>{t('Type')}</Table.Th>
@@ -353,6 +408,12 @@ export function LocationsPage() {
             ) : (
               filteredLocations.map((location) => (
                 <Table.Tr key={location._id}>
+                  <Table.Td>
+                    <Checkbox
+                      checked={selectedLocations.includes(location._id)}
+                      onChange={() => toggleLocation(location._id)}
+                    />
+                  </Table.Td>
                   <Table.Td>
                     <span style={{ paddingLeft: `${(location.level || 0) * 24}px` }}>
                       {location.name}

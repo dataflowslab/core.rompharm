@@ -1,0 +1,18 @@
+﻿# Sesiune de Lucru - 15.02.2026
+
+## Task: Scripturi de testare (smoke) pentru platforma
+
+### Ce s-a adaugat
+- Helper HTTP client reutilizabil in `_tools/http_client.py`.
+- Set de scripturi smoke in `scripts/testing/`:
+  - `00_auth_health.py`
+  - `10_inventory_smoke.py`
+  - `20_procurement_smoke.py`
+  - `30_requests_smoke.py`
+  - `40_sales_smoke.py`
+  - `run_all.py`
+- `scripts/testing/README.md` cu instructiuni si variabile de mediu.
+
+### Observatii
+- Scripturile folosesc `DF_BASE_URL`, `DF_USERNAME`, `DF_PASSWORD` sau `DF_TOKEN`.
+- Sales API inca este stub, scriptul doar valideaza endpointurile.

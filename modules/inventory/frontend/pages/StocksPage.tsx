@@ -12,12 +12,15 @@ import {
   Text,
   Select,
   Stack,
+  Checkbox,
+  Button,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { IconSearch } from '@tabler/icons-react';
+import { IconSearch, IconPrinter } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { api } from '../../../../src/frontend/src/services/api';
 import { formatDate } from '../../../../src/frontend/src/utils/dateFormat';
+import { PrintLabelsModal } from '../../../../src/frontend/src/components/Common/PrintLabelsModal';
 
 interface Stock {
   _id: string;
@@ -72,16 +75,18 @@ export function StocksPage() {
   const navigate = useNavigate();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   // Filters state
   const [search, setSearch] = useState('');
   const [locationFilter, setLocationFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
-  
+
   // Options
   const [locations, setLocations] = useState<Location[]>([]);
   const [stockStates, setStockStates] = useState<StockState[]>([]);
+  const [selectedStocks, setSelectedStocks] = useState<string[]>([]);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
 
   // Load filters from localStorage on mount
   useEffect(() => {
@@ -98,10 +103,10 @@ export function StocksPage() {
   // Fetch stocks when filters change
   // Only fetch if date range is complete (both dates selected) or empty
   useEffect(() => {
-    const isDateRangeValid = 
+    const isDateRangeValid =
       (dateRange[0] === null && dateRange[1] === null) || // No date range selected
       (dateRange[0] !== null && dateRange[1] !== null);   // Both dates selected
-    
+
     if (isDateRangeValid) {
       fetchStocks();
     }
@@ -112,16 +117,16 @@ export function StocksPage() {
       const stored = localStorage.getItem(FILTERS_STORAGE_KEY);
       if (stored) {
         const filters: StoredFilters = JSON.parse(stored);
-        
+
         // Check if filters are still valid (within 9 hours)
         const now = Date.now();
         const expiryTime = filters.timestamp + (FILTERS_EXPIRY_HOURS * 60 * 60 * 1000);
-        
+
         if (now < expiryTime) {
           setSearch(filters.search || '');
           setLocationFilter(filters.locationFilter || '');
           setStatusFilter(filters.statusFilter || '');
-          
+
           // Parse date range
           if (filters.dateRange) {
             const [start, end] = filters.dateRange;
@@ -162,16 +167,16 @@ export function StocksPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      
+
       // Search: batch_code, ipn, supplier_batch_code, supplier_name
       if (search) params.append('search', search);
-      
+
       // Location filter
       if (locationFilter) params.append('location_id', locationFilter);
-      
+
       // Status filter
       if (statusFilter) params.append('state_id', statusFilter);
-      
+
       // Date range filter
       if (dateRange[0]) {
         params.append('start_date', dateRange[0].toISOString().split('T')[0]);
@@ -227,11 +232,53 @@ export function StocksPage() {
     return <Badge color="gray">{stock.status}</Badge>;
   };
 
+  const toggleAll = () => {
+    if (selectedStocks.length === stocks.length) {
+      setSelectedStocks([]);
+    } else {
+      setSelectedStocks(stocks.map((s) => s._id));
+    }
+  };
+
+  const toggleStock = (id: string) => {
+    if (selectedStocks.includes(id)) {
+      setSelectedStocks(selectedStocks.filter((s) => s !== id));
+    } else {
+      setSelectedStocks([...selectedStocks, id]);
+    }
+  };
+
+  const getSelectedItems = () => {
+    return stocks
+      .filter((s) => selectedStocks.includes(s._id))
+      .map((s) => ({
+        id: s._id,
+        name: s.part_detail?.name || 'Unknown',
+        code: s.batch_code
+      }));
+  };
+
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
         <Title order={2}>Stocks</Title>
+        {selectedStocks.length > 0 && (
+          <Button
+            variant="light"
+            leftSection={<IconPrinter size={16} />}
+            onClick={() => setPrintModalOpen(true)}
+          >
+            Print Labels ({selectedStocks.length})
+          </Button>
+        )}
       </Group>
+
+      <PrintLabelsModal
+        isOpen={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        items={getSelectedItems()}
+        table="depo_stocks"
+      />
 
       <Paper p="md" mb="md">
         <Group>
@@ -282,6 +329,13 @@ export function StocksPage() {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th style={{ width: 40 }}>
+                <Checkbox
+                  onChange={toggleAll}
+                  checked={stocks.length > 0 && selectedStocks.length === stocks.length}
+                  indeterminate={selectedStocks.length > 0 && selectedStocks.length !== stocks.length}
+                />
+              </Table.Th>
               <Table.Th>Batch</Table.Th>
               <Table.Th>Status</Table.Th>
               <Table.Th>Supplier</Table.Th>
@@ -303,11 +357,16 @@ export function StocksPage() {
               stocks.map((stock) => (
                 <Table.Tr
                   key={stock._id}
-                  onClick={() => navigate(`/inventory/stocks/${stock._id}`)}
                   style={{ cursor: 'pointer' }}
                 >
-                  {/* Batch: Batch Code (bold) + Batch Date (smaller below) */}
                   <Table.Td>
+                    <Checkbox
+                      checked={selectedStocks.includes(stock._id)}
+                      onChange={() => toggleStock(stock._id)}
+                    />
+                  </Table.Td>
+                  {/* Batch: Batch Code (bold) + Batch Date (smaller below) WITH LINK */}
+                  <Table.Td onClick={() => navigate(`/inventory/stocks/${stock._id}`)}>
                     <Stack gap={2}>
                       <Text fw={700}>{stock.batch_code || '-'}</Text>
                       <Text size="xs" c="dimmed">
@@ -315,21 +374,21 @@ export function StocksPage() {
                       </Text>
                     </Stack>
                   </Table.Td>
-                  
+
                   {/* Status */}
                   <Table.Td>{getStatusBadge(stock)}</Table.Td>
-                  
+
                   {/* Supplier */}
                   <Table.Td>{stock.supplier_name || '-'}</Table.Td>
-                  
+
                   {/* Location */}
                   <Table.Td>{stock.location_detail?.name || '-'}</Table.Td>
-                  
+
                   {/* Quantity */}
                   <Table.Td>
                     {stock.quantity} {stock.part_detail?.um || 'buc'}
                   </Table.Td>
-                  
+
                   {/* Product: Name + IPN in parentheses */}
                   <Table.Td>
                     {stock.part_detail?.name || '-'}

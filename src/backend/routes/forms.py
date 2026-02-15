@@ -9,14 +9,14 @@ from bson import ObjectId
 import qrcode
 import qrcode.image.svg
 from io import BytesIO
-
-from ..utils.db import get_db
-from ..models.form_model import FormModel
-from ..routes.auth import verify_token, verify_admin
-from ..utils.audit import log_action
-from ..utils.slug_generator import generate_unique_slug
 import yaml
 import os
+
+from src.backend.utils.db import get_db
+from src.backend.models.form_model import FormModel
+from src.backend.routes.auth import verify_token, verify_admin
+from src.backend.utils.audit import log_action
+from src.backend.utils.slug_generator import generate_unique_slug
 
 router = APIRouter(prefix="/api/forms", tags=["forms"])
 
@@ -30,6 +30,9 @@ class FormCreate(BaseModel):
     template_codes: Optional[List[str]] = None
     notification_emails: Optional[List[str]] = None
     notification_template: str = 'default'
+    has_registry: bool = False
+    registry_start: Optional[int] = None
+    approval_settings: Optional[Dict[Any, Any]] = None
 
 
 class FormUpdate(BaseModel):
@@ -42,10 +45,13 @@ class FormUpdate(BaseModel):
     template_codes: Optional[List[str]] = None
     notification_emails: Optional[List[str]] = None
     notification_template: Optional[str] = None
+    has_registry: Optional[bool] = None
+    registry_start: Optional[int] = None
+    approval_settings: Optional[Dict[Any, Any]] = None
 
 
 @router.get("/{slug}")
-async def get_form_by_slug(slug: str, authorization: Optional[str] = Header(None)):
+def get_form_by_slug(slug: str, authorization: Optional[str] = Header(None)):
     """
     Get form definition by slug
     Public forms accessible to all, protected forms require authentication
@@ -74,7 +80,8 @@ async def get_form_by_slug(slug: str, authorization: Optional[str] = Header(None
             raise HTTPException(status_code=401, detail="Authentication required for this form")
         
         try:
-            await verify_token(authorization)
+            # Manually verify token since this is a def not async def
+            verify_token(authorization)
         except HTTPException:
             raise HTTPException(status_code=401, detail="Authentication required for this form")
     
@@ -82,7 +89,7 @@ async def get_form_by_slug(slug: str, authorization: Optional[str] = Header(None
 
 
 @router.get("/")
-async def list_forms(user = Depends(verify_admin)):
+def list_forms(user = Depends(verify_admin)):
     """
     List all forms (requires administrator access)
     Only returns non-deleted forms or forms with future deletion date
@@ -103,7 +110,7 @@ async def list_forms(user = Depends(verify_admin)):
 
 
 @router.post("/")
-async def create_form(form_data: FormCreate, request: Request, user = Depends(verify_admin)):
+def create_form(form_data: FormCreate, request: Request, user = Depends(verify_admin)):
     """
     Create a new form (requires administrator access)
     """
@@ -122,7 +129,10 @@ async def create_form(form_data: FormCreate, request: Request, user = Depends(ve
         is_public=form_data.is_public,
         template_codes=form_data.template_codes,
         notification_emails=form_data.notification_emails,
-        notification_template=form_data.notification_template
+        notification_template=form_data.notification_template,
+        has_registry=form_data.has_registry,
+        registry_start=form_data.registry_start,
+        approval_settings=form_data.approval_settings
     )
     
     forms_collection = db[FormModel.collection_name]
@@ -143,7 +153,7 @@ async def create_form(form_data: FormCreate, request: Request, user = Depends(ve
 
 
 @router.put("/{form_id}")
-async def update_form(form_id: str, form_data: FormUpdate, request: Request, user = Depends(verify_admin)):
+def update_form(form_id: str, form_data: FormUpdate, request: Request, user = Depends(verify_admin)):
     """
     Update an existing form (requires administrator access)
     """
@@ -175,6 +185,12 @@ async def update_form(form_id: str, form_data: FormUpdate, request: Request, use
         update_doc['notification_emails'] = form_data.notification_emails
     if form_data.notification_template is not None:
         update_doc['notification_template'] = form_data.notification_template
+    if form_data.has_registry is not None:
+        update_doc['has_registry'] = form_data.has_registry
+    if form_data.registry_start is not None:
+        update_doc['registry_start'] = form_data.registry_start
+    if form_data.approval_settings is not None:
+        update_doc['approval_settings'] = form_data.approval_settings
     
     if not update_doc:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -205,7 +221,7 @@ async def update_form(form_id: str, form_data: FormUpdate, request: Request, use
 
 
 @router.delete("/{form_id}")
-async def delete_form(form_id: str, request: Request, user = Depends(verify_admin)):
+def delete_form(form_id: str, request: Request, user = Depends(verify_admin)):
     """
     Soft delete a form (requires administrator access)
     Sets deleted timestamp instead of removing from database
@@ -241,7 +257,7 @@ async def delete_form(form_id: str, request: Request, user = Depends(verify_admi
 
 
 @router.get("/{slug}/qr")
-async def get_form_qr_code(slug: str):
+def get_form_qr_code(slug: str):
     """
     Generate QR code SVG for form URL
     """
@@ -300,7 +316,7 @@ async def get_form_qr_code(slug: str):
 
 
 @router.get("/mail-templates/list")
-async def list_mail_templates(user = Depends(verify_admin)):
+def list_mail_templates(user = Depends(verify_admin)):
     """
     List available email notification templates
     """

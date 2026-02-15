@@ -5,30 +5,31 @@ import {
   Title,
   Paper,
   Tabs,
-  TextInput,
-  Textarea,
   Button,
   Group,
   LoadingOverlay,
-  Checkbox,
-  Table,
-  ActionIcon,
   Modal,
-  Select,
   Text,
+  Checkbox,
+  TextInput,
   NumberInput,
+  Select
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconEdit, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
+import { IconDeviceFloppy } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { api } from '../../../../src/frontend/src/services/api';
+
+import { CompanyDetailsTab } from '../components/Company/CompanyDetailsTab';
+import { CompanyAddressesTab } from '../components/Company/CompanyAddressesTab';
+import { CompanyContactsTab } from '../components/Company/CompanyContactsTab';
+import { CompanyArticlesTab } from '../components/Company/CompanyArticlesTab';
 
 interface Manufacturer {
   _id: string;
   pk?: number;
   name: string;
-  code?: string;
   vatno?: string;
   regno?: string;
   payment_conditions?: string;
@@ -63,27 +64,26 @@ interface Contact {
 
 interface Part {
   _id: string;
-  name: string;
   ipn: string;
+  name: string;
   supplier_code?: string;
   supplier_currency?: string;
 }
 
 export function ManufacturerDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const navigate = useNavigate();
-  const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>('details');
+  const [loading, setLoading] = useState(false);
+  const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
 
-  // Details form
+  // Form states
   const [detailsForm, setDetailsForm] = useState({
     name: '',
-    code: '',
     vatno: '',
     regno: '',
-    payment_conditions: '',
     delivery_conditions: '',
+    payment_conditions: '',
     bank_account: '',
     currency_id: '',
     is_supplier: false,
@@ -91,109 +91,65 @@ export function ManufacturerDetailPage() {
     is_client: false,
   });
 
-  // Countries and Currencies
-  const [countries, setCountries] = useState<Array<{ value: string; label: string }>>([]);
-  const [currencies, setCurrencies] = useState<Array<{ value: string; label: string }>>([]);
-
-  // Address modal
+  // Modal states
   const [addressModalOpened, { open: openAddressModal, close: closeAddressModal }] = useDisclosure(false);
+  const [contactModalOpened, { open: openContactModal, close: closeContactModal }] = useDisclosure(false);
+  const [createProductModalOpened, { open: openCreateProductModal, close: closeCreateProductModal }] = useDisclosure(false);
+
+  // Editing states
   const [editingAddressIndex, setEditingAddressIndex] = useState<number | null>(null);
   const [addressForm, setAddressForm] = useState<Address>({
     name: '',
     country: '',
+    country_id: '',
     city: '',
+    postal_code: '',
     address: '',
     description: '',
     contact: '',
-    email: '',
+    email: ''
   });
 
-  // Contact modal
-  const [contactModalOpened, { open: openContactModal, close: closeContactModal }] = useDisclosure(false);
   const [editingContactIndex, setEditingContactIndex] = useState<number | null>(null);
   const [contactForm, setContactForm] = useState<Contact>({
     name: '',
     role: '',
     phone: '',
-    email: '',
+    email: ''
   });
 
-  // Parts
+  // Products/Parts
   const [parts, setParts] = useState<Part[]>([]);
   const [allParts, setAllParts] = useState<Part[]>([]);
-  const [partModalOpened, { open: openPartModal, close: closePartModal }] = useDisclosure(false);
   const [partForm, setPartForm] = useState({
     part_id: '',
     supplier_code: '',
-    currency: 'EUR',
+    currency: 'EUR'
   });
 
+  const [newProductForm, setNewProductForm] = useState({
+    name: '',
+    ipn: '',
+    um: '',
+    minimum_stock: 0,
+    lotallexp: false
+  });
+
+  const [currencies] = useState(['EUR', 'USD', 'RON', 'GBP']); // Mock currencies
+  const [countries, setCountries] = useState<Array<{ value: string; label: string }>>([]);
+
   useEffect(() => {
-    if (id) {
-      fetchManufacturer();
-      fetchManufacturerParts();
-      fetchAllParts();
-    }
+    fetchData();
     fetchCountries();
-    fetchCurrencies();
+    fetchAllParts();
   }, [id]);
 
   const fetchCountries = async () => {
     try {
       const response = await api.get('/modules/inventory/api/countries');
-      const data = response.data || [];
-      setCountries(data.map((c: any) => ({ value: c._id, label: c.name })));
+      setCountries(response.data.map((c: any) => ({ value: c._id, label: c.name })));
     } catch (error) {
-      console.error('Failed to fetch countries:', error);
-    }
-  };
-
-  const fetchCurrencies = async () => {
-    try {
-      const response = await api.get('/modules/inventory/api/currencies');
-      const data = response.data || [];
-      setCurrencies(data.map((c: any) => ({ value: c._id, label: `${c.code} - ${c.name}` })));
-    } catch (error) {
-      console.error('Failed to fetch currencies:', error);
-    }
-  };
-
-  const fetchManufacturer = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get(`/modules/inventory/api/manufacturers/${id}`);
-      const data = response.data;
-      setManufacturer(data);
-      setDetailsForm({
-        name: data.name || '',
-        code: data.code || '',
-        vatno: data.vatno || '',
-        regno: data.regno || '',
-        payment_conditions: data.payment_conditions || '',
-        delivery_conditions: data.delivery_conditions || '',
-        bank_account: data.bank_account || '',
-        currency_id: data.currency_id || null,
-        is_supplier: data.is_supplier || false,
-        is_manufacturer: data.is_manufacturer || false,
-        is_client: data.is_client || false,
-      });
-    } catch (error) {
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to fetch manufacturer',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchManufacturerParts = async () => {
-    try {
-      const response = await api.get(`/modules/inventory/api/suppliers/${id}/parts`);
-      setParts(response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch manufacturer parts:', error);
+      console.error("Failed to fetch countries", error);
     }
   };
 
@@ -202,11 +158,61 @@ export function ManufacturerDetailPage() {
       const response = await api.get('/modules/inventory/api/articles?limit=1000');
       setAllParts(response.data.results || []);
     } catch (error) {
-      console.error('Failed to fetch parts:', error);
+      console.error("Failed to fetch parts", error);
+    }
+  };
+
+  const fetchData = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      if (id === 'new') {
+        setManufacturer({
+          _id: 'new',
+          name: 'New Manufacturer',
+          is_supplier: false,
+          is_manufacturer: true,
+          is_client: false,
+          addresses: [],
+          contacts: []
+        });
+      } else {
+        const response = await api.get(`/modules/inventory/api/manufacturers/${id}`);
+        const data = response.data;
+        setManufacturer(data);
+        setDetailsForm({
+          name: data.name || '',
+          vatno: data.vatno || '',
+          regno: data.regno || '',
+          delivery_conditions: data.delivery_conditions || '',
+          payment_conditions: data.payment_conditions || '',
+          bank_account: data.bank_account || '',
+          currency_id: data.currency_id || '',
+          is_supplier: data.is_supplier || false,
+          is_manufacturer: data.is_manufacturer || false,
+          is_client: data.is_client || false,
+        });
+
+        // For now simulating parts, as the original fetchManufacturerParts was removed
+        // In a real scenario, you'd fetch parts related to this manufacturer here.
+        const partsResponse = await api.get(`/modules/inventory/api/suppliers/${id}/parts`);
+        setParts(partsResponse.data || []);
+      }
+    } catch (error) {
+      console.error(error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to load manufacturer details',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSaveDetails = async () => {
+    if (!manufacturer) return;
+
     // Validate at least one checkbox
     if (!detailsForm.is_supplier && !detailsForm.is_manufacturer && !detailsForm.is_client) {
       notifications.show({
@@ -218,23 +224,36 @@ export function ManufacturerDetailPage() {
     }
 
     try {
-      await api.put(`/modules/inventory/api/manufacturers/${id}`, detailsForm);
-      notifications.show({
-        title: 'Success',
-        message: 'Manufacturer updated successfully',
-        color: 'green',
-      });
-      fetchManufacturer();
+      const payload = { ...detailsForm };
+
+      let response;
+      if (id === 'new') {
+        response = await api.post('/modules/inventory/api/manufacturers', payload);
+        notifications.show({
+          title: 'Success',
+          message: 'Manufacturer created successfully',
+          color: 'green',
+        });
+        navigate(`/inventory/manufacturers/${response.data._id}`);
+      } else {
+        await api.put(`/modules/inventory/api/manufacturers/${id}`, payload);
+        notifications.show({
+          title: 'Success',
+          message: 'Details saved successfully',
+          color: 'green',
+        });
+      }
+
+      fetchData();
     } catch (error: any) {
       notifications.show({
         title: 'Error',
-        message: error.response?.data?.detail || 'Failed to update manufacturer',
+        message: error.response?.data?.detail || 'Failed to save details',
         color: 'red',
       });
     }
   };
 
-  // Address functions
   const handleAddAddress = () => {
     setEditingAddressIndex(null);
     setAddressForm({
@@ -246,158 +265,129 @@ export function ManufacturerDetailPage() {
       address: '',
       description: '',
       contact: '',
-      email: '',
+      email: ''
     });
     openAddressModal();
   };
 
   const handleEditAddress = (index: number) => {
-    if (manufacturer?.addresses && manufacturer.addresses[index]) {
-      setEditingAddressIndex(index);
-      setAddressForm(manufacturer.addresses[index]);
-      openAddressModal();
-    }
+    if (!manufacturer?.addresses) return;
+    setEditingAddressIndex(index);
+    setAddressForm({ ...manufacturer.addresses[index] });
+    openAddressModal();
   };
 
   const handleSaveAddress = async () => {
-    const addresses = [...(manufacturer?.addresses || [])];
-    if (editingAddressIndex !== null) {
-      addresses[editingAddressIndex] = addressForm;
+    if (!manufacturer) return;
+
+    const newAddresses = [...(manufacturer.addresses || [])];
+    const currentAddressForm = { ...addressForm };
+
+    // Identify country name
+    const countryObj = countries.find(c => c.value === currentAddressForm.country_id);
+    if (countryObj) {
+      currentAddressForm.country = countryObj.label;
     } else {
-      addresses.push(addressForm);
+      currentAddressForm.country = ''; // Clear if no country selected
+    }
+
+    if (editingAddressIndex !== null) {
+      newAddresses[editingAddressIndex] = currentAddressForm;
+    } else {
+      newAddresses.push(currentAddressForm);
     }
 
     try {
-      await api.put(`/modules/inventory/api/manufacturers/${id}`, { addresses });
-      notifications.show({
-        title: 'Success',
-        message: 'Address saved successfully',
-        color: 'green',
-      });
+      await api.put(`/modules/inventory/api/manufacturers/${id}`, { addresses: newAddresses });
       closeAddressModal();
-      fetchManufacturer();
+      fetchData();
+      notifications.show({ title: 'Success', message: 'Address saved', color: 'green' });
     } catch (error) {
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to save address',
-        color: 'red',
-      });
+      notifications.show({ title: 'Error', message: 'Failed to save address', color: 'red' });
     }
   };
 
-  const handleDeleteAddress = (index: number) => {
+  const handleDeleteAddress = async (index: number) => {
+    if (!manufacturer || !manufacturer.addresses) return;
+
     modals.openConfirmModal({
       title: 'Delete Address',
-      children: <Text size="sm">Are you sure you want to delete this address?</Text>,
+      children: <Text>Are you sure you want to delete this address?</Text>,
       labels: { confirm: 'Delete', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
       onConfirm: async () => {
-        const addresses = [...(manufacturer?.addresses || [])];
-        addresses.splice(index, 1);
+        const newAddresses = manufacturer.addresses!.filter((_, i) => i !== index);
         try {
-          await api.put(`/modules/inventory/api/manufacturers/${id}`, { addresses });
-          notifications.show({
-            title: 'Success',
-            message: 'Address deleted successfully',
-            color: 'green',
-          });
-          fetchManufacturer();
+          await api.put(`/modules/inventory/api/manufacturers/${id}`, { addresses: newAddresses });
+          fetchData();
+          notifications.show({ title: 'Success', message: 'Address deleted', color: 'green' });
         } catch (error) {
-          notifications.show({
-            title: 'Error',
-            message: 'Failed to delete address',
-            color: 'red',
-          });
+          notifications.show({ title: 'Error', message: 'Failed to delete address', color: 'red' });
         }
       },
     });
   };
 
-  // Contact functions
   const handleAddContact = () => {
     setEditingContactIndex(null);
-    setContactForm({
-      name: '',
-      role: '',
-      phone: '',
-      email: '',
-    });
+    setContactForm({ name: '', role: '', phone: '', email: '' });
     openContactModal();
   };
 
   const handleEditContact = (index: number) => {
-    if (manufacturer?.contacts && manufacturer.contacts[index]) {
-      setEditingContactIndex(index);
-      setContactForm(manufacturer.contacts[index]);
-      openContactModal();
-    }
+    if (!manufacturer?.contacts) return;
+    setEditingContactIndex(index);
+    setContactForm({ ...manufacturer.contacts[index] });
+    openContactModal();
   };
 
   const handleSaveContact = async () => {
-    const contacts = [...(manufacturer?.contacts || [])];
+    if (!manufacturer) return;
+
+    const newContacts = [...(manufacturer.contacts || [])];
     if (editingContactIndex !== null) {
-      contacts[editingContactIndex] = contactForm;
+      newContacts[editingContactIndex] = contactForm;
     } else {
-      contacts.push(contactForm);
+      newContacts.push(contactForm);
     }
 
     try {
-      await api.put(`/modules/inventory/api/manufacturers/${id}`, { contacts });
-      notifications.show({
-        title: 'Success',
-        message: 'Contact saved successfully',
-        color: 'green',
-      });
+      await api.put(`/modules/inventory/api/manufacturers/${id}`, { contacts: newContacts });
       closeContactModal();
-      fetchManufacturer();
+      fetchData();
+      notifications.show({ title: 'Success', message: 'Contact saved', color: 'green' });
     } catch (error) {
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to save contact',
-        color: 'red',
-      });
+      notifications.show({ title: 'Error', message: 'Failed to save contact', color: 'red' });
     }
   };
 
-  const handleDeleteContact = (index: number) => {
+  const handleDeleteContact = async (index: number) => {
+    if (!manufacturer || !manufacturer.contacts) return;
+
     modals.openConfirmModal({
       title: 'Delete Contact',
-      children: <Text size="sm">Are you sure you want to delete this contact?</Text>,
+      children: <Text>Are you sure you want to delete this contact?</Text>,
       labels: { confirm: 'Delete', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
       onConfirm: async () => {
-        const contacts = [...(manufacturer?.contacts || [])];
-        contacts.splice(index, 1);
+        const newContacts = manufacturer.contacts!.filter((_, i) => i !== index);
         try {
-          await api.put(`/modules/inventory/api/manufacturers/${id}`, { contacts });
-          notifications.show({
-            title: 'Success',
-            message: 'Contact deleted successfully',
-            color: 'green',
-          });
-          fetchManufacturer();
+          await api.put(`/modules/inventory/api/manufacturers/${id}`, { contacts: newContacts });
+          fetchData();
+          notifications.show({ title: 'Success', message: 'Contact deleted', color: 'green' });
         } catch (error) {
-          notifications.show({
-            title: 'Error',
-            message: 'Failed to delete contact',
-            color: 'red',
-          });
+          notifications.show({ title: 'Error', message: 'Failed to delete contact', color: 'red' });
         }
       },
     });
   };
 
-  // Part functions
-  const handleAddPart = () => {
-    setPartForm({
-      part_id: '',
-      supplier_code: '',
-      currency: 'EUR',
-    });
-    openPartModal();
-  };
+  const handleAddPart = async () => {
+    if (!partForm.part_id) {
+      notifications.show({ title: 'Error', message: 'Please select an article', color: 'red' });
+      return;
+    }
 
-  const handleSavePart = async () => {
     try {
       await api.post(`/modules/inventory/api/suppliers/${id}/parts`, partForm);
       notifications.show({
@@ -405,8 +395,12 @@ export function ManufacturerDetailPage() {
         message: 'Part added successfully',
         color: 'green',
       });
-      closePartModal();
-      fetchManufacturerParts();
+      setPartForm({
+        part_id: '',
+        supplier_code: '',
+        currency: partForm.currency,
+      });
+      fetchData(); // Re-fetch manufacturer data to update parts list
     } catch (error: any) {
       notifications.show({
         title: 'Error',
@@ -416,7 +410,7 @@ export function ManufacturerDetailPage() {
     }
   };
 
-  const handleDeletePart = (partId: string, partName: string) => {
+  const handleDeletePart = async (partId: string, partName: string) => {
     modals.openConfirmModal({
       title: 'Remove Part',
       children: (
@@ -434,7 +428,7 @@ export function ManufacturerDetailPage() {
             message: 'Part removed successfully',
             color: 'green',
           });
-          fetchManufacturerParts();
+          fetchData(); // Re-fetch manufacturer data to update parts list
         } catch (error) {
           notifications.show({
             title: 'Error',
@@ -445,6 +439,50 @@ export function ManufacturerDetailPage() {
       },
     });
   };
+
+  const handleCreateNewProduct = async () => {
+    try {
+      // 1. Create the article
+      const articleResponse = await api.post('/modules/inventory/api/articles', {
+        ...newProductForm,
+        manufacturer_id: id, // key to link it implicitly
+        is_active: true,
+        is_component: true,
+      });
+
+      const newArticleId = articleResponse.data._id;
+
+      // 2. Link it to this manufacturer as a supplier part
+      await api.post(`/modules/inventory/api/suppliers/${id}/parts`, {
+        part_id: newArticleId,
+        supplier_code: '',
+        currency: 'EUR',
+      });
+
+      notifications.show({
+        title: 'Success',
+        message: 'Product created and linked successfully',
+        color: 'green',
+      });
+      closeCreateProductModal();
+      setNewProductForm({
+        name: '',
+        ipn: '',
+        um: '',
+        minimum_stock: 0,
+        lotallexp: false,
+      });
+      fetchData(); // Re-fetch manufacturer data to update parts list
+      fetchAllParts(); // Re-fetch all parts to update the select dropdown
+    } catch (error: any) {
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.detail || 'Failed to create product',
+        color: 'red',
+      });
+    }
+  };
+
 
   if (!manufacturer) {
     return (
@@ -458,7 +496,7 @@ export function ManufacturerDetailPage() {
     <Container size="xl">
       <Group justify="space-between" mb="md">
         <Title order={2}>
-          {manufacturer.name} {manufacturer.id_str && <Text span c="dimmed" size="lg">({manufacturer.id_str})</Text>}
+          {manufacturer.name} {manufacturer.pk && <Text span c="dimmed" size="lg">({manufacturer.pk})</Text>}
         </Title>
         <Button variant="default" onClick={() => navigate('/inventory/manufacturers')}>
           Back
@@ -478,230 +516,36 @@ export function ManufacturerDetailPage() {
             </Tabs.Tab>
           </Tabs.List>
 
-          <Tabs.Panel value="details" pt="md">
-            <Group grow mb="sm">
-              <TextInput
-                label="Name"
-                placeholder="Manufacturer name"
-                required
-                value={detailsForm.name}
-                onChange={(e) => setDetailsForm({ ...detailsForm, name: e.currentTarget.value })}
-                style={{ flex: 3 }}
-              />
-              <TextInput
-                label="Code"
-                placeholder="Auto-generated"
-                value={detailsForm.code}
-                disabled
-                style={{ flex: 1 }}
-              />
-            </Group>
+          <CompanyDetailsTab
+            detailsForm={detailsForm}
+            setDetailsForm={setDetailsForm}
+            currencies={currencies}
+            handleSaveDetails={handleSaveDetails}
+          />
 
-            <TextInput
-              label="VAT Number"
-              placeholder="VAT number"
-              value={detailsForm.vatno}
-              onChange={(e) => setDetailsForm({ ...detailsForm, vatno: e.currentTarget.value })}
-              mb="sm"
-            />
+          <CompanyAddressesTab
+            addresses={manufacturer.addresses || []}
+            handleAddAddress={handleAddAddress}
+            handleEditAddress={handleEditAddress}
+            handleDeleteAddress={handleDeleteAddress}
+          />
 
-            <TextInput
-              label="Registration Number"
-              placeholder="Registration number"
-              value={detailsForm.regno}
-              onChange={(e) => setDetailsForm({ ...detailsForm, regno: e.currentTarget.value })}
-              mb="sm"
-            />
+          <CompanyContactsTab
+            contacts={manufacturer.contacts || []}
+            handleAddContact={handleAddContact}
+            handleEditContact={handleEditContact}
+            handleDeleteContact={handleDeleteContact}
+          />
 
-            <Group grow mb="sm" align="flex-start">
-              <Textarea
-                label="Delivery Conditions"
-                placeholder="Delivery terms and conditions"
-                value={detailsForm.delivery_conditions}
-                onChange={(e) => setDetailsForm({ ...detailsForm, delivery_conditions: e.currentTarget.value })}
-                minRows={3}
-              />
-              <NumberInput
-                label="Payment Condition"
-                placeholder="0"
-                suffix=" zile"
-                value={detailsForm.payment_conditions ? parseInt(detailsForm.payment_conditions) : 0}
-                onChange={(value) => setDetailsForm({ ...detailsForm, payment_conditions: String(value || 0) })}
-                min={0}
-                allowNegative={false}
-              />
-            </Group>
-
-            <TextInput
-              label="Bank Account"
-              placeholder="Bank account information"
-              value={detailsForm.bank_account}
-              onChange={(e) => setDetailsForm({ ...detailsForm, bank_account: e.currentTarget.value })}
-              mb="sm"
-            />
-
-            <Select
-              label="Currency"
-              placeholder="Select currency"
-              data={currencies}
-              value={detailsForm.currency_id}
-              onChange={(value) => setDetailsForm({ ...detailsForm, currency_id: value || '' })}
-              searchable
-              clearable
-              mb="sm"
-            />
-
-            <Text size="sm" fw={500} mb="xs">
-              Type *
-            </Text>
-            <Group mb="md">
-              <Checkbox
-                label="Supplier"
-                checked={detailsForm.is_supplier}
-                onChange={(e) => setDetailsForm({ ...detailsForm, is_supplier: e.currentTarget.checked })}
-              />
-              <Checkbox
-                label="Manufacturer"
-                checked={detailsForm.is_manufacturer}
-                onChange={(e) => setDetailsForm({ ...detailsForm, is_manufacturer: e.currentTarget.checked })}
-              />
-              <Checkbox
-                label="Client"
-                checked={detailsForm.is_client}
-                onChange={(e) => setDetailsForm({ ...detailsForm, is_client: e.currentTarget.checked })}
-              />
-            </Group>
-
-            <Group justify="flex-end">
-              <Button leftSection={<IconDeviceFloppy size={16} />} onClick={handleSaveDetails}>
-                Save Changes
-              </Button>
-            </Group>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="addresses" pt="md">
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Addresses</Title>
-              <Button leftSection={<IconPlus size={16} />} onClick={handleAddAddress}>
-                Add Address
-              </Button>
-            </Group>
-
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th>Country</Table.Th>
-                  <Table.Th>City</Table.Th>
-                  <Table.Th>Address</Table.Th>
-                  <Table.Th>Contact</Table.Th>
-                  <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {manufacturer.addresses?.map((address, index) => (
-                  <Table.Tr key={index}>
-                    <Table.Td>{address.name}</Table.Td>
-                    <Table.Td>{address.country || '-'}</Table.Td>
-                    <Table.Td>{address.city || '-'}</Table.Td>
-                    <Table.Td>{address.address || '-'}</Table.Td>
-                    <Table.Td>{address.contact || '-'}</Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        <ActionIcon variant="light" color="blue" onClick={() => handleEditAddress(index)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="light" color="red" onClick={() => handleDeleteAddress(index)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="contacts" pt="md">
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Contacts</Title>
-              <Button leftSection={<IconPlus size={16} />} onClick={handleAddContact}>
-                Add Contact
-              </Button>
-            </Group>
-
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th>Role</Table.Th>
-                  <Table.Th>Phone</Table.Th>
-                  <Table.Th>Email</Table.Th>
-                  <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {manufacturer.contacts?.map((contact, index) => (
-                  <Table.Tr key={index}>
-                    <Table.Td>{contact.name}</Table.Td>
-                    <Table.Td>{contact.role || '-'}</Table.Td>
-                    <Table.Td>{contact.phone || '-'}</Table.Td>
-                    <Table.Td>{contact.email || '-'}</Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        <ActionIcon variant="light" color="blue" onClick={() => handleEditContact(index)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="light" color="red" onClick={() => handleDeleteContact(index)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="articles" pt="md">
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Articles</Title>
-              <Button leftSection={<IconPlus size={16} />} onClick={handleAddPart}>
-                Add Article
-              </Button>
-            </Group>
-
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>IPN</Table.Th>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th>Supplier Code</Table.Th>
-                  <Table.Th>Currency</Table.Th>
-                  <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {parts.map((part) => (
-                  <Table.Tr key={part._id}>
-                    <Table.Td>{part.ipn}</Table.Td>
-                    <Table.Td>{part.name}</Table.Td>
-                    <Table.Td>{part.supplier_code || '-'}</Table.Td>
-                    <Table.Td>{part.supplier_currency || 'EUR'}</Table.Td>
-                    <Table.Td>
-                      <ActionIcon
-                        variant="light"
-                        color="red"
-                        onClick={() => handleDeletePart(part._id, part.name)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Tabs.Panel>
+          <CompanyArticlesTab
+            openCreateProductModal={openCreateProductModal}
+            allParts={allParts}
+            partForm={partForm}
+            setPartForm={setPartForm}
+            parts={parts}
+            handleAddPart={handleAddPart}
+            handleDeletePart={handleDeletePart}
+          />
 
           <Tabs.Panel value="purchase_orders" pt="md">
             <Text c="dimmed">Purchase orders functionality coming soon...</Text>
@@ -820,40 +664,50 @@ export function ManufacturerDetailPage() {
         </Group>
       </Modal>
 
-      {/* Part Modal */}
-      <Modal opened={partModalOpened} onClose={closePartModal} title="Add Article" size="lg">
-        <Select
-          label="Article"
-          placeholder="Select article"
+      {/* Create Product Modal */}
+      <Modal opened={createProductModalOpened} onClose={closeCreateProductModal} title="Create New Product" size="lg">
+        <TextInput
+          label="Name"
+          placeholder="Product name"
           required
-          data={allParts.map((part) => ({ value: part._id, label: `${part.ipn} - ${part.name}` }))}
-          value={partForm.part_id}
-          onChange={(value) => setPartForm({ ...partForm, part_id: value || '' })}
-          searchable
+          value={newProductForm.name}
+          onChange={(e) => setNewProductForm({ ...newProductForm, name: e.currentTarget.value })}
           mb="sm"
         />
         <TextInput
-          label="Supplier Code"
-          placeholder="Supplier's code for this article"
-          value={partForm.supplier_code}
-          onChange={(e) => setPartForm({ ...partForm, supplier_code: e.currentTarget.value })}
+          label="IPN"
+          placeholder="Internal Part Number"
+          required
+          value={newProductForm.ipn}
+          onChange={(e) => setNewProductForm({ ...newProductForm, ipn: e.currentTarget.value })}
           mb="sm"
         />
-        <Select
-          label="Currency"
-          placeholder="Currency"
-          data={['EUR', 'USD', 'RON', 'GBP']}
-          value={partForm.currency}
-          onChange={(value) => setPartForm({ ...partForm, currency: value || 'EUR' })}
-          mb="md"
+        <TextInput
+          label="Unit of Measure"
+          placeholder="e.g. buc"
+          required
+          value={newProductForm.um}
+          onChange={(e) => setNewProductForm({ ...newProductForm, um: e.currentTarget.value })}
+          mb="sm"
+        />
+        <NumberInput
+          label="Minimum Stock"
+          placeholder="0"
+          value={newProductForm.minimum_stock}
+          onChange={(value) => setNewProductForm({ ...newProductForm, minimum_stock: Number(value) || 0 })}
+          mb="sm"
+        />
+        <Checkbox
+          label="Lotallexp"
+          checked={newProductForm.lotallexp}
+          onChange={(e) => setNewProductForm({ ...newProductForm, lotallexp: e.currentTarget.checked })}
+          mb="lg"
         />
         <Group justify="flex-end">
-          <Button variant="default" onClick={closePartModal}>
-            Cancel
-          </Button>
-          <Button onClick={handleSavePart}>Add</Button>
+          <Button variant="default" onClick={closeCreateProductModal}>Cancel</Button>
+          <Button onClick={handleCreateNewProduct}>Create & Link</Button>
         </Group>
       </Modal>
-    </Container>
+    </Container >
   );
 }

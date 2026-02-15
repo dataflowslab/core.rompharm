@@ -18,7 +18,10 @@ class FormModel:
                is_public: bool = True,
                template_codes: Optional[list] = None,
                notification_emails: Optional[list] = None,
-               notification_template: str = 'default') -> Dict[Any, Any]:
+               notification_template: str = 'default',
+               has_registry: bool = False,
+               registry_start: Optional[int] = None,
+               approval_settings: Optional[Dict[Any, Any]] = None) -> Dict[Any, Any]:
         """
         Create a new form document
         
@@ -32,6 +35,9 @@ class FormModel:
             template_codes: List of DataFlows Depo template codes
             notification_emails: List of emails to notify on new submissions
             notification_template: Email template name (default: 'default')
+            has_registry: Whether form uses registry numbering
+            registry_start: Starting number for registry
+            approval_settings: Configuration for approval workflow
             
         Returns:
             Form document
@@ -46,6 +52,9 @@ class FormModel:
             'template_codes': template_codes or [],
             'notification_emails': notification_emails or [],
             'notification_template': notification_template,
+            'has_registry': has_registry,
+            'registry_start': registry_start,
+            'approval_settings': approval_settings or {},
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow(),
             'active': True,

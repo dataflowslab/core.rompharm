@@ -11,7 +11,7 @@ from src.backend.utils.db import get_db
 from ..utils import serialize_doc
 
 
-async def get_purchase_orders_list(search=None, state_id=None, date_from=None, date_to=None):
+async def get_purchase_orders_list(search=None, state_id=None, date_from=None, date_to=None, skip=None, limit=None):
     """Get list of purchase orders with supplier and state details"""
     db = get_db()
     collection = db['depo_purchase_orders']
@@ -20,11 +20,48 @@ async def get_purchase_orders_list(search=None, state_id=None, date_from=None, d
     
     # Search filter
     if search:
-        query['$or'] = [
+        search = search.strip()
+        if not search:
+            search = None
+        
+    if search:
+        or_clauses = [
             {'reference': {'$regex': search, '$options': 'i'}},
             {'description': {'$regex': search, '$options': 'i'}},
-            {'supplier_reference': {'$regex': search, '$options': 'i'}}
+            {'supplier_reference': {'$regex': search, '$options': 'i'}},
+            {'items.part_detail.name': {'$regex': search, '$options': 'i'}},
+            {'items.part_detail.ipn': {'$regex': search, '$options': 'i'}},
+            {'items.reference': {'$regex': search, '$options': 'i'}},
         ]
+
+        # Supplier name search -> map to supplier_id
+        supplier_ids = []
+        suppliers = db['depo_companies'].find(
+            {'name': {'$regex': search, '$options': 'i'}},
+            {'_id': 1}
+        )
+        supplier_ids = [s['_id'] for s in suppliers]
+        if supplier_ids:
+            supplier_id_variants = supplier_ids + [str(sid) for sid in supplier_ids]
+            or_clauses.append({'supplier_id': {'$in': supplier_id_variants}})
+
+        # Part name / IPN search -> map to part_id in items
+        part_ids = []
+        parts = db['depo_parts'].find(
+            {
+                '$or': [
+                    {'name': {'$regex': search, '$options': 'i'}},
+                    {'ipn': {'$regex': search, '$options': 'i'}}
+                ]
+            },
+            {'_id': 1}
+        )
+        part_ids = [p['_id'] for p in parts]
+        if part_ids:
+            part_id_variants = part_ids + [str(pid) for pid in part_ids]
+            or_clauses.append({'items.part_id': {'$in': part_id_variants}})
+
+        query['$or'] = or_clauses
     
     # State filter
     if state_id:
@@ -40,6 +77,11 @@ async def get_purchase_orders_list(search=None, state_id=None, date_from=None, d
     
     try:
         cursor = collection.find(query).sort('created_at', -1)
+        total = collection.count_documents(query)
+        if limit is not None:
+            cursor = cursor.skip(skip or 0).limit(limit)
+        elif skip:
+            cursor = cursor.skip(skip)
         orders = list(cursor)
         
         # Enrich with supplier and state details
@@ -67,7 +109,15 @@ async def get_purchase_orders_list(search=None, state_id=None, date_from=None, d
                     'value': 0
                 }
         
-        return serialize_doc(orders)
+        results = serialize_doc(orders)
+        if limit is not None or skip:
+            return {
+                'results': results,
+                'total': total,
+                'skip': skip or 0,
+                'limit': limit or len(results)
+            }
+        return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch purchase orders: {str(e)}")
 
@@ -232,4 +282,3 @@ async def create_new_purchase_order(order_data, current_user):
         return serialize_doc(doc)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create purchase order: {str(e)}")
-

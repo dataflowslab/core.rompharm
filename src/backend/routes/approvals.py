@@ -7,15 +7,15 @@ from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
 
-from ..utils.db import get_db
-from ..routes.auth import verify_admin, verify_token
-from ..models.approval_template_model import (
+from src.backend.utils.db import get_db
+from src.backend.routes.auth import verify_admin, verify_token
+from src.backend.models.approval_template_model import (
     ApprovalTemplateModel,
     ApprovalTemplateCreate,
     ApprovalTemplateUpdate,
     ApprovalOfficer
 )
-from ..models.approval_flow_model import (
+from src.backend.models.approval_flow_model import (
     ApprovalFlowModel,
     ApprovalFlowCreate,
     ApprovalSignature,
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/approvals", tags=["approvals"])
 # ==================== APPROVAL TEMPLATES ====================
 
 @router.get("/templates")
-async def list_templates(
+def list_templates(
     object_type: Optional[str] = None,
     object_source: Optional[str] = None,
     active: Optional[bool] = None,
@@ -54,7 +54,7 @@ async def list_templates(
 
 
 @router.post("/templates")
-async def create_template(
+def create_template(
     template: ApprovalTemplateCreate,
     current_user: dict = Depends(verify_admin)
 ):
@@ -85,7 +85,7 @@ async def create_template(
 
 
 @router.get("/templates/{template_id}")
-async def get_template(
+def get_template(
     template_id: str,
     current_user: dict = Depends(verify_admin)
 ):
@@ -103,7 +103,7 @@ async def get_template(
 
 
 @router.put("/templates/{template_id}")
-async def update_template(
+def update_template(
     template_id: str,
     update: ApprovalTemplateUpdate,
     current_user: dict = Depends(verify_admin)
@@ -133,7 +133,7 @@ async def update_template(
 
 
 @router.delete("/templates/{template_id}")
-async def delete_template(
+def delete_template(
     template_id: str,
     current_user: dict = Depends(verify_admin)
 ):
@@ -151,7 +151,7 @@ async def delete_template(
 # ==================== APPROVAL FLOWS ====================
 
 @router.get("/flows")
-async def list_flows(
+def list_flows(
     object_type: Optional[str] = None,
     object_id: Optional[str] = None,
     status: Optional[str] = None,
@@ -177,7 +177,7 @@ async def list_flows(
 
 
 @router.post("/flows")
-async def create_flow(
+def create_flow(
     flow: ApprovalFlowCreate,
     current_user: dict = Depends(verify_token)
 ):
@@ -234,7 +234,7 @@ async def create_flow(
 
 
 @router.get("/flows/{flow_id}")
-async def get_flow(
+def get_flow(
     flow_id: str,
     current_user: dict = Depends(verify_token)
 ):
@@ -252,7 +252,7 @@ async def get_flow(
 
 
 @router.get("/flows/object/{object_type}/{object_id}")
-async def get_flow_by_object(
+def get_flow_by_object(
     object_type: str,
     object_id: str,
     current_user: dict = Depends(verify_token)
@@ -274,7 +274,7 @@ async def get_flow_by_object(
 
 
 @router.post("/flows/{flow_id}/sign")
-async def sign_flow(
+def sign_flow(
     flow_id: str,
     signature_data: ApprovalSignatureCreate,
     request: Request,
@@ -385,7 +385,7 @@ async def sign_flow(
 
 
 @router.delete("/flows/{flow_id}/signatures/{user_id}")
-async def remove_signature(
+def remove_signature(
     flow_id: str,
     user_id: str,
     current_user: dict = Depends(verify_admin)
@@ -420,3 +420,88 @@ async def remove_signature(
         )
     
     return {"message": "Signature removed successfully"}
+
+@router.get("/pending")
+def get_pending_approvals(current_user: dict = Depends(verify_token)):
+    """Get pending approvals for current user"""
+    db = get_db()
+    user_id = current_user["_id"]
+    user_role = current_user.get("role") or current_user.get("local_role")
+    
+    # metrics for debugging
+    # print(f"DEBUG: Finding pending approvals for user {user_id} (Role: {user_role})")
+
+    # Find flows that are active
+    active_flows = list(db.approval_flows.find({
+        "status": {"$in": ["pending", "in_progress"]}
+    }))
+    
+    pending_approvals = []
+    
+    for flow in active_flows:
+        # Check if already signed
+        if any(s["user_id"] == user_id for s in flow.get("signatures", [])):
+            continue
+            
+        can_sign = False
+        officer_type = "optional"
+        
+        # Check required officers
+        for officer in flow.get("must_sign_officers", []):
+            if officer["type"] == "person" and str(officer["reference"]) == str(user_id):
+                can_sign = True
+                officer_type = "required"
+                break
+            elif officer["type"] == "role" and user_role and str(officer["reference"]) == str(user_role):
+                can_sign = True
+                officer_type = "required"
+                break
+        
+        # Check optional officers if not already found
+        if not can_sign:
+            for officer in flow.get("can_sign_officers", []):
+                if officer["type"] == "person" and str(officer["reference"]) == str(user_id):
+                    can_sign = True
+                    break
+                elif officer["type"] == "role" and user_role and str(officer["reference"]) == str(user_role):
+                    can_sign = True
+                    break
+        
+        if can_sign:
+            # Add metadata for frontend
+            flow["_id"] = str(flow["_id"])
+            flow["officer_type"] = officer_type
+            
+            # Fetch object details for better UI context
+            flow["object_details"] = {
+                "reference": f"{flow['object_type']} #{flow['object_id']}",
+                "description": "Waiting for approval",
+                "supplier": "-"
+            }
+
+            if flow["object_type"] == "procurement_order" and flow["object_source"] == "depo_procurement":
+                try:
+                    order = db.depo_purchase_orders.find_one({"_id": ObjectId(flow["object_id"])})
+                    if order:
+                        flow["object_details"]["reference"] = order.get("reference", "Unknown")
+                        flow["object_details"]["description"] = order.get("description", "")
+                        # Try to get supplier name
+                        if order.get("supplier_id"):
+                             supplier = db.depo_companies.find_one({"_id": order["supplier_id"]})
+                             if supplier:
+                                 flow["object_details"]["supplier"] = supplier.get("name", "Unknown")
+                except Exception as e:
+                    print(f"Error fetching object details: {e}")
+
+            elif flow["object_type"] == "purchase_request" and flow["object_source"] == "core":
+                 try:
+                    request = db.depo_purchase_requests.find_one({"_id": ObjectId(flow["object_id"])})
+                    if request:
+                        flow["object_details"]["reference"] = request.get("reference", f"Request #{request.get('number', '')}")
+                        flow["object_details"]["description"] = request.get("notes", "")
+                 except Exception as e:
+                    print(f"Error fetching request details: {e}")
+
+            pending_approvals.append(flow)
+            
+    return {"approvals": pending_approvals}

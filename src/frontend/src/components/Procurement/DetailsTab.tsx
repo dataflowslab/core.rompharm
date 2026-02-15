@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Paper, Group, Title, Stack, Badge, Text, Modal, Alert, Table } from '@mantine/core';
+import { Grid, TextInput, Textarea, Button, Paper, Group, Stack, Badge, Text, Modal, Alert, Table } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
-import { IconDeviceFloppy, IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconCheck, IconAlertCircle } from '@tabler/icons-react';
 import { DocumentManager } from '../Common/DocumentManager';
+import { SafeSelect } from '../Common/SafeSelect';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
@@ -72,14 +73,14 @@ interface DetailsTabProps {
 export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUpdate, orderStateId }: DetailsTabProps) {
   const { t } = useTranslation();
   const { username, isStaff } = useAuth();
-  
+
   // Check if order is in FINISHED or CANCELLED state (cannot modify signatures)
   const FINISHED_STATE = '6943a4a6451609dd8a618ce3';
   const CANCELLED_STATE = '6943a4a6451609dd8a618ce2';
   const isOrderLocked = orderStateId === FINISHED_STATE || orderStateId === CANCELLED_STATE;
   const canRemoveSignatures = isStaff && !isOrderLocked;
   const [saving, setSaving] = useState(false);
-  const [documentTemplates, setDocumentTemplates] = useState<Array<{code: string; name: string; label: string}>>([]);
+  const [documentTemplates, setDocumentTemplates] = useState<Array<{ code: string; name: string; label: string }>>([]);
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [signModalOpened, setSignModalOpened] = useState(false);
@@ -87,7 +88,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
   const [userToRemove, setUserToRemove] = useState<string | null>(null);
   const [itemsCount, setItemsCount] = useState(0);
   const [signAction, setSignAction] = useState<'issue' | 'cancel'>('issue');
-  
+
   // Editable state
   const [formData, setFormData] = useState({
     reference: order.reference || '',
@@ -108,20 +109,20 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
       try {
         const response = await api.get('/modules/depo_procurement/api/document-templates');
         const templatesObj = response.data.templates || {};
-        
+
         const templates = Object.entries(templatesObj).map(([code, name]) => ({
           code,
           name: name as string,
           label: name as string
         }));
-        
+
         setDocumentTemplates(templates);
       } catch (error) {
         console.error('Failed to load templates:', error);
         setDocumentTemplates([]);
       }
     };
-    
+
     loadTemplates();
     loadApprovalFlow();
     loadItemsCount();
@@ -130,7 +131,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
   const loadApprovalFlow = async () => {
     try {
       const response = await api.get(`${procurementApi.getPurchaseOrder(order._id)}/approval-flow`);
-      
+
       if (!response.data.flow) {
         try {
           const createResponse = await api.post(`${procurementApi.getPurchaseOrder(order._id)}/approval-flow`);
@@ -176,7 +177,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
       }
 
       await onUpdate(updateData);
-      
+
       notifications.show({
         title: t('Success'),
         message: t('Order updated successfully'),
@@ -214,11 +215,11 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
         action: signAction  // 'issue' or 'cancel'
       });
       setFlow(response.data);
-      
-      const message = signAction === 'issue' 
+
+      const message = signAction === 'issue'
         ? t('Order issued successfully')
         : t('Order cancelled successfully');
-      
+
       notifications.show({
         title: t('Success'),
         message,
@@ -228,10 +229,10 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
       if (onOrderUpdate) {
         onOrderUpdate();
       }
-      
+
       // Reset action to default
       setSignAction('issue');
-      
+
       setTimeout(() => {
         window.location.reload();
       }, 1000);
@@ -249,11 +250,11 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
 
   const confirmRemoveSignature = async () => {
     if (!userToRemove) return;
-    
+
     setRemoveModalOpened(false);
     try {
       await api.delete(`${procurementApi.getPurchaseOrder(order._id)}/signatures/${userToRemove}`);
-      
+
       notifications.show({
         title: t('Success'),
         message: t('Signature removed successfully'),
@@ -278,7 +279,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
 
   const canUserSign = (): boolean => {
     if (!flow || !username) return false;
-    
+
     // Check if user already signed
     const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
@@ -286,7 +287,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
     // Check if minimum signatures already reached
     const minSignatures = flow.min_signatures || 0;
     const currentSignatures = flow.signatures.length;
-    
+
     if (currentSignatures >= minSignatures && minSignatures > 0) {
       // Minimum signatures reached - no more signing allowed
       return false;
@@ -311,7 +312,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
     if (status === 'in_progress' && flow && flow.signatures.length > 0) {
       return t('Signed');
     }
-    
+
     switch (status) {
       case 'pending': return t('Pending');
       case 'in_progress': return t('In Progress');
@@ -358,7 +359,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
 
                 {canUserSign() && flow.status !== 'approved' && (
                   <>
-                    <Select
+                    <SafeSelect
                       label={t('Action')}
                       description={t('Select action when signing')}
                       value={signAction}
@@ -370,9 +371,9 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
                       size="sm"
                       required
                     />
-                    
-                    <Button 
-                      onClick={() => setSignModalOpened(true)} 
+
+                    <Button
+                      onClick={() => setSignModalOpened(true)}
                       loading={submitting}
                       leftSection={<IconCheck size={16} />}
                       fullWidth
@@ -387,7 +388,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
                 {flow.signatures.length > 0 && (
                   <div>
                     <Text size="xs" c="dimmed" mb="xs">{t('Signatures')}</Text>
-                    <Table withTableBorder withColumnBorders size="xs">
+                    <Table withTableBorder withColumnBorders>
                       <Table.Tbody>
                         {flow.signatures.map((signature, index) => (
                           <Table.Tr key={index}>
@@ -397,9 +398,9 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
                             </Table.Td>
                             {canRemoveSignatures && (
                               <Table.Td style={{ width: '60px' }}>
-                                <Button 
-                                  size="xs" 
-                                  color="red" 
+                                <Button
+                                  size="xs"
+                                  color="red"
                                   variant="subtle"
                                   onClick={() => {
                                     setUserToRemove(signature.user_id);
@@ -408,7 +409,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
                                 >
                                   {t('Remove')}
                                 </Button>
-              </Table.Td>
+                              </Table.Td>
                             )}
                           </Table.Tr>
                         ))}
@@ -486,14 +487,13 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
             </Grid.Col>
 
             <Grid.Col span={12}>
-              <Select
+              <SafeSelect
                 label={t('Destination')}
                 value={formData.destination_id}
                 onChange={(value) => setFormData({ ...formData, destination_id: value || '' })}
-                data={stockLocations.map(loc => ({ 
-                  value: loc._id, 
-                  label: loc.name 
-                }))}
+                data={stockLocations}
+                valueKey="_id"
+                labelKey="name"
                 disabled={!canEdit}
                 searchable
                 clearable
@@ -546,7 +546,7 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
       >
         <Stack gap="md">
           <Alert color={signAction === 'cancel' ? 'red' : 'blue'} icon={<IconAlertCircle />}>
-            {signAction === 'issue' 
+            {signAction === 'issue'
               ? t('Are you sure you want to issue this order? The order will be ready for receiving items.')
               : t('Are you sure you want to cancel this order? This action cannot be undone.')
             }
@@ -557,15 +557,15 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
           </Text>
 
           <Group justify="flex-end">
-            <Button 
-              variant="default" 
+            <Button
+              variant="default"
               onClick={() => setSignModalOpened(false)}
             >
               {t('No, go back')}
             </Button>
-            <Button 
-              color={signAction === 'cancel' ? 'red' : 'green'} 
-              onClick={confirmSign} 
+            <Button
+              color={signAction === 'cancel' ? 'red' : 'green'}
+              onClick={confirmSign}
               loading={submitting}
               leftSection={<IconCheck size={16} />}
             >
@@ -590,8 +590,8 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
             {t('Are you sure you want to remove this signature?')}
           </Text>
           <Group justify="flex-end">
-            <Button 
-              variant="default" 
+            <Button
+              variant="default"
               onClick={() => {
                 setRemoveModalOpened(false);
                 setUserToRemove(null);

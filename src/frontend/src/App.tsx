@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppShell, Burger, Group, Image, Text, Button, Select, ScrollArea } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconLogout, IconLanguage } from '@tabler/icons-react';
@@ -31,7 +31,18 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { LocationsPage } from './pages/LocationsPage';
 import { SuppliersPage, SupplierDetailPage, ManufacturersPage, ManufacturerDetailPage, ClientsPage, ClientDetailPage, StocksPage } from '../../../modules/inventory/frontend/pages';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { MobileDashboardPage } from './pages/MobileDashboardPage';
+import { MobileProcurementPage } from './pages/MobileProcurementPage';
+import { MobileProcurementDetailPage } from './pages/MobileProcurementDetailPage';
+import { MobileTransfersPage } from './pages/MobileTransfersPage';
+import { MobileTransferDetailPage } from './pages/MobileTransferDetailPage';
+import { MobileSalesPage } from './pages/MobileSalesPage';
+import { MobileSalesDetailPage } from './pages/MobileSalesDetailPage';
+import { MobileInventoryPage } from './pages/MobileInventoryPage';
+import { MobileRequestsPage } from './pages/MobileRequestsPage';
+import { MobileRequestDetailPage } from './pages/MobileRequestDetailPage';
 import { Navbar } from './components/Layout/Navbar';
+import { MobileLayout } from './components/Layout/MobileLayout';
 import { useAuth } from './context/AuthContext';
 import { api } from './services/api';
 
@@ -46,6 +57,8 @@ function App() {
   const [opened, { toggle }] = useDisclosure();
   const [config, setConfig] = useState<Config | null>(null);
   const [language, setLanguage] = useState<string>(i18n.language || 'en');
+  const location = useLocation();
+  const isMobileRoute = location.pathname.startsWith('/mobile');
 
   useEffect(() => {
     api.get('/api/config/')
@@ -75,60 +88,64 @@ function App() {
 
   return (
     <AppShell
-      header={{ height: 60 }}
-      navbar={{
+      header={isMobileRoute ? undefined : { height: 60 }}
+      navbar={isMobileRoute ? undefined : {
         width: 250,
         breakpoint: 'sm',
         collapsed: { mobile: !opened },
       }}
-      padding="md"
+      padding={isMobileRoute ? 0 : 'md'}
     >
-      <AppShell.Header style={{ backgroundColor: '#e8f3fc' }}>
-        <Group h="100%" px="md" justify="space-between">
-          <Group>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Image
-              src={config?.company_logo || '/media/img/logo.svg'}
-              alt={config?.company_name || 'DataFlows Core'}
-              h={40}
-              w="auto"
-              fit="contain"
-            />
-          </Group>
+      {!isMobileRoute && (
+        <AppShell.Header style={{ backgroundColor: '#e8f3fc' }}>
+          <Group h="100%" px="md" justify="space-between">
+            <Group>
+              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+              <Image
+                src={config?.company_logo || '/media/img/logo.svg'}
+                alt={config?.company_name || 'DataFlows Core'}
+                h={40}
+                w="auto"
+                fit="contain"
+              />
+            </Group>
 
-          <Group>
-            <Select
-              value={language}
-              onChange={handleLanguageChange}
-              data={[
-                { value: 'en', label: t('English') },
-                { value: 'ro', label: t('Română') },
-              ]}
-              leftSection={<IconLanguage size={16} />}
-              w={120}
-              size="xs"
-            />
-            <Text size="sm" c="dimmed">
-              {username}
-            </Text>
-            <Button
-              variant="subtle"
-              color="red"
-              leftSection={<IconLogout size={16} />}
-              onClick={handleLogout}
-              size="sm"
-            >
-              {t('Logout')}
-            </Button>
+            <Group>
+              <Select
+                value={language}
+                onChange={handleLanguageChange}
+                data={[
+                  { value: 'en', label: t('English') },
+                  { value: 'ro', label: t('Rom??n??') },
+                ]}
+                leftSection={<IconLanguage size={16} />}
+                w={120}
+                size="xs"
+              />
+              <Text size="sm" c="dimmed">
+                {username}
+              </Text>
+              <Button
+                variant="subtle"
+                color="red"
+                leftSection={<IconLogout size={16} />}
+                onClick={handleLogout}
+                size="sm"
+              >
+                {t('Logout')}
+              </Button>
+            </Group>
           </Group>
-        </Group>
-      </AppShell.Header>
+        </AppShell.Header>
+      )}
 
-      <AppShell.Navbar p="md" style={{ backgroundColor: '#f6fbff' }}>
-        <ScrollArea h="calc(100vh - 60px)" type="auto" offsetScrollbars scrollbarSize={8}>
-          <Navbar />
-        </ScrollArea>
-      </AppShell.Navbar>
+      {!isMobileRoute && (
+        <AppShell.Navbar p="md" style={{ backgroundColor: '#f6fbff' }}>
+          <ScrollArea h="calc(100vh - 60px)" type="auto" offsetScrollbars scrollbarSize={8}>
+            <Navbar />
+          </ScrollArea>
+        </AppShell.Navbar>
+      )}
 
       <AppShell.Main>
         <Routes>
@@ -166,6 +183,22 @@ function App() {
           <Route path="/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/data/:formId" element={<ProtectedRoute><DataListPage /></ProtectedRoute>} />
+
+          {/* Mobile Routes */}
+          <Route path="/mobile" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="/mobile/dashboard" replace />} />
+            <Route path="dashboard" element={<MobileDashboardPage />} />
+            <Route path="procurement" element={<MobileProcurementPage />} />
+            <Route path="procurement/:id" element={<MobileProcurementDetailPage />} />
+            <Route path="requests" element={<MobileRequestsPage />} />
+            <Route path="requests/:id" element={<MobileRequestDetailPage />} />
+            <Route path="transfers" element={<MobileTransfersPage />} />
+            <Route path="transfers/:id" element={<MobileTransferDetailPage />} />
+            <Route path="sales" element={<MobileSalesPage />} />
+            <Route path="sales/:id" element={<MobileSalesDetailPage />} />
+            <Route path="inventory" element={<MobileInventoryPage />} />
+          </Route>
+
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AppShell.Main>

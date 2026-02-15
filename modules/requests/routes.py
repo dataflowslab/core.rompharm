@@ -27,7 +27,12 @@ from .approval_routes import router as approval_router
 router = APIRouter(prefix="/modules/requests/api", tags=["requests"])
 
 # Include approval routes
+# Include approval routes
 router.include_router(approval_router)
+
+# Include transfer execution routes
+from .transfer_routes import router as transfer_router
+router.include_router(transfer_router)
 
 
 # ==================== STOCK LOCATIONS ====================
@@ -117,14 +122,98 @@ async def get_part_recipe(
 
 @router.get("/")
 async def list_requests(
+    has_batch_codes: Optional[bool] = None,
+    search: Optional[str] = None,
+    state_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
     current_user: dict = Depends(verify_admin)
 ):
     """List all requests with location names from depo_locations"""
     db = get_db()
     requests_collection = db['depo_requests']
     locations_collection = db['depo_locations']
+    parts_collection = db['depo_parts']
     
-    requests_list = list(requests_collection.find().sort('created_at', -1))
+    query = {}
+    if has_batch_codes:
+        query["items.batch_code"] = {"$exists": True, "$ne": None}
+
+    if state_id:
+        try:
+            query["state_id"] = ObjectId(state_id)
+        except Exception:
+            query["state_id"] = state_id
+
+    # Date range filter on created_at
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            try:
+                if len(date_from) == 10:
+                    date_query["$gte"] = datetime.fromisoformat(f"{date_from}T00:00:00")
+                else:
+                    date_query["$gte"] = datetime.fromisoformat(date_from)
+            except Exception:
+                pass
+        if date_to:
+            try:
+                if len(date_to) == 10:
+                    date_query["$lte"] = datetime.fromisoformat(f"{date_to}T23:59:59")
+                else:
+                    date_query["$lte"] = datetime.fromisoformat(date_to)
+            except Exception:
+                pass
+        if date_query:
+            query["created_at"] = date_query
+
+    # Search filter
+    if search:
+        search = search.strip()
+        if search:
+            or_clauses = [
+                {'reference': {'$regex': search, '$options': 'i'}},
+                {'notes': {'$regex': search, '$options': 'i'}},
+                {'items.batch_code': {'$regex': search, '$options': 'i'}},
+            ]
+
+            # Match locations by name/code
+            locs = list(locations_collection.find({
+                '$or': [
+                    {'name': {'$regex': search, '$options': 'i'}},
+                    {'code': {'$regex': search, '$options': 'i'}}
+                ]
+            }, {'_id': 1}))
+            if locs:
+                loc_ids = [l['_id'] for l in locs]
+                loc_variants = loc_ids + [str(x) for x in loc_ids]
+                or_clauses.append({'source': {'$in': loc_variants}})
+                or_clauses.append({'destination': {'$in': loc_variants}})
+
+            # Match parts by name or IPN
+            parts = list(parts_collection.find({
+                '$or': [
+                    {'name': {'$regex': search, '$options': 'i'}},
+                    {'ipn': {'$regex': search, '$options': 'i'}}
+                ]
+            }, {'_id': 1}))
+            if parts:
+                part_ids = [p['_id'] for p in parts]
+                part_variants = part_ids + [str(x) for x in part_ids]
+                or_clauses.append({'items.part': {'$in': part_variants}})
+
+            query["$or"] = or_clauses
+
+    total = requests_collection.count_documents(query)
+    requests_list = list(
+        requests_collection
+        .find(query)
+        .sort('created_at', -1)
+        .skip(skip)
+        .limit(limit)
+    )
     
     # Get all unique location ObjectIds
     location_oids = set()
@@ -151,52 +240,73 @@ async def list_requests(
         except Exception as e:
             print(f"Warning: Failed to fetch locations: {e}")
     
-    # Convert ObjectId to string and add location names
+    # Helper to recursively convert ObjectId to string
+    def fix_oid(obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)
+        if isinstance(obj, list):
+            return [fix_oid(x) for x in obj]
+        if isinstance(obj, dict):
+            return {k: fix_oid(v) for k, v in obj.items()}
+        return obj
+
+    # Process each request
+    processed_list = []
+    
     for req in requests_list:
-        req['_id'] = str(req['_id'])
+        # Apply recursive conversion first
+        req = fix_oid(req)
         
+        # Helper to safely get value (now strings)
+        def get_val(doc, key):
+            val = doc.get(key)
+            return val if val else None
+
+        # Add source name
+        source_id = get_val(req, 'source')
+        if source_id:
+            req['source_name'] = location_map.get(source_id, source_id)
+            
+        # Add destination name
+        dest_id = get_val(req, 'destination')
+        if dest_id:
+            req['destination_name'] = location_map.get(dest_id, dest_id)
+
         # Get state info from state_id and set status
+        # Note: fix_oid already converted state_id to string if it was ObjectId
         if req.get('state_id'):
             states_collection = db['depo_requests_states']
             try:
-                state_id_obj = req['state_id'] if isinstance(req['state_id'], ObjectId) else ObjectId(req['state_id'])
+                # We need ObjectId for lookup
+                state_id_obj = ObjectId(req['state_id'])
                 state = states_collection.find_one({'_id': state_id_obj})
                 if state:
                     # Set status from state name
                     req['status'] = state.get('name', 'Unknown')
-                req['state_id'] = str(state_id_obj)
             except Exception as e:
-                print(f"[ERROR] Failed to lookup state for request {req['_id']}: {e}")
-                if isinstance(req.get('state_id'), ObjectId):
-                    req['state_id'] = str(req['state_id'])
+                print(f"[ERROR] Failed to lookup state for request {req.get('_id')}: {e}")
         
-        # Convert source and destination ObjectIds to strings
-        if req.get('source'):
-            if isinstance(req['source'], ObjectId):
-                req['source'] = str(req['source'])
-            source_id = req['source']
-            req['source_name'] = location_map.get(source_id, source_id)
+        # Handle dates that might be datetime objects (fix_oid doesn't touch datetime unless we add it)
+        # But fix_oid above didn't handle datetime.
+        # Let's verify if pymongo returns datetime or strings. It returns datetime.
+        # We should handle datetime in fix_oid or separately.
         
-        if req.get('destination'):
-            if isinstance(req['destination'], ObjectId):
-                req['destination'] = str(req['destination'])
-            dest_id = req['destination']
-            req['destination_name'] = location_map.get(dest_id, dest_id)
-        
-        # Convert recipe ObjectIds if present
-        if 'recipe_id' in req and isinstance(req['recipe_id'], ObjectId):
-            req['recipe_id'] = str(req['recipe_id'])
-        if 'recipe_part_id' in req and isinstance(req['recipe_part_id'], ObjectId):
-            req['recipe_part_id'] = str(req['recipe_part_id'])
-        
+        # Let's perform manual datetime conversion as before to be safe/consistent
         if 'created_at' in req and isinstance(req['created_at'], datetime):
             req['created_at'] = req['created_at'].isoformat()
         if 'updated_at' in req and isinstance(req['updated_at'], datetime):
             req['updated_at'] = req['updated_at'].isoformat()
         if 'issue_date' in req and isinstance(req['issue_date'], datetime):
             req['issue_date'] = req['issue_date'].isoformat()
+            
+        processed_list.append(req)
     
-    return {"results": requests_list}
+    return {
+        "results": processed_list,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.get("/{request_id}")

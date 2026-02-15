@@ -9,12 +9,12 @@ from bson import ObjectId
 from datetime import datetime
 import os
 
-from ..utils.db import get_db
-from ..models.data_model import DataModel
-from ..models.form_state_model import FormStateModel
-from ..routes.auth import verify_token, verify_admin
-from ..utils.audit import log_action
-from ..utils.file_handler import save_upload_file, get_file_path
+from src.backend.utils.db import get_db
+from src.backend.models.data_model import DataModel
+from src.backend.models.form_state_model import FormStateModel
+from src.backend.routes.auth import verify_token, verify_admin
+from src.backend.utils.audit import log_action
+from src.backend.utils.file_handler import save_upload_file, get_file_path
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 
@@ -25,7 +25,7 @@ class DataSubmit(BaseModel):
 
 
 @router.post("/")
-async def submit_data(submission: DataSubmit, request: Request, authorization: Optional[str] = Header(None)):
+def submit_data(submission: DataSubmit, request: Request, authorization: Optional[str] = Header(None)):
     """
     Submit form data
     Public forms accessible to all, protected forms require authentication
@@ -52,14 +52,16 @@ async def submit_data(submission: DataSubmit, request: Request, authorization: O
             raise HTTPException(status_code=401, detail="Authentication required for this form")
         
         try:
-            user = await verify_token(authorization)
+            # Manually verify token since this is a def not async def
+            # We can reuse the verify_token function directly (it's now sync)
+            user = verify_token(authorization)
             submitted_by = user['username']
         except HTTPException:
             raise HTTPException(status_code=401, detail="Authentication required for this form")
     elif authorization:
         # If authenticated, save username even for public forms
         try:
-            user = await verify_token(authorization)
+            user = verify_token(authorization)
             submitted_by = user['username']
         except:
             pass  # Ignore auth errors for public forms
@@ -105,7 +107,7 @@ async def submit_data(submission: DataSubmit, request: Request, authorization: O
     if notification_emails:
         print(f"[SUBMIT] Attempting to send email notifications to: {notification_emails}")
         try:
-            from ..utils.newsman import send_form_notification
+            from src.backend.utils.newsman import send_form_notification
             import yaml
             
             # Load config for base_url
@@ -159,7 +161,7 @@ async def submit_data(submission: DataSubmit, request: Request, authorization: O
 
 
 @router.get("/{form_id}")
-async def get_form_data(form_id: str, user = Depends(verify_admin)):
+def get_form_data(form_id: str, user = Depends(verify_admin)):
     """
     Get all submissions for a form (requires administrator access)
     """
@@ -172,7 +174,7 @@ async def get_form_data(form_id: str, user = Depends(verify_admin)):
 
 
 @router.get("/submission/{submission_id}")
-async def get_submission(submission_id: str, user = Depends(verify_admin)):
+def get_submission(submission_id: str, user = Depends(verify_admin)):
     """
     Get a specific submission (requires administrator access)
     """
@@ -199,7 +201,7 @@ async def get_submission(submission_id: str, user = Depends(verify_admin)):
 
 
 @router.delete("/submission/{submission_id}")
-async def delete_submission(submission_id: str, request: Request, user = Depends(verify_admin)):
+def delete_submission(submission_id: str, request: Request, user = Depends(verify_admin)):
     """
     Delete a submission (requires administrator access)
     """
@@ -237,7 +239,7 @@ class StateUpdate(BaseModel):
 
 
 @router.get("/submissions/stats")
-async def get_submissions_stats(user = Depends(verify_admin)):
+def get_submissions_stats(user = Depends(verify_admin)):
     """
     Get submission statistics (requires administrator access)
     """
@@ -270,7 +272,7 @@ async def get_submissions_stats(user = Depends(verify_admin)):
 
 
 @router.get("/submissions/all")
-async def get_all_submissions(user = Depends(verify_admin)):
+def get_all_submissions(user = Depends(verify_admin)):
     """
     Get all submissions across all forms (requires administrator access)
     """
@@ -292,7 +294,7 @@ async def get_all_submissions(user = Depends(verify_admin)):
 
 
 @router.put("/submission/{submission_id}/state")
-async def update_submission_state(
+def update_submission_state(
     submission_id: str,
     state_update: StateUpdate,
     request: Request,
@@ -360,7 +362,7 @@ async def update_submission_state(
 
 
 @router.get("/submission/{submission_id}/history")
-async def get_submission_history(submission_id: str, user = Depends(verify_admin)):
+def get_submission_history(submission_id: str, user = Depends(verify_admin)):
     """
     Get state change history for a submission
     """
@@ -385,6 +387,7 @@ async def get_submission_history(submission_id: str, user = Depends(verify_admin
 async def upload_file(file: UploadFile = File(...)):
     """
     Upload a file (public endpoint for form submissions)
+    Note: kept as async def because file upload involves async I/O
     """
     try:
         file_metadata = await save_upload_file(file)
@@ -396,7 +399,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @router.get("/files/{file_hash}")
-async def get_file(file_hash: str):
+def get_file(file_hash: str):
     """
     Serve a file by its hash (public endpoint)
     """

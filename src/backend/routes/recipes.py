@@ -7,9 +7,9 @@ from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
 
-from ..utils.db import get_db
-from .auth import verify_token
-from ..models.recipe_model import RecipeModel, RecipeItem, RecipeLogModel
+from src.backend.utils.db import get_db
+from src.backend.routes.auth import verify_token
+from src.backend.models.recipe_model import RecipeModel, RecipeItem, RecipeLogModel
 
 router = APIRouter()
 
@@ -29,7 +29,7 @@ def log_recipe_change(db, recipe_id: str, action: str, changes: dict, user: str,
 
 
 @router.get("/api/recipes")
-async def list_recipes(
+def list_recipes(
     search: Optional[str] = None,
     current_user: dict = Depends(verify_token),
     db = Depends(get_db)
@@ -79,7 +79,7 @@ async def list_recipes(
 
 
 @router.get("/api/recipes/parts")
-async def search_parts(
+def search_parts(
     search: Optional[str] = None,
     current_user: dict = Depends(verify_token),
     db = Depends(get_db)
@@ -110,7 +110,7 @@ async def search_parts(
 
 
 @router.get("/api/recipes/{recipe_id}")
-async def get_recipe(
+def get_recipe(
     recipe_id: str,
     current_user: dict = Depends(verify_token),
     db = Depends(get_db)
@@ -176,7 +176,7 @@ async def get_recipe(
 
 
 @router.post("/api/recipes")
-async def create_recipe(
+def create_recipe(
     data: dict,
     request: Request,
     current_user: dict = Depends(verify_token),
@@ -221,7 +221,7 @@ async def create_recipe(
 
 
 @router.post("/api/recipes/{recipe_id}/items")
-async def add_item(
+def add_item(
     recipe_id: str,
     data: dict,
     request: Request,
@@ -282,7 +282,7 @@ async def add_item(
 
 
 @router.put("/api/recipes/{recipe_id}/items/{item_index}")
-async def update_item(
+def update_item(
     recipe_id: str,
     item_index: int,
     data: dict,
@@ -343,7 +343,7 @@ async def update_item(
 
 
 @router.delete("/api/recipes/{recipe_id}/items/{item_index}")
-async def remove_item(
+def remove_item(
     recipe_id: str,
     item_index: int,
     request: Request,
@@ -394,7 +394,7 @@ async def remove_item(
 
 
 @router.post("/api/recipes/{recipe_id}/items/{item_index}/alternatives")
-async def add_alternative(
+def add_alternative(
     recipe_id: str,
     item_index: int,
     data: dict,
@@ -462,7 +462,7 @@ async def add_alternative(
 
 
 @router.put("/api/recipes/{recipe_id}/items/{item_index}/alternatives/{alt_index}")
-async def update_alternative(
+def update_alternative(
     recipe_id: str,
     item_index: int,
     alt_index: int,
@@ -531,7 +531,7 @@ async def update_alternative(
 
 
 @router.delete("/api/recipes/{recipe_id}/items/{item_index}/alternatives/{alt_index}")
-async def remove_alternative(
+def remove_alternative(
     recipe_id: str,
     item_index: int,
     alt_index: int,
@@ -592,7 +592,7 @@ async def remove_alternative(
 
 
 @router.post("/api/recipes/{recipe_id}/increment-version")
-async def increment_version(
+def increment_version(
     recipe_id: str,
     request: Request,
     current_user: dict = Depends(verify_token),
@@ -639,7 +639,7 @@ async def increment_version(
 
 
 @router.get("/api/recipes/{recipe_id}/revisions")
-async def get_recipe_revisions(
+def get_recipe_revisions(
     recipe_id: str,
     current_user: dict = Depends(verify_token),
     db = Depends(get_db)
@@ -678,7 +678,7 @@ async def get_recipe_revisions(
 
 
 @router.get("/api/recipes/{recipe_id}/logs")
-async def get_recipe_logs(
+def get_recipe_logs(
     recipe_id: str,
     current_user: dict = Depends(verify_token),
     db = Depends(get_db)

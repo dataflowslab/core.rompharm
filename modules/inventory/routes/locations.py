@@ -51,6 +51,33 @@ async def get_locations(
         raise HTTPException(status_code=500, detail=f"Failed to fetch locations: {str(e)}")
 
 
+@router.get("/locations/{location_id}")
+async def get_location(
+    request: Request,
+    location_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Get a specific location by ID"""
+    db = get_db()
+    collection = db['depo_locations']
+
+    try:
+        location = collection.find_one({'_id': ObjectId(location_id)})
+        if not location:
+            raise HTTPException(status_code=404, detail="Location not found")
+
+        if location.get('parent_id'):
+            parent = collection.find_one({'_id': location['parent_id']})
+            if parent:
+                location['parent_detail'] = {'name': parent.get('name', '')}
+
+        return serialize_doc(location)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch location: {str(e)}")
+
+
 @router.post("/locations")
 async def create_location(
     request: Request,

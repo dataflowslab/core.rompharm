@@ -240,6 +240,79 @@ balance = get_stock_balance(db, stock_id)
 # Returns: {stock_id, locations: [...], total_quantity}
 ```
 
+
+## Sistem Generare Etichete (Produse, Stocuri, Locuri)
+
+Sistemul de etichete genereaza PDF-uri cu QR prin DataFlows Docu, folosind date din MongoDB si template-uri predefinite.
+
+### Backend
+- Endpoint: `POST /modules/inventory/api/generate-labels-docu`
+- Implementare: `modules/inventory/routes/labels.py`
+- Config Docu: `config/config.yaml` -> `dataflows_docu`
+- Payload:
+```json
+{
+  "table": "depo_parts|depo_stocks|depo_locations",
+  "items": [{"id": "<ObjectId>", "quantity": 1}]
+}
+```
+
+### Template-uri Docu (coduri)
+- `depo_parts` -> `VZ128YDOUWXZ`
+- `depo_stocks` -> `Z4ZW2CN0A0VY`
+- `depo_locations` -> `WOPS3UAKOVWH`
+
+### Format QR (generat in backend)
+- Produse (articles): `P{IPN}`
+- Stocuri: `P{IPN}L{BATCH_CODE}`
+- Locuri: `LOC{CODE}`
+
+### Date trimise catre Docu (campuri principale)
+Payload Docu per eticheta:
+```json
+{
+  "template_code": "<CODE>",
+  "data": {
+    "data": {
+      "barcode": "...",
+      "barcode_str": "data:image/png;base64,...",
+      "part_name": "...",
+      "part_ipn": "...",
+      "batch_code": "...",
+      "expiry_date": "YYYY-MM-DD",
+      "quantity": 0,
+      "location_name": "...",
+      "state_name": "...",
+      "is_salable": true,
+      "um": "",
+      "storage_conditions": "",
+      "purchase_price": "",
+      "user_name": "...",
+      "quant": 1,
+      "crt_no": 1
+    }
+  },
+  "format": "pdf",
+  "filename": "labels-...-1",
+  "options": {}
+}
+```
+Generatorul trimite un job per eticheta (realtime) si apoi concateneaza PDF-urile intr-un singur fisier.
+
+### Frontend (flux UI)
+Componenta comuna: `src/frontend/src/components/Common/PrintLabelsModal.tsx`.
+
+Integrari:
+1. `src/frontend/src/pages/ArticlesPage.tsx` (selectie multipla -> Print Labels, table `depo_parts`)
+2. `modules/inventory/frontend/pages/StocksPage.tsx` (selectie multipla -> Print Labels, table `depo_stocks`)
+3. `src/frontend/src/pages/LocationsPage.tsx` (selectie multipla -> Print Labels, table `depo_locations`)
+4. `src/frontend/src/components/Procurement/ReceivedStockTab.tsx` (selectie din receptii -> Print Labels, table `depo_stocks`)
+
+### Observatii / Aliniere
+- Endpointul `GET /modules/inventory/api/read-label` asteapta format `table:id---...`, dar QR-urile generate acum sunt `P...` / `LOC...`. Daca vrei scanare cu `read-label`, formatul trebuie aliniat.
+- In `src/frontend/src/pages/MobileProcurementDetailPage.tsx` se folosesc endpointuri vechi (`/label-templates`, `/generate-labels`) care nu exista in prezent; trebuie migrat la `/generate-labels-docu` daca se doreste print pe mobil.
+
+
 ## Migrare la Ledger System
 
 ### Script Migrare

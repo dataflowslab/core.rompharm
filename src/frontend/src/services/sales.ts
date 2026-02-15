@@ -49,8 +49,8 @@ export interface Shipment {
 
 export const salesService = {
   // Get all sales orders
-  async getSalesOrders() {
-    const response = await api.get('/api/sales/sales-orders');
+  async getSalesOrders(params?: Record<string, string>) {
+    const response = await api.get('/api/sales/sales-orders', params ? { params } : undefined);
     return response.data;
   },
 

@@ -1,0 +1,25 @@
+{
+  "template_code": "Z4ZW2CN0A0VY",
+  "data": {
+    "data": {
+      "barcode": "P300135603L30.01.202601",
+      "barcode_str": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOYAAADmAQAAAADpEcQWAAABZElEQVR4nO1ZS27FIAwcA9JbkhvkKOnNerVwoCeRZSSQKwPJ+7TvLYurMgtEmEVGFrbHCTFeI5s3JPDfWPB6t7PMq0/HgU86NZtOLHj1LEhgjpYlQigHEjWdmk1HNhPRBCDMO9XTQES6NXdntwvfUvIX3/tHWPfwlAlLzP1VGbWxstILM7AwUJNQdj1VGf190Ke6NIza/gS+QyxX6oYRqweY0vPoQ0pVmOVKba71wTCp1dytXvmr4zBFKVGWESYr6Xd1UuV1ajadWFQHunDCsTBjiXbk4Hccbp1P896K1qjtP/v2Y4GYdwlTdVqKNffug6tviVju2pgHX/RBAaRKlUGndUS9mvv1wSib7IBtAgN7GXSEUKrZdJxxcjEOEM+QmnGgOvfo1GwUsGHeWzp+xiz+VIUqpex24dMulEFRhSqV3xlwVq6Wg0o1m37sVtLOyVMmXuVyyb0aOfgMGv9x7vDei34BM5LQ/n4IX5AAAAAASUVORK5CYII=",
+      "part_name": "ACID TIOCTIC",
+      "part_ipn": "300135603",
+      "batch_code": "30.01.202601",
+      "expiry_date": "2028-01-13",
+      "quantity": 49.75,
+      "location_name": "Materii prime",
+      "state_name": "OK",
+      "is_salable": true,
+      "um": "",
+      "storage_conditions": "15-25 GRADE C",
+      "purchase_price": "",
+      "quant": 2,
+      "crt_no": 1
+    }
+  },
+  "format": "pdf",
+  "filename": "labels-depo_stocks-2pcs-697c6071-1",
+  "options": {}
+}

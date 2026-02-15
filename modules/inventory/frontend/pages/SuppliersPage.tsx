@@ -25,7 +25,7 @@ interface Supplier {
   _id: string;
   pk?: number;
   name: string;
-  code?: string;
+
   vatno?: string;
   regno?: string;
   is_supplier: boolean;
@@ -50,7 +50,7 @@ export function SuppliersPage() {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    code: '',
+
     vatno: '',
     regno: '',
     payment_conditions: '',
@@ -145,7 +145,7 @@ export function SuppliersPage() {
   const resetForm = () => {
     setFormData({
       name: '',
-      code: '',
+
       vatno: '',
       regno: '',
       payment_conditions: '',
@@ -242,13 +242,7 @@ export function SuppliersPage() {
           mb="sm"
         />
 
-        <TextInput
-          label="Code"
-          placeholder="Supplier code"
-          value={formData.code}
-          onChange={(e) => setFormData({ ...formData, code: e.currentTarget.value })}
-          mb="sm"
-        />
+
 
         <TextInput
           label="VAT Number"

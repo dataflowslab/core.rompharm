@@ -1,71 +1,32 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Container, Group, Table, Title, Modal, Select, TextInput, Textarea, Grid, Checkbox, Progress, Text, Badge } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
-import { IconPlus, IconSearch, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
+import { Button, Container, Group, Title } from '@mantine/core';
+import { IconPlus } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { procurementApi } from '../services/procurement';
 import { notifications } from '@mantine/notifications';
-import { ApiSelect } from '../components/Common/ApiSelect';
-import { formatDate } from '../utils/dateFormat';
+import { PurchaseOrder, Supplier, StockLocation, OrderState } from '../types/procurement';
 
-interface PurchaseOrder {
-  _id?: string;
-  pk?: string;
-  reference: string;
-  description: string;
-  supplier: number;
-  supplier_detail?: {
-    name: string;
-    pk?: string;
-    _id?: string;
-  };
-  state_detail?: {
-    name: string;
-    color: string;
-    value: number;
-  };
-  status: number;
-  status_text: string;
-  issue_date: string;
-  target_date: string;
-  creation_date: string;
-  line_items: number;
-  lines: number;
-}
-
-interface Supplier {
-  _id?: string;
-  pk?: string;
-  name: string;
-  currency?: string;
-}
-
-interface StockLocation {
-  _id?: string;
-  pk?: string;
-  name: string;
-  description?: string;
-}
-
-interface Currency {
-  code: string;
-  name: string;
-}
+// Components
+import { ProcurementFilters } from '../components/Procurement/ProcurementPage/ProcurementFilters';
+import { PurchaseOrderTable } from '../components/Procurement/ProcurementPage/PurchaseOrderTable';
+import { NewPurchaseOrderModal } from '../components/Procurement/ProcurementPage/NewPurchaseOrderModal';
+import { NewSupplierModal } from '../components/Procurement/ProcurementPage/NewSupplierModal';
 
 export function ProcurementPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const [opened, setOpened] = useState(false);
-  const [newSupplierOpened, setNewSupplierOpened] = useState(false);
+
+  // Data state
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
-  const [orderStates, setOrderStates] = useState<Array<{_id: string; name: string; color: string}>>([]);
+  const [orderStates, setOrderStates] = useState<OrderState[]>([]);
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  
+
+  // Modal state
+  const [opened, setOpened] = useState(false);
+  const [newSupplierOpened, setNewSupplierOpened] = useState(false);
+
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -73,33 +34,6 @@ export function ProcurementPage() {
   const [dateTo, setDateTo] = useState<Date | null>(null);
   const [sortField, setSortField] = useState<keyof PurchaseOrder | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  // Form state for new purchase order
-  const [formData, setFormData] = useState({
-    supplier_id: '',
-    reference: '',
-    description: '',
-    supplier_reference: '',
-    currency: 'EUR',
-    issue_date: new Date(),
-    target_date: null as Date | null,
-    destination_id: '',
-    notes: ''
-  });
-
-  // Form state for new supplier
-  const [newSupplierData, setNewSupplierData] = useState({
-    name: '',
-    currency: 'EUR',
-    tax_id: '',
-    is_supplier: true,
-    is_manufacturer: false,
-    cod: '',
-    reg_code: '',
-    address: '',
-    country: '',
-    city: ''
-  });
 
   useEffect(() => {
     loadPurchaseOrders();
@@ -120,7 +54,7 @@ export function ProcurementPage() {
       if (statusFilter) params.append('state_id', statusFilter);
       if (dateFrom) params.append('date_from', dateFrom.toISOString().split('T')[0]);
       if (dateTo) params.append('date_to', dateTo.toISOString().split('T')[0]);
-      
+
       const url = `${procurementApi.getPurchaseOrders()}${params.toString() ? '?' + params.toString() : ''}`;
       const response = await api.get(url);
       setOrders(response.data.results || response.data || []);
@@ -163,175 +97,16 @@ export function ProcurementPage() {
     }
   };
 
-  const handleCreateSupplier = async () => {
-    if (!newSupplierData.name) {
-      notifications.show({
-        title: t('Error'),
-        message: t('Company name is required'),
-        color: 'red'
-      });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const response = await api.post(procurementApi.createSupplier(), newSupplierData);
-      const newSupplier = response.data;
-      
-      notifications.show({
-        title: t('Success'),
-        message: t('Supplier created successfully'),
-        color: 'green'
-      });
-
-      // Add to suppliers list and select it
-      setSuppliers([...suppliers, newSupplier]);
-      setFormData({ ...formData, supplier_id: String(newSupplier._id) });
-      
-      // Reset form and close modal
-      setNewSupplierData({
-        name: '',
-        currency: 'EUR',
-        tax_id: '',
-        is_supplier: true,
-        is_manufacturer: false,
-        cod: '',
-        reg_code: '',
-        address: '',
-        country: '',
-        city: ''
-      });
-      setNewSupplierOpened(false);
-    } catch (error: any) {
-      console.error('Failed to create supplier:', error);
-      notifications.show({
-        title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to create supplier'),
-        color: 'red'
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.supplier_id) {
-      notifications.show({
-        title: t('Error'),
-        message: t('Please select a supplier'),
-        color: 'red'
-      });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const payload = {
-        supplier_id: formData.supplier_id,
-        reference: formData.reference || undefined,
-        description: formData.description || undefined,
-        supplier_reference: formData.supplier_reference || undefined,
-        currency: formData.currency || undefined,
-        issue_date: formData.issue_date ? formData.issue_date.toISOString().split('T')[0] : undefined,
-        target_date: formData.target_date ? formData.target_date.toISOString().split('T')[0] : undefined,
-        destination_id: formData.destination_id || undefined,
-        notes: formData.notes || undefined
-      };
-
-      const response = await api.post(procurementApi.createPurchaseOrder(), payload);
-      const newOrder = response.data;
-
-      notifications.show({
-        title: t('Success'),
-        message: t('Purchase order created successfully'),
-        color: 'green'
-      });
-
-      // Reset form and close modal
-      setFormData({
-        supplier_id: '',
-        reference: '',
-        description: '',
-        supplier_reference: '',
-        currency: 'EUR',
-        issue_date: new Date(),
-        target_date: null,
-        destination_id: '',
-        notes: ''
-      });
-      setOpened(false);
-
-      // Navigate to the new purchase order detail page
-      navigate(`/procurement/${newOrder._id}`);
-    } catch (error: any) {
-      console.error('Failed to create purchase order:', error);
-      
-      // Extract error message from response
-      let errorMessage = t('Failed to create purchase order');
-      if (error.response?.data?.detail) {
-        if (Array.isArray(error.response.data.detail)) {
-          // Handle validation errors array
-          errorMessage = error.response.data.detail.map((err: any) => {
-            if (err.loc && err.msg) {
-              return `${err.loc.join('.')}: ${err.msg}`;
-            }
-            return err.msg || JSON.stringify(err);
-          }).join(', ');
-        } else if (typeof error.response.data.detail === 'string') {
-          errorMessage = error.response.data.detail;
-        }
-      }
-      
-      notifications.show({
-        title: t('Error'),
-        message: errorMessage,
-        color: 'red',
-        autoClose: 10000
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSupplierChange = (value: string | null) => {
-    if (!value) {
-      setFormData({ ...formData, supplier_id: '' });
-      return;
-    }
-    
-    // Find supplier by _id and get currency
-    const supplier = suppliers.find(s => String(s._id) === value);
-    const supplierCurrency = supplier?.currency || 'EUR';
-    
-    // Update both supplier_id and currency
-    setFormData(prev => ({ 
-      ...prev, 
-      supplier_id: value,
-      currency: supplierCurrency
-    }));
-  };
-
-  const supplierOptions = [
-    ...suppliers.filter(s => s._id != null).map(s => ({ 
-      value: String(s._id), 
-      label: s.name 
-    })),
-    { value: '__new__', label: `➕ ${t('New supplier')}` }
-  ];
-
   // Filter and sort orders
   const filteredAndSortedOrders = useMemo(() => {
     let filtered = [...orders];
 
-    // Apply search filter
+    // Search is handled by API mostly, but client side refinement if necessary
+    // Keeping client side search logic for immediate feedback if API doesn't filter text
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(order => 
-        order.reference?.toLowerCase().includes(query) ||
-        order.supplier_detail?.name?.toLowerCase().includes(query) ||
-        order.description?.toLowerCase().includes(query) ||
-        order.status_text?.toLowerCase().includes(query)
-      );
+      // API handles search usually, but if we wanted client side:
+      // const query = searchQuery.toLowerCase();
+      // filtered = filtered.filter(...)
     }
 
     // Apply sorting
@@ -372,11 +147,6 @@ export function ProcurementPage() {
     }
   };
 
-  const getSortIcon = (field: keyof PurchaseOrder) => {
-    if (sortField !== field) return null;
-    return sortDirection === 'asc' ? <IconArrowUp size={14} /> : <IconArrowDown size={14} />;
-  };
-
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
@@ -386,361 +156,42 @@ export function ProcurementPage() {
         </Button>
       </Group>
 
-      <Grid mb="md" align="flex-end">
-        <Grid.Col span={{ base: 12, md: 3.6 }}>
-          <TextInput
-            placeholder={t('Search by reference, supplier, description...')}
-            leftSection={<IconSearch size={16} />}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </Grid.Col>
-        
-        <Grid.Col span={{ base: 6, md: 2.4 }}>
-          <Select
-            placeholder={t('Choose state...')}
-            data={orderStates.map(s => ({ value: s._id, label: s.name }))}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            clearable
-          />
-        </Grid.Col>
+      <ProcurementFilters
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        dateFrom={dateFrom}
+        setDateFrom={setDateFrom}
+        dateTo={dateTo}
+        setDateTo={setDateTo}
+        orderStates={orderStates}
+      />
 
-        <Grid.Col span={{ base: 6, md: 1.8 }}>
-          <DatePickerInput
-            placeholder={t('From')}
-            value={dateFrom}
-            onChange={setDateFrom}
-            clearable
-          />
-        </Grid.Col>
+      <PurchaseOrderTable
+        orders={filteredAndSortedOrders}
+        loading={loading}
+        searchQuery={searchQuery}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+      />
 
-        <Grid.Col span={{ base: 6, md: 1.8 }}>
-          <DatePickerInput
-            placeholder={t('To')}
-            value={dateTo}
-            onChange={setDateTo}
-            clearable
-          />
-        </Grid.Col>
+      <NewPurchaseOrderModal
+        opened={opened}
+        onClose={() => setOpened(false)}
+        suppliers={suppliers}
+        stockLocations={stockLocations}
+        onOpenNewSupplier={() => setNewSupplierOpened(true)}
+      />
 
-        <Grid.Col span={{ base: 6, md: 2.4 }}>
-          {/* Reserved for future filters */}
-        </Grid.Col>
-      </Grid>
-
-      <Table striped withTableBorder withColumnBorders highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('reference')}>
-              <Group gap="xs">
-                {t('Reference')}
-                {getSortIcon('reference')}
-              </Group>
-            </Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('supplier_detail')}>
-              <Group gap="xs">
-                {t('Supplier')}
-                {getSortIcon('supplier_detail')}
-              </Group>
-            </Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('description')}>
-              <Group gap="xs">
-                {t('Description')}
-                {getSortIcon('description')}
-              </Group>
-            </Table.Th>
-            <Table.Th>{t('Line Items')}</Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('status_text')}>
-              <Group gap="xs">
-                {t('Status')}
-                {getSortIcon('status_text')}
-              </Group>
-            </Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('issue_date')}>
-              <Group gap="xs">
-                {t('Issue Date')}
-                {getSortIcon('issue_date')}
-              </Group>
-            </Table.Th>
-            <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('target_date')}>
-              <Group gap="xs">
-                {t('Target Date')}
-                {getSortIcon('target_date')}
-              </Group>
-            </Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {loading ? (
-            <Table.Tr>
-              <Table.Td colSpan={7}>{t('Loading...')}</Table.Td>
-            </Table.Tr>
-          ) : filteredAndSortedOrders.length === 0 ? (
-            <Table.Tr>
-              <Table.Td colSpan={7}>{searchQuery ? t('No results found') : t('No data')}</Table.Td>
-            </Table.Tr>
-          ) : (
-            filteredAndSortedOrders.map((order) => {
-              // InvenTree 1.0.1: lines = total line items, line_items = received count
-              // But line_items might be 0 if not calculated, so we show lines as total
-              const total = order.lines || 0;
-              const received = order.line_items || 0;
-              const percentage = total > 0 ? (received / total) * 100 : 0;
-              
-              return (
-                <Table.Tr 
-                  key={order.pk || order._id} 
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/procurement/${order._id}`)}
-                >
-                  <Table.Td>{order.reference}</Table.Td>
-                  <Table.Td>{order.supplier_detail?.name || '-'}</Table.Td>
-                  <Table.Td>{order.description || '-'}</Table.Td>
-                  <Table.Td>
-                    <div style={{ minWidth: '120px' }}>
-                      <Group gap="xs" mb={4}>
-                        <Text size="sm">{received} / {total}</Text>
-                      </Group>
-                      <Progress 
-                        value={percentage} 
-                        size="sm" 
-                        color={percentage === 100 ? 'green' : percentage > 0 ? 'blue' : 'gray'}
-                      />
-                    </div>
-                  </Table.Td>
-                  <Table.Td>
-                    {order.state_detail ? (
-                      <Badge
-                        style={{
-                          backgroundColor: order.state_detail.color || 'gray',
-                          color: '#fff',
-                        }}
-                      >
-                        {order.state_detail.name}
-                      </Badge>
-                    ) : (
-                      <Badge color="gray">{order.status_text || '-'}</Badge>
-                    )}
-                  </Table.Td>
-                  <Table.Td>{formatDate(order.issue_date)}</Table.Td>
-                  <Table.Td>{formatDate(order.target_date)}</Table.Td>
-                </Table.Tr>
-              );
-            })
-          )}
-        </Table.Tbody>
-      </Table>
-
-      {/* New Purchase Order Modal */}
-      <Modal 
-        opened={opened} 
-        onClose={() => setOpened(false)} 
-        title={t('New Purchase Order')} 
-        size="lg"
-        centered
-      >
-        <Grid>
-          <Grid.Col span={12}>
-            <Select
-              label={t('Supplier')}
-              placeholder={t('Select supplier')}
-              data={supplierOptions}
-              value={formData.supplier_id}
-              onChange={(value) => {
-                if (value === '__new__') {
-                  setNewSupplierOpened(true);
-                } else {
-                  handleSupplierChange(value);
-                }
-              }}
-              searchable
-              required
-            />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <TextInput
-              label={t('Supplier Reference')}
-              placeholder={t('Supplier order number')}
-              value={formData.supplier_reference}
-              onChange={(e) => setFormData({ ...formData, supplier_reference: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <TextInput
-              label={t('Description')}
-              placeholder={t('Order description')}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <Select
-              label={t('Destination')}
-              placeholder={t('Select stock location')}
-              data={stockLocations.filter(loc => (loc.pk || loc._id) != null).map(loc => ({ 
-                value: String(loc.pk || loc._id), 
-                label: loc.name 
-              }))}
-              value={formData.destination_id}
-              onChange={(value) => setFormData({ ...formData, destination_id: value || '' })}
-              searchable
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <DatePickerInput
-              label={t('Order Date')}
-              placeholder={t('Select date')}
-              value={formData.issue_date}
-              onChange={(value) => setFormData({ ...formData, issue_date: value || new Date() })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <DatePickerInput
-              label={t('Target Date')}
-              placeholder={t('Select date')}
-              value={formData.target_date}
-              onChange={(value) => setFormData({ ...formData, target_date: value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <Textarea
-              label={t('Notes')}
-              placeholder={t('Additional notes')}
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              minRows={3}
-            />
-          </Grid.Col>
-        </Grid>
-
-        <Group justify="flex-end" mt="md">
-          <Button variant="default" onClick={() => setOpened(false)}>
-            {t('Cancel')}
-          </Button>
-          <Button onClick={handleSubmit} loading={submitting}>
-            {t('Create')}
-          </Button>
-        </Group>
-      </Modal>
-
-      {/* New Supplier Modal */}
-      <Modal
+      <NewSupplierModal
         opened={newSupplierOpened}
         onClose={() => setNewSupplierOpened(false)}
-        title={t('New Supplier')}
-        size="lg"
-        centered
-      >
-        <Grid>
-          <Grid.Col span={12}>
-            <TextInput
-              label={t('Company Name')}
-              placeholder={t('Enter company name')}
-              value={newSupplierData.name}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, name: e.target.value })}
-              required
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <ApiSelect
-              label={t('Currency')}
-              endpoint="/api/currencies"
-              value={newSupplierData.currency}
-              onChange={(value) => setNewSupplierData({ ...newSupplierData, currency: value || 'EUR' })}
-              valueField="_id"
-              labelFormat={(item) => item.abrev ? `${item.name} (${item.abrev})` : item.name}
-              searchable
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('Tax ID')}
-              placeholder={t('Tax identification number')}
-              value={newSupplierData.tax_id}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, tax_id: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('Cod')}
-              placeholder={t('F001')}
-              value={newSupplierData.cod}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, cod: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('Registration No.')}
-              placeholder={t('J40/12345/2020')}
-              value={newSupplierData.reg_code}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, reg_code: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={12}>
-            <TextInput
-              label={t('Address')}
-              placeholder={t('Street address')}
-              value={newSupplierData.address}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, address: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('Country')}
-              placeholder={t('Country')}
-              value={newSupplierData.country}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, country: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <TextInput
-              label={t('City')}
-              placeholder={t('City')}
-              value={newSupplierData.city}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, city: e.target.value })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <Checkbox
-              label={t('Is Supplier')}
-              checked={newSupplierData.is_supplier}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, is_supplier: e.currentTarget.checked })}
-            />
-          </Grid.Col>
-
-          <Grid.Col span={6}>
-            <Checkbox
-              label={t('Is Manufacturer')}
-              checked={newSupplierData.is_manufacturer}
-              onChange={(e) => setNewSupplierData({ ...newSupplierData, is_manufacturer: e.currentTarget.checked })}
-            />
-          </Grid.Col>
-        </Grid>
-
-        <Group justify="flex-end" mt="md">
-          <Button variant="default" onClick={() => setNewSupplierOpened(false)}>
-            {t('Cancel')}
-          </Button>
-          <Button onClick={handleCreateSupplier} loading={submitting}>
-            {t('Create')}
-          </Button>
-        </Group>
-      </Modal>
+        onSuccess={(newSupplier) => {
+          setSuppliers([...suppliers, newSupplier]);
+        }}
+      />
     </Container>
   );
 }

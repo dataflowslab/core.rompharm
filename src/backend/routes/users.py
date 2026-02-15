@@ -4,15 +4,14 @@ Users routes
 from fastapi import APIRouter, Depends
 from typing import List, Dict, Any
 
-from ..utils.db import get_db
-# UserModel removed - using direct DB access
-from ..routes.auth import verify_admin
+from src.backend.utils.db import get_db
+from src.backend.routes.auth import verify_admin
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 @router.get("/")
-async def list_users(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
+def list_users(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
     """
     List all users with their last login information
     Requires administrator access

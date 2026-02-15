@@ -1,133 +1,31 @@
 # API Routes Documentation
-**Last Updated:** 2026-01-29 22:47:46
+**Last Updated:** 2026-02-15 21:45:33
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
-### Approvals
-- `GET /api/approvals/flows` - List approval flows
-- `POST /api/approvals/flows` - Create approval flow for an object
-- `GET /api/approvals/flows/object/{object_type}/{object_id}` - Get approval flow for specific object
-- `GET /api/approvals/flows/{flow_id}` - Get approval flow
-- `POST /api/approvals/flows/{flow_id}/sign` - Sign approval flow
-- `DELETE /api/approvals/flows/{flow_id}/signatures/{user_id}` - Remove signature from flow (admin only)
-- `GET /api/approvals/templates` - List approval templates
-- `POST /api/approvals/templates` - Create approval template
-- `DELETE /api/approvals/templates/{template_id}` - Delete approval template
-- `GET /api/approvals/templates/{template_id}` - Get approval template
-- `PUT /api/approvals/templates/{template_id}` - Update approval template
-
-### Audit
-- `GET /api/audit/` - Get audit logs with pagination and filtering
-- `GET /api/audit/actions` - Get list of all available action types
-
-### Auth
-- `GET /api/auth/dashboard/shortcuts` - Get dashboard shortcuts for current user based on their role
-- `GET /api/auth/me` - Get current user information
-- `POST /api/auth/refresh-status` - Refresh user's staff status from InvenTree (only works when identity_server is 'inventree')
-- `GET /api/auth/verify` - Verify if current token is valid and return user info
-
-### Config
-- `GET /api/config/` - Get application configuration (public endpoint)
-- `POST /api/config/` - Create or update application configuration (requires authentication)
-
-### Crm
-- `GET /api/crm/campaigns` - Get all campaigns
-- `POST /api/crm/campaigns` - Create a new campaign
-- `DELETE /api/crm/campaigns/{campaign_id}` - Delete a campaign
-- `PUT /api/crm/campaigns/{campaign_id}` - Update a campaign
-- `POST /api/crm/campaigns/{campaign_id}/send` - Mark campaign as ready to send (actual sending will be done by cron)
-- `GET /api/crm/segments` - Get all segments
-- `POST /api/crm/segments` - Create a new segment
-- `DELETE /api/crm/segments/{segment_id}` - Delete a segment
-- `PUT /api/crm/segments/{segment_id}` - Update a segment
-- `GET /api/crm/subscribers` - Get all subscribers
-- `POST /api/crm/subscribers` - Create a new subscriber
-- `DELETE /api/crm/subscribers/{subscriber_id}` - Delete a subscriber
-- `PUT /api/crm/subscribers/{subscriber_id}` - Update a subscriber
-
 ### Data
-- `POST /api/data/` - Submit form data
-- `GET /api/data/files/{file_hash}` - Serve a file by its hash (public endpoint)
-- `DELETE /api/data/submission/{submission_id}` - Delete a submission (requires administrator access)
-- `GET /api/data/submission/{submission_id}` - Get a specific submission (requires administrator access)
-- `GET /api/data/submission/{submission_id}/history` - Get state change history for a submission
-- `PUT /api/data/submission/{submission_id}/state` - Update submission state (requires administrator access)
-- `GET /api/data/submissions/all` - Get all submissions across all forms (requires administrator access)
-- `GET /api/data/submissions/stats` - Get submission statistics (requires administrator access)
+- `POST /api/data/` - Upload a file (public endpoint for form submissions)
+- `DELETE /api/data/submission/{submission_id}` - Upload a file (public endpoint for form submissions)
+- `GET /api/data/submission/{submission_id}` - Upload a file (public endpoint for form submissions)
+- `GET /api/data/submission/{submission_id}/history` - Upload a file (public endpoint for form submissions)
+- `PUT /api/data/submission/{submission_id}/state` - Upload a file (public endpoint for form submissions)
+- `GET /api/data/submissions/all` - Upload a file (public endpoint for form submissions)
+- `GET /api/data/submissions/stats` - Upload a file (public endpoint for form submissions)
 - `POST /api/data/upload` - Upload a file (public endpoint for form submissions)
-- `GET /api/data/{form_id}` - Get all submissions for a form (requires administrator access)
-
-### Documents
-- `GET /api/documents/for/{object_id}` - Get all documents for an object
-- `POST /api/documents/generate` - Generate document - returns only job_id
-- `GET /api/documents/job/{job_id}/status` - Check job status
-- `GET /api/documents/templates` - Get all available templates
-- `GET /api/documents/{doc_id}/download` - Download document by document _id or job_id
-- `DELETE /api/documents/{job_id}` - Delete document by job_id
+- `GET /api/data/{form_id}` - Upload a file (public endpoint for form submissions)
 
 ### Forms
-- `GET /api/forms/` - List all forms (requires administrator access)
-- `POST /api/forms/` - Create a new form (requires administrator access)
-- `GET /api/forms/mail-templates/list` - List available email notification templates
-- `DELETE /api/forms/{form_id}` - Soft delete a form (requires administrator access)
-- `PUT /api/forms/{form_id}` - Update an existing form (requires administrator access)
-- `GET /api/forms/{slug}` - Get form definition by slug
-- `GET /api/forms/{slug}/qr` - Generate QR code SVG for form URL
+- `GET /api/forms/{slug}` - List all forms (requires administrator access)
 
-### Recipes
-- `GET /api/recipes` - List all recipes with optional search (latest revision only)
-- `POST /api/recipes` - Create new recipe
-- `GET /api/recipes/parts` - Search parts from depo_parts
-- `GET /api/recipes/{recipe_id}` - Get recipe details
-- `POST /api/recipes/{recipe_id}/increment-version` - Increment recipe version (revision)
-- `POST /api/recipes/{recipe_id}/items` - Add item to recipe
-- `DELETE /api/recipes/{recipe_id}/items/{item_index}` - Remove item from recipe
-- `PUT /api/recipes/{recipe_id}/items/{item_index}` - Update item in recipe
-- `POST /api/recipes/{recipe_id}/items/{item_index}/alternatives` - Add alternative to group (Type 2 item)
-- `DELETE /api/recipes/{recipe_id}/items/{item_index}/alternatives/{alt_index}` - Remove alternative from group
-- `PUT /api/recipes/{recipe_id}/items/{item_index}/alternatives/{alt_index}` - Update alternative in group
-- `GET /api/recipes/{recipe_id}/logs` - Get recipe change history
-- `GET /api/recipes/{recipe_id}/revisions` - Get all revisions for a recipe's product
-
-### Roles
-- `GET /api/roles/` - List all roles
-- `POST /api/roles/` - Create new role
-- `GET /api/roles/permissions/items` - List all available permission items from roles_items collection
-- `DELETE /api/roles/{role_id}` - Delete role
-- `GET /api/roles/{role_id}` - Get role by ID
-- `PUT /api/roles/{role_id}` - Update role
-
-### System
-- `GET /api/currencies` - Get list of currencies
-- `GET /api/system/jobs` - List all configured jobs
-- `POST /api/system/jobs` - Create a new job configuration
-- `DELETE /api/system/jobs/{job_name}` - Delete a job configuration
-- `PUT /api/system/jobs/{job_name}` - Update job configuration
-- `POST /api/system/jobs/{job_name}/run` - Manually trigger a job to run immediately
-- `GET /api/system/notifications` - Get system notifications (warnings, errors, info)
-- `GET /api/system/status` - Get system status and configuration
-
-### Templates
-- `GET /api/templates/` - List all templates from DataFlows Docu
-- `POST /api/templates/` - Create a new template by creating its first part (usually base)
-- `DELETE /api/templates/{template_code}` - Delete entire template bundle from OfficeClerk and local database
-- `GET /api/templates/{template_code}` - Get template bundle with all parts from OfficeClerk
-- `PUT /api/templates/{template_code}` - Update template metadata (name, description) in local database
-- `POST /api/templates/{template_code}/parts` - Add a new part (header, footer, css, code) to existing template
-- `DELETE /api/templates/{template_code}/{part_type}` - Delete a specific part from template
-- `GET /api/templates/{template_code}/{part_type}` - Get metadata for specific template part
-- `PUT /api/templates/{template_code}/{part_type}` - Update template part content and/or name
-- `GET /api/templates/{template_code}/{part_type}/raw` - Get raw content of template part for editing
-
-### Users
-- `GET /api/users/` - List all users with their last login information
-
-### Users Local
-- `GET /api/users/` - List all users
-- `POST /api/users/` - Create new user
-- `DELETE /api/users/{user_id}` - Delete user
-- `GET /api/users/{user_id}` - Get user by ID
-- `PUT /api/users/{user_id}` - Update user
+### Sales
+- `GET /api/sales/customers` - Stub endpoint for customers list.
+- `GET /api/sales/order-statuses` - Stub endpoint for sales order statuses.
+- `GET /api/sales/sales-orders` - Stub endpoint for sales orders list.
+- `GET /api/sales/sales-orders/{order_id}` - Stub endpoint for sales order detail.
+- `GET /api/sales/sales-orders/{order_id}/attachments` - Stub endpoint for sales order attachments.
+- `GET /api/sales/sales-orders/{order_id}/items` - Stub endpoint for sales order items.
+- `GET /api/sales/sales-orders/{order_id}/shipments` - Stub endpoint for sales order shipments.
+- `PATCH /api/sales/sales-orders/{order_id}/status` - Stub endpoint for updating sales order status.
 
 ---
 

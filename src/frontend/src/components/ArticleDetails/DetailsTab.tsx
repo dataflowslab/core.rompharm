@@ -1,9 +1,9 @@
-import { 
-  TextInput, 
-  Select, 
-  Checkbox, 
-  NumberInput, 
-  Group, 
+import {
+  TextInput,
+  Select,
+  Checkbox,
+  NumberInput,
+  Group,
   TagsInput,
   Grid,
   Paper,
@@ -101,7 +101,7 @@ export function DetailsTab({
                 value={article.name}
                 onChange={(e) => setArticle({ ...article, name: e.currentTarget.value })}
               />
-              
+
               <TextInput
                 label="IPN"
                 placeholder="Internal Part Number"
@@ -109,7 +109,7 @@ export function DetailsTab({
                 value={article.ipn}
                 onChange={(e) => setArticle({ ...article, ipn: e.currentTarget.value })}
               />
-              
+
               <Select
                 label="Manufacturer"
                 placeholder="Select manufacturer"
@@ -119,21 +119,21 @@ export function DetailsTab({
                 searchable
                 clearable
               />
-              
+
               <TextInput
                 label="Manufacturer IPN"
                 placeholder="Manufacturer part number"
                 value={article.manufacturer_ipn || ''}
                 onChange={(e) => setArticle({ ...article, manufacturer_ipn: e.currentTarget.value })}
               />
-              
+
               <TextInput
                 label="Link"
                 placeholder="External link"
                 value={article.link || ''}
                 onChange={(e) => setArticle({ ...article, link: e.currentTarget.value })}
               />
-              
+
               <Select
                 label="Category"
                 placeholder="Select category"
@@ -176,7 +176,7 @@ export function DetailsTab({
                 onChange={(e) => setArticle({ ...article, regulated: e.currentTarget.checked })}
               />
               <Checkbox
-                label="Batch Required"
+                label="Lotallexp"
                 checked={article.lotallexp || false}
                 onChange={(e) => setArticle({ ...article, lotallexp: e.currentTarget.checked })}
               />
@@ -204,7 +204,7 @@ export function DetailsTab({
               searchable
               clearable
             />
-            
+
             <NumberInput
               label="Minimum Stock"
               placeholder="0"
@@ -212,14 +212,14 @@ export function DetailsTab({
               onChange={(value) => setArticle({ ...article, minimum_stock: Number(value) || 0 })}
               min={0}
             />
-            
+
             <Group grow align="flex-end">
               <Select
                 label="System U.M."
                 placeholder="Select unit"
-                data={systemUMs.map((um) => ({ 
-                  value: um._id, 
-                  label: `${um.name} (${um.abrev})` 
+                data={systemUMs.map((um) => ({
+                  value: um._id,
+                  label: `${um.name} (${um.abrev})`
                 }))}
                 value={article.system_um_id || ''}
                 onChange={(value) => setArticle({ ...article, system_um_id: value || undefined })}
@@ -227,7 +227,7 @@ export function DetailsTab({
                 clearable
                 style={{ flex: 1 }}
               />
-              
+
               <NumberInput
                 label="Conversion Modifier"
                 placeholder="1.0"
@@ -239,14 +239,14 @@ export function DetailsTab({
                 style={{ flex: 1 }}
               />
             </Group>
-            
+
             <div style={{ width: '50%' }}>
               <Select
                 label="Manufacturer UM"
                 placeholder="Select unit"
-                data={systemUMs.map((um) => ({ 
-                  value: um._id, 
-                  label: `${um.name} (${um.abrev})` 
+                data={systemUMs.map((um) => ({
+                  value: um._id,
+                  label: `${um.name} (${um.abrev})`
                 }))}
                 value={article.manufacturer_um_id || ''}
                 onChange={(value) => setArticle({ ...article, manufacturer_um_id: value || undefined })}
@@ -254,7 +254,7 @@ export function DetailsTab({
                 clearable
               />
             </div>
-            
+
             <NumberInput
               label="Total Delivery Time"
               placeholder="0"
@@ -263,14 +263,14 @@ export function DetailsTab({
               onChange={(value) => setArticle({ ...article, total_delivery_time: String(value || 0) })}
               min={0}
             />
-            
+
             <TextInput
               label="Storage Condition"
               placeholder="e.g., 1-3°C"
               value={article.storage_conditions || ''}
               onChange={(e) => setArticle({ ...article, storage_conditions: e.currentTarget.value })}
             />
-            
+
             <Select
               label="Selection Method"
               placeholder="Select method"
@@ -298,14 +298,14 @@ export function DetailsTab({
               onChange={(e) => setArticle({ ...article, description: e.currentTarget.value })}
               minRows={3}
             />
-            
+
             <TagsInput
               label="Keywords"
               placeholder="Add keywords"
               value={article.keywords || []}
               onChange={(value) => setArticle({ ...article, keywords: value })}
             />
-            
+
             <div>
               <label style={{ fontSize: '14px', fontWeight: 500, marginBottom: '8px', display: 'block' }}>
                 Notes

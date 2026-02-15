@@ -92,6 +92,12 @@ async def get_stock_by_id(db, stock_id: str) -> Dict[str, Any]:
     
     # Add recent movements
     stock_data['recent_movements'] = get_stock_movements(db, stock_oid, limit=20)
+
+    # Enrich supplier UM name
+    if 'supplier_um_id' in stock and stock['supplier_um_id']:
+        um = db.depo_ums.find_one({'_id': stock['supplier_um_id']})
+        if um:
+            stock_data['supplier_um_name'] = um.get('name')
     
     return stock_data
 

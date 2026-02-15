@@ -1,0 +1,1489 @@
+# Translation file
+# Generated automatically
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+
+msgid ","
+msgstr ","
+
+msgid "."
+msgstr "."
+
+msgid "/api/audit/?limit=${limit}&skip=${skip}"
+msgstr "/api/audit/?limit=${limit}&skip=${skip}"
+
+msgid "/api/auth/dashboard/shortcuts"
+msgstr "/api/auth/dashboard/shortcuts"
+
+msgid "/api/auth/verify"
+msgstr "/api/auth/verify"
+
+msgid "/api/config/"
+msgstr "/api/config/"
+
+msgid "/api/config/entries/all"
+msgstr "/api/config/entries/all"
+
+msgid "/api/crm/campaigns"
+msgstr "/api/crm/campaigns"
+
+msgid "/api/crm/campaigns/${campaignToSend}/send"
+msgstr "/api/crm/campaigns/${campaignToSend}/send"
+
+msgid "/api/crm/segments"
+msgstr "/api/crm/segments"
+
+msgid "/api/crm/subscribers"
+msgstr "/api/crm/subscribers"
+
+
+msgid "/api/data/${formId}"
+msgstr "/api/data/${formId}"
+
+msgid "/api/data/submission/${submissionId}"
+msgstr "/api/data/submission/${submissionId}"
+
+msgid "/api/data/submission/${submissionId}/approval-status"
+msgstr "/api/data/submission/${submissionId}/approval-status"
+
+msgid "/api/data/submission/${submissionId}/documents"
+msgstr "/api/data/submission/${submissionId}/documents"
+
+msgid "/api/data/submission/${submissionId}/history"
+msgstr "/api/data/submission/${submissionId}/history"
+
+msgid "/api/data/submission/${submissionId}/sign"
+msgstr "/api/data/submission/${submissionId}/sign"
+
+msgid "/api/data/submissions/all"
+msgstr "/api/data/submissions/all"
+
+msgid "/api/data/submissions/stats"
+msgstr "/api/data/submissions/stats"
+
+msgid "/api/documents/form/${formId}/templates"
+msgstr "/api/documents/form/${formId}/templates"
+
+msgid "/api/documents/job/${submissionId}/${jobId}/status"
+msgstr "/api/documents/job/${submissionId}/${jobId}/status"
+
+msgid "/api/forms/"
+msgstr "/api/forms/"
+
+msgid "/api/forms/${slug}"
+msgstr "/api/forms/${slug}"
+
+msgid "/api/forms/mail-templates/list"
+msgstr "/api/forms/mail-templates/list"
+
+msgid "/api/forms/registries/list"
+msgstr "/api/forms/registries/list"
+
+msgid "/api/roles/"
+msgstr "/api/roles/"
+
+msgid "/api/system/identity-server"
+msgstr "/api/system/identity-server"
+
+msgid "/api/system/modules/menu"
+msgstr "/api/system/modules/menu"
+
+msgid "/api/system/notifications"
+msgstr "/api/system/notifications"
+
+msgid "/api/system/status"
+msgstr "/api/system/status"
+
+msgid "/api/templates"
+msgstr "/api/templates"
+
+msgid "/api/templates/${code}"
+msgstr "/api/templates/${code}"
+
+msgid "/api/templates/${code}/base/raw"
+msgstr "/api/templates/${code}/base/raw"
+
+msgid "/api/users/"
+msgstr "/api/users/"
+
+msgid "/api/users/roles"
+msgstr "/api/users/roles"
+
+msgid "1"
+msgstr "1"
+
+msgid "<html>\n<body>\n  <h1>{{title}}</h1>\n  <p>{{content}}</p>\n</body>\n</html>"
+msgstr "<html>\n<body>\n  <h1>{{title}}</h1>\n  <p>{{content}}</p>\n</body>\n</html>"
+
+msgid "Access Denied"
+msgstr "Access Denied"
+
+msgid "Action"
+msgstr "Action"
+
+msgid "Actions"
+msgstr "Actions"
+
+msgid "Active"
+msgstr "Active"
+
+msgid "Activity Log"
+msgstr "Activity Log"
+
+msgid "Add"
+msgstr "Add"
+
+msgid "Add Campaign"
+msgstr "Add Campaign"
+
+msgid "Add Role"
+msgstr "Add Role"
+
+msgid "Add Segment"
+msgstr "Add Segment"
+
+msgid "Add Signers"
+msgstr "Add Signers"
+
+msgid "Add Subscriber"
+msgstr "Add Subscriber"
+
+msgid "Add User"
+msgstr "Add User"
+
+msgid "Add notes..."
+msgstr "Add notes..."
+
+msgid "Admin"
+msgstr "Admin"
+
+msgid "Administration"
+msgstr "Administration"
+
+msgid "Administrator"
+msgstr "Administrator"
+
+msgid "Administrator access required"
+msgstr "Administrator access required"
+
+msgid "Administrator access required to view submissions."
+msgstr "Administrator access required to view submissions."
+
+msgid "Administrator access required to view this page."
+msgstr "Administrator access required to view this page."
+
+msgid "All Forms"
+msgstr "All Forms"
+
+msgid "All Submissions"
+msgstr "All Submissions"
+
+msgid "All systems operational"
+msgstr "All systems operational"
+
+msgid "Anonymous"
+msgstr "Anonymous"
+
+msgid "Any file type accepted"
+msgstr "Any file type accepted"
+
+msgid "Approval"
+msgstr "Approval"
+
+msgid "Approval workflow not enabled for this form"
+msgstr "Approval workflow not enabled for this form"
+
+msgid "Approvals"
+msgstr "Approvals"
+
+msgid "Are you sure you want to delete this campaign?"
+msgstr "Are you sure you want to delete this campaign?"
+
+msgid "Are you sure you want to delete this file? This action cannot be undone."
+msgstr "Are you sure you want to delete this file? This action cannot be undone."
+
+msgid "Are you sure you want to delete this form? This action cannot be undone."
+msgstr "Are you sure you want to delete this form? This action cannot be undone."
+
+msgid "Are you sure you want to delete this part?"
+msgstr "Are you sure you want to delete this part?"
+
+msgid "Are you sure you want to delete this role? Users with this role may lose access."
+msgstr "Are you sure you want to delete this role? Users with this role may lose access."
+
+msgid "Are you sure you want to delete this segment?"
+msgstr "Are you sure you want to delete this segment?"
+
+msgid "Are you sure you want to delete this submission? This action cannot be undone."
+msgstr "Are you sure you want to delete this submission? This action cannot be undone."
+
+msgid "Are you sure you want to delete this subscriber?"
+msgstr "Are you sure you want to delete this subscriber?"
+
+msgid "Are you sure you want to delete this user? This action cannot be undone."
+msgstr "Are you sure you want to delete this user? This action cannot be undone."
+
+msgid "Are you sure you want to send this campaign? It will be processed by the cron job."
+msgstr "Are you sure you want to send this campaign? It will be processed by the cron job."
+
+msgid "At least one contact method (email or phone) is required"
+msgstr "At least one contact method (email or phone) is required"
+
+msgid "Audit Log"
+msgstr "Audit Log"
+
+msgid "Authentication Required"
+msgstr "Authentication Required"
+
+msgid "Authentication required for this form"
+msgstr "Authentication required for this form"
+
+msgid "Authentication required. Please login to submit this form."
+msgstr "Authentication required. Please login to submit this form."
+
+msgid "Author"
+msgstr "Author"
+
+msgid "Back"
+msgstr "Back"
+
+msgid "Back to Dashboard"
+msgstr "Back to Dashboard"
+
+msgid "Base template to copy content from"
+msgstr "Base template to copy content from"
+
+msgid "By"
+msgstr "By"
+
+msgid "Campaign created successfully"
+msgstr "Campaign created successfully"
+
+msgid "Campaign deleted successfully"
+msgstr "Campaign deleted successfully"
+
+msgid "Campaign marked for sending. It will be processed by the cron job."
+msgstr "Campaign marked for sending. It will be processed by the cron job."
+
+msgid "Campaign updated successfully"
+msgstr "Campaign updated successfully"
+
+msgid "Campaign will be sent automatically at this date/time if active"
+msgstr "Campaign will be sent automatically at this date/time if active"
+
+msgid "Campaigns"
+msgstr "Campaigns"
+
+msgid "Can Sign"
+msgstr "Can Sign"
+
+msgid "Cancel"
+msgstr "Cancel"
+
+msgid "Cannot connect to server. Please check if the backend is running."
+msgstr "Cannot connect to server. Please check if the backend is running."
+
+msgid "Cererea a fost înregistrată"
+msgstr "Cererea a fost înregistrată"
+
+msgid "Change State"
+msgstr "Change State"
+
+msgid "Choose from Library"
+msgstr "Choose from Library"
+
+msgid "Coming soon..."
+msgstr "Coming soon..."
+
+msgid "Comma-separated email addresses to notify when a new submission is received"
+msgstr "Comma-separated email addresses to notify when a new submission is received"
+
+msgid "Confirm"
+msgstr "Confirm"
+
+msgid "Confirm Submission"
+msgstr "Confirm Submission"
+
+msgid "Confirmi trimiterea formularului în forma actuală?"
+msgstr "Confirmi trimiterea formularului în forma actuală?"
+
+msgid "Consents"
+msgstr "Consents"
+
+msgid "Contact Form"
+msgstr "Contact Form"
+
+msgid "Content"
+msgstr "Content"
+
+msgid "Content is required"
+msgstr "Content is required"
+
+msgid "Create"
+msgstr "Create"
+
+msgid "Create Form"
+msgstr "Create Form"
+
+msgid "Create New Form"
+msgstr "Create New Form"
+
+msgid "Create New Template"
+msgstr "Create New Template"
+
+msgid "Create Template"
+msgstr "Create Template"
+
+msgid "Create your first form to get started."
+msgstr "Create your first form to get started."
+
+msgid "Created"
+msgstr "Created"
+
+msgid "Current"
+msgstr "Current"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Database will be: dataflows_{domain}"
+msgstr "Database will be: dataflows_{domain}"
+
+msgid "Domain"
+msgstr "Domain"
+
+msgid "Enter domain"
+msgstr "Enter domain"
+
+msgid "Data"
+msgstr "Data"
+
+msgid "DataFlows Docu is not configured"
+msgstr "DataFlows Docu is not configured"
+
+msgid "DataFlows Docu is not configured. Please configure it in config.yaml to use document templates."
+msgstr "DataFlows Docu is not configured. Please configure it in config.yaml to use document templates."
+
+msgid "Delete"
+msgstr "Delete"
+
+msgid "Delete Campaign"
+msgstr "Delete Campaign"
+
+msgid "Delete Form"
+msgstr "Delete Form"
+
+msgid "Delete Part"
+msgstr "Delete Part"
+
+msgid "Delete Role"
+msgstr "Delete Role"
+
+msgid "Delete Segment"
+msgstr "Delete Segment"
+
+msgid "Delete Submission"
+msgstr "Delete Submission"
+
+msgid "Delete Subscriber"
+msgstr "Delete Subscriber"
+
+msgid "Delete User"
+msgstr "Delete User"
+
+msgid "Delete form"
+msgstr "Delete form"
+
+msgid "Delete submission"
+msgstr "Delete submission"
+
+msgid "Description"
+msgstr "Description"
+
+msgid "Document Templates"
+msgstr "Document Templates"
+
+msgid "Document deleted successfully"
+msgstr "Document deleted successfully"
+
+msgid "Document generated successfully!"
+msgstr "Document generated successfully!"
+
+msgid "Documents uploaded successfully"
+msgstr "Documents uploaded successfully"
+
+msgid "Download"
+msgstr "Download"
+
+msgid "Drag file here or click to select"
+msgstr "Drag file here or click to select"
+
+msgid "Drag files here or click to select"
+msgstr "Drag files here or click to select"
+
+msgid "Drag image here or click to select"
+msgstr "Drag image here or click to select"
+
+msgid "Edit"
+msgstr "Edit"
+
+msgid "Edit Campaign"
+msgstr "Edit Campaign"
+
+msgid "Edit File"
+msgstr "Edit File"
+
+msgid "Edit Form"
+msgstr "Edit Form"
+
+msgid "Edit Role"
+msgstr "Edit Role"
+
+msgid "Edit Segment"
+msgstr "Edit Segment"
+
+msgid "Edit Setting"
+msgstr "Edit Setting"
+
+msgid "Edit Subscriber"
+msgstr "Edit Subscriber"
+
+msgid "Edit Template"
+msgstr "Edit Template"
+
+msgid "Edit User"
+msgstr "Edit User"
+
+msgid "Edit form"
+msgstr "Edit form"
+
+msgid "Edit template name"
+msgstr "Edit template name"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "Email marketing consent"
+msgstr "Email marketing consent"
+
+msgid "Email template to use for notifications"
+msgstr "Email template to use for notifications"
+
+msgid "Enable Approval Workflow"
+msgstr "Enable Approval Workflow"
+
+msgid "Enable automatic registry numbering for submissions"
+msgstr "Enable automatic registry numbering for submissions"
+
+msgid "English"
+msgstr "English"
+
+msgid "Enter campaign title"
+msgstr "Enter campaign title"
+
+msgid "Enter description"
+msgstr "Enter description"
+
+msgid "Enter email"
+msgstr "Enter email"
+
+msgid "Enter file description"
+msgstr "Enter file description"
+
+msgid "Enter file description (optional)"
+msgstr "Enter file description (optional)"
+
+msgid "Enter file title"
+msgstr "Enter file title"
+
+msgid "Enter file title (optional)"
+msgstr "Enter file title (optional)"
+
+msgid "Enter link URL"
+msgstr "Enter link URL"
+
+msgid "Enter name"
+msgstr "Enter name"
+
+msgid "Enter password"
+msgstr "Enter password"
+
+msgid "Enter phone"
+msgstr "Enter phone"
+
+msgid "Enter role description"
+msgstr "Enter role description"
+
+msgid "Enter role name"
+msgstr "Enter role name"
+
+msgid "Enter segment name"
+msgstr "Enter segment name"
+
+msgid "Enter tax ID"
+msgstr "Enter tax ID"
+
+msgid "Enter username"
+msgstr "Enter username"
+
+msgid "Enter usernames or roles"
+msgstr "Enter usernames or roles"
+
+msgid "Enter value (plain text or JSON format for objects/arrays)"
+msgstr "Enter value (plain text or JSON format for objects/arrays)"
+
+msgid "Enter your password"
+msgstr "Enter your password"
+
+msgid "Enter your username"
+msgstr "Enter your username"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Example array:"
+msgstr "Example array:"
+
+msgid "Failed to create template"
+msgstr "Failed to create template"
+
+msgid "Failed to delete campaign"
+msgstr "Failed to delete campaign"
+
+msgid "Failed to delete document"
+msgstr "Failed to delete document"
+
+msgid "Failed to delete file"
+msgstr "Failed to delete file"
+
+msgid "Failed to delete files"
+msgstr "Failed to delete files"
+
+msgid "Failed to delete form"
+msgstr "Failed to delete form"
+
+msgid "Failed to delete part"
+msgstr "Failed to delete part"
+
+msgid "Failed to delete role"
+msgstr "Failed to delete role"
+
+msgid "Failed to delete segment"
+msgstr "Failed to delete segment"
+
+msgid "Failed to delete submission"
+msgstr "Failed to delete submission"
+
+msgid "Failed to delete subscriber"
+msgstr "Failed to delete subscriber"
+
+msgid "Failed to delete user"
+msgstr "Failed to delete user"
+
+msgid "Failed to download file"
+msgstr "Failed to download file"
+
+msgid "Failed to generate document"
+msgstr "Failed to generate document"
+
+
+msgid "Failed to load campaigns"
+msgstr "Failed to load campaigns"
+
+msgid "Failed to load files"
+msgstr "Failed to load files"
+
+msgid "Failed to load form"
+msgstr "Failed to load form"
+
+msgid "Failed to load forms"
+msgstr "Failed to load forms"
+
+msgid "Failed to load part content"
+msgstr "Failed to load part content"
+
+msgid "Failed to load registries"
+msgstr "Failed to load registries"
+
+msgid "Failed to load roles"
+msgstr "Failed to load roles"
+
+msgid "Failed to load segments"
+msgstr "Failed to load segments"
+
+msgid "Failed to load settings"
+msgstr "Failed to load settings"
+
+msgid "Failed to load submission"
+msgstr "Failed to load submission"
+
+msgid "Failed to load submissions"
+msgstr "Failed to load submissions"
+
+msgid "Failed to load subscribers"
+msgstr "Failed to load subscribers"
+
+msgid "Failed to load template content"
+msgstr "Failed to load template content"
+
+msgid "Failed to load templates"
+msgstr "Failed to load templates"
+
+msgid "Failed to load users"
+msgstr "Failed to load users"
+
+msgid "Failed to save campaign"
+msgstr "Failed to save campaign"
+
+msgid "Failed to save part"
+msgstr "Failed to save part"
+
+msgid "Failed to save role"
+msgstr "Failed to save role"
+
+msgid "Failed to save segment"
+msgstr "Failed to save segment"
+
+msgid "Failed to save setting"
+msgstr "Failed to save setting"
+
+msgid "Failed to save subscriber"
+msgstr "Failed to save subscriber"
+
+msgid "Failed to save user"
+msgstr "Failed to save user"
+
+msgid "Failed to send campaign"
+msgstr "Failed to send campaign"
+
+msgid "Failed to sign submission"
+msgstr "Failed to sign submission"
+
+msgid "Failed to submit form. Please try again."
+msgstr "Failed to submit form. Please try again."
+
+msgid "Failed to update file"
+msgstr "Failed to update file"
+
+msgid "Failed to update state"
+msgstr "Failed to update state"
+
+msgid "Failed to update template"
+msgstr "Failed to update template"
+
+msgid "Failed to upload documents"
+msgstr "Failed to upload documents"
+
+msgid "Failed to upload file"
+msgstr "Failed to upload file"
+
+msgid "Failed to upload image"
+msgstr "Failed to upload image"
+
+msgid "File deleted successfully"
+msgstr "File deleted successfully"
+
+msgid "File updated successfully"
+msgstr "File updated successfully"
+
+msgid "File uploaded successfully"
+msgstr "File uploaded successfully"
+
+msgid "Files deleted successfully"
+msgstr "Files deleted successfully"
+
+msgid "Filter by form"
+msgstr "Filter by form"
+
+msgid "For JSON arrays/objects, use proper JSON format with quotes"
+msgstr "For JSON arrays/objects, use proper JSON format with quotes"
+
+msgid "For plain text (like email content), just type normally"
+msgstr "For plain text (like email content), just type normally"
+
+msgid "Force regenerate document even if already exists"
+msgstr "Force regenerate document even if already exists"
+
+msgid "Form"
+msgstr "Form"
+
+msgid "Form Submissions"
+msgstr "Form Submissions"
+
+msgid "Form Summary"
+msgstr "Form Summary"
+
+msgid "Form Title"
+msgstr "Form Title"
+
+msgid "Form created successfully"
+msgstr "Form created successfully"
+
+msgid "Form deleted successfully"
+msgstr "Form deleted successfully"
+
+msgid "Form description..."
+msgstr "Form description..."
+
+msgid "Form not found"
+msgstr "Form not found"
+
+msgid "Form submitted successfully!"
+msgstr "Form submitted successfully!"
+
+msgid "Form updated successfully"
+msgstr "Form updated successfully"
+
+msgid "Forms"
+msgstr "Forms"
+
+msgid "Forms Management"
+msgstr "Forms Management"
+
+msgid "General"
+msgstr "General"
+
+msgid "Generate Document"
+msgstr "Generate Document"
+
+msgid "Generate Documents"
+msgstr "Generate Documents"
+
+msgid "Grant full administrative access"
+msgstr "Grant full administrative access"
+
+msgid "Has Registry"
+msgstr "Has Registry"
+
+msgid "History"
+msgstr "History"
+
+msgid "IP Address"
+msgstr "IP Address"
+
+msgid "Image"
+msgstr "Image"
+
+msgid "Image should not exceed 5MB"
+msgstr "Image should not exceed 5MB"
+
+msgid "Image uploaded successfully"
+msgstr "Image uploaded successfully"
+
+
+msgid "Imported"
+msgstr "Imported"
+
+msgid "Inactive"
+msgstr "Inactive"
+
+
+msgid "Invalid file type. Please upload an image."
+msgstr "Invalid file type. Please upload an image."
+
+
+msgid "JSON Forms Documentation"
+msgstr "JSON Forms Documentation"
+
+msgid "JSON Schema"
+msgstr "JSON Schema"
+
+msgid "JavaScript code"
+msgstr "JavaScript code"
+
+msgid "Key"
+msgstr "Key"
+
+msgid "Last Login"
+msgstr "Last Login"
+
+msgid "Last Updated"
+msgstr "Last Updated"
+
+msgid "Last updated"
+msgstr "Last updated"
+
+msgid "Leave empty to keep current"
+msgstr "Leave empty to keep current"
+
+msgid "Library"
+msgstr "Library"
+
+msgid "Link"
+msgstr "Link"
+
+msgid "Load More"
+msgstr "Load More"
+
+msgid "Loading audit logs..."
+msgstr "Loading audit logs..."
+
+msgid "Loading campaigns..."
+msgstr "Loading campaigns..."
+
+msgid "Loading files..."
+msgstr "Loading files..."
+
+msgid "Loading form..."
+msgstr "Loading form..."
+
+msgid "Loading forms..."
+msgstr "Loading forms..."
+
+msgid "Loading notifications..."
+msgstr "Loading notifications..."
+
+msgid "Loading registries..."
+msgstr "Loading registries..."
+
+msgid "Loading roles..."
+msgstr "Loading roles..."
+
+msgid "Loading segments..."
+msgstr "Loading segments..."
+
+msgid "Loading settings..."
+msgstr "Loading settings..."
+
+msgid "Loading submission..."
+msgstr "Loading submission..."
+
+msgid "Loading submissions..."
+msgstr "Loading submissions..."
+
+msgid "Loading subscribers..."
+msgstr "Loading subscribers..."
+
+msgid "Loading templates..."
+msgstr "Loading templates..."
+
+msgid "Loading users..."
+msgstr "Loading users..."
+
+msgid "Login"
+msgstr "Login"
+
+msgid "Logout"
+msgstr "Logout"
+
+msgid "Message"
+msgstr "Message"
+
+msgid "Metadata"
+msgstr "Metadata"
+
+msgid "Minimum Number of Signatures"
+msgstr "Minimum Number of Signatures"
+
+msgid "Minimum Signatures"
+msgstr "Minimum Signatures"
+
+msgid "Minimum signatures required for approval"
+msgstr "Minimum signatures required for approval"
+
+msgid "Modified"
+msgstr "Modified"
+
+msgid "Must Sign"
+msgstr "Must Sign"
+
+msgid "My Files"
+msgstr "My Files"
+
+msgid "My Template"
+msgstr "My Template"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Need help with JSON Schema or UI Schema?"
+msgstr "Need help with JSON Schema or UI Schema?"
+
+msgid "Never"
+msgstr "Never"
+
+msgid "New Template"
+msgstr "New Template"
+
+msgid "No"
+msgstr "No"
+
+msgid "No audit logs found"
+msgstr "No audit logs found"
+
+msgid "No campaigns"
+msgstr "No campaigns"
+
+msgid "No campaigns found. Create your first campaign to send to subscribers."
+msgstr "No campaigns found. Create your first campaign to send to subscribers."
+
+msgid "No configuration entries found in the database."
+msgstr "No configuration entries found in the database."
+
+msgid "No files"
+msgstr "No files"
+
+msgid "No files found in this section."
+msgstr "No files found in this section."
+
+msgid "No files found matching your search."
+msgstr "No files found matching your search."
+
+msgid "No files found. Upload files to the library first."
+msgstr "No files found. Upload files to the library first."
+
+msgid "No form shortcuts configured"
+msgstr "No form shortcuts configured"
+
+msgid "No forms with registries found. Enable registry on a form to see it here."
+msgstr "No forms with registries found. Enable registry on a form to see it here."
+
+msgid "No forms yet"
+msgstr "No forms yet"
+
+msgid "No history"
+msgstr "No history"
+
+msgid "No notifications"
+msgstr "No notifications"
+
+msgid "No registries"
+msgstr "No registries"
+
+msgid "No roles found"
+msgstr "No roles found"
+
+msgid "No roles found. Create your first role to assign to users."
+msgstr "No roles found. Create your first role to assign to users."
+
+msgid "No segments"
+msgstr "No segments"
+
+msgid "No segments found. Add your first segment to organize subscribers."
+msgstr "No segments found. Add your first segment to organize subscribers."
+
+msgid "No settings"
+msgstr "No settings"
+
+msgid "No signers configured. Add at least one signer to enable approval workflow."
+msgstr "No signers configured. Add at least one signer to enable approval workflow."
+
+msgid "No submissions"
+msgstr "No submissions"
+
+msgid "No submissions found matching your criteria."
+msgstr "No submissions found matching your criteria."
+
+msgid "No submissions found matching your search."
+msgstr "No submissions found matching your search."
+
+msgid "No submissions found."
+msgstr "No submissions found."
+
+msgid "No submissions yet"
+msgstr "No submissions yet"
+
+msgid "No subscribers"
+msgstr "No subscribers"
+
+
+msgid "No templates available"
+msgstr "No templates available"
+
+msgid "No templates available in DataFlows Docu"
+msgstr "No templates available in DataFlows Docu"
+
+msgid "No templates configured for this form"
+msgstr "No templates configured for this form"
+
+msgid "No templates found"
+msgstr "No templates found"
+
+msgid "No uploaded documents"
+msgstr "No uploaded documents"
+
+msgid "No users found"
+msgstr "No users found"
+
+msgid "No users found. Create your first user."
+msgstr "No users found. Create your first user."
+
+msgid "Not Found"
+msgstr "Not Found"
+
+msgid "Notes"
+msgstr "Notes"
+
+msgid "Notification Emails"
+msgstr "Notification Emails"
+
+msgid "Notification Template"
+msgstr "Notification Template"
+
+msgid "Notifications"
+msgstr "Notifications"
+
+msgid "Notify author"
+msgstr "Notify author"
+
+msgid "Owner"
+msgstr "Owner"
+
+msgid "PDF, DOC, DOCX, XLS, XLSX, PNG, JPG"
+msgstr "PDF, DOC, DOCX, XLS, XLSX, PNG, JPG"
+
+msgid "Part Type"
+msgstr "Part Type"
+
+msgid "Part deleted successfully"
+msgstr "Part deleted successfully"
+
+msgid "Part updated successfully"
+msgstr "Part updated successfully"
+
+msgid "Password"
+msgstr "Password"
+
+msgid "Password is required for new users"
+msgstr "Password is required for new users"
+
+msgid "Pending"
+msgstr "Pending"
+
+msgid "Phone"
+msgstr "Phone"
+
+msgid "Please login to submit this form"
+msgstr "Please login to submit this form"
+
+msgid "Please select a file"
+msgstr "Please select a file"
+
+msgid "Preview"
+msgstr "Preview"
+
+msgid "Preview not available for this file type"
+msgstr "Preview not available for this file type"
+
+msgid "Processing"
+msgstr "Processing"
+
+msgid "Protected"
+msgstr "Protected"
+
+msgid "Protected Form"
+msgstr "Protected Form"
+
+msgid "Public"
+msgstr "Public"
+
+msgid "Public Form"
+msgstr "Public Form"
+
+msgid "Public forms can be filled by anyone. Protected forms require authentication."
+msgstr "Public forms can be filled by anyone. Protected forms require authentication."
+
+msgid "Quick Actions"
+msgstr "Quick Actions"
+
+msgid "Recent Activity"
+msgstr "Recent Activity"
+
+msgid "Recent Submissions"
+msgstr "Recent Submissions"
+
+msgid "Regenerate"
+msgstr "Regenerate"
+
+msgid "Registers"
+msgstr "Registers"
+
+msgid "Registry"
+msgstr "Registry"
+
+msgid "Registry #"
+msgstr "Registry #"
+
+msgid "Registry Settings"
+msgstr "Registry Settings"
+
+msgid "Require signatures before submission can be approved"
+msgstr "Require signatures before submission can be approved"
+
+msgid "Role"
+msgstr "Role"
+
+msgid "Role Name"
+msgstr "Role Name"
+
+msgid "Role created successfully"
+msgstr "Role created successfully"
+
+msgid "Role deleted successfully"
+msgstr "Role deleted successfully"
+
+
+msgid "Role name is required"
+msgstr "Role name is required"
+
+msgid "Role updated successfully"
+msgstr "Role updated successfully"
+
+msgid "Roles"
+msgstr "Roles"
+
+msgid "Roles define permissions and access levels for users in Firebase authentication mode."
+msgstr "Roles define permissions and access levels for users in Firebase authentication mode."
+
+msgid "Română"
+msgstr "Română"
+
+msgid "SMS marketing consent"
+msgstr "SMS marketing consent"
+
+msgid "Save"
+msgstr "Save"
+
+msgid "Scheduled At"
+msgstr "Scheduled At"
+
+msgid "Search files..."
+msgstr "Search files..."
+
+msgid "Search in registry..."
+msgstr "Search in registry..."
+
+msgid "Search..."
+msgstr "Search..."
+
+msgid "Segment"
+msgstr "Segment"
+
+msgid "Segment created successfully"
+msgstr "Segment created successfully"
+
+msgid "Segment deleted successfully"
+msgstr "Segment deleted successfully"
+
+msgid "Segment updated successfully"
+msgstr "Segment updated successfully"
+
+msgid "Segments"
+msgstr "Segments"
+
+msgid "Select"
+msgstr "Select"
+
+msgid "Select date and time"
+msgstr "Select date and time"
+
+msgid "Select email template"
+msgstr "Select email template"
+
+msgid "Select role"
+msgstr "Select role"
+
+msgid "Select segment"
+msgstr "Select segment"
+
+msgid "Select segments"
+msgstr "Select segments"
+
+msgid "Select templates"
+msgstr "Select templates"
+
+msgid "Select templates for document generation"
+msgstr "Select templates for document generation"
+
+msgid "Select the type of template part to create"
+msgstr "Select the type of template part to create"
+
+msgid "Select user"
+msgstr "Select user"
+
+msgid "Send Campaign"
+msgstr "Send Campaign"
+
+msgid "Sent Count"
+msgstr "Sent Count"
+
+msgid "Setting updated successfully"
+msgstr "Setting updated successfully"
+
+msgid "Settings"
+msgstr "Settings"
+
+msgid "Share with"
+msgstr "Share with"
+
+msgid "Shared with Me"
+msgstr "Shared with Me"
+
+msgid "Sign Now"
+msgstr "Sign Now"
+
+msgid "Signatures"
+msgstr "Signatures"
+
+msgid "Signed"
+msgstr "Signed"
+
+msgid "Signers"
+msgstr "Signers"
+
+msgid "Size"
+msgstr "Size"
+
+msgid "Skipped"
+msgstr "Skipped"
+
+msgid "Slug"
+msgstr "Slug"
+
+msgid "Standard CSS syntax"
+msgstr "Standard CSS syntax"
+
+msgid "Start"
+msgstr "Start"
+
+msgid "Start With"
+msgstr "Start With"
+
+msgid "Starting number for registry (will auto-increment)"
+msgstr "Starting number for registry (will auto-increment)"
+
+msgid "State"
+msgstr "State"
+
+msgid "State updated successfully"
+msgstr "State updated successfully"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Submission Details"
+msgstr "Submission Details"
+
+msgid "Submission deleted successfully"
+msgstr "Submission deleted successfully"
+
+msgid "Submission not found"
+msgstr "Submission not found"
+
+msgid "Submission signed successfully"
+msgstr "Submission signed successfully"
+
+msgid "Submissions (30 days)"
+msgstr "Submissions (30 days)"
+
+msgid "Submissions (7 days)"
+msgstr "Submissions (7 days)"
+
+msgid "Submit"
+msgstr "Submit"
+
+msgid "Submitted At"
+msgstr "Submitted At"
+
+msgid "Submitted By"
+msgstr "Submitted By"
+
+msgid "Subscriber created successfully"
+msgstr "Subscriber created successfully"
+
+msgid "Subscriber deleted successfully"
+msgstr "Subscriber deleted successfully"
+
+msgid "Subscriber updated successfully"
+msgstr "Subscriber updated successfully"
+
+msgid "Subscribers"
+msgstr "Subscribers"
+
+msgid "Success"
+msgstr "Success"
+
+msgid "System Notifications"
+msgstr "System Notifications"
+
+msgid "T"
+msgstr "T"
+
+msgid "Tags"
+msgstr "Tags"
+
+msgid "Tax ID"
+msgstr "Tax ID"
+
+msgid "Tax ID (CUI/CIF)"
+msgstr "Tax ID (CUI/CIF)"
+
+msgid "Template Name"
+msgstr "Template Name"
+
+msgid "Template Parts"
+msgstr "Template Parts"
+
+msgid "Template created successfully"
+msgstr "Template created successfully"
+
+msgid "Template description..."
+msgstr "Template description..."
+
+msgid "Template name is required"
+msgstr "Template name is required"
+
+msgid "Template updated successfully"
+msgstr "Template updated successfully"
+
+msgid "Templates"
+msgstr "Templates"
+
+msgid "The DataFlows Docu server may be experiencing issues with the /raw endpoint."
+msgstr "The DataFlows Docu server may be experiencing issues with the /raw endpoint."
+
+msgid "This action cannot be undone."
+msgstr "This action cannot be undone."
+
+msgid "This is a protected form. You need to login to access it."
+msgstr "This is a protected form. You need to login to access it."
+
+msgid "Timestamp"
+msgstr "Timestamp"
+
+msgid "Tips:"
+msgstr "Tips:"
+
+msgid "Title"
+msgstr "Title"
+
+msgid "Total Submissions"
+msgstr "Total Submissions"
+
+msgid "Type"
+msgstr "Type"
+
+msgid "UI Schema (optional)"
+msgstr "UI Schema (optional)"
+
+msgid "Unable to load template content. Please try again later or contact support."
+msgstr "Unable to load template content. Please try again later or contact support."
+
+msgid "Update"
+msgstr "Update"
+
+msgid "Update State"
+msgstr "Update State"
+
+msgid "Upload"
+msgstr "Upload"
+
+msgid "Upload File"
+msgstr "Upload File"
+
+msgid "Uploaded Documents"
+msgstr "Uploaded Documents"
+
+msgid "Use Jinja2 syntax: {{variable}}, {% for %}, {% if %}"
+msgstr "Use Jinja2 syntax: {{variable}}, {% for %}, {% if %}"
+
+msgid "User"
+msgstr "User"
+
+msgid "User already added"
+msgstr "User already added"
+
+msgid "User created successfully"
+msgstr "User created successfully"
+
+msgid "User deleted successfully"
+msgstr "User deleted successfully"
+
+msgid "User updated successfully"
+msgstr "User updated successfully"
+
+msgid "Username"
+msgstr "Username"
+
+msgid "Username is required"
+msgstr "Username is required"
+
+msgid "Users"
+msgstr "Users"
+
+msgid "Valid"
+msgstr "Valid"
+
+msgid "Value"
+msgstr "Value"
+
+msgid "View Documentation"
+msgstr "View Documentation"
+
+msgid "View details"
+msgstr "View details"
+
+msgid "View submissions"
+msgstr "View submissions"
+
+msgid "Waiting"
+msgstr "Waiting"
+
+msgid "Warning"
+msgstr "Warning"
+
+msgid "Warning: Editing these settings directly can affect system behavior. Make sure you know what you are doing."
+msgstr "Warning: Editing these settings directly can affect system behavior. Make sure you know what you are doing."
+
+msgid "Welcome"
+msgstr "Welcome"
+
+msgid "Will be verified with ANAF if provided"
+msgstr "Will be verified with ANAF if provided"
+
+msgid "Yes"
+msgstr "Yes"
+
+msgid "You are not authorized to sign this submission"
+msgstr "You are not authorized to sign this submission"
+
+msgid "You have already signed this submission"
+msgstr "You have already signed this submission"
+
+msgid "a"
+msgstr "a"
+
+msgid "base"
+msgstr "base"
+
+msgid "entries"
+msgstr "entries"
+
+msgid "file(s) selected"
+msgstr "file(s) selected"
+
+msgid "filter"
+msgstr "filter"
+
+msgid "form"
+msgstr "form"
+
+msgid "form_title"
+msgstr "form_title"
+
+msgid "part"
+msgstr "part"
+
+msgid "registry_number"
+msgstr "registry_number"
+
+msgid "state"
+msgstr "state"
+
+msgid "submitted_at"
+msgstr "submitted_at"
+
+msgid "submitted_by"
+msgstr "submitted_by"

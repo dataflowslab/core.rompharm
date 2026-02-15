@@ -1,71 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Text, Table, Button, Group, Modal, ActionIcon, Badge, Grid, Stack, Select, Textarea } from '@mantine/core';
-import { IconPlus, IconTrash, IconSignature } from '@tabler/icons-react';
+import { Paper, Title, Text, Button, Group, Modal, Grid } from '@mantine/core';
+import { IconPlus, IconPrinter } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
 import { ReceiveStockForm, ReceiveStockFormData } from '../Common/ReceiveStockForm';
-import { formatDateTime } from '../../utils/dateFormat';
-
-interface ReceivedItem {
-  _id: string;
-  pk?: number;  // Legacy support
-  part: number;
-  part_detail?: {
-    name: string;
-    IPN: string;
-  };
-  quantity: number;
-  quantity_received?: number;  // Original quantity in Manufacturer UM
-  quantity_system_um?: number;  // Converted quantity in System UM
-  conversion_modifier?: number;
-  system_um_detail?: {
-    name: string;
-    abrev: string;
-    symbol: string;
-  };
-  manufacturer_um_detail?: {
-    name: string;
-    abrev: string;
-    symbol: string;
-  };
-  location: number;
-  location_detail?: {
-    name: string;
-  };
-  batch?: string;  // Legacy field
-  batch_code?: string;  // New field
-  serial: string;
-  packaging: string;
-  status: number;
-  status_detail?: {
-    name: string;
-    value: number;
-    color: string;
-  };
-  notes: string;
-}
-
-interface PurchaseOrderItem {
-  _id: string;
-  part_id: string;
-  part_detail?: {
-    name: string;
-    ipn: string;
-    um?: string;
-    manufacturer_um?: string;
-    lotallexp?: boolean;
-  };
-  quantity: number;
-  received: number;
-}
-
-interface StockLocation {
-  _id: string;
-  name: string;
-}
+import { ReceivedStockTable } from './ReceivedStockTable';
+import { ReceivedStockApproval } from './ReceivedStockApproval';
+import { ReceivedItem, PurchaseOrderItem, StockLocation, ApprovalFlow } from '../../types/procurement';
+import { PrintLabelsModal } from '../Common/PrintLabelsModal';
 
 interface ReceivedStockTabProps {
   orderId: string;
@@ -78,23 +23,9 @@ interface ReceivedStockTabProps {
   canModify?: boolean;
 }
 
-interface ApprovalFlow {
-  _id: string;
-  signatures: Array<{
-    user_id: string;
-    username: string;
-    user_name?: string;
-    signed_at: string;
-    signature_hash: string;
-  }>;
-  status: string;
-  required_officers: any[];
-  optional_officers: any[];
-}
-
 export function ReceivedStockTab({ orderId, items, stockLocations, onReload, supplierName, supplierId, orderStateId, canModify = true }: ReceivedStockTabProps) {
   const { t } = useTranslation();
-  
+
   // Check if order is in FINISHED or CANCELLED state (cannot modify)
   const FINISHED_STATE = '6943a4a6451609dd8a618ce3';
   const CANCELLED_STATE = '6943a4a6451609dd8a618ce2';
@@ -105,7 +36,9 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
   const [submitting, setSubmitting] = useState(false);
   const [stockStatuses, setStockStatuses] = useState<{ value: string; label: string }[]>([]);
   const [systemUms, setSystemUms] = useState<{ value: string; label: string }[]>([]);
-  
+  const [selectedReceivedItems, setSelectedReceivedItems] = useState<string[]>([]);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+
   // Approval flow state
   const [approvalFlow, setApprovalFlow] = useState<ApprovalFlow | null>(null);
   const [loadingFlow, setLoadingFlow] = useState(false);
@@ -114,7 +47,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
   const [availableStates, setAvailableStates] = useState<{ value: string; label: string }[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [refusalComments, setRefusalComments] = useState<string>('');
-  
+
   // Form state using ReceiveStockFormData interface
   const [formData, setFormData] = useState<ReceiveStockFormData>({
     line_item: '',
@@ -179,7 +112,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
       const response = await api.get('/modules/depo_procurement/api/order-statuses');
       const allStates = response.data.statuses || [];
       // Filter states: 6943a4a6451609dd8a618ce3, 6943a4a6451609dd8a618ce4
-      const targetStates = allStates.filter((s: any) => 
+      const targetStates = allStates.filter((s: any) =>
         s._id === '6943a4a6451609dd8a618ce3' || s._id === '6943a4a6451609dd8a618ce4'
       );
       setAvailableStates(targetStates.map((s: any) => ({
@@ -207,8 +140,8 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
 
     // Get selected state name
     const selectedState = availableStates.find(s => s.value === targetStateId);
-    const isRefused = selectedState?.label?.toLowerCase().includes('refused') || 
-                      selectedState?.label?.toLowerCase().includes('refuz');
+    const isRefused = selectedState?.label?.toLowerCase().includes('refused') ||
+      selectedState?.label?.toLowerCase().includes('refuz');
 
     // Validate comments for refused state
     if (isRefused && !refusalComments.trim()) {
@@ -307,9 +240,9 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
     try {
       const response = await api.get('/modules/inventory/api/system-ums');
       const ums = response.data || [];
-      setSystemUms(ums.map((um: any) => ({ 
-        value: um._id, 
-        label: `${um.name} (${um.abrev})` 
+      setSystemUms(ums.map((um: any) => ({
+        value: um._id,
+        label: `${um.name} (${um.abrev})`
       })));
     } catch (error) {
       console.error('Failed to fetch system UMs:', error);
@@ -418,6 +351,8 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
         transferable: formData.transferable, // Backend will determine actual status based on part.regulated and this flag
         supplier_id: formData.supplier_id || supplierId || '',
         supplier_um_id: formData.supplier_um_id || '694813b6297c9dde6d7065b7',
+        supplier_ba_no: formData.supplier_ba_no || '',
+        supplier_ba_date: formData.supplier_ba_date ? formData.supplier_ba_date.toISOString().split('T')[0] : null,
         notes: formData.notes || '',
         manufacturing_date: formData.manufacturing_date ? formData.manufacturing_date.toISOString().split('T')[0] : null,
         expected_quantity: formData.expected_quantity || 0,
@@ -425,8 +360,6 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
         reset_date: !formData.use_expiry && formData.reset_date ? formData.reset_date.toISOString().split('T')[0] : null,
         containers: formData.containers.length > 0 ? formData.containers : [],
         containers_cleaned: formData.containers_cleaned,
-        supplier_ba_no: formData.supplier_ba_no || '',
-        supplier_ba_date: formData.supplier_ba_date ? formData.supplier_ba_date.toISOString().split('T')[0] : null,
         accord_ba: formData.accord_ba,
         is_list_supplier: formData.is_list_supplier,
         clean_transport: formData.clean_transport,
@@ -435,8 +368,6 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
       };
 
       console.log('[ReceivedStockTab] Sending payload:', receivePayload);
-      console.log('[ReceivedStockTab] Payload keys:', Object.keys(receivePayload));
-      console.log('[ReceivedStockTab] URL:', procurementApi.receiveStock(orderId));
 
       await api.post(procurementApi.receiveStock(orderId), receivePayload);
 
@@ -491,7 +422,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
 
   const handleLineItemChange = (value: string | null) => {
     setFormData({ ...formData, line_item: value || '' });
-    
+
     // Auto-set expected quantity based on selected item (but allow user to receive more)
     if (value) {
       const item = items.find(i => i._id === value);
@@ -523,28 +454,55 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
   });
 
   // Prepare locations for ReceiveStockForm
-  const locationsData = stockLocations.map(loc => ({ 
-    value: loc._id, 
-    label: loc.name 
+  const locationsData = stockLocations.map(loc => ({
+    value: loc._id,
+    label: loc.name
   }));
 
   const hasReceivedItems = receivedItems.length > 0;
-  const hasSignatures = approvalFlow && approvalFlow.signatures && approvalFlow.signatures.length > 0;
+
+  const getSelectedPrintItems = () => {
+    return receivedItems
+      .filter(i => selectedReceivedItems.includes(i._id || i.pk))
+      .map(i => ({
+        id: i._id || i.pk,
+        name: i.part_detail?.name || i.part,
+        code: i.batch_code || i.batch || '-'
+      }));
+  };
 
   return (
     <Paper p="md" withBorder>
       <Group justify="space-between" mb="md">
         <Title order={4}>{t('Received Stock')}</Title>
-        {canModifyStock && (
-          <Button 
-            leftSection={<IconPlus size={16} />}
-            onClick={() => setReceiveModalOpened(true)}
-            disabled={availableItems.length === 0}
-          >
-            {t('Receive Stock')}
-          </Button>
-        )}
+        <Group>
+          {selectedReceivedItems.length > 0 && (
+            <Button
+              variant="light"
+              leftSection={<IconPrinter size={16} />}
+              onClick={() => setPrintModalOpen(true)}
+            >
+              {t('Print Labels')} ({selectedReceivedItems.length})
+            </Button>
+          )}
+          {canModifyStock && (
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => setReceiveModalOpened(true)}
+              disabled={availableItems.length === 0}
+            >
+              {t('Receive Stock')}
+            </Button>
+          )}
+        </Group>
       </Group>
+
+      <PrintLabelsModal
+        isOpen={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        items={getSelectedPrintItems()}
+        table="depo_stocks"
+      />
 
       {!hasReceivedItems ? (
         <Text size="sm" c="dimmed">{t('No received items')}</Text>
@@ -552,156 +510,30 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
         <Grid>
           {/* Approval Box - 1/4 width */}
           <Grid.Col span={3}>
-            <Paper p="md" withBorder>
-              <Title order={5} mb="md">{t('Approval')}</Title>
-              
-              {!hasSignatures ? (
-                <Stack gap="sm">
-                  <Select
-                    label={t('Target State')}
-                    placeholder={t('Select state')}
-                    value={targetStateId}
-                    onChange={(value) => {
-                      setTargetStateId(value || '');
-                      // Reset comments when changing state
-                      if (value) {
-                        const selectedState = availableStates.find(s => s.value === value);
-                        const isRefused = selectedState?.label?.toLowerCase().includes('refused') || 
-                                          selectedState?.label?.toLowerCase().includes('refuz');
-                        if (!isRefused) {
-                          setRefusalComments('');
-                        }
-                      }
-                    }}
-                    data={availableStates}
-                    required
-                  />
-                  
-                  {/* Show comments field if Refused is selected */}
-                  {(() => {
-                    const selectedState = availableStates.find(s => s.value === targetStateId);
-                    const isRefused = selectedState?.label?.toLowerCase().includes('refused') || 
-                                      selectedState?.label?.toLowerCase().includes('refuz');
-                    return isRefused ? (
-                      <Textarea
-                        label={t('Comments')}
-                        placeholder={t('Please provide a reason for refusal')}
-                        value={refusalComments}
-                        onChange={(e) => setRefusalComments(e.currentTarget.value)}
-                        required
-                        minRows={3}
-                        error={!refusalComments ? t('Comments are required for refusal') : undefined}
-                      />
-                    ) : null;
-                  })()}
-                  
-                  <Button
-                    leftSection={<IconSignature size={16} />}
-                    onClick={handleSignReceivedStock}
-                    loading={signing}
-                    fullWidth
-                    color="blue"
-                  >
-                    {t('Sign')}
-                  </Button>
-                </Stack>
-              ) : (
-                <Stack gap="sm">
-                  <Text size="sm" fw={500}>{t('Signatures')}</Text>
-                  {approvalFlow.signatures.map((sig) => (
-                    <Group key={sig.user_id} justify="space-between">
-                      <div>
-                        <Text size="sm">{sig.user_name || sig.username}</Text>
-                        <Text size="xs" c="dimmed">{formatDateTime(sig.signed_at)}</Text>
-                      </div>
-                      {canModifyStock && (
-                        <ActionIcon
-                          color="red"
-                          variant="subtle"
-                          onClick={() => handleRemoveSignature(sig.user_id, sig.user_name || sig.username)}
-                          title={t('Remove')}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      )}
-                    </Group>
-                  ))}
-                </Stack>
-              )}
-            </Paper>
+            <ReceivedStockApproval
+              approvalFlow={approvalFlow}
+              targetStateId={targetStateId}
+              setTargetStateId={setTargetStateId}
+              availableStates={availableStates}
+              refusalComments={refusalComments}
+              setRefusalComments={setRefusalComments}
+              onSign={handleSignReceivedStock}
+              onRemoveSignature={handleRemoveSignature}
+              signing={signing}
+              canModifyStock={canModifyStock}
+            />
           </Grid.Col>
 
           {/* Table - 3/4 width */}
           <Grid.Col span={9}>
-            <Table striped withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('Part')}</Table.Th>
-                  <Table.Th>
-                    {t('Quantity')}
-                    {receivedItems[0]?.system_um_detail && (
-                      <Text span size="xs" c="dimmed"> ({receivedItems[0].system_um_detail.abrev})</Text>
-                    )}
-                  </Table.Th>
-                  <Table.Th>{t('Location')}</Table.Th>
-                  <Table.Th>{t('Batch')}</Table.Th>
-                  <Table.Th>{t('Status')}</Table.Th>
-                  {canModifyStock && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {receivedItems.map((item) => (
-                  <Table.Tr key={item._id || item.pk}>
-                    <Table.Td>
-                      {item.part_detail?.name || item.part}
-                      {item.part_detail?.IPN && ` (${item.part_detail.IPN})`}
-                    </Table.Td>
-                    <Table.Td>
-                      {item.quantity_system_um !== undefined ? (
-                        <>
-                          <Text fw={500}>{item.quantity_system_um.toFixed(2)}</Text>
-                          {item.quantity_received !== item.quantity_system_um && (
-                            <Text size="xs" c="dimmed">
-                              ({item.quantity_received} {item.manufacturer_um_detail?.abrev || ''} × {item.conversion_modifier})
-                            </Text>
-                          )}
-                        </>
-                      ) : (
-                        item.quantity
-                      )}
-                    </Table.Td>
-                    <Table.Td>{item.location_detail?.name || item.location}</Table.Td>
-                    <Table.Td>{item.batch_code || item.batch || '-'}</Table.Td>
-                    <Table.Td>
-                      {item.status_detail ? (
-                        <Badge
-                          style={{
-                            backgroundColor: item.status_detail.color || '#gray',
-                            color: '#fff',
-                          }}
-                        >
-                          {item.status_detail.name}
-                        </Badge>
-                      ) : (
-                        <Badge color="gray">{getStatusLabel(item.status)}</Badge>
-                      )}
-                    </Table.Td>
-                    {canModifyStock && (
-                      <Table.Td>
-                        <ActionIcon
-                          color="red"
-                          variant="subtle"
-                          onClick={() => handleDeleteStock(item)}
-                          title={t('Delete')}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Table.Td>
-                    )}
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
+            <ReceivedStockTable
+              items={receivedItems}
+              canModifyStock={canModifyStock}
+              onDeleteStock={handleDeleteStock}
+              getStatusLabel={getStatusLabel}
+              selectedItems={selectedReceivedItems}
+              onSelectionChange={setSelectedReceivedItems}
+            />
           </Grid.Col>
         </Grid>
       )}

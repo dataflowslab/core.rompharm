@@ -159,13 +159,14 @@ async def update_stock(
         update_doc['test_result'] = stock_data.test_result
     
     # Auto-set state_id based on test_result when BA is signed
-    if stock_data.rompharm_ba_no and stock_data.test_result:
-        if stock_data.test_result == 'conform':
-            # Set to OK status
-            update_doc['state_id'] = ObjectId('694321db8728e4d75ae72789')
-        elif stock_data.test_result == 'neconform':
-            # Set to Quarantined Not OK status
-            update_doc['state_id'] = ObjectId('6979211af8165bc859d6f2d2')
+    # REMOVED: BA Rompharm no longer changes state. Only QA Rompharm does.
+    # if stock_data.rompharm_ba_no and stock_data.test_result:
+    #     if stock_data.test_result == 'conform':
+    #         # Set to OK status
+    #         update_doc['state_id'] = ObjectId('694321db8728e4d75ae72789')
+    #     elif stock_data.test_result == 'neconform':
+    #         # Set to Quarantined Not OK status
+    #         update_doc['state_id'] = ObjectId('6979211af8165bc859d6f2d2')
     
     # Allow manual state_id override if provided explicitly
     if stock_data.state_id is not None:
@@ -261,6 +262,41 @@ async def remove_stock_signature_endpoint(
     """Remove signature from stock QC approval flow"""
     from modules.inventory.services import remove_stock_signature
     return await remove_stock_signature(stock_id, user_id, current_user)
+
+
+@router.post("/stocks/{stock_id}/sign-qa")
+async def sign_stock_qa_endpoint(
+    request: Request,
+    stock_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Sign QA Rompharm for a stock item"""
+    from modules.inventory.services import sign_stock_qa
+    
+    body = await request.json()
+    qa_data = {
+        'qa_rompharm_ba_no': body.get('qa_rompharm_ba_no'),
+        'qa_rompharm_ba_date': body.get('qa_rompharm_ba_date'),
+        'qa_test_result': body.get('qa_test_result'),
+        'qa_reason': body.get('qa_reason')
+    }
+    
+    client_host = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
+    return await sign_stock_qa(stock_id, qa_data, current_user, client_host, user_agent)
+
+
+@router.delete("/stocks/{stock_id}/signatures-qa/{user_id}")
+async def remove_stock_qa_signature_endpoint(
+    request: Request,
+    stock_id: str,
+    user_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    """Remove QA signature from stock"""
+    from modules.inventory.services import remove_stock_qa_signature
+    return await remove_stock_qa_signature(stock_id, current_user)
 
 
 @router.put("/stocks/{stock_id}/transactionable")

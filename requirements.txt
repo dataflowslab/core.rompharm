@@ -1,2 +1,3 @@
 # Task runner
 invoke>=2.2.0
+pypdf>=4.0.0

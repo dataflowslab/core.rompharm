@@ -12,42 +12,44 @@ export const requestsApi = {
   createRequest: () => `${API_PREFIX}/`,
   updateRequest: (id: string) => `${API_PREFIX}/${id}`,
   deleteRequest: (id: string) => `${API_PREFIX}/${id}`,
-  
+
   // Stock Locations
   getStockLocations: () => `${API_PREFIX}/stock-locations`,
-  
+
   // Parts
   getParts: () => `${API_PREFIX}/parts`,
   getPartStockInfo: (partId: string) => `${API_PREFIX}/parts/${partId}/stock-info`,
   getPartRecipe: (partId: string) => `${API_PREFIX}/parts/${partId}/recipe`,
   getPartBatchCodes: (partId: string) => `${API_PREFIX}/parts/${partId}/batch-codes`,
   getPartBom: (partId: string) => `${API_PREFIX}/parts/${partId}/bom`,
-  
+
   // Approval Flow
   getApprovalFlow: (requestId: string) => `${API_PREFIX}/${requestId}/approval-flow`,
   createApprovalFlow: (requestId: string) => `${API_PREFIX}/${requestId}/approval-flow`,
   signRequest: (requestId: string) => `${API_PREFIX}/${requestId}/sign`,
   removeSignature: (requestId: string, userId: string) => `${API_PREFIX}/${requestId}/signatures/${userId}`,
-  
+
   // Operations Flow
   getOperationsFlow: (requestId: string) => `${API_PREFIX}/${requestId}/operations-flow`,
   signOperations: (requestId: string) => `${API_PREFIX}/${requestId}/operations-sign`,
   removeOperationsSignature: (requestId: string, userId: string) => `${API_PREFIX}/${requestId}/operations-signatures/${userId}`,
   updateOperationsStatus: (requestId: string) => `${API_PREFIX}/${requestId}/operations-status`,
-  
+
   // Reception Flow
   getReceptionFlow: (requestId: string) => `${API_PREFIX}/${requestId}/reception-flow`,
   signReception: (requestId: string) => `${API_PREFIX}/${requestId}/reception-sign`,
   removeReceptionSignature: (requestId: string, userId: string) => `${API_PREFIX}/${requestId}/reception-signatures/${userId}`,
   updateReceptionStatus: (requestId: string) => `${API_PREFIX}/${requestId}/reception-status`,
-  
+
   // Production Flow
   getProductionData: (requestId: string) => `${API_PREFIX}/${requestId}/production`,
   saveProductionData: (requestId: string) => `${API_PREFIX}/${requestId}/production`,
   getProductionFlow: (requestId: string) => `${API_PREFIX}/${requestId}/production-flow`,
   signProduction: (requestId: string) => `${API_PREFIX}/${requestId}/production-sign`,
   updateProductionStatus: (requestId: string) => `${API_PREFIX}/${requestId}/production-status`,
-  
+
   // States
   getStates: () => `${API_PREFIX}/states`,
+  // Transfer
+  executeTransfer: (requestId: string) => `${API_PREFIX}/${requestId}/execute-transfer`,
 };

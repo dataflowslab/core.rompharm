@@ -14,25 +14,27 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
 
-from .routes import auth
-from .routes import forms
-from .routes import data
-from .routes import config
-from .routes import documents
-from .routes import templates
-from .routes import users
-from .routes import users_local
-from .routes import roles
-from .routes import audit
-from .routes import system
-from .routes import external
-from .routes import approvals
-from .routes import recipes
-from .utils.db import close_db
-from .scheduler import get_scheduler
+from src.backend.routes import auth
+from src.backend.routes import forms
+from src.backend.routes import data
+from src.backend.routes import config
+from src.backend.routes import documents
+from src.backend.routes import templates
+from src.backend.routes import users
+from src.backend.routes import users_local
+from src.backend.routes import roles
+from src.backend.routes import audit
+from src.backend.routes import system
+from src.backend.routes import external
+from src.backend.routes import approvals
+from src.backend.routes import recipes
+from src.backend.routes import sales
+from src.backend.utils.db import close_db
+from src.backend.scheduler import get_scheduler
 
 # Import modules from root
 import sys
+# Ensure root is in path to import 'modules'
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from modules import register_modules
 
@@ -67,9 +69,12 @@ app.include_router(system.router)
 app.include_router(external.router)
 app.include_router(approvals.router)
 app.include_router(recipes.router)
+app.include_router(sales.router)
 
 # Register modules dynamically
 print("\n=== Loading Modules ===")
+# Pass the absolute path to app if needed, or valid object
+# register_modules expects app instance
 register_modules(app)
 print("=== Modules Loaded ===\n")
 
@@ -80,7 +85,7 @@ if os.path.exists(media_path):
 
 
 @app.get("/")
-async def root():
+def root():
     """
     Root endpoint - redirect to /web
     """
@@ -93,7 +98,7 @@ from fastapi.responses import FileResponse
 frontend_dist = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
 
 @app.get("/web/{full_path:path}")
-async def serve_frontend(full_path: str):
+def serve_frontend(full_path: str):
     """
     Serve frontend static files with SPA fallback to index.html
     """
@@ -114,7 +119,7 @@ async def serve_frontend(full_path: str):
 
 
 @app.get("/health")
-async def health_check():
+def health_check():
     """
     Health check endpoint
     """
@@ -122,7 +127,7 @@ async def health_check():
 
 
 @app.on_event("startup")
-async def startup_event():
+def startup_event():
     """
     Initialize services on startup
     """
@@ -136,7 +141,7 @@ async def startup_event():
 
 
 @app.on_event("shutdown")
-async def shutdown_event():
+def shutdown_event():
     """
     Cleanup on shutdown
     """

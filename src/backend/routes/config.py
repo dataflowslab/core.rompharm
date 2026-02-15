@@ -6,9 +6,9 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-from ..utils.db import get_db
-from ..models.config_model import ConfigModel
-from ..routes.auth import verify_token
+from src.backend.utils.db import get_db
+from src.backend.models.config_model import ConfigModel
+from src.backend.routes.auth import verify_token
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -19,7 +19,7 @@ class ConfigUpdate(BaseModel):
 
 
 @router.get("/")
-async def get_config():
+def get_config():
     """
     Get application configuration (public endpoint)
     """
@@ -39,7 +39,7 @@ async def get_config():
 
 
 @router.post("/")
-async def create_or_update_config(config_data: ConfigUpdate, user = Depends(verify_token)):
+def create_or_update_config(config_data: ConfigUpdate, user = Depends(verify_token)):
     """
     Create or update application configuration (requires authentication)
     """

@@ -23,6 +23,8 @@ import { IconPlus, IconEdit, IconTrash, IconSearch } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { api } from '../services/api';
+import { PrintLabelsModal } from '../components/Common/PrintLabelsModal';
+
 
 interface Article {
   _id: string;
@@ -77,7 +79,10 @@ export function ArticlesPage() {
   const [opened, { open, close }] = useDisclosure(false);
   const [locations, setLocations] = useState<Location[]>([]);
   const [suppliers, setSuppliers] = useState<Company[]>([]);
+  const [manufacturers, setManufacturers] = useState<Company[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedArticles, setSelectedArticles] = useState<string[]>([]);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -86,20 +91,22 @@ export function ArticlesPage() {
     default_location_id: '',
     um: 'buc',
     supplier_id: '',
+    manufacturer_id: '',
     minimum_stock: 0,
-    default_expiry: 0,
     notes: '',
     is_component: true,
     is_assembly: true,
     is_testable: true,
     is_salable: false,
     is_active: true,
+    lotallexp: false,
   });
 
   useEffect(() => {
     fetchArticles();
     fetchLocations();
     fetchSuppliers();
+    fetchManufacturers();
     fetchCategories();
   }, [search, sortBy, sortOrder, categoryFilter]);
 
@@ -151,6 +158,15 @@ export function ArticlesPage() {
     }
   };
 
+  const fetchManufacturers = async () => {
+    try {
+      const response = await api.get('/modules/inventory/api/companies?is_manufacturer=true');
+      setManufacturers(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch manufacturers:', error);
+    }
+  };
+
   const fetchCategories = async () => {
     try {
       const response = await api.get('/modules/inventory/api/categories');
@@ -163,7 +179,7 @@ export function ArticlesPage() {
   const handleCategoryFilterChange = (value: string | null) => {
     const newValue = value || '';
     setCategoryFilter(newValue);
-    
+
     // Update URL params
     if (newValue) {
       setSearchParams({ category: newValue });
@@ -238,14 +254,15 @@ export function ArticlesPage() {
       default_location_id: '',
       um: 'buc',
       supplier_id: '',
+      manufacturer_id: '',
       minimum_stock: 0,
-      default_expiry: 0,
       notes: '',
       is_component: true,
       is_assembly: true,
       is_testable: true,
       is_salable: false,
       is_active: true,
+      lotallexp: false,
     });
   };
 
@@ -254,14 +271,54 @@ export function ArticlesPage() {
     open();
   };
 
+  const toggleAll = () => {
+    if (selectedArticles.length === articles.length) {
+      setSelectedArticles([]);
+    } else {
+      setSelectedArticles(articles.map((a) => a._id));
+    }
+  };
+
+  const toggleArticle = (id: string) => {
+    if (selectedArticles.includes(id)) {
+      setSelectedArticles(selectedArticles.filter((a) => a !== id));
+    } else {
+      setSelectedArticles([...selectedArticles, id]);
+    }
+  };
+
+  const getSelectedItems = () => {
+    return articles
+      .filter((a) => selectedArticles.includes(a._id))
+      .map((a) => ({ id: a._id, name: a.name, code: a.ipn }));
+  };
+
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
         <Title order={2}>Articles</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
-          Add Article
-        </Button>
+        <Group>
+          {selectedArticles.length > 0 && (
+            <Button
+              variant="light"
+              leftSection={<IconPlus size={16} />} // Reuse icon or add Printer icon
+              onClick={() => setPrintModalOpen(true)}
+            >
+              Print Labels ({selectedArticles.length})
+            </Button>
+          )}
+          <Button leftSection={<IconPlus size={16} />} onClick={openCreateModal}>
+            Add Article
+          </Button>
+        </Group>
       </Group>
+
+      <PrintLabelsModal
+        isOpen={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        items={getSelectedItems()}
+        table="depo_parts"
+      />
 
       <Paper p="md" mb="md">
         <Group>
@@ -292,6 +349,13 @@ export function ArticlesPage() {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
+              <Table.Th style={{ width: 40 }}>
+                <Checkbox
+                  onChange={toggleAll}
+                  checked={articles.length > 0 && selectedArticles.length === articles.length}
+                  indeterminate={selectedArticles.length > 0 && selectedArticles.length !== articles.length}
+                />
+              </Table.Th>
               <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('ipn')}>
                 Code {sortBy === 'ipn' && (sortOrder === 'asc' ? '↑' : '↓')}
               </Table.Th>
@@ -310,6 +374,12 @@ export function ArticlesPage() {
           <Table.Tbody>
             {articles.map((article) => (
               <Table.Tr key={article._id}>
+                <Table.Td>
+                  <Checkbox
+                    checked={selectedArticles.includes(article._id)}
+                    onChange={() => toggleArticle(article._id)}
+                  />
+                </Table.Td>
                 <Table.Td>{article.ipn}</Table.Td>
                 <Table.Td>{article.name}</Table.Td>
                 <Table.Td>{article.description || '-'}</Table.Td>
@@ -405,11 +475,14 @@ export function ArticlesPage() {
           mb="sm"
         />
 
-        <NumberInput
-          label="Default Expiry (days)"
-          placeholder="0"
-          value={formData.default_expiry}
-          onChange={(value) => setFormData({ ...formData, default_expiry: Number(value) || 0 })}
+        <Select
+          label="Manufacturer"
+          placeholder="Select manufacturer"
+          data={manufacturers.map((man) => ({ value: man._id, label: man.name }))}
+          value={formData.manufacturer_id}
+          onChange={(value) => setFormData({ ...formData, manufacturer_id: value || '' })}
+          searchable
+          clearable
           mb="sm"
         />
 
@@ -438,6 +511,13 @@ export function ArticlesPage() {
             onChange={(e) => setFormData({ ...formData, is_salable: e.currentTarget.checked })}
           />
         </Group>
+
+        <Checkbox
+          label="Lotallexp"
+          checked={formData.lotallexp}
+          onChange={(e) => setFormData({ ...formData, lotallexp: e.currentTarget.checked })}
+          mb="sm"
+        />
 
         <Checkbox
           label="Active"

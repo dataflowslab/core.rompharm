@@ -19,23 +19,23 @@ interface SafeSelectProps extends Omit<SelectProps, 'data'> {
    * - Array of objects with _id/id and name fields (auto-converted)
    * - Array of strings (auto-converted to {value, label})
    */
-  data?: 
-    | SelectOption[] 
-    | Array<{ _id?: string; id?: string; name?: string; [key: string]: any }>
-    | string[]
-    | null
-    | undefined;
-  
+  data?:
+  | SelectOption[]
+  | Array<{ _id?: string; id?: string; name?: string;[key: string]: any }>
+  | string[]
+  | null
+  | undefined;
+
   /**
    * Key to use for value (default: tries _id, then id)
    */
   valueKey?: string;
-  
+
   /**
    * Key to use for label (default: 'name')
    */
   labelKey?: string;
-  
+
   /**
    * Enable debug logging
    */
@@ -44,7 +44,7 @@ interface SafeSelectProps extends Omit<SelectProps, 'data'> {
 
 export const SafeSelect = forwardRef<HTMLInputElement, SafeSelectProps>(
   ({ data, valueKey, labelKey = 'name', debug = false, ...props }, ref) => {
-    
+
     const sanitizedData = useMemo(() => {
       if (!data || !Array.isArray(data)) {
         if (debug) console.log('[SafeSelect] No data provided');
@@ -64,7 +64,7 @@ export const SafeSelect = forwardRef<HTMLInputElement, SafeSelectProps>(
       const options = (data as any[]).map((item, index) => {
         // Try to get value from multiple possible keys
         let value: string | undefined;
-        
+
         if (valueKey) {
           value = item[valueKey];
         } else {
@@ -96,7 +96,7 @@ export const SafeSelect = forwardRef<HTMLInputElement, SafeSelectProps>(
       }).filter(Boolean) as SelectOption[];
 
       const sanitized = sanitizeSelectOptions(options);
-      
+
       if (debug) {
         console.log('[SafeSelect] Data processed:', {
           input: data.length,
@@ -112,7 +112,7 @@ export const SafeSelect = forwardRef<HTMLInputElement, SafeSelectProps>(
     // Validate current value
     const validatedValue = useMemo(() => {
       if (!props.value) return props.value;
-      
+
       const found = sanitizedData.find(opt => opt.value === props.value);
       if (!found && debug) {
         console.warn('[SafeSelect] Selected value not found in options:', {
@@ -120,13 +120,14 @@ export const SafeSelect = forwardRef<HTMLInputElement, SafeSelectProps>(
           availableValues: sanitizedData.map(o => o.value)
         });
       }
-      
+
       return found ? props.value : undefined;
     }, [props.value, sanitizedData, debug]);
 
     return (
       <Select
         ref={ref}
+        limit={100}
         {...props}
         data={sanitizedData}
         value={validatedValue}

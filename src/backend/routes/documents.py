@@ -11,9 +11,9 @@ from datetime import datetime
 import io
 import base64
 
-from ..utils.db import get_db
-from ..utils.dataflows_docu import DataFlowsDocuClient
-from .auth import verify_token
+from src.backend.utils.db import get_db
+from src.backend.utils.dataflows_docu import DataFlowsDocuClient
+from src.backend.routes.auth import verify_token
 
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -26,7 +26,7 @@ class GenerateDocumentRequest(BaseModel):
 
 
 @router.get("/templates")
-async def get_templates(user = Depends(verify_token)):
+def get_templates(user = Depends(verify_token)):
     """Get all available templates"""
     try:
         db = get_db()
@@ -76,7 +76,7 @@ async def get_templates(user = Depends(verify_token)):
 
 
 @router.post("/generate")
-async def generate_document(
+def generate_document(
     request: GenerateDocumentRequest,
     user = Depends(verify_token)
 ):
@@ -92,21 +92,21 @@ async def generate_document(
     
     # Determine type by checking collections
     if db['depo_purchase_orders'].find_one({'_id': object_obj_id}):
-        return await _generate_procurement_order_document(db, object_obj_id, request, user)
+        return _generate_procurement_order_document(db, object_obj_id, request, user)
     
     if db['depo_requests'].find_one({'_id': object_obj_id}):
-        return await _generate_stock_request_document(db, object_obj_id, request, user)
+        return _generate_stock_request_document(db, object_obj_id, request, user)
     
     raise HTTPException(status_code=404, detail="Object not found")
 
 
 @router.get("/{doc_id}/download")
-async def download_document(
+def download_document(
     doc_id: str,
     user = Depends(verify_token)
 ):
     """Download document by document _id or job_id"""
-    from ..utils.config import load_config
+    from src.backend.utils.config import load_config
     
     config = load_config()
     debug_mode = config.get('app', {}).get('debug', False)
@@ -199,7 +199,7 @@ async def download_document(
 
 
 @router.delete("/{job_id}")
-async def delete_document(
+def delete_document(
     job_id: str,
     user = Depends(verify_token)
 ):
@@ -217,7 +217,7 @@ async def delete_document(
 
 
 @router.get("/job/{job_id}/status")
-async def get_job_status(
+def get_job_status(
     job_id: str,
     user = Depends(verify_token)
 ):
@@ -238,7 +238,7 @@ async def get_job_status(
 
 
 @router.get("/for/{object_id}")
-async def get_documents_for_object(
+def get_documents_for_object(
     object_id: str,
     user = Depends(verify_token)
 ):
@@ -308,10 +308,11 @@ async def get_documents_for_object(
 
 # ==================== INTERNAL HANDLERS ====================
 
-async def _generate_procurement_order_document(db, order_obj_id, request, user):
+def _generate_procurement_order_document(db, order_obj_id, request, user):
     """Generate procurement order document"""
     import qrcode
     import qrcode.image.svg
+    import json
     
     purchase_order = db['depo_purchase_orders'].find_one({'_id': order_obj_id})
     if not purchase_order:
@@ -330,7 +331,6 @@ async def _generate_procurement_order_document(db, order_obj_id, request, user):
     if org_config:
         content = org_config.get('content', {})
         if isinstance(content, str):
-            import json
             try:
                 company_info = json.loads(content)
             except:
@@ -439,12 +439,10 @@ async def _generate_procurement_order_document(db, order_obj_id, request, user):
     }
 
 
-async def _generate_stock_request_document(db, request_obj_id, request, user):
+def _generate_stock_request_document(db, request_obj_id, request, user):
     """Generate stock request document"""
     import qrcode
     import qrcode.image.svg
-    import yaml
-    import os
     
     req = db['depo_requests'].find_one({'_id': request_obj_id})
     if not req:

@@ -29,8 +29,8 @@ class ApprovalFlowModel(BaseModel):
     template_id: str  # Reference to approval template
     
     # Officers who need to approve
-    required_officers: List[Dict[str, Any]] = []  # Officers who must sign
-    optional_officers: List[Dict[str, Any]] = []  # Officers who can sign
+    must_sign_officers: List[Dict[str, Any]] = []  # Officers who must sign
+    can_sign_officers: List[Dict[str, Any]] = []  # Officers who can sign
     
     # Signatures collected
     signatures: List[ApprovalSignature] = []

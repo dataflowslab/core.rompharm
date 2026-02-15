@@ -1,5 +1,6 @@
-import { Select, Textarea, Button, Group } from '@mantine/core';
+import { Textarea, Button, Group } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
+import { SafeSelect } from '../Common/SafeSelect';
 
 interface RequestState {
   _id: string;
@@ -37,13 +38,12 @@ export function DecisionSection({
 
   return (
     <>
-      <Select
+      <SafeSelect
         label={t('Status')}
         placeholder={t('Select status')}
-        data={availableStates.map(state => ({
-          value: state._id,
-          label: state.name
-        }))}
+        data={availableStates}
+        valueKey="_id"
+        labelKey="name"
         value={status}
         onChange={onStatusChange}
         required

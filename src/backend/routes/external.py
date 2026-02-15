@@ -6,12 +6,12 @@ from pydantic import BaseModel
 from typing import Optional, Any, Dict, List
 from datetime import datetime
 
-from ..utils.db import get_db
+from src.backend.utils.db import get_db
 
 router = APIRouter(prefix="/api/ext", tags=["external"])
 
 
-async def verify_api_token(authorization: Optional[str] = Header(None)):
+def verify_api_token(authorization: Optional[str] = Header(None)):
     """
     Dependency to verify API token from api_tokens collection
     """
@@ -50,7 +50,7 @@ async def verify_api_token(authorization: Optional[str] = Header(None)):
     return token_doc
 
 
-async def verify_api_right(right: str, token_doc: Dict[str, Any]):
+def verify_api_right(right: str, token_doc: Dict[str, Any]):
     """
     Verify that the API token has the required right
     """
@@ -60,5 +60,3 @@ async def verify_api_right(right: str, token_doc: Dict[str, Any]):
             status_code=403, 
             detail=f"API token does not have permission for: {right}"
         )
-
-

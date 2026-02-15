@@ -28,7 +28,7 @@ interface Client {
   _id: string;
   pk?: number;
   name: string;
-  code?: string;
+
   vatno?: string;
   regno?: string;
   payment_conditions?: string;
@@ -79,7 +79,7 @@ export function ClientDetailPage() {
   // Details form
   const [detailsForm, setDetailsForm] = useState({
     name: '',
-    code: '',
+
     vatno: '',
     regno: '',
     payment_conditions: '',
@@ -166,7 +166,7 @@ export function ClientDetailPage() {
       setClient(data);
       setDetailsForm({
         name: data.name || '',
-        code: data.code || '',
+
         vatno: data.vatno || '',
         regno: data.regno || '',
         payment_conditions: data.payment_conditions || '',
@@ -486,15 +486,9 @@ export function ClientDetailPage() {
                 required
                 value={detailsForm.name}
                 onChange={(e) => setDetailsForm({ ...detailsForm, name: e.currentTarget.value })}
-                style={{ flex: 3 }}
+                style={{ width: '100%' }}
               />
-              <TextInput
-                label="Code"
-                placeholder="Auto-generated"
-                value={detailsForm.code}
-                disabled
-                style={{ flex: 1 }}
-              />
+
             </Group>
 
             <TextInput

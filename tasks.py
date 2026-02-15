@@ -21,7 +21,7 @@ def install(c):
     # Install frontend dependencies
     print("\n[2/2] Installing Node.js dependencies...")
     with c.cd("src/frontend"):
-        c.run("npm install")
+        c.run("npm install", in_stream=False)
     
     print("\n✓ All dependencies installed successfully!")
 
@@ -51,7 +51,7 @@ def build_frontend(c):
     
     with c.cd("src/frontend"):
         print("\nBuilding frontend...")
-        c.run("npm run build")
+        c.run("npm run build", in_stream=False)
     
     print("\n✓ Frontend built successfully!")
     print("Output: src/frontend/dist/")
@@ -68,7 +68,7 @@ def dev_frontend(c):
     print("\nPress Ctrl+C to stop\n")
     
     with c.cd("src/frontend"):
-        c.run("npm run dev")
+        c.run("npm run dev", in_stream=False)
 
 
 @task
@@ -195,7 +195,7 @@ def lint_frontend(c):
     """Run frontend linter"""
     print("Running frontend linter...")
     with c.cd("src/frontend"):
-        c.run("npm run lint")
+        c.run("npm run lint", in_stream=False)
 
 
 @task

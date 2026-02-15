@@ -6,15 +6,15 @@ from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 from datetime import datetime
 
-from ..utils.db import get_db
-from ..models.user_model import RoleCreate, RoleUpdate
-from .auth import verify_admin
+from src.backend.utils.db import get_db
+from src.backend.models.user_model import RoleCreate, RoleUpdate
+from src.backend.routes.auth import verify_admin
 
 router = APIRouter(prefix="/api/roles", tags=["roles"])
 
 
 @router.get("/")
-async def list_roles(
+def list_roles(
     current_user: dict = Depends(verify_admin)
 ):
     """List all roles"""
@@ -34,7 +34,7 @@ async def list_roles(
 
 
 @router.get("/permissions/items")
-async def list_permission_items(
+def list_permission_items(
     current_user: dict = Depends(verify_admin)
 ):
     """List all available permission items from roles_items collection"""
@@ -50,7 +50,7 @@ async def list_permission_items(
 
 
 @router.get("/{role_id}")
-async def get_role(
+def get_role(
     role_id: str,
     current_user: dict = Depends(verify_admin)
 ):
@@ -77,7 +77,7 @@ async def get_role(
 
 
 @router.post("/")
-async def create_role(
+def create_role(
     role_data: RoleCreate,
     current_user: dict = Depends(verify_admin)
 ):
@@ -108,7 +108,7 @@ async def create_role(
 
 
 @router.put("/{role_id}")
-async def update_role(
+def update_role(
     role_id: str,
     role_data: RoleUpdate,
     current_user: dict = Depends(verify_admin)
@@ -155,11 +155,12 @@ async def update_role(
     )
     
     # Get updated role
-    return await get_role(role_id, current_user)
+    # Note: Calling get_role directly since it's now a sync function
+    return get_role(role_id, current_user)
 
 
 @router.delete("/{role_id}")
-async def delete_role(
+def delete_role(
     role_id: str,
     current_user: dict = Depends(verify_admin)
 ):

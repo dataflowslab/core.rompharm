@@ -1,0 +1,27 @@
+﻿# Sesiune de Lucru - 15.02.2026
+
+## Task: Mobile Procurement & Sales UX + Stub Sales API
+
+### Modificari Mobile Procurement
+- Eliminat butonul de "New" si adaugat refresh (icon).
+- Search cu debounce + paginare (skip/limit) si filtre in Drawer (From/To + Status).
+- Filtrarea status-ului foloseste `state_id` si lista din `/modules/depo_procurement/api/order-statuses`.
+
+Fisiere:
+- `src/frontend/src/pages/MobileProcurementPage.tsx`
+
+### Modificari Mobile Sales
+- Search cu debounce + paginare (skip/limit).
+- Filtre mutate in Drawer (Status + From/To) cu icon de filtrare.
+- Refresh ramane in header; status select scos din UI principal.
+
+Fisiere:
+- `src/frontend/src/pages/MobileSalesPage.tsx`
+- `src/frontend/src/services/sales.ts`
+
+### Stub Sales API (backend)
+- Adaugat router `src/backend/routes/sales.py` cu endpointuri stub `GET /api/sales/sales-orders`, `GET /api/sales/order-statuses`, etc.
+- Integrat router in `src/backend/app.py`.
+
+TODO
+- Implementare reala pentru Sales API (listare, detalii, items, status update, filtrare/paginare).

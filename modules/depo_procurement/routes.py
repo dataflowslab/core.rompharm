@@ -33,11 +33,13 @@ async def get_purchase_orders(
     state_id: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    skip: Optional[int] = Query(None, ge=0),
+    limit: Optional[int] = Query(None, ge=1, le=200),
     current_user: dict = Depends(verify_token)
 ):
     """Get list of purchase orders from MongoDB with filters"""
     from modules.depo_procurement.services import get_purchase_orders_list
-    return await get_purchase_orders_list(search, state_id, date_from, date_to)
+    return await get_purchase_orders_list(search, state_id, date_from, date_to, skip, limit)
 
 
 @router.get("/purchase-orders/{order_id}")

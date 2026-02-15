@@ -1,0 +1,1 @@
+﻿2026-02-15: Labels flow switched to Docu /jobs only with polling every 2s (max 60s). PrintLabelsModal shows blocking loader message. Added pypdf to requirements for multi-label PDF merge.

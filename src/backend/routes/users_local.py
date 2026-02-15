@@ -7,16 +7,16 @@ from typing import List, Optional
 from bson import ObjectId
 from datetime import datetime
 
-from ..utils.db import get_db
-from ..utils.local_auth import create_user, hash_password, generate_salt
-from ..models.user_model import UserCreate, UserUpdate
-from .auth import verify_admin
+from src.backend.utils.db import get_db
+from src.backend.utils.local_auth import create_user, hash_password, generate_salt
+from src.backend.models.user_model import UserCreate, UserUpdate
+from src.backend.routes.auth import verify_admin
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 @router.get("/")
-async def list_users(
+def list_users(
     current_user: dict = Depends(verify_admin)
 ):
     """List all users"""
@@ -61,7 +61,7 @@ async def list_users(
 
 
 @router.get("/{user_id}")
-async def get_user(
+def get_user(
     user_id: str,
     current_user: dict = Depends(verify_admin)
 ):
@@ -111,7 +111,7 @@ async def get_user(
 
 
 @router.post("/")
-async def create_new_user(
+def create_new_user(
     user_data: UserCreate,
     current_user: dict = Depends(verify_admin)
 ):
@@ -126,7 +126,8 @@ async def create_new_user(
             email=user_data.email,
             phone=user_data.phone,
             is_staff=user_data.is_staff,
-            is_active=user_data.is_active
+            is_active=user_data.is_active,
+            mobile=user_data.mobile
         )
         
         # Remove sensitive data
@@ -141,7 +142,7 @@ async def create_new_user(
 
 
 @router.put("/{user_id}")
-async def update_user(
+def update_user(
     user_id: str,
     user_data: UserUpdate,
     current_user: dict = Depends(verify_admin)
@@ -177,6 +178,8 @@ async def update_user(
         update_data['is_active'] = user_data.is_active
     if user_data.is_staff is not None:
         update_data['is_staff'] = user_data.is_staff
+    if user_data.mobile is not None:
+        update_data['mobile'] = user_data.mobile
     
     # Update password if provided
     if user_data.password:
@@ -191,12 +194,12 @@ async def update_user(
         {'$set': update_data}
     )
     
-    # Get updated user
-    return await get_user(user_id, current_user)
+    # Get updated user -- MANUAL CALL INSTEAD OF ASYNC AWAIT
+    return get_user(user_id, current_user)
 
 
 @router.delete("/{user_id}")
-async def delete_user(
+def delete_user(
     user_id: str,
     current_user: dict = Depends(verify_admin)
 ):

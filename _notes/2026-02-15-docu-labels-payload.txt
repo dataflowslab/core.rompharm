@@ -1,0 +1,1 @@
+﻿2026-02-15: Updated label generation payload sent to DataFlows Docu to wrap label data under data + metadata fields (submitted_at/state/state_updated_by/state_updated_at). Labels endpoint now sends docu_payload to /jobs/realtime.

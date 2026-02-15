@@ -18,6 +18,7 @@ class UserCreate(BaseModel):
     phone: Optional[str] = None
     is_active: bool = True
     is_staff: bool = False
+    mobile: bool = True  # Default to True as requested
 
 
 class UserUpdate(BaseModel):
@@ -29,6 +30,7 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
     is_active: Optional[bool] = None
     is_staff: Optional[bool] = None
+    mobile: Optional[bool] = None
     password: Optional[str] = None  # Doar dacă se schimbă parola
 
 

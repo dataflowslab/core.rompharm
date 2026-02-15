@@ -7,15 +7,15 @@ from typing import Optional, List
 from bson import ObjectId
 from datetime import datetime
 import requests
-
-from ..utils.db import get_db
-from ..utils.anaf import verify_tax_id
-from ..models.subscriber_model import SubscriberModel
-from ..models.segment_model import SegmentModel
-from ..models.campaign_model import CampaignModel
-from .auth import verify_token
 import yaml
 import os
+
+from src.backend.utils.db import get_db
+from src.backend.utils.anaf import verify_tax_id
+from src.backend.models.subscriber_model import SubscriberModel
+from src.backend.models.segment_model import SegmentModel
+from src.backend.models.campaign_model import CampaignModel
+from src.backend.routes.auth import verify_token
 
 
 router = APIRouter(prefix="/api/crm", tags=["crm"])
@@ -51,7 +51,7 @@ class SubscriberUpdate(BaseModel):
 
 
 @router.get("/subscribers")
-async def get_subscribers(user = Depends(verify_token)):
+def get_subscribers(user = Depends(verify_token)):
     """Get all subscribers"""
     db = get_db()
     subscribers_collection = db[SubscriberModel.collection_name]
@@ -70,7 +70,7 @@ async def get_subscribers(user = Depends(verify_token)):
 
 
 @router.post("/subscribers")
-async def create_subscriber(subscriber: SubscriberCreate, user = Depends(verify_token)):
+def create_subscriber(subscriber: SubscriberCreate, user = Depends(verify_token)):
     """Create a new subscriber"""
     db = get_db()
     subscribers_collection = db[SubscriberModel.collection_name]
@@ -117,7 +117,7 @@ async def create_subscriber(subscriber: SubscriberCreate, user = Depends(verify_
 
 
 @router.put("/subscribers/{subscriber_id}")
-async def update_subscriber(
+def update_subscriber(
     subscriber_id: str,
     subscriber: SubscriberUpdate,
     user = Depends(verify_token)
@@ -164,7 +164,7 @@ async def update_subscriber(
 
 
 @router.delete("/subscribers/{subscriber_id}")
-async def delete_subscriber(subscriber_id: str, user = Depends(verify_token)):
+def delete_subscriber(subscriber_id: str, user = Depends(verify_token)):
     """Delete a subscriber"""
     db = get_db()
     subscribers_collection = db[SubscriberModel.collection_name]
@@ -175,8 +175,6 @@ async def delete_subscriber(subscriber_id: str, user = Depends(verify_token)):
         raise HTTPException(status_code=404, detail="Subscriber not found")
     
     return {"message": "Subscriber deleted successfully"}
-
-
 
 
 # ============= SEGMENTS =============
@@ -192,7 +190,7 @@ class SegmentUpdate(BaseModel):
 
 
 @router.get("/segments")
-async def get_segments(user = Depends(verify_token)):
+def get_segments(user = Depends(verify_token)):
     """Get all segments"""
     db = get_db()
     segments_collection = db[SegmentModel.collection_name]
@@ -211,7 +209,7 @@ async def get_segments(user = Depends(verify_token)):
 
 
 @router.post("/segments")
-async def create_segment(segment: SegmentCreate, user = Depends(verify_token)):
+def create_segment(segment: SegmentCreate, user = Depends(verify_token)):
     """Create a new segment"""
     db = get_db()
     segments_collection = db[SegmentModel.collection_name]
@@ -234,7 +232,7 @@ async def create_segment(segment: SegmentCreate, user = Depends(verify_token)):
 
 
 @router.put("/segments/{segment_id}")
-async def update_segment(
+def update_segment(
     segment_id: str,
     segment: SegmentUpdate,
     user = Depends(verify_token)
@@ -268,7 +266,7 @@ async def update_segment(
 
 
 @router.delete("/segments/{segment_id}")
-async def delete_segment(segment_id: str, user = Depends(verify_token)):
+def delete_segment(segment_id: str, user = Depends(verify_token)):
     """Delete a segment"""
     db = get_db()
     segments_collection = db[SegmentModel.collection_name]
@@ -305,7 +303,7 @@ class CampaignUpdate(BaseModel):
 
 
 @router.get("/campaigns")
-async def get_campaigns(user = Depends(verify_token)):
+def get_campaigns(user = Depends(verify_token)):
     """Get all campaigns"""
     db = get_db()
     campaigns_collection = db[CampaignModel.collection_name]
@@ -330,7 +328,7 @@ async def get_campaigns(user = Depends(verify_token)):
 
 
 @router.post("/campaigns")
-async def create_campaign(campaign: CampaignCreate, user = Depends(verify_token)):
+def create_campaign(campaign: CampaignCreate, user = Depends(verify_token)):
     """Create a new campaign"""
     db = get_db()
     campaigns_collection = db[CampaignModel.collection_name]
@@ -360,7 +358,7 @@ async def create_campaign(campaign: CampaignCreate, user = Depends(verify_token)
 
 
 @router.put("/campaigns/{campaign_id}")
-async def update_campaign(
+def update_campaign(
     campaign_id: str,
     campaign: CampaignUpdate,
     user = Depends(verify_token)
@@ -395,7 +393,7 @@ async def update_campaign(
 
 
 @router.delete("/campaigns/{campaign_id}")
-async def delete_campaign(campaign_id: str, user = Depends(verify_token)):
+def delete_campaign(campaign_id: str, user = Depends(verify_token)):
     """Delete a campaign"""
     db = get_db()
     campaigns_collection = db[CampaignModel.collection_name]
@@ -413,7 +411,7 @@ async def delete_campaign(campaign_id: str, user = Depends(verify_token)):
 
 
 @router.post("/campaigns/{campaign_id}/send")
-async def send_campaign(campaign_id: str, user = Depends(verify_token)):
+def send_campaign(campaign_id: str, user = Depends(verify_token)):
     """Mark campaign as ready to send (actual sending will be done by cron)"""
     db = get_db()
     campaigns_collection = db[CampaignModel.collection_name]

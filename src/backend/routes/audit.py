@@ -4,15 +4,15 @@ Audit log routes
 from fastapi import APIRouter, Depends, Query
 from typing import List, Dict, Any, Optional
 
-from ..utils.db import get_db
-from ..models.audit_log_model import AuditLogModel
-from ..routes.auth import verify_admin
+from src.backend.utils.db import get_db
+from src.backend.models.audit_log_model import AuditLogModel
+from src.backend.routes.auth import verify_admin
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
 
 @router.get("/")
-async def get_audit_logs(
+def get_audit_logs(
     limit: int = Query(100, ge=1, le=1000),
     skip: int = Query(0, ge=0),
     action: Optional[str] = None,
@@ -59,7 +59,7 @@ async def get_audit_logs(
 
 
 @router.get("/actions")
-async def get_available_actions(user = Depends(verify_admin)) -> List[str]:
+def get_available_actions(user = Depends(verify_admin)) -> List[str]:
     """
     Get list of all available action types
     Requires administrator access

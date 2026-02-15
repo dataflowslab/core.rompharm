@@ -1,0 +1,333 @@
+{
+  "_id": {
+    "$oid": "691ce2f93043ba0ac508c83b"
+  },
+  "name": "Admin",
+  "menu_items": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "icon": "IconDashboard",
+      "path": "/dashboard",
+      "order": 1
+    },
+    {
+      "id": "alop",
+      "label": "ALOP",
+      "icon": "IconShoppingCart",
+      "path": "/procurement",
+      "order": 3,
+      "submenu": [
+        {
+          "id": "procurement_referate",
+          "label": "Referate",
+          "path": "/procurement/referate",
+          "icon": "IconFileText"
+        },
+        {
+          "id": "procurement_fundamentare",
+          "label": "Doc. Fundamentare",
+          "path": "/procurement/fundamentare",
+          "icon": "IconFileDescription"
+        },
+        {
+          "id": "angajamente_bugetare",
+          "label": "Angaj. Bugetare",
+          "path": "/buget/angajamente-bugetare",
+          "icon": "IconFileInvoice"
+        },
+        {
+          "id": "angajamente_legale",
+          "label": "Angaj. Legale",
+          "path": "/buget/angajamente-legale",
+          "icon": "IconFileContract"
+        },
+        {
+          "id": "ordonantare",
+          "label": "Ordonanțare",
+          "path": "/procurement/ordonantare",
+          "icon": "IconFileContract"
+        }
+      ]
+    },
+    {
+      "id": "achizitii",
+      "label": "Achizitii",
+      "icon": "IconCash",
+      "path": "/achizitii",
+      "order": 4,
+      "submenu": [
+        {
+          "id": "procurement_paap",
+          "label": "Plan de achiziții",
+          "path": "/procurement/paap",
+          "icon": "IconFileInvoice"
+        },
+        {
+          "id": "procurement_doctehnice",
+          "label": "Achiziții",
+          "path": "/procurement/doctehnice",
+          "icon": "IconFileCheck"
+        },
+        {
+          "id": "procurement_contracte",
+          "label": "Contracte",
+          "path": "/procurement/contracte",
+          "icon": "IconFileInvoice"
+        }
+      ]
+    },
+    {
+      "id": "buget",
+      "label": "Buget",
+      "icon": "IconCash",
+      "path": "/buget",
+      "order": 4,
+      "submenu": [
+        {
+          "id": "buget_aprobat",
+          "label": "Buget aprobat",
+          "path": "/buget/aprobat",
+          "icon": "IconFileCheck"
+        },
+        {
+          "id": "buget_initial",
+          "label": "Buget inițial",
+          "path": "/buget/initial",
+          "icon": "IconFileCheck"
+        }
+      ]
+    },
+    {
+      "id": "nomenclatoare",
+      "label": "Nomenclatoare",
+      "icon": "IconBook",
+      "path": "/procurement/nomenclatoare",
+      "order": 5
+    },
+    {
+      "id": "library",
+      "label": "Library",
+      "icon": "IconBook",
+      "path": "/library",
+      "order": 6
+    },
+    {
+      "id": "administration",
+      "label": "Administration",
+      "icon": "IconSettings",
+      "path": "/admin",
+      "order": 7,
+      "submenu": [
+        {
+          "id": "admin_users",
+          "label": "Users",
+          "path": "/admin/users",
+          "icon": "IconUsers"
+        },
+        {
+          "id": "admin_roles",
+          "label": "Roles",
+          "path": "/admin/roles",
+          "icon": "IconShieldLock"
+        },
+        {
+          "id": "admin_audit",
+          "label": "Audit Log",
+          "path": "/admin/audit",
+          "icon": "IconHistory"
+        },
+        {
+          "id": "admin_notifications",
+          "label": "Notifications",
+          "path": "/admin/notifications",
+          "icon": "IconBell"
+        },
+        {
+          "id": "admin_settings",
+          "label": "Settings",
+          "path": "/admin/settings",
+          "icon": "IconSettings"
+        }
+      ]
+    },
+    {
+      "id": "approvals",
+      "label": "Aprobari",
+      "icon": "IconFileCheck",
+      "path": "/approvals",
+      "order": 2
+    }
+  ],
+  "sections": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard",
+      "description": "Access to main dashboard",
+      "permissions": [
+        "dashboard/_::*"
+      ]
+    },
+    {
+      "id": "procurement/referate",
+      "name": "Referate",
+      "description": "Full access to referate",
+      "permissions": [
+        "procurement/referate/_::*"
+      ]
+    },
+    {
+      "id": "procurement/fundamentare",
+      "name": "Doc. Fundamentare",
+      "description": "Full access to fundamentare",
+      "permissions": [
+        "procurement/fundamentare/_::*"
+      ]
+    },
+    {
+      "id": "procurement/doctehnice",
+      "name": "Doc. Tehnice",
+      "description": "Full access to technical docs",
+      "permissions": [
+        "procurement/doctehnice/_::*"
+      ]
+    },
+    {
+      "id": "procurement/contracte",
+      "name": "Contracte",
+      "description": "Full access to contracts",
+      "permissions": [
+        "procurement/contracte/_::*"
+      ]
+    },
+    {
+      "id": "procurement/ordonantare",
+      "name": "Ordonanțare",
+      "description": "Full access to payment orders",
+      "permissions": [
+        "procurement/ordonantare/_::*"
+      ]
+    },
+    {
+      "id": "procurement/nomenclatoare",
+      "name": "Nomenclatoare",
+      "description": "Full access to nomenclatures",
+      "permissions": [
+        "procurement/nomenclatoare/_::*"
+      ]
+    },
+    {
+      "id": "library",
+      "name": "Library",
+      "description": "Full access to library",
+      "permissions": [
+        "library/_::*"
+      ]
+    },
+    {
+      "id": "admin/users",
+      "name": "Admin - Users",
+      "description": "Manage users",
+      "permissions": [
+        "admin/users::*"
+      ]
+    },
+    {
+      "id": "admin/roles",
+      "name": "Admin - Roles",
+      "description": "Manage roles",
+      "permissions": [
+        "admin/roles::*"
+      ]
+    },
+    {
+      "id": "admin/audit",
+      "name": "Admin - Audit",
+      "description": "View audit logs",
+      "permissions": [
+        "admin/audit::GET"
+      ]
+    },
+    {
+      "id": "admin/notifications",
+      "name": "Admin - Notifications",
+      "description": "Manage notifications",
+      "permissions": [
+        "admin/notifications::*"
+      ]
+    },
+    {
+      "id": "admin/settings",
+      "name": "Admin - Settings",
+      "description": "Manage settings",
+      "permissions": [
+        "admin/settings::*"
+      ]
+    },
+    {
+      "id": "admin_full",
+      "name": "Admin - Full",
+      "description": "Full admin access",
+      "permissions": [
+        "admin/_::*"
+      ]
+    },
+    {
+      "id": "buget/angajamente-bugetare",
+      "name": "Angajamente Bugetare",
+      "description": "Full access to budget commitments",
+      "permissions": [
+        "buget/angajamente-bugetare/_::*",
+        "api/angajamente-bugetare::*"
+      ]
+    },
+    {
+      "id": "buget/angajamente-legale",
+      "name": "Angajamente Legale",
+      "description": "Full access to legal commitments",
+      "permissions": [
+        "buget/angajamente-legale/_::*",
+        "api/angajamente-legale::*"
+      ]
+    },
+    {
+      "id": "buget/aprobat",
+      "name": "Buget Aprobat",
+      "description": "Full access to approved budget",
+      "permissions": [
+        "buget/aprobat/_::*",
+        "api/buget::*"
+      ]
+    },
+    {
+      "id": "rapoarte",
+      "name": "Rapoarte",
+      "description": "Full access to reports",
+      "permissions": [
+        "rapoarte/_::*"
+      ]
+    },
+    {
+      "id": "approvals",
+      "name": "Aprobari",
+      "description": "Aprobari documente",
+      "permissions": [
+        "approvals/_::*"
+      ]
+    }
+  ],
+  "notes": {
+    "permission_format": "route::methods",
+    "wildcard_route": "Use _ to indicate all subroutes (e.g., 'forms/_::*' = all forms routes)",
+    "wildcard_methods": "Use * to indicate all HTTP methods (GET, POST, PUT, DELETE, PATCH)",
+    "examples": [
+      "dashboard/_::* = Full access to dashboard and all sub-routes",
+      "forms/_::GET = Read-only access to all forms routes",
+      "crm/subscribers::GET,POST = Can view and create subscribers only",
+      "admin/users::* = Full access to user management"
+    ]
+  },
+  "updated_at": {
+    "$date": "2026-02-08T15:30:52.977Z"
+  }
+}

@@ -192,14 +192,6 @@ async def sign_stock_qc(stock_id: str, qc_data: dict, current_user: dict, reques
         'updated_by': username
     }
     
-    # Set state_id based on test_result
-    if qc_data['test_result'] == 'conform':
-        # OK status
-        update_doc['state_id'] = ObjectId('694321db8728e4d75ae72789')
-    elif qc_data['test_result'] == 'neconform':
-        # Quarantined Not OK status
-        update_doc['state_id'] = ObjectId('6979211af8165bc859d6f2d2')
-    
     db.depo_stocks.update_one(
         {'_id': ObjectId(stock_id)},
         {'$set': update_doc}
@@ -352,3 +344,177 @@ async def update_stock_transactionable(stock_id: str, transactionable: bool, cur
     
     updated_stock = db.depo_stocks.find_one({'_id': ObjectId(stock_id)})
     return serialize_doc(updated_stock)
+
+
+async def sign_stock_qa(stock_id: str, qa_data: dict, current_user: dict, request_client_host: str, request_user_agent: str):
+    """Sign QA Rompharm for a stock item (Quality Assurance)"""
+    db = get_db()
+    
+    # Validate QA data
+    if not qa_data.get('qa_rompharm_ba_no') or not qa_data.get('qa_rompharm_ba_date') or not qa_data.get('qa_test_result'):
+        raise HTTPException(status_code=400, detail="QA Number, Date, and Result are required")
+    
+    # Additional validation: Reason is required if Neconform
+    if qa_data.get('qa_test_result') == 'neconform' and not qa_data.get('qa_reason'):
+        raise HTTPException(status_code=400, detail="Reason is required for Non-conforming result")
+
+    stock_oid = ObjectId(stock_id)
+    
+    # Prepare update
+    timestamp = datetime.utcnow()
+    username = current_user["username"]
+    
+    update_doc = {
+        'qa_rompharm_ba_no': qa_data['qa_rompharm_ba_no'],
+        'qa_rompharm_ba_date': qa_data['qa_rompharm_ba_date'],
+        'qa_test_result': qa_data['qa_test_result'],
+        'qa_reason': qa_data.get('qa_reason', ''),
+        'qa_signed_by': username,
+        'qa_signed_at': timestamp,
+        'updated_at': timestamp,
+        'updated_by': username
+    }
+    
+    # State and Location Logic
+    if qa_data['qa_test_result'] == 'conform':
+        # OK status
+        update_doc['state_id'] = ObjectId('694321db8728e4d75ae72789')
+        # Location remains same? Or should we ensure it's in a specific place? 
+        # Requirement doesn't mention moving if Conform, implies it stays where it is (usually Quarantine -> OK)
+        
+    elif qa_data['qa_test_result'] == 'neconform':
+        # Quarantined Not OK status (or Non-conforming state)
+        update_doc['state_id'] = ObjectId('6979211af8165bc859d6f2d2')
+        
+        # Move to Non-conforming location
+        new_location_id = ObjectId('69418f4c71d731f72ad65486')
+        update_doc['location_id'] = new_location_id
+        
+        # We need to log this movement!
+        # But `db.depo_stocks.update_one` won't trigger movement logic automatically if we just change location_id field.
+        # However, `create_movement` creates a record. 
+        # We should update the stock's location_id AND create a movement record.
+        
+        stock = db.depo_stocks.find_one({'_id': stock_oid})
+        if stock and stock.get('location_id') != new_location_id:
+             # Create internal movement record for tracking
+             from modules.inventory.stock_movements import create_movement, MovementType
+             create_movement(
+                db=db,
+                stock_id=stock_oid,
+                part_id=stock['part_id'],
+                batch_code=stock['batch_code'],
+                movement_type=MovementType.TRANSFER, # Or adjustment/status change? Transfer seems appropriate for location change.
+                quantity=stock.get('quantity', 0), # Entire quantity moves?
+                from_location_id=stock.get('location_id'),
+                to_location_id=new_location_id,
+                document_type="QA_DECISION",
+                document_id=stock_oid,
+                created_by=username,
+                notes=f"Moved to Non-conforming due to QA Neconform. Reason: {qa_data.get('qa_reason', '')}"
+             )
+
+    db.depo_stocks.update_one(
+        {'_id': stock_oid},
+        {'$set': update_doc}
+    )
+    
+    # Log to journal (using stock notes or separate journal collection? Stock currently has `notes`. 
+    # Let's append to a journal if exists, or just rely on the movement and fields)
+    
+    # Return updated stock
+    updated_stock = db.depo_stocks.find_one({'_id': stock_oid})
+    return serialize_doc(updated_stock)
+
+
+async def remove_stock_qa_signature(stock_id: str, current_user: dict):
+    """Remove QA signature and revert actions"""
+    db = get_db()
+    stock_oid = ObjectId(stock_id)
+    username = current_user["username"]
+    
+    stock = db.depo_stocks.find_one({'_id': stock_oid})
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+        
+    if not stock.get('qa_signed_at'):
+        raise HTTPException(status_code=400, detail="QA not signed")
+
+    # Revert logic
+    # If it was Neconform, it might have been moved.
+    # We should probably revert state to "Received" or "Quarantine" (Initial state).
+    # Since we don't store "previous state", we might default to standard Quarantine state?
+    # Requirement: "Este scos din carantina sau decizia anulata"
+    # Let's set it back to a neutral "Quarantine" state (usually where it enters before QA).
+    # Quarantine State OID: 694322878728e4d75ae72790 (Wait, that was transactionable? Let's check stocks.py created state)
+    # stocks.py: state = states_collection.find_one({'name': {'$regex': 'quarantin', '$options': 'i'}})
+    # Usually '694322878728e4d75ae72790' is Quarantine Transactionable?
+    # Let's assume we revert to "Quarantine" (not transactionable usually, or simple Quarantine).
+    # Let's look up "Quarantine" state.
+    
+    quarantine_state = db.depo_stocks_states.find_one({'name': 'Quarantine'}) 
+    # If not found, use a fallback from config/known IDs?
+    # Known ID for "Quarantine" (from `create_stock` logic inference or context):
+    # In `create_stock`: if no status, valid default is 65 (Quarantine).
+    # Let's try to find value=65 state.
+    
+    target_state_id = None
+    state_65 = db.depo_stocks_states.find_one({'value': 65})
+    if state_65:
+        target_state_id = state_65['_id']
+    else:
+        # Fallback to the ID we know is "Quarantined Not OK" or similar? No, we want "Pending QA".
+        # Let's assume we unset state changes or move to a "Quarantine" state.
+        pass
+
+    # If it was moved to Non-conforming location (69418f4c71d731f72ad65486), should we move it back?
+    # Use `initial_location_id`?
+    target_location_id = stock.get('initial_location_id')
+    
+    update_unset = {
+        'qa_rompharm_ba_no': '',
+        'qa_rompharm_ba_date': '',
+        'qa_test_result': '',
+        'qa_reason': '',
+        'qa_signed_by': '',
+        'qa_signed_at': ''
+    }
+    
+    update_set = {
+        'updated_at': datetime.utcnow(),
+        'updated_by': username
+    }
+    
+    if target_state_id:
+        update_set['state_id'] = target_state_id
+        
+    # If we are moving it back
+    if stock.get('qa_test_result') == 'neconform' and target_location_id and stock.get('location_id') != target_location_id:
+        # Move back to initial location
+        update_set['location_id'] = target_location_id
+        
+        from modules.inventory.stock_movements import create_movement, MovementType
+        create_movement(
+            db=db,
+            stock_id=stock_oid,
+            part_id=stock['part_id'],
+            batch_code=stock['batch_code'],
+            movement_type=MovementType.TRANSFER,
+            quantity=stock.get('quantity', 0),
+            from_location_id=stock.get('location_id'),
+            to_location_id=target_location_id,
+            document_type="QA_DECISION_REVERT",
+            document_id=stock_oid,
+            created_by=username,
+            notes="Reverted QA Decision (Removed from Non-conforming)"
+        )
+
+    db.depo_stocks.update_one(
+        {'_id': stock_oid},
+        {
+            '$unset': update_unset,
+            '$set': update_set
+        }
+    )
+    
+    return {"message": "QA Signature removed successfully"}

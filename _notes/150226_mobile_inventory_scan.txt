@@ -1,0 +1,28 @@
+﻿# Sesiune de Lucru - 15.02.2026
+
+## Task: Mobile Inventory - QR scan + UI compact + label parsing
+
+### Frontend (Mobile Inventory)
+- Adaugat scaner QR cu WebRTC + BarcodeDetector (auto-scan ~100ms, capture burst 5 frames).
+- Torch auto-enable daca e disponibil, cu toggle in UI.
+- Scan deschide camera in modal; exista si buton Capture.
+- Search manual imbunatatit: incearca /read-label pentru coduri QR, altfel fallback pe /stocks + enrich part/location.
+- Card compact: badge tip (Stock/Part/Location), spacing redus, actions doar pentru stock.
+
+Fisier:
+- `src/frontend/src/pages/MobileInventoryPage.tsx`
+
+### Backend
+- Extins `/modules/inventory/api/read-label` sa accepte coduri QR: `P{IPN}L{BATCH}`, `P{IPN}`, `LOC{CODE}`.
+- Pentru stocuri: adauga `quantity` din balances si normalizeaza `location_id` (initial_location_id daca e cazul).
+- Adaugat `GET /modules/inventory/api/locations/{id}` pentru lookup nume locatie.
+
+Fisiere:
+- `modules/inventory/routes/labels.py`
+- `modules/inventory/routes/locations.py`
+
+### Mobile Layout
+- Click pe sigla -> `/mobile/dashboard`.
+
+Fisier:
+- `src/frontend/src/components/Layout/MobileLayout.tsx`

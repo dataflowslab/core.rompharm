@@ -8,11 +8,11 @@ import yaml
 import os
 from datetime import datetime
 
-from ..utils.dataflows_docu import DataFlowsDocuClient
-from ..utils.db import get_db
-from ..models.job_model import JobModel
-from ..scheduler import get_scheduler
-from ..routes.auth import verify_admin
+from src.backend.utils.dataflows_docu import DataFlowsDocuClient
+from src.backend.utils.db import get_db
+from src.backend.models.job_model import JobModel
+from src.backend.scheduler import get_scheduler
+from src.backend.routes.auth import verify_admin
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -38,7 +38,7 @@ def load_config():
 
 
 @router.get("/currencies")
-async def get_currencies():
+def get_currencies():
     """
     Get list of currencies
     Public endpoint - used across multiple modules
@@ -65,7 +65,7 @@ async def get_currencies():
 
 
 @router.get("/system/status")
-async def get_system_status() -> Dict[str, Any]:
+def get_system_status() -> Dict[str, Any]:
     """
     Get system status and configuration
     Public endpoint
@@ -100,7 +100,7 @@ async def get_system_status() -> Dict[str, Any]:
 
 
 @router.get("/system/notifications")
-async def get_system_notifications() -> Dict[str, Any]:
+def get_system_notifications() -> Dict[str, Any]:
     """
     Get system notifications (warnings, errors, info)
     Public endpoint
@@ -147,7 +147,7 @@ async def get_system_notifications() -> Dict[str, Any]:
 
 
 @router.get("/system/jobs")
-async def list_jobs(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
+def list_jobs(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
     """
     List all configured jobs
     Requires admin access
@@ -160,7 +160,7 @@ async def list_jobs(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
 
 
 @router.post("/system/jobs")
-async def create_job(job_data: JobCreate, user = Depends(verify_admin)) -> Dict[str, Any]:
+def create_job(job_data: JobCreate, user = Depends(verify_admin)) -> Dict[str, Any]:
     """
     Create a new job configuration
     Requires admin access
@@ -196,7 +196,7 @@ async def create_job(job_data: JobCreate, user = Depends(verify_admin)) -> Dict[
 
 
 @router.put("/system/jobs/{job_name}")
-async def update_job(job_name: str, job_data: JobUpdate, user = Depends(verify_admin)) -> Dict[str, Any]:
+def update_job(job_name: str, job_data: JobUpdate, user = Depends(verify_admin)) -> Dict[str, Any]:
     """
     Update job configuration
     Requires admin access
@@ -238,7 +238,7 @@ async def update_job(job_name: str, job_data: JobUpdate, user = Depends(verify_a
 
 
 @router.post("/system/jobs/{job_name}/run")
-async def run_job_now(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
+def run_job_now(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
     """
     Manually trigger a job to run immediately
     Requires admin access
@@ -263,7 +263,7 @@ async def run_job_now(job_name: str, user = Depends(verify_admin)) -> Dict[str, 
 
 
 @router.delete("/system/jobs/{job_name}")
-async def delete_job(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
+def delete_job(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
     """
     Delete a job configuration
     Requires admin access

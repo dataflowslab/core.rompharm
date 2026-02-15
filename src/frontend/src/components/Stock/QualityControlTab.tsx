@@ -47,7 +47,7 @@ interface ApprovalFlow {
 
 export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTabProps) {
   const { t } = useTranslation();
-  
+
   // Prelevation form
   const [prelevationDate, setPrelevationDate] = useState<Date | null>(null);
   const [prelevationQuantity, setPrelevationQuantity] = useState<number>(0);
@@ -58,6 +58,13 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
   const [baNo, setBaNo] = useState('');
   const [testResult, setTestResult] = useState<'conform' | 'neconform' | ''>('');
   const [signing, setSigning] = useState(false);
+
+  // QA Rompharm form
+  const [qaDate, setQaDate] = useState<Date | null>(null);
+  const [qaNo, setQaNo] = useState('');
+  const [qaTestResult, setQaTestResult] = useState<'conform' | 'neconform' | ''>('');
+  const [qaReason, setQaReason] = useState('');
+  const [signingQA, setSigningQA] = useState(false);
 
   // Transactionable
   const [transactionable, setTransactionable] = useState(false);
@@ -71,12 +78,12 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
   useEffect(() => {
     loadApprovalFlow();
     loadCurrentUser();
-    
+
     // Load transactionable status from stock
     if (stock.transactionable !== undefined) {
       setTransactionable(stock.transactionable);
     }
-    
+
     // Check if stock state is Quarantined Transactionable
     if (stock.state_id === '694322878728e4d75ae72790') {
       setTransactionable(true);
@@ -125,7 +132,7 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
 
     try {
       setSavingPrelevation(true);
-      
+
       // Create stock movement for prelevation
       await api.post('/modules/inventory/api/stock-movements', {
         stock_id: stockId,
@@ -186,7 +193,7 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
       setBaDate(null);
       setBaNo('');
       setTestResult('');
-      
+
       // Reload approval flow and stock
       await loadApprovalFlow();
       onUpdate();
@@ -232,10 +239,96 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
     });
   };
 
+  const handleSignQA = async () => {
+    if (!qaDate || !qaNo || !qaTestResult) {
+      notifications.show({
+        title: 'Validation Error',
+        message: 'Please fill in all required fields (Date, No, Result)',
+        color: 'red',
+      });
+      return;
+    }
+
+    if (qaTestResult === 'neconform' && !qaReason) {
+      notifications.show({
+        title: 'Validation Error',
+        message: 'Reason is required for Non-conforming result',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      setSigningQA(true);
+
+      await api.post(`/modules/inventory/api/stocks/${stockId}/sign-qa`, {
+        qa_rompharm_ba_no: qaNo,
+        qa_rompharm_ba_date: qaDate.toISOString().split('T')[0],
+        qa_test_result: qaTestResult,
+        qa_reason: qaReason,
+      });
+
+      notifications.show({
+        title: 'Success',
+        message: 'QA Rompharm signed successfully',
+        color: 'green',
+      });
+
+      // Reset form
+      setQaDate(null);
+      setQaNo('');
+      setQaTestResult('');
+      setQaReason('');
+
+      onUpdate();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.detail || 'Failed to sign QA Rompharm',
+        color: 'red',
+      });
+    } finally {
+      setSigningQA(false);
+    }
+  };
+
+  const handleRemoveQASignature = () => {
+    modals.openConfirmModal({
+      title: 'Remove QA Signature',
+      children: (
+        <Text size="sm">
+          Are you sure you want to remove the QA signature? This will revert the decision.
+        </Text>
+      ),
+      labels: { confirm: 'Remove', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          // Use current user ID for the endpoint path parameter requirement, 
+          // although specific implementation might just check current user from token.
+          // The route asks for {user_id} in path.
+          await api.delete(`/modules/inventory/api/stocks/${stockId}/signatures-qa/${currentUserId}`);
+          notifications.show({
+            title: 'Success',
+            message: 'QA Signature removed successfully',
+            color: 'green',
+          });
+          onUpdate();
+        } catch (error: any) {
+          notifications.show({
+            title: 'Error',
+            message: error.response?.data?.detail || 'Failed to remove signature',
+            color: 'red',
+          });
+        }
+      },
+    });
+  };
+
   const handleSaveTransactionable = async () => {
     try {
       setSavingTransactionable(true);
-      
+
       await api.put(`/modules/inventory/api/stocks/${stockId}/transactionable`, {
         transactionable: transactionable,
       });
@@ -261,7 +354,7 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
   const hasSignatures = approvalFlow && approvalFlow.signatures && approvalFlow.signatures.length > 0;
   const isApproved = approvalFlow && approvalFlow.status === 'approved';
   const isQuarantinedTransactionable = stock.state_id === '694322878728e4d75ae72790';
-  
+
   // Show transactionable checkbox only if:
   // 1. Not signed yet (no signatures), OR
   // 2. Has Quarantined Transactionable state
@@ -502,6 +595,122 @@ export function QualityControlTab({ stockId, stock, onUpdate }: QualityControlTa
             </Table.Tbody>
           </Table>
         </Paper>
+
+        {/* QA Rompharm Section */}
+        <Stack mt="md">
+          {/* Form - Only show if not signed */}
+          {!stock.qa_signed_at && (
+            <Paper shadow="xs" p="md" withBorder>
+              <Title order={5} mb="md">{t('QA Rompharm')}</Title>
+              <Stack gap="sm">
+                <DatePickerInput
+                  label={t('Date')}
+                  placeholder={t('Select date')}
+                  value={qaDate}
+                  onChange={setQaDate}
+                  required
+                />
+                <TextInput
+                  label={t('No')}
+                  placeholder={t('QA Number')}
+                  value={qaNo}
+                  onChange={(e) => setQaNo(e.currentTarget.value)}
+                  required
+                />
+                <Select
+                  label={t('Result')}
+                  placeholder={t('Select result')}
+                  value={qaTestResult}
+                  onChange={(value) => setQaTestResult(value as 'conform' | 'neconform' | '')}
+                  data={[
+                    { value: 'conform', label: t('Conform') },
+                    { value: 'neconform', label: t('Neconform') }
+                  ]}
+                  required
+                />
+
+                {qaTestResult === 'neconform' && (
+                  <Textarea
+                    label={t('Reason')}
+                    placeholder={t('Enter reason for non-conformity')}
+                    value={qaReason}
+                    onChange={(e) => setQaReason(e.currentTarget.value)}
+                    required
+                    minRows={3}
+                  />
+                )}
+
+                <Button
+                  leftSection={<IconSignature size={16} />}
+                  onClick={handleSignQA}
+                  loading={signingQA}
+                  fullWidth
+                  color="blue"
+                  disabled={!hasSignatures} // Optional implicitly: Should QA wait for BA? Assuming Yes.
+                >
+                  {t('Sign QA Rompharm')}
+                </Button>
+                {!hasSignatures && (
+                  <Text size="xs" c="red" ta="center">
+                    {t('BA Rompharm must be signed first')}
+                  </Text>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          {/* QA Info - Show if signed */}
+          {stock.qa_signed_at && (
+            <Paper shadow="xs" p="md" withBorder>
+              <Group justify="space-between" mb="md">
+                <Title order={5}>{t('QA Rompharm Information')}</Title>
+                <ActionIcon
+                  color="red"
+                  variant="subtle"
+                  onClick={handleRemoveQASignature}
+                  title={t('Remove signature')}
+                >
+                  <IconTrash size={16} />
+                </ActionIcon>
+              </Group>
+              <Table>
+                <Table.Tbody>
+                  <Table.Tr>
+                    <Table.Td fw={500}>{t('QA No')}</Table.Td>
+                    <Table.Td>{stock.qa_rompharm_ba_no}</Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Td fw={500}>{t('QA Date')}</Table.Td>
+                    <Table.Td>{formatDate(stock.qa_rompharm_ba_date)}</Table.Td>
+                  </Table.Tr>
+                  <Table.Tr>
+                    <Table.Td fw={500}>{t('Result')}</Table.Td>
+                    <Table.Td>
+                      <Badge color={stock.qa_test_result === 'conform' ? 'green' : 'red'}>
+                        {stock.qa_test_result === 'conform' ? t('Conform') : t('Neconform')}
+                      </Badge>
+                    </Table.Td>
+                  </Table.Tr>
+                  {stock.qa_reason && (
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Reason')}</Table.Td>
+                      <Table.Td>{stock.qa_reason}</Table.Td>
+                    </Table.Tr>
+                  )}
+                  <Table.Tr>
+                    <Table.Td fw={500}>{t('Signed By')}</Table.Td>
+                    <Table.Td>
+                      <Stack gap={0}>
+                        <Text size="sm">{stock.qa_signed_by}</Text>
+                        <Text size="xs" c="dimmed">{formatDateTime(stock.qa_signed_at)}</Text>
+                      </Stack>
+                    </Table.Td>
+                  </Table.Tr>
+                </Table.Tbody>
+              </Table>
+            </Paper>
+          )}
+        </Stack>
       </Grid.Col>
     </Grid>
   );

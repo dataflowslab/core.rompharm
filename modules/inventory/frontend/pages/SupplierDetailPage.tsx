@@ -23,12 +23,16 @@ import { IconPlus, IconEdit, IconTrash, IconDeviceFloppy } from '@tabler/icons-r
 import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { api } from '../../../../src/frontend/src/services/api';
+import { CompanyDetailsTab } from '../components/Company/CompanyDetailsTab';
+import { CompanyAddressesTab } from '../components/Company/CompanyAddressesTab';
+import { CompanyContactsTab } from '../components/Company/CompanyContactsTab';
+import { CompanyArticlesTab } from '../components/Company/CompanyArticlesTab';
 
 interface Supplier {
   _id: string;
   pk?: number;
   name: string;
-  code?: string;
+
   vatno?: string;
   regno?: string;
   payment_conditions?: string;
@@ -79,7 +83,7 @@ export function SupplierDetailPage() {
   // Details form
   const [detailsForm, setDetailsForm] = useState({
     name: '',
-    code: '',
+
     vatno: '',
     regno: '',
     payment_conditions: '',
@@ -121,11 +125,20 @@ export function SupplierDetailPage() {
   // Parts
   const [parts, setParts] = useState<Part[]>([]);
   const [allParts, setAllParts] = useState<Part[]>([]);
-  const [partModalOpened, { open: openPartModal, close: closePartModal }] = useDisclosure(false);
   const [partForm, setPartForm] = useState({
     part_id: '',
     supplier_code: '',
     currency: 'EUR',
+  });
+
+  // New Product Modal
+  const [createProductModalOpened, { open: openCreateProductModal, close: closeCreateProductModal }] = useDisclosure(false);
+  const [newProductForm, setNewProductForm] = useState({
+    name: '',
+    ipn: '',
+    um: 'buc',
+    minimum_stock: 0,
+    lotallexp: false,
   });
 
   useEffect(() => {
@@ -166,7 +179,7 @@ export function SupplierDetailPage() {
       setSupplier(data);
       setDetailsForm({
         name: data.name || '',
-        code: data.code || '',
+
         vatno: data.vatno || '',
         regno: data.regno || '',
         payment_conditions: data.payment_conditions || '',
@@ -388,13 +401,49 @@ export function SupplierDetailPage() {
   };
 
   // Part functions
-  const handleAddPart = () => {
-    setPartForm({
-      part_id: '',
-      supplier_code: '',
-      currency: 'EUR',
-    });
-    openPartModal();
+  const handleCreateNewProduct = async () => {
+    try {
+      // 1. Create the article
+      const articleResponse = await api.post('/modules/inventory/api/articles', {
+        ...newProductForm,
+        supplier_id: id, // key to link it immediately or set default supplier
+        is_active: true,
+        is_component: true,
+      });
+
+      const newArticleId = articleResponse.data._id;
+
+      // 2. Link it to this supplier (if not done automatically by creation, but usually not)
+      // Actually, let's explicitly link it in the parts list
+      await api.post(`/modules/inventory/api/suppliers/${id}/parts`, {
+        part_id: newArticleId,
+        supplier_code: '',
+        currency: 'EUR',
+      });
+
+      notifications.show({
+        title: 'Success',
+        message: 'Product created and linked successfully',
+        color: 'green',
+      });
+      closeCreateProductModal();
+      // Reset form
+      setNewProductForm({
+        name: '',
+        ipn: '',
+        um: 'buc',
+        minimum_stock: 0,
+        lotallexp: false,
+      });
+      fetchSupplierParts();
+      fetchAllParts();
+    } catch (error: any) {
+      notifications.show({
+        title: 'Error',
+        message: error.response?.data?.detail || 'Failed to create product',
+        color: 'red',
+      });
+    }
   };
 
   const handleSavePart = async () => {
@@ -405,7 +454,12 @@ export function SupplierDetailPage() {
         message: 'Part added successfully',
         color: 'green',
       });
-      closePartModal();
+      // Reset form but keep currency
+      setPartForm({
+        part_id: '',
+        supplier_code: '',
+        currency: partForm.currency,
+      });
       fetchSupplierParts();
     } catch (error: any) {
       notifications.show({
@@ -446,6 +500,15 @@ export function SupplierDetailPage() {
     });
   };
 
+
+  const handleAddPart = async () => {
+    if (!partForm.part_id) {
+      notifications.show({ title: 'Error', message: 'Please select an article', color: 'red' });
+      return;
+    }
+    await handleSavePart();
+  };
+
   if (!supplier) {
     return (
       <Container size="xl">
@@ -478,230 +541,36 @@ export function SupplierDetailPage() {
             </Tabs.Tab>
           </Tabs.List>
 
-          <Tabs.Panel value="details" pt="md">
-            <Group grow mb="sm">
-              <TextInput
-                label="Name"
-                placeholder="Supplier name"
-                required
-                value={detailsForm.name}
-                onChange={(e) => setDetailsForm({ ...detailsForm, name: e.currentTarget.value })}
-                style={{ flex: 3 }}
-              />
-              <TextInput
-                label="Code"
-                placeholder="Auto-generated"
-                value={detailsForm.code}
-                disabled
-                style={{ flex: 1 }}
-              />
-            </Group>
+          <CompanyDetailsTab
+            detailsForm={detailsForm}
+            setDetailsForm={setDetailsForm}
+            currencies={currencies}
+            handleSaveDetails={handleSaveDetails}
+          />
 
-            <TextInput
-              label="VAT Number"
-              placeholder="VAT number"
-              value={detailsForm.vatno}
-              onChange={(e) => setDetailsForm({ ...detailsForm, vatno: e.currentTarget.value })}
-              mb="sm"
-            />
+          <CompanyAddressesTab
+            addresses={supplier.addresses || []}
+            handleAddAddress={handleAddAddress}
+            handleEditAddress={handleEditAddress}
+            handleDeleteAddress={handleDeleteAddress}
+          />
 
-            <TextInput
-              label="Registration Number"
-              placeholder="Registration number"
-              value={detailsForm.regno}
-              onChange={(e) => setDetailsForm({ ...detailsForm, regno: e.currentTarget.value })}
-              mb="sm"
-            />
+          <CompanyContactsTab
+            contacts={supplier.contacts || []}
+            handleAddContact={handleAddContact}
+            handleEditContact={handleEditContact}
+            handleDeleteContact={handleDeleteContact}
+          />
 
-            <Group grow mb="sm" align="flex-start">
-              <Textarea
-                label="Delivery Conditions"
-                placeholder="Delivery terms and conditions"
-                value={detailsForm.delivery_conditions}
-                onChange={(e) => setDetailsForm({ ...detailsForm, delivery_conditions: e.currentTarget.value })}
-                minRows={3}
-              />
-              <NumberInput
-                label="Payment Condition"
-                placeholder="0"
-                suffix=" zile"
-                value={detailsForm.payment_conditions ? parseInt(detailsForm.payment_conditions) : 0}
-                onChange={(value) => setDetailsForm({ ...detailsForm, payment_conditions: String(value || 0) })}
-                min={0}
-                allowNegative={false}
-              />
-            </Group>
-
-            <TextInput
-              label="Bank Account"
-              placeholder="Bank account information"
-              value={detailsForm.bank_account}
-              onChange={(e) => setDetailsForm({ ...detailsForm, bank_account: e.currentTarget.value })}
-              mb="sm"
-            />
-
-            <Select
-              label="Currency"
-              placeholder="Select currency"
-              data={currencies}
-              value={detailsForm.currency_id}
-              onChange={(value) => setDetailsForm({ ...detailsForm, currency_id: value || '' })}
-              searchable
-              clearable
-              mb="sm"
-            />
-
-            <Text size="sm" fw={500} mb="xs">
-              Type *
-            </Text>
-            <Group mb="md">
-              <Checkbox
-                label="Supplier"
-                checked={detailsForm.is_supplier}
-                onChange={(e) => setDetailsForm({ ...detailsForm, is_supplier: e.currentTarget.checked })}
-              />
-              <Checkbox
-                label="Manufacturer"
-                checked={detailsForm.is_manufacturer}
-                onChange={(e) => setDetailsForm({ ...detailsForm, is_manufacturer: e.currentTarget.checked })}
-              />
-              <Checkbox
-                label="Client"
-                checked={detailsForm.is_client}
-                onChange={(e) => setDetailsForm({ ...detailsForm, is_client: e.currentTarget.checked })}
-              />
-            </Group>
-
-            <Group justify="flex-end">
-              <Button leftSection={<IconDeviceFloppy size={16} />} onClick={handleSaveDetails}>
-                Save Changes
-              </Button>
-            </Group>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="addresses" pt="md">
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Addresses</Title>
-              <Button leftSection={<IconPlus size={16} />} onClick={handleAddAddress}>
-                Add Address
-              </Button>
-            </Group>
-
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th>Country</Table.Th>
-                  <Table.Th>City</Table.Th>
-                  <Table.Th>Address</Table.Th>
-                  <Table.Th>Contact</Table.Th>
-                  <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {supplier.addresses?.map((address, index) => (
-                  <Table.Tr key={index}>
-                    <Table.Td>{address.name}</Table.Td>
-                    <Table.Td>{address.country || '-'}</Table.Td>
-                    <Table.Td>{address.city || '-'}</Table.Td>
-                    <Table.Td>{address.address || '-'}</Table.Td>
-                    <Table.Td>{address.contact || '-'}</Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        <ActionIcon variant="light" color="blue" onClick={() => handleEditAddress(index)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="light" color="red" onClick={() => handleDeleteAddress(index)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="contacts" pt="md">
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Contacts</Title>
-              <Button leftSection={<IconPlus size={16} />} onClick={handleAddContact}>
-                Add Contact
-              </Button>
-            </Group>
-
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th>Role</Table.Th>
-                  <Table.Th>Phone</Table.Th>
-                  <Table.Th>Email</Table.Th>
-                  <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {supplier.contacts?.map((contact, index) => (
-                  <Table.Tr key={index}>
-                    <Table.Td>{contact.name}</Table.Td>
-                    <Table.Td>{contact.role || '-'}</Table.Td>
-                    <Table.Td>{contact.phone || '-'}</Table.Td>
-                    <Table.Td>{contact.email || '-'}</Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        <ActionIcon variant="light" color="blue" onClick={() => handleEditContact(index)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="light" color="red" onClick={() => handleDeleteContact(index)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="articles" pt="md">
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Articles</Title>
-              <Button leftSection={<IconPlus size={16} />} onClick={handleAddPart}>
-                Add Article
-              </Button>
-            </Group>
-
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>IPN</Table.Th>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th>Supplier Code</Table.Th>
-                  <Table.Th>Currency</Table.Th>
-                  <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {parts.map((part) => (
-                  <Table.Tr key={part._id}>
-                    <Table.Td>{part.ipn}</Table.Td>
-                    <Table.Td>{part.name}</Table.Td>
-                    <Table.Td>{part.supplier_code || '-'}</Table.Td>
-                    <Table.Td>{part.supplier_currency || 'EUR'}</Table.Td>
-                    <Table.Td>
-                      <ActionIcon
-                        variant="light"
-                        color="red"
-                        onClick={() => handleDeletePart(part._id, part.name)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Tabs.Panel>
+          <CompanyArticlesTab
+            openCreateProductModal={openCreateProductModal}
+            allParts={allParts}
+            partForm={partForm}
+            setPartForm={setPartForm}
+            parts={parts}
+            handleAddPart={handleAddPart}
+            handleDeletePart={handleDeletePart}
+          />
 
           <Tabs.Panel value="purchase_orders" pt="md">
             <Text c="dimmed">Purchase orders functionality coming soon...</Text>
@@ -820,40 +689,54 @@ export function SupplierDetailPage() {
         </Group>
       </Modal>
 
-      {/* Part Modal */}
-      <Modal opened={partModalOpened} onClose={closePartModal} title="Add Article" size="lg">
-        <Select
-          label="Article"
-          placeholder="Select article"
+
+
+      {/* Create Product Modal */}
+      <Modal opened={createProductModalOpened} onClose={closeCreateProductModal} title="Create New Product" size="lg">
+        <TextInput
+          label="Name"
+          placeholder="Product name"
           required
-          data={allParts.map((part) => ({ value: part._id, label: `${part.ipn} - ${part.name}` }))}
-          value={partForm.part_id}
-          onChange={(value) => setPartForm({ ...partForm, part_id: value || '' })}
-          searchable
+          value={newProductForm.name}
+          onChange={(e) => setNewProductForm({ ...newProductForm, name: e.currentTarget.value })}
           mb="sm"
         />
         <TextInput
-          label="Supplier Code"
-          placeholder="Supplier's code for this article"
-          value={partForm.supplier_code}
-          onChange={(e) => setPartForm({ ...partForm, supplier_code: e.currentTarget.value })}
+          label="IPN"
+          placeholder="Internal Part Number"
+          required
+          value={newProductForm.ipn}
+          onChange={(e) => setNewProductForm({ ...newProductForm, ipn: e.currentTarget.value })}
           mb="sm"
         />
-        <Select
-          label="Currency"
-          placeholder="Currency"
-          data={['EUR', 'USD', 'RON', 'GBP']}
-          value={partForm.currency}
-          onChange={(value) => setPartForm({ ...partForm, currency: value || 'EUR' })}
-          mb="md"
+        <TextInput
+          label="Unit of Measure"
+          placeholder="e.g. buc"
+          required
+          value={newProductForm.um}
+          onChange={(e) => setNewProductForm({ ...newProductForm, um: e.currentTarget.value })}
+          mb="sm"
+        />
+        <NumberInput
+          label="Minimum Stock"
+          placeholder="0"
+          value={newProductForm.minimum_stock}
+          onChange={(value) => setNewProductForm({ ...newProductForm, minimum_stock: Number(value) || 0 })}
+          mb="sm"
+        />
+        <Checkbox
+          label="Lotallexp"
+          checked={newProductForm.lotallexp}
+          onChange={(e) => setNewProductForm({ ...newProductForm, lotallexp: e.currentTarget.checked })}
+          mb="lg"
         />
         <Group justify="flex-end">
-          <Button variant="default" onClick={closePartModal}>
-            Cancel
-          </Button>
-          <Button onClick={handleSavePart}>Add</Button>
+          <Button variant="default" onClick={closeCreateProductModal}>Cancel</Button>
+          <Button onClick={handleCreateNewProduct}>Create & Link</Button>
         </Group>
       </Modal>
-    </Container>
+    </Container >
   );
 }
+
+

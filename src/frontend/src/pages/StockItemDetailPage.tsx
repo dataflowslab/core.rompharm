@@ -14,9 +14,9 @@ import {
   Table,
   Anchor,
 } from '@mantine/core';
-import { 
-  IconArrowLeft, 
-  IconInfoCircle, 
+import {
+  IconArrowLeft,
+  IconInfoCircle,
   IconClipboardCheck,
   IconTransfer,
   IconBook,
@@ -59,7 +59,7 @@ interface StockDetail {
   updated_at: string;
   created_by: string;
   updated_by: string;
-  
+
   // Enriched data
   part_detail?: {
     name: string;
@@ -77,7 +77,9 @@ interface StockDetail {
     color: string;
   };
   supplier_name?: string;
+  supplier_name?: string;
   stock_value?: number;
+  supplier_um_name?: string;
 }
 
 export function StockItemDetailPage() {
@@ -222,6 +224,12 @@ export function StockItemDetailPage() {
                       <Table.Td>{stock.quantity} {stock.part_detail?.um}</Table.Td>
                     </Table.Tr>
                     <Table.Tr>
+                      <Table.Td fw={500}>{t('UM (Manufacturer > System)')}</Table.Td>
+                      <Table.Td>
+                        {stock.supplier_um_name || '-'} {'>'} {stock.part_detail?.um || '-'}
+                      </Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
                       <Table.Td fw={500}>{t('Received On')}</Table.Td>
                       <Table.Td>{formatDate(stock.received_date)}</Table.Td>
                     </Table.Tr>
@@ -236,7 +244,7 @@ export function StockItemDetailPage() {
                           <Text c={expiryColor}>{formatDate(stock.expiry_date)}</Text>
                           {daysUntilExpiry !== null && (
                             <Text size="sm" c={expiryColor}>
-                              {daysUntilExpiry >= 0 
+                              {daysUntilExpiry >= 0
                                 ? `${daysUntilExpiry} ${t('days remaining')}`
                                 : `${Math.abs(daysUntilExpiry)} ${t('days expired')}`
                               }
@@ -302,9 +310,9 @@ export function StockItemDetailPage() {
 
         {/* Quality Control Tab */}
         <Tabs.Panel value="qc" pt="md">
-          <QualityControlTab 
-            stockId={id!} 
-            stock={stock} 
+          <QualityControlTab
+            stockId={id!}
+            stock={stock}
             onUpdate={fetchStockDetails}
           />
         </Tabs.Panel>

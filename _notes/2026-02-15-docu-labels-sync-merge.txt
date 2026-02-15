@@ -1,0 +1,1 @@
+﻿2026-02-15: Labels Docu payload now matches cleaned model (data.data = single label). Endpoint renders each label via /jobs/realtime with fallback to /jobs, then merges PDFs using pypdf. Expiry_date format adjusted to YYYY-MM-DD. README updated.

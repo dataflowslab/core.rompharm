@@ -126,9 +126,8 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
         'lastname': user.get('lastname', ''),
         'name': f"{user.get('firstname', '')} {user.get('lastname', '')}".strip(),
         'email': user.get('email'),
-        'phone': user.get('phone'),
-        'is_staff': user.get('is_staff', False),
         'is_active': user.get('is_active', True),
+        'mobile': user.get('mobile', True),  # Default True as requested
         'role': role_data,
         'token': token,
         'access_token': token  # Alias pentru compatibilitate
@@ -184,9 +183,9 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         'lastname': user.get('lastname', ''),
         'name': f"{user.get('firstname', '')} {user.get('lastname', '')}".strip(),
         'email': user.get('email'),
-        'phone': user.get('phone'),
         'is_staff': user.get('is_staff', False),
         'is_active': user.get('is_active', True),
+        'mobile': user.get('mobile', True),  # Default True as requested
         'role': role_data
     }
 
@@ -200,7 +199,8 @@ def create_user(
     email: Optional[str] = None,
     phone: Optional[str] = None,
     is_staff: bool = False,
-    is_active: bool = True
+    is_active: bool = True,
+    mobile: bool = True
 ) -> Dict[str, Any]:
     """
     Creare user nou
@@ -229,6 +229,7 @@ def create_user(
         'phone': phone,
         'is_staff': is_staff,
         'is_active': is_active,
+        'mobile': mobile,
         'created_at': datetime.utcnow(),
         'updated_at': datetime.utcnow()
     }

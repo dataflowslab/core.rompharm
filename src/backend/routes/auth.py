@@ -1,24 +1,19 @@
 """
 Authentication routes
 """
-from fastapi import APIRouter, HTTPException, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
 
-from ..utils.db import get_db
-from ..utils.config import load_config
-from ..utils.inventree_auth import get_inventree_user_info, verify_inventree_token, get_user_staff_status
-from ..utils.local_auth import authenticate_user, get_user_from_token
-from ..utils.audit import log_action
+from src.backend.services.auth_service import AuthService
+# Use absolute imports
+from src.backend.utils.db import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
 
 class LoginRequest(BaseModel):
     username: str
     password: str
-
 
 class LoginResponse(BaseModel):
     token: str
@@ -27,143 +22,22 @@ class LoginResponse(BaseModel):
     name: Optional[str] = None
     message: str
 
-
 @router.post("/login", response_model=LoginResponse)
-async def login(request_data: LoginRequest, request: Request):
+def login(request_data: LoginRequest, request: Request):
     """
-    Authenticate user (localhost or InvenTree based on config)
+    Authenticate user
     """
-    config = load_config()
-    identity_server = config.get('identity_server', 'inventree')
-    
-    if identity_server == 'localhost':
-        # Local authentication
-        user_info = authenticate_user(request_data.username, request_data.password)
-        
-        if not user_info:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid credentials. Please check your username and password."
-            )
-        
-        # Log login action
-        log_action(
-            action='login',
-            username=request_data.username,
-            request=request,
-            details={'is_staff': user_info.get('is_staff', False), 'identity_server': 'localhost'}
-        )
-        
-        return LoginResponse(
-            token=user_info['access_token'],
-            username=user_info['username'],
-            is_staff=user_info.get('is_staff', False),
-            name=user_info.get('name'),
-            message="Login successful"
-        )
-    
-    else:
-        # InvenTree authentication
-        try:
-            user_info = get_inventree_user_info(request_data.username, request_data.password)
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to connect to InvenTree: {str(e)}"
-            )
-        
-        if not user_info:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid InvenTree credentials. Please check your username and password."
-            )
-        
-        token = user_info['token']
-        is_staff = user_info['is_staff']
-        name = user_info.get('name')
-        
-        # Save or update user in database
-        db = get_db()
-        users_collection = db['users']
-        roles_collection = db['roles']
-        
-        existing_user = users_collection.find_one({'username': request_data.username})
-        
-        if existing_user:
-            # Update existing user
-            update_data = {
-                'token': token,
-                'is_staff': is_staff,
-                'updated_at': datetime.utcnow(),
-                'last_login': datetime.utcnow()
-            }
-            
-            # Update name if provided
-            if name:
-                update_data['name'] = name
-            
-            # If user doesn't have a role yet, assign one based on is_staff
-            if not existing_user.get('local_role'):
-                if is_staff:
-                    admin_role = roles_collection.find_one({'name': 'admin'})
-                    if admin_role:
-                        update_data['local_role'] = str(admin_role['_id'])
-                else:
-                    user_role = roles_collection.find_one({'name': 'standard user'})
-                    if user_role:
-                        update_data['local_role'] = str(user_role['_id'])
-            
-            users_collection.update_one(
-                {'username': request_data.username},
-                {'$set': update_data}
-            )
-        else:
-            # Create new user with role assignment
-            local_role = None
-            if is_staff:
-                admin_role = roles_collection.find_one({'name': 'admin'})
-                if admin_role:
-                    local_role = str(admin_role['_id'])
-            else:
-                user_role = roles_collection.find_one({'name': 'standard user'})
-                if user_role:
-                    local_role = str(user_role['_id'])
-            
-            # Create user document manually
-            user_doc = {
-                'username': request_data.username,
-                'token': token,
-                'is_staff': is_staff,
-                'local_role': local_role,
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow()
-            }
-            users_collection.insert_one(user_doc)
-        
-        # Log login action
-        log_action(
-            action='login',
-            username=request_data.username,
-            request=request,
-            details={'is_staff': is_staff, 'identity_server': 'inventree'}
-        )
-        
-        return LoginResponse(
-            token=token,
-            username=request_data.username,
-            is_staff=is_staff,
-            name=name,
-            message="Login successful"
-        )
+    # Delegate to Service Layer
+    # Note: This route is now synchronous (def) to allow FastAPI to run it in a threadpool
+    login_result = AuthService.login(request_data.username, request_data.password, request)
+    return LoginResponse(**login_result)
 
 
-async def verify_token(authorization: Optional[str] = Header(None)):
+def verify_token(authorization: Optional[str] = Header(None)):
     """
-    Dependency to verify authentication token (localhost or InvenTree)
+    Dependency to verify authentication token
     Returns normalized user data with consistent types
     """
-    from bson import ObjectId
-    
     if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header missing")
     
@@ -174,30 +48,13 @@ async def verify_token(authorization: Optional[str] = Header(None)):
     
     token = parts[1]
     
-    config = load_config()
-    identity_server = config.get('identity_server', 'inventree')
+    # Verify via Service
+    user_data = AuthService.verify_token(token)
     
-    if identity_server == 'localhost':
-        # Verify JWT token
-        user_data = get_user_from_token(token)
-        
-        if not user_data:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
-        
-        # ✅ Normalize user data
-        return _normalize_user_data(user_data)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
     
-    else:
-        # Verify token exists in database (InvenTree)
-        db = get_db()
-        users_collection = db['users']
-        user = users_collection.find_one({'token': token})
-        
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        # ✅ Normalize user data
-        return _normalize_user_data(user)
+    return _normalize_user_data(user_data)
 
 
 def _normalize_user_data(user: dict) -> dict:
@@ -235,22 +92,20 @@ def _normalize_user_data(user: dict) -> dict:
     return normalized
 
 
-async def verify_admin(authorization: Optional[str] = Header(None)):
+def verify_admin(authorization: Optional[str] = Header(None)):
     """
     Dependency to verify user is administrator
-    Staff status is determined from local database only (no InvenTree calls)
     """
-    user = await verify_token(authorization)
+    user = verify_token(authorization)
     
     if not user.get('is_staff', False):
-        print(f"Access denied for user {user['username']}: is_staff={user.get('is_staff')}")
         raise HTTPException(status_code=403, detail="Administrator access required")
     
     return user
 
 
 @router.get("/verify")
-async def verify(user = Depends(verify_token)):
+def verify(user = Depends(verify_token)):
     """
     Verify if current token is valid and return user info
     """
@@ -263,7 +118,7 @@ async def verify(user = Depends(verify_token)):
 
 
 @router.get("/me")
-async def get_current_user(user = Depends(verify_token)):
+def get_current_user(user = Depends(verify_token)):
     """
     Get current user information
     """
@@ -278,50 +133,20 @@ async def get_current_user(user = Depends(verify_token)):
 
 
 @router.post("/refresh-status")
-async def refresh_status(user = Depends(verify_token)):
+def refresh_status(user = Depends(verify_token)):
     """
-    Refresh user's staff status from InvenTree (only works when identity_server is 'inventree')
+    Refresh user's staff status
     For localhost mode, staff status is managed locally in the database
     """
-    config = load_config()
-    identity_server = config.get('identity_server', 'inventree')
-    
-    if identity_server == 'localhost':
-        # For localhost mode, just return current status from database
-        return {
-            'username': user['username'],
-            'is_staff': user.get('is_staff', False),
-            'message': 'Staff status is managed locally (localhost mode)'
-        }
-    
-    # InvenTree mode - refresh from InvenTree
-    staff_status = get_user_staff_status(user['token'])
-    
-    if staff_status is None:
-        raise HTTPException(status_code=500, detail="Failed to get staff status from InvenTree")
-    
-    # Update user in database
-    db = get_db()
-    users_collection = db['users']
-    users_collection.update_one(
-        {'token': user['token']},
-        {
-            '$set': {
-                'is_staff': staff_status,
-                'updated_at': datetime.utcnow()
-            }
-        }
-    )
-    
     return {
         'username': user['username'],
-        'is_staff': staff_status,
-        'message': 'Staff status updated successfully'
+        'is_staff': user.get('is_staff', False),
+        'message': 'Staff status is managed locally'
     }
 
 
 @router.get("/dashboard/shortcuts")
-async def get_dashboard_shortcuts(user = Depends(verify_token)):
+def get_dashboard_shortcuts(user = Depends(verify_token)):
     """
     Get dashboard shortcuts for current user based on their role
     """

@@ -1,0 +1,15 @@
+﻿# Sesiune de Lucru - 15.02.2026
+
+## Task: Label generation - quant/crt_no + test Docu
+
+### Modificari
+- In `modules/inventory/routes/labels.py`, fiecare label item include:
+  - `quant` = total etichete pentru acel item
+  - `crt_no` = numar curent (1..quant)
+
+### Teste DataFlows Docu
+- `POST /modules/inventory/api/generate-labels-docu` pentru `depo_stocks`, `depo_parts`, `depo_locations` a returnat **502**.
+- Mesaj: `DataFlows Docu failed to generate the label PDF`.
+
+### Observatii
+- Probabil problema cu DataFlows Docu (token/template). Necesita verificare in serviciul Docu.

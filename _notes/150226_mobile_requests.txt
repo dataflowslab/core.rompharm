@@ -1,0 +1,22 @@
+﻿# Sesiune de Lucru - 15.02.2026
+
+## Task: Mobile Requests - list + detalii + filtre
+
+### Frontend
+- Adaugat `MobileRequestsPage` (search, filtre drawer, paginare, refresh).
+- Adaugat `MobileRequestDetailPage` cu tab Summary + Details (JSON raw) si placeholder Actions.
+- Integrat in rute mobile, dashboard si meniul mobil.
+
+Fisiere:
+- `src/frontend/src/pages/MobileRequestsPage.tsx`
+- `src/frontend/src/pages/MobileRequestDetailPage.tsx`
+- `src/frontend/src/App.tsx`
+- `src/frontend/src/components/Layout/MobileLayout.tsx`
+- `src/frontend/src/pages/MobileDashboardPage.tsx`
+
+### Backend
+- Extins `GET /modules/requests/api/` cu parametri: `search`, `state_id`, `date_from`, `date_to`, `skip`, `limit`.
+- Search acopera reference, notes, batch_code, locatii (name/code), piese (name/IPN).
+
+Fisier:
+- `modules/requests/routes.py`
