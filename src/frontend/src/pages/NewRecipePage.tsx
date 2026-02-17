@@ -7,7 +7,8 @@ import { IconDeviceFloppy, IconArrowLeft } from '@tabler/icons-react';
 import api from '../services/api';
 
 interface Part {
-  id: number;
+  _id: string;
+  id?: number;
   name: string;
   IPN: string;
 }
@@ -50,12 +51,10 @@ export function NewRecipePage() {
       return;
     }
     
-    const productId = parseInt(selectedPart);
-
     setLoading(true);
     try {
       const response = await api.post('/api/recipes', {
-        product_id: productId
+        product_id: selectedPart
       });
 
       notifications.show({
@@ -97,7 +96,7 @@ export function NewRecipePage() {
           label={t('Select Product')}
           placeholder={t('Search for product...')}
           data={parts.map(part => ({
-            value: String(part.id),
+            value: String(part._id),
             label: `${part.name} (${part.IPN})`
           }))}
           value={selectedPart}

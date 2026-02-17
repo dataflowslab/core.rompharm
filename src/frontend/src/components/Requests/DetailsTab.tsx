@@ -10,18 +10,19 @@ import { requestsApi } from '../../services/requests';
 import { DocumentGenerator } from '../Common/DocumentGenerator';
 
 interface StockLocation {
-  pk: string;
+  _id: string;
   name: string;
 }
 
 interface Part {
-  pk: number;
+  _id: string;
+  id?: number;
   name: string;
   IPN: string;
 }
 
 interface RequestItem {
-  part: number;
+  part: string;
   quantity: number;
   notes?: string;
   part_detail?: Part;
@@ -45,7 +46,7 @@ interface Request {
   product_id?: string;
   product_quantity?: number;
   product_detail?: {
-    pk: string;
+    _id: string;
     name: string;
     IPN: string;
     description: string;
@@ -150,7 +151,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
     }
 
     // Check for duplicates
-    const isDuplicate = formData.items.some(item => item.part === parseInt(newItem.part));
+    const isDuplicate = formData.items.some(item => item.part === newItem.part);
     if (isDuplicate) {
       notifications.show({
         title: t('Error'),
@@ -160,9 +161,9 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
       return;
     }
 
-    const partDetail = parts.find(p => String(p.pk) === newItem.part);
+    const partDetail = parts.find(p => String(p._id) === newItem.part);
     const item: RequestItem = {
-      part: parseInt(newItem.part),
+      part: newItem.part,
       quantity: newItem.quantity,
       notes: newItem.notes || undefined,
       part_detail: partDetail
@@ -352,7 +353,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           {editing ? (
             <Select
               label={t('Source Location')}
-              data={stockLocations.map(loc => ({ value: String(loc.pk), label: loc.name }))}
+              data={stockLocations.map(loc => ({ value: String(loc._id), label: loc.name }))}
               value={formData.source}
               onChange={(value) => {
                 if (value) setFormData({ ...formData, source: value });
@@ -375,8 +376,8 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             <Select
               label={t('Destination Location')}
               data={stockLocations
-                .filter(loc => String(loc.pk) !== formData.source)
-                .map(loc => ({ value: String(loc.pk), label: loc.name }))}
+                .filter(loc => String(loc._id) !== formData.source)
+                .map(loc => ({ value: String(loc._id), label: loc.name }))}
               value={formData.destination}
               onChange={(value) => {
                 if (value) setFormData({ ...formData, destination: value });
@@ -450,7 +451,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
               label={t('Part')}
               placeholder={t('Search for part...')}
               data={parts.map(part => ({
-                value: String(part.pk),
+                value: String(part._id),
                 label: `${part.name} (${part.IPN})`
               }))}
               value={newItem.part}

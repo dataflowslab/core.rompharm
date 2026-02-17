@@ -112,7 +112,7 @@ export function RequestsPage() {
 
   const debouncedSearchParts = debounce(searchParts, 250);
 
-  const loadStockInfo = async (partId: number) => {
+  const loadStockInfo = async (partId: string) => {
     try {
       const response = await api.get(requestsApi.getPartStockInfo(partId));
       setStockInfo(response.data);
@@ -122,7 +122,7 @@ export function RequestsPage() {
     }
   };
 
-  const loadRecipe = async (partId: number) => {
+  const loadRecipe = async (partId: string) => {
     try {
       const response = await api.get(requestsApi.getPartRecipe(partId));
       setRecipeData(response.data);

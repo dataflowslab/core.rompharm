@@ -83,7 +83,7 @@ export function AddIngredientModal({ opened, onClose, recipeId, onSuccess }: Add
             };
 
             if (itemType === '1') {
-                itemData.product_id = parseInt(selectedPart!);
+                itemData.product_id = selectedPart;
                 itemData.q = quantity;
                 itemData.start = startDate.toISOString();
                 if (endDate) {
@@ -137,7 +137,7 @@ export function AddIngredientModal({ opened, onClose, recipeId, onSuccess }: Add
                             label={t('Product')}
                             placeholder={t('Search for product...')}
                             data={parts.map((part) => ({
-                                value: String(part.id),
+                                value: String(part._id),
                                 label: `${part.name} (${part.IPN})`,
                             }))}
                             value={selectedPart}

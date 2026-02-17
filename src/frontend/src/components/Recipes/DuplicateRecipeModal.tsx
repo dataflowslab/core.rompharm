@@ -50,7 +50,7 @@ export function DuplicateRecipeModal({ opened, onClose, recipeId }: DuplicateRec
         setDuplicating(true);
         try {
             const response = await api.post(`/api/recipes/${recipeId}/duplicate`, {
-                product_id: parseInt(duplicateProductId)
+                product_id: duplicateProductId
             });
 
             notifications.show({
@@ -101,7 +101,7 @@ export function DuplicateRecipeModal({ opened, onClose, recipeId }: DuplicateRec
                     label={t('Product')}
                     placeholder={t('Search for product...')}
                     data={duplicateParts.map((part) => ({
-                        value: String(part.id),
+                        value: String(part._id),
                         label: `${part.name} (${part.IPN})`,
                     }))}
                     value={duplicateProductId}

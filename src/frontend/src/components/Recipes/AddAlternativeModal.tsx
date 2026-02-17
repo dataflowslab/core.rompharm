@@ -15,7 +15,8 @@ import { IconPlus } from '@tabler/icons-react';
 import api from '../../services/api';
 
 interface Part {
-  id: number;
+  _id: string;
+  id?: number;
   name: string;
   IPN: string;
 }
@@ -72,7 +73,7 @@ export function AddAlternativeModal({
     setSaving(true);
     try {
       const alternativeData = {
-        product_id: parseInt(selectedPart),
+        product_id: selectedPart,
         q: quantity,
         start: startDate.toISOString(),
         fin: endDate?.toISOString(),
@@ -120,7 +121,7 @@ export function AddAlternativeModal({
           label={t('Product')}
           placeholder={t('Search for product...')}
           data={parts.map((part) => ({
-            value: String(part.id),
+            value: String(part._id),
             label: `${part.name} (${part.IPN})`,
           }))}
           value={selectedPart}

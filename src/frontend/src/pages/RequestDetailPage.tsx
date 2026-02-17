@@ -14,18 +14,19 @@ import { ReceptieTab } from '../components/Requests/ReceptieTab';
 import { ProductionTab } from '../components/Requests/ProductionTab';
 
 interface StockLocation {
-  pk: number;
+  _id: string;
   name: string;
 }
 
 interface Part {
-  pk: number;
+  _id: string;
+  id?: number;
   name: string;
   IPN: string;
 }
 
 interface RequestItem {
-  part: number;
+  part: string;
   quantity: number;
   notes?: string;
   part_detail?: Part;
@@ -42,8 +43,8 @@ interface StateDetail {
 interface Request {
   _id: string;
   reference: string;
-  source: number;
-  destination: number;
+  source: string;
+  destination: string;
   items: RequestItem[];
   line_items: number;
   status: string;

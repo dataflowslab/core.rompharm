@@ -8,7 +8,8 @@ import api from '../services/api';
 
 interface Recipe {
   _id: string;
-  id: number;
+  part_id?: string;
+  id?: number;
   name: string;
   code: string;
   rev: number;

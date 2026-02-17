@@ -14,6 +14,49 @@ from src.backend.models.recipe_model import RecipeModel, RecipeItem, RecipeLogMo
 router = APIRouter()
 
 
+def normalize_object_id(value) -> Optional[ObjectId]:
+    """Normalize possible ObjectId values to ObjectId or None."""
+    if isinstance(value, ObjectId):
+        return value
+    if isinstance(value, str):
+        try:
+            return ObjectId(value)
+        except Exception:
+            return None
+    return None
+
+
+def resolve_part_id(db, product_id):
+    """
+    Resolve product_id to MongoDB ObjectId.
+    Accepts ObjectId, ObjectId string, or legacy numeric ID (int/str digits).
+    Returns (part_oid, legacy_id).
+    """
+    legacy_id = None
+
+    if isinstance(product_id, ObjectId):
+        return product_id, None
+
+    if isinstance(product_id, str):
+        product_id = product_id.strip()
+        if not product_id:
+            return None, None
+        try:
+            return ObjectId(product_id), None
+        except Exception:
+            if product_id.isdigit():
+                legacy_id = int(product_id)
+    elif isinstance(product_id, int):
+        legacy_id = product_id
+
+    if legacy_id is not None:
+        part = db.depo_parts.find_one({"id": legacy_id})
+        if part:
+            return part.get("_id"), legacy_id
+
+    return None, legacy_id
+
+
 def log_recipe_change(db, recipe_id: str, action: str, changes: dict, user: str, 
                       ip_address: str = None, user_agent: str = None):
     """Log recipe change to audit trail"""
@@ -39,21 +82,45 @@ def list_recipes(
         # Get all recipes (use depo_recipes, not depo_recipes_latest)
         recipes = list(db.depo_recipes.find().sort("rev_date", -1))
         
-        # Get product IDs (part_id is ObjectId in depo_recipes)
-        product_ids = [r.get("part_id") for r in recipes if r.get("part_id")]
+        # Collect part ObjectIds and legacy IDs
+        part_oids = []
+        legacy_ids = []
+        for recipe in recipes:
+            part_oid = normalize_object_id(recipe.get("part_id"))
+            if part_oid:
+                part_oids.append(part_oid)
+            elif recipe.get("id") is not None:
+                legacy_ids.append(recipe.get("id"))
         
-        # Get product details from depo_parts using _id
-        parts = list(db.depo_parts.find({"_id": {"$in": product_ids}}))
+        # Fetch parts by ObjectId
+        parts = list(db.depo_parts.find({"_id": {"$in": part_oids}})) if part_oids else []
         parts_map = {p["_id"]: p for p in parts}
+        
+        # Fetch parts by legacy numeric ID (if any)
+        legacy_parts = list(db.depo_parts.find({"id": {"$in": legacy_ids}})) if legacy_ids else []
+        legacy_parts_map = {p.get("id"): p for p in legacy_parts}
         
         # Enrich recipes with product info
         result = []
         for recipe in recipes:
             part_id = recipe.get("part_id")
-            product = parts_map.get(part_id, {})
+            part_oid = normalize_object_id(part_id)
+            product = None
+            legacy_id = recipe.get("id")
+
+            if part_oid:
+                product = parts_map.get(part_oid)
+            elif legacy_id is not None:
+                product = legacy_parts_map.get(legacy_id)
+                if product:
+                    part_oid = product.get("_id")
+
+            product = product or {}
+
             recipe_data = {
                 "_id": str(recipe["_id"]),
-                "part_id": str(part_id) if part_id else None,
+                "part_id": str(part_oid) if part_oid else None,
+                "id": legacy_id if legacy_id is not None else None,
                 "name": product.get("name", "Unknown Product"),
                 "code": product.get("ipn", ""),
                 "rev": recipe.get("rev", 0),
@@ -97,14 +164,17 @@ def search_parts(
         
         parts = list(db.depo_parts.find(query).limit(50))
         
-        return [
-            {
-                "id": p["id"],
-                "name": p.get("name", ""),
-                "IPN": p.get("ipn", "")
-            }
-            for p in parts
-        ]
+        results = []
+        for part in parts:
+            part_oid = part.get("_id")
+            results.append({
+                "_id": str(part_oid) if part_oid else None,
+                "id": part.get("id"),
+                "name": part.get("name", ""),
+                "IPN": part.get("ipn", "")
+            })
+        
+        return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -121,49 +191,73 @@ def get_recipe(
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
-        # Get product details using part_id (ObjectId)
+        # Get product details using part_id (ObjectId) or legacy id
         product = None
-        if recipe.get("part_id"):
-            part_id = recipe["part_id"] if isinstance(recipe["part_id"], ObjectId) else ObjectId(recipe["part_id"])
-            product = db.depo_parts.find_one({"_id": part_id})
+        part_oid = normalize_object_id(recipe.get("part_id"))
+        legacy_id = recipe.get("id")
+
+        if part_oid:
+            product = db.depo_parts.find_one({"_id": part_oid})
+        elif legacy_id is not None:
+            product = db.depo_parts.find_one({"id": legacy_id})
+            if product:
+                part_oid = product.get("_id")
         
-        # Get all part IDs from items (recursive) - part_id is ObjectId
-        def collect_part_ids(items):
-            ids = []
+        # Get all part IDs from items (recursive) - part_id is ObjectId, fallback to legacy id
+        def collect_part_refs(items):
+            oids = []
+            legacy_ids = []
             for item in items:
-                if item.get("type") == 1 and item.get("part_id"):
-                    part_id = item["part_id"] if isinstance(item["part_id"], ObjectId) else ObjectId(item["part_id"])
-                    ids.append(part_id)
+                if item.get("type") == 1:
+                    part_id_val = item.get("part_id")
+                    part_oid_val = normalize_object_id(part_id_val)
+                    if part_oid_val:
+                        oids.append(part_oid_val)
+                    elif item.get("id") is not None:
+                        legacy_ids.append(item.get("id"))
                 if item.get("items"):
-                    ids.extend(collect_part_ids(item["items"]))
-            return ids
+                    child_oids, child_legacy = collect_part_refs(item["items"])
+                    oids.extend(child_oids)
+                    legacy_ids.extend(child_legacy)
+            return oids, legacy_ids
         
-        part_ids = collect_part_ids(recipe.get("items", []))
-        parts = list(db.depo_parts.find({"_id": {"$in": part_ids}}))
+        part_ids, legacy_part_ids = collect_part_refs(recipe.get("items", []))
+        parts = list(db.depo_parts.find({"_id": {"$in": part_ids}})) if part_ids else []
         parts_map = {p["_id"]: p for p in parts}
+        legacy_parts = list(db.depo_parts.find({"id": {"$in": legacy_part_ids}})) if legacy_part_ids else []
+        legacy_parts_map = {p.get("id"): p for p in legacy_parts}
         
         # Enrich items with part details
         def enrich_items(items):
             enriched = []
             for item in items:
                 enriched_item = dict(item)
-                if item.get("type") == 1 and item.get("part_id"):
-                    part_id = item["part_id"] if isinstance(item["part_id"], ObjectId) else ObjectId(item["part_id"])
-                    part = parts_map.get(part_id, {})
-                    enriched_item["part_detail"] = {
-                        "name": part.get("name", f"Part {str(part_id)}"),
-                        "IPN": part.get("ipn", "")
-                    }
-                    # Convert ObjectId to string for JSON
-                    enriched_item["part_id"] = str(part_id)
+                if item.get("type") == 1:
+                    part = None
+                    part_oid_val = normalize_object_id(item.get("part_id"))
+                    if part_oid_val:
+                        part = parts_map.get(part_oid_val)
+                    elif item.get("id") is not None:
+                        part = legacy_parts_map.get(item.get("id"))
+                        if part:
+                            part_oid_val = part.get("_id")
+
+                    if part:
+                        enriched_item["part_detail"] = {
+                            "name": part.get("name", f"Part {str(part_oid_val) if part_oid_val else ''}"),
+                            "IPN": part.get("ipn", "")
+                        }
+                    if part_oid_val:
+                        # Convert ObjectId to string for JSON
+                        enriched_item["part_id"] = str(part_oid_val)
                 if item.get("items"):
                     enriched_item["items"] = enrich_items(item["items"])
                 enriched.append(enriched_item)
             return enriched
         
         recipe["_id"] = str(recipe["_id"])
-        if recipe.get("part_id"):
-            recipe["part_id"] = str(recipe["part_id"])
+        if part_oid:
+            recipe["part_id"] = str(part_oid)
         recipe["product_detail"] = {
             "name": product.get("name", "Unknown Product") if product else "Unknown Product",
             "IPN": product.get("ipn", "") if product else ""
@@ -187,16 +281,23 @@ def create_recipe(
         product_id = data.get("product_id")
         if not product_id:
             raise HTTPException(status_code=400, detail="product_id is required")
+
+        part_oid, legacy_id = resolve_part_id(db, product_id)
+        if not part_oid:
+            raise HTTPException(status_code=400, detail="Invalid product_id")
         
-        # Check if recipe already exists
-        existing = db[RecipeModel.Config.collection_name].find_one({"id": product_id})
+        # Check if recipe already exists (by part_id or legacy id)
+        existing = db[RecipeModel.Config.collection_name].find_one({"part_id": part_oid})
+        if not existing and legacy_id is not None:
+            existing = db[RecipeModel.Config.collection_name].find_one({"id": legacy_id})
         if existing:
             raise HTTPException(status_code=400, detail="Recipe already exists for this product")
         
         # Create recipe
         recipe_doc = RecipeModel.create(
-            product_id=product_id,
-            created_by=current_user["username"]
+            part_id=part_oid,
+            created_by=current_user["username"],
+            legacy_id=legacy_id
         )
         
         result = db[RecipeModel.Config.collection_name].insert_one(recipe_doc)
@@ -247,7 +348,12 @@ def add_item(
         }
         
         if data.get("type") == 1:
-            new_item["id"] = data.get("product_id")
+            part_oid, legacy_id = resolve_part_id(db, data.get("product_id"))
+            if not part_oid:
+                raise HTTPException(status_code=400, detail="Invalid product_id")
+            new_item["part_id"] = part_oid
+            if legacy_id is not None:
+                new_item["id"] = legacy_id
         else:
             new_item["items"] = []
         
@@ -304,7 +410,16 @@ def update_item(
         
         # Update item fields
         if data.get("type") == 1:
-            items[item_index]["id"] = data.get("product_id", items[item_index].get("id"))
+            if "product_id" in data and data.get("product_id") is not None:
+                part_oid, legacy_id = resolve_part_id(db, data.get("product_id"))
+                if not part_oid:
+                    raise HTTPException(status_code=400, detail="Invalid product_id")
+                items[item_index]["part_id"] = part_oid
+                if legacy_id is not None:
+                    items[item_index]["id"] = legacy_id
+                else:
+                    items[item_index].pop("id", None)
+
             items[item_index]["q"] = data.get("q", items[item_index].get("q"))
             items[item_index]["start"] = datetime.fromisoformat(data.get("start")) if data.get("start") else items[item_index].get("start")
             items[item_index]["fin"] = datetime.fromisoformat(data.get("fin")) if data.get("fin") else items[item_index].get("fin")
@@ -417,14 +532,20 @@ def add_alternative(
             raise HTTPException(status_code=400, detail="Can only add alternatives to Type 2 (group) items")
         
         # Create new alternative
+        part_oid, legacy_id = resolve_part_id(db, data.get("product_id"))
+        if not part_oid:
+            raise HTTPException(status_code=400, detail="Invalid product_id")
+
         new_alternative = {
             "type": 1,
-            "id": data.get("product_id"),
+            "part_id": part_oid,
             "q": data.get("q", 1),
             "start": datetime.fromisoformat(data.get("start")) if data.get("start") else datetime.utcnow(),
             "fin": datetime.fromisoformat(data.get("fin")) if data.get("fin") else None,
             "notes": data.get("notes")
         }
+        if legacy_id is not None:
+            new_alternative["id"] = legacy_id
         
         # Add to items array
         if "items" not in parent_item:
@@ -492,7 +613,15 @@ def update_alternative(
         old_alt = dict(alternatives[alt_index])
         
         # Update alternative fields
-        alternatives[alt_index]["id"] = data.get("product_id", alternatives[alt_index].get("id"))
+        if "product_id" in data and data.get("product_id") is not None:
+            part_oid, legacy_id = resolve_part_id(db, data.get("product_id"))
+            if not part_oid:
+                raise HTTPException(status_code=400, detail="Invalid product_id")
+            alternatives[alt_index]["part_id"] = part_oid
+            if legacy_id is not None:
+                alternatives[alt_index]["id"] = legacy_id
+            else:
+                alternatives[alt_index].pop("id", None)
         alternatives[alt_index]["q"] = data.get("q", alternatives[alt_index].get("q"))
         alternatives[alt_index]["start"] = datetime.fromisoformat(data.get("start")) if data.get("start") else alternatives[alt_index].get("start")
         alternatives[alt_index]["fin"] = datetime.fromisoformat(data.get("fin")) if data.get("fin") else alternatives[alt_index].get("fin")
@@ -651,15 +780,21 @@ def get_recipe_revisions(
         if not recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         
-        if not recipe.get("part_id"):
+        part_oid = normalize_object_id(recipe.get("part_id"))
+        legacy_id = recipe.get("id")
+
+        if not part_oid and legacy_id is None:
             raise HTTPException(status_code=400, detail="Recipe has no part_id")
         
-        part_id = recipe["part_id"] if isinstance(recipe["part_id"], ObjectId) else ObjectId(recipe["part_id"])
-        
         # Get all revisions for this product, sorted by revision desc
-        revisions = list(db[RecipeModel.Config.collection_name].find(
-            {"part_id": part_id}
-        ).sort("rev", -1))
+        if part_oid:
+            revisions = list(db[RecipeModel.Config.collection_name].find(
+                {"part_id": part_oid}
+            ).sort("rev", -1))
+        else:
+            revisions = list(db[RecipeModel.Config.collection_name].find(
+                {"id": legacy_id}
+            ).sort("rev", -1))
         
         result = []
         for rev in revisions:

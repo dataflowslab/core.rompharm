@@ -5,6 +5,7 @@ export interface PartDetail {
 
 export interface RecipeItem {
     type: number;
+    part_id?: string;
     id?: number;
     q?: number;
     start?: string;
@@ -17,7 +18,8 @@ export interface RecipeItem {
 
 export interface Recipe {
     _id: string;
-    id: number;
+    part_id?: string;
+    id?: number;
     rev: number;
     rev_date: string;
     items: RecipeItem[];
@@ -29,7 +31,8 @@ export interface Recipe {
 }
 
 export interface Part {
-    id: number;
+    _id: string;
+    id?: number;
     name: string;
     IPN: string;
 }

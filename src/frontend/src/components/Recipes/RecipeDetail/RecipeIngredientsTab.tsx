@@ -63,7 +63,7 @@ export function RecipeIngredientsTab({
                                 {t('Alternative Group')} ({item.items?.length || 0} {t('items')})
                             </Text>
                         ) : (
-                            <Text>{item.part_detail?.name || `Product ${item.id}`}</Text>
+                            <Text>{item.part_detail?.name || `Product ${item.part_id || item.id}`}</Text>
                         )}
                     </Group>
                     {item.notes && (
@@ -135,7 +135,7 @@ export function RecipeIngredientsTab({
                         }}
                     >
                         <Table.Td style={{ paddingLeft: '48px' }}>
-                            <Text size="sm">↳ {alt.part_detail?.name || `Product ${alt.id}`}</Text>
+                            <Text size="sm">↳ {alt.part_detail?.name || `Product ${alt.part_id || alt.id}`}</Text>
                             {alt.notes && (
                                 <Text size="xs" c="dimmed" mt={2}>
                                     {alt.notes}

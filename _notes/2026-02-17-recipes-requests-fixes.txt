@@ -1,0 +1,4 @@
+2026-02-17
+- Fix /api/recipes/parts to return _id safely (avoid KeyError on missing id) and include legacy id.
+- Align recipes backend + frontend to use Mongo ObjectId part_id (create/add/update items), keep legacy id fallback.
+- Fix request edit page select options to use _id (avoid duplicate undefined values) and update related types.

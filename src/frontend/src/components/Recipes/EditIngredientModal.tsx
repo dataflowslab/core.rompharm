@@ -17,6 +17,7 @@ import api from '../../services/api';
 
 interface RecipeItem {
   type: number;
+  part_id?: string;
   id?: number;
   q?: number;
   start?: string;
@@ -71,7 +72,7 @@ export function EditIngredientModal({
       };
 
       if (item.type === 1) {
-        updateData.product_id = item.id; // Product cannot be changed
+        updateData.product_id = item.part_id || item.id; // Product cannot be changed
         updateData.q = quantity;
         updateData.start = startDate?.toISOString();
         if (endDate) {
@@ -113,7 +114,7 @@ export function EditIngredientModal({
           <>
             <TextInput
               label={t('Product')}
-              value={item.part_detail ? `${item.part_detail.name} (${item.part_detail.IPN})` : `Product ${item.id}`}
+              value={item.part_detail ? `${item.part_detail.name} (${item.part_detail.IPN})` : `Product ${item.part_id || item.id}`}
               disabled
               description={t('Product cannot be changed. To change product, delete this ingredient and add a new one.')}
             />

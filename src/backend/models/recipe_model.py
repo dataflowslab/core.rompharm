@@ -11,7 +11,8 @@ from bson import ObjectId
 class RecipeItem(BaseModel):
     """Recipe item (ingredient or alternative group)"""
     type: int = Field(..., description="1=Single product, 2=Alternative group")
-    id: Optional[int] = Field(None, description="Product ID (for type=1)")
+    part_id: Optional[str] = Field(None, description="Product ObjectId (for type=1)")
+    id: Optional[int] = Field(None, description="Legacy product ID (for type=1)")
     q: float = Field(..., description="Quantity")
     start: datetime = Field(default_factory=datetime.utcnow, description="Validity start date")
     fin: Optional[datetime] = Field(None, description="Validity end date (optional)")
@@ -34,7 +35,8 @@ RecipeItem.model_rebuild()
 
 class RecipeModel(BaseModel):
     """Recipe model"""
-    id: int = Field(..., description="Product ID")
+    part_id: str = Field(..., description="Product ObjectId")
+    id: Optional[int] = Field(None, description="Legacy product ID")
     items: List[RecipeItem] = Field(default_factory=list, description="Recipe items")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     created_by: str
@@ -49,16 +51,21 @@ class RecipeModel(BaseModel):
         }
 
     @staticmethod
-    def create(product_id: int, created_by: str) -> Dict[str, Any]:
+    def create(part_id: ObjectId, created_by: str, legacy_id: Optional[int] = None) -> Dict[str, Any]:
         """Create new recipe"""
-        return {
-            "id": product_id,
+        doc = {
+            "part_id": part_id,
             "items": [],
+            "rev": 0,
+            "rev_date": datetime.utcnow(),
             "created_at": datetime.utcnow(),
             "created_by": created_by,
             "updated_at": datetime.utcnow(),
             "updated_by": created_by
         }
+        if legacy_id is not None:
+            doc["id"] = legacy_id
+        return doc
 
 
 class RecipeLogModel(BaseModel):
