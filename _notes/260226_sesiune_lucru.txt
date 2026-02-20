@@ -1,0 +1,127 @@
+SESIUNE LUCRU - 26.02.2026
+===========================
+
+URL: http://localhost:8000/web/requests/6995d1eb6804a21585d64fd0
+
+PROBLEME IDENTIFICATE:
+-----------------------
+
+1. BLANK SCREEN LA SAVE (422 Unprocessable Entity)
+   - Endpoint: PATCH /modules/requests/api/6995d1eb6804a21585d64fd0
+   - Cauza: Validare esuata la salvarea items
+   - Solutie: Adaugat error handling si logging in update_request endpoint
+   - Asigurat ca init_q este setat automat daca lipseste
+
+2. PROBLEMA CU SELECTUL DE PART
+   - Simptom: Daca adaugi un part apoi cauti altul, primul se reselecteaza
+   - Cauza: Logica de "keep selected part" in searchParts care mentinea partul selectat in array
+   - Solutie: Simplificat logica - cand search < 2 caractere, goleste array-ul complet
+   - Eliminat logica de "move to front" care cauza confuzie
+
+3. BATCH CODES NU SE INCARCA
+   - Simptom: Dupa selectarea unui part cu stock (ex: ACID TIOCTIC - 697c6071a2906a7551ea0094), 
+     dropdown-ul de Batch Code ramane gol
+   - Cauza: Batch codes nu erau grupate corect si nu includeau location_name
+   - Solutie:
+     * Modificat fetch_part_batch_codes sa grupeze dupa batch_code + location_id
+     * Adaugat location_name in label: "BATCH_CODE (QTY buc) - LOCATION_NAME"
+     * Adaugat logging pentru debugging
+     * Asigurat ca state_info (is_transferable, is_requestable) este inclus
+
+4. BATCH CODES GOL - API returna []
+   - URL: http://localhost:8000/modules/requests/api/parts/697/batch-codes?location_id=6941cb988728e4d75ae7273b
+   - Cauza: API-ul cauta doar in location-ul sursa (location_id parameter)
+   - Solutie: Modificat endpoint sa ignore location_id si sa caute peste tot
+   - Rationale: Utilizatorul trebuie sa vada toate batch codes disponibile, nu doar din sursa
+
+5. EROARE LA SAVE - "Input should be a valid string"
+   - Eroare: {"type": "string_type", "loc": ["body", "items", 0, "part"], "input": 697}
+   - Cauza: Frontend trimite part ca numar (697) in loc de string ("697")
+   - Solutie: Adaugat String() conversion in handleAddItem si handleSaveBatchData
+   - Asigurat ca part este INTOTDEAUNA string inainte de trimitere la API
+
+6. CARACTERE UTF-8 IN CONSOLA
+   - Problema: Caracterele speciale (✓, ✅) nu se afiseaza corect in consola Windows
+   - Solutie: Inlocuit cu [OK] (ASCII standard)
+   - Fisier: src/frontend/scripts/po-to-json.cjs
+
+7. FILTRARE GLOBALA STOCK TRANSACTIONABLE
+   - Necesitate: Doar anumite state-uri permit tranzactionarea stock-ului
+   - State IDs permise: 694321db8728e4d75ae72789, 694322878728e4d75ae72790, 694322758728e4d75ae7278f
+   - Solutie: Creat functie globala get_transactionable_state_ids()
+   - Locatie: src/backend/utils/stock_utils.py
+
+MODIFICARI EFECTUATE:
+---------------------
+
+1. modules/requests/services.py - fetch_part_batch_codes()
+   - Grupare dupa batch_code + location_id (nu doar batch_code)
+   - Fetch location names din depo_locations
+   - Label format: "{batch_code} ({quantity} buc) - {location_name}"
+   - Adaugat logging pentru debugging
+   - Returneaza toate combinatiile batch+location separate
+   - Foloseste get_transactionable_state_ids() pentru filtrare
+
+2. src/frontend/src/components/Requests/OperationsTab.tsx
+   - Simplificat searchParts() - elimina array-ul cand search < 2 caractere
+   - Eliminat logica de "keep selected part" care cauza reselection
+   - Eliminat logica de "move to front" din handlePartSelect
+   - Adaugat logging in loadBatchCodes si handlePartSelect
+   - Actualizat mapping pentru batch options sa includa toate campurile noi
+   - handleAddItem: Adaugat String(newItem.part) pentru conversie explicita
+   - handleSaveBatchData: Adaugat String(item.part) in map pentru toate items
+   - loadBatchCodes: Eliminat parametrul location_id din request
+
+3. modules/requests/routes.py - update_request()
+   - Adaugat try-catch pentru update_one cu logging
+   - Asigurat ca init_q este setat automat daca lipseste
+   - Raise HTTPException 422 cu detalii in caz de eroare
+
+4. modules/requests/routes.py - get_part_batch_codes()
+   - Modificat sa ignore parametrul location_id
+   - Trimite None la fetch_part_batch_codes pentru a cauta in toate locatiile
+   - Comentariu adaugat: "Don't filter by location - show all available batch codes"
+
+5. src/frontend/scripts/po-to-json.cjs
+   - Inlocuit caracterele UTF-8 speciale (✓) cu [OK] (ASCII)
+   - Fix pentru afisare corecta in consola Windows
+   - Mesaje: "[OK] Created..." si "[OK] All translations compiled!"
+
+6. src/backend/utils/stock_utils.py - NOU FISIER
+   - Creat modul global pentru filtrarea stock items tranzactionabile
+   - Constanta: TRANSACTIONABLE_STOCK_STATE_IDS (3 state IDs)
+   - Functii:
+     * get_transactionable_state_ids() - returneaza lista de ObjectIds
+     * filter_transactionable_stock_items() - filtreaza lista de stock items
+     * build_transactionable_stock_query() - construieste query MongoDB
+     * is_stock_transactionable() - verifica daca un state_id permite tranzactii
+   - Documentatie completa pentru fiecare functie cu exemple de utilizare
+
+TESTARE FINALA:
+---------------
+1. Selecteaza ACID TIOCTIC (697c6071a2906a7551ea0094)
+2. Verifica ca batch codes apar (cauta in toate locatiile, nu doar sursa)
+3. Verifica ca apar DOAR batch codes din state-urile permise (3 state-uri)
+4. Adauga item cu batch code selectat
+5. Salveaza - ar trebui sa functioneze fara eroare 422
+6. Verifica ca item-ul apare in tabel cu toate detaliile
+7. Verifica ca mesajele din consola apar corect (fara caractere stricate)
+
+OBSERVATII:
+-----------
+- Batch codes sunt acum afisate per locatie (daca acelasi batch exista in mai multe locatii)
+- Logging adaugat pentru debugging - poate fi eliminat dupa testare
+- Frontend acum afiseaza corect toate informatiile despre batch (quantity, location, state)
+- Part ID este INTOTDEAUNA trimis ca string la API (fix pentru validare Pydantic)
+- API cauta batch codes in TOATE locatiile, nu doar in sursa transferului
+- Consola Windows afiseaza corect mesajele (fara caractere UTF-8 speciale)
+- Functie globala pentru filtrarea stock items tranzactionabile - reutilizabila in toata platforma
+- Doar stock items din cele 3 state-uri specifice pot fi tranzactionate
+
+NEXT STEPS (pentru continuare):
+--------------------------------
+- Inlocuire Select cu tabel de batch codes (checkboxes)
+- Coloane: # (Checkbox), Batch (cod + stare), Available, Quantity (input)
+- Logica: Quantity general vs Quantity per batch
+- Adaugare multipla de items (cate unul per batch code selectat)
+[2026-02-20] Curatat frontend Sales/Procurement/Inventory de pk; ramas backend companies_service cu pk auto-increment de migrat separat.

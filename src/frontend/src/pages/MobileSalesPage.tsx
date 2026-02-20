@@ -109,7 +109,7 @@ export function MobileSalesPage() {
             const statuses = data.statuses || data || [];
             if (statuses.length > 0) {
                 setStatusOptions(statuses.map((s: any) => ({
-                    value: String(s.value ?? s.status ?? s.pk ?? s.id ?? s.code ?? s),
+                    value: String(s.value ?? s.status ?? s.id ?? s.code ?? s),
                     label: s.name || s.label || s.text || String(s)
                 })));
             } else {
@@ -204,12 +204,12 @@ export function MobileSalesPage() {
                 <Stack gap="sm">
                     {orders.map((order) => (
                         <Paper
-                            key={order.pk}
+                            key={order._id}
                             p="md"
                             shadow="sm"
                             radius="md"
                             withBorder
-                            onClick={() => navigate(`/mobile/sales/${order.pk}`)}
+                            onClick={() => navigate(`/mobile/sales/${order._id}`)}
                             style={{ cursor: 'pointer' }}
                         >
                             <Group justify="space-between" mb="xs">

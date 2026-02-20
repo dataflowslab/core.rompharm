@@ -40,8 +40,7 @@ interface ApprovalFlow {
 }
 
 interface PurchaseOrder {
-  _id?: string;
-  pk?: number;
+  _id: string;
   status: number | string;
   status_text?: string;
 }
@@ -61,8 +60,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
   const [removeModalOpened, setRemoveModalOpened] = useState(false);
   const [userToRemove, setUserToRemove] = useState<string | null>(null);
 
-  // ✅ FIX: Use _id or pk (support both formats)
-  const orderId = order._id || order.pk;
+  const orderId = order._id;
 
   useEffect(() => {
     loadApprovalFlow();

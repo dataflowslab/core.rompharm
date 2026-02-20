@@ -43,7 +43,7 @@ function convertPoToJson(poFile, jsonFile) {
   }
   
   fs.writeFileSync(jsonFile, JSON.stringify(translations, null, 2));
-  console.log(`✓ Created ${jsonFile}`);
+  console.log(`[OK] Created ${jsonFile}`);
 }
 
 // Convert EN and RO
@@ -60,4 +60,4 @@ convertPoToJson(
   path.join(outputDir, 'ro.json')
 );
 
-console.log('\n✓ All translations compiled!');
+console.log('\n[OK] All translations compiled!');

@@ -25,7 +25,6 @@ interface QCRecord {
 
 interface ReceivedItem {
   _id: string;
-  pk?: number;  // Legacy support
   batch?: string;  // Legacy field
   batch_code?: string;  // New field
   part_id: string;  // MongoDB ObjectId
@@ -540,7 +539,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
             </Table.Thead>
             <Table.Tbody>
               {lotallexpItems.map((item) => (
-                <Table.Tr key={item._id || item.pk}>
+                <Table.Tr key={item._id}>
                   <Table.Td>{item.part_detail?.name || `Part ${item.part}`}</Table.Td>
                   <Table.Td>{item.part_detail?.IPN || '-'}</Table.Td>
                   <Table.Td>{item.quantity}</Table.Td>

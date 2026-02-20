@@ -1,7 +1,7 @@
 {
   "${procurementApi.getPurchaseOrder(id!)}/approval-flow": "${procurementApi.getPurchaseOrder(id!)}/approval-flow",
-  "${procurementApi.getPurchaseOrder(order.pk)}/approval-flow": "${procurementApi.getPurchaseOrder(order.pk)}/approval-flow",
-  "${procurementApi.getPurchaseOrder(order.pk)}/sign": "${procurementApi.getPurchaseOrder(order.pk)}/sign",
+  "${procurementApi.getPurchaseOrder(order._id)}/approval-flow": "${procurementApi.getPurchaseOrder(order._id)}/approval-flow",
+  "${procurementApi.getPurchaseOrder(order._id)}/sign": "${procurementApi.getPurchaseOrder(order._id)}/sign",
   "${url}${params}": "${url}${params}",
   ",": ",",
   ".": ".",

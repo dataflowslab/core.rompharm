@@ -1,11 +1,11 @@
 import { api } from './api';
 
 export interface SalesOrder {
-  pk: number;
+  _id: string;
   reference: string;
-  customer: number;
+  customer: string;
   customer_detail?: {
-    pk: number;
+    _id: string;
     name: string;
   };
   status: number;
@@ -19,11 +19,11 @@ export interface SalesOrder {
 }
 
 export interface SalesOrderItem {
-  pk: number;
-  order: number;
-  part: number;
+  _id: string;
+  order: string;
+  part: string;
   part_detail?: {
-    pk: number;
+    _id: string;
     name: string;
     IPN?: string;
     description?: string;
@@ -38,8 +38,8 @@ export interface SalesOrderItem {
 }
 
 export interface Shipment {
-  pk: number;
-  order: number;
+  _id: string;
+  order: string;
   reference?: string;
   tracking_number?: string;
   shipment_date?: string;
@@ -55,25 +55,25 @@ export const salesService = {
   },
 
   // Get single sales order
-  async getSalesOrder(orderId: number) {
+  async getSalesOrder(orderId: string) {
     const response = await api.get(`/api/sales/sales-orders/${orderId}`);
     return response.data;
   },
 
   // Get sales order items
-  async getSalesOrderItems(orderId: number) {
+  async getSalesOrderItems(orderId: string) {
     const response = await api.get(`/api/sales/sales-orders/${orderId}/items`);
     return response.data;
   },
 
   // Get shipments
-  async getShipments(orderId: number) {
+  async getShipments(orderId: string) {
     const response = await api.get(`/api/sales/sales-orders/${orderId}/shipments`);
     return response.data;
   },
 
   // Get attachments
-  async getAttachments(orderId: number) {
+  async getAttachments(orderId: string) {
     const response = await api.get(`/api/sales/sales-orders/${orderId}/attachments`);
     return response.data;
   },
@@ -85,7 +85,7 @@ export const salesService = {
   },
 
   // Update order status
-  async updateOrderStatus(orderId: number, status: number) {
+  async updateOrderStatus(orderId: string, status: number) {
     const response = await api.patch(`/api/sales/sales-orders/${orderId}/status`, { status });
     return response.data;
   },

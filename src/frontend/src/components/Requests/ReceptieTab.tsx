@@ -39,7 +39,7 @@ interface RequestItem {
   quantity: number;
   notes?: string;
   part_detail?: {
-    pk: number;
+    _id?: string;
     name: string;
     IPN: string;
   };

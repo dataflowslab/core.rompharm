@@ -25,7 +25,6 @@ import { procurementApi } from '../../services/procurement';
 
 interface Attachment {
   _id: string;
-  pk?: number;
   attachment: string;
   filename: string;
   comment: string;
@@ -89,7 +88,7 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
     if (!attachmentToDelete) return;
 
     try {
-      await api.delete(procurementApi.deleteAttachment(orderId, attachmentToDelete._id || String(attachmentToDelete.pk)));
+      await api.delete(procurementApi.deleteAttachment(orderId, attachmentToDelete._id));
       notifications.show({
         title: t('Success'),
         message: t('Attachment deleted successfully'),
@@ -174,7 +173,7 @@ export function AttachmentsTab({ orderId, attachments, onReload, canEdit }: Atta
               {attachments.map((attachment) => {
                 const attachmentUrl = getAttachmentUrl(attachment);
                 return (
-                  <Paper key={attachment._id || attachment.pk} p="sm" withBorder>
+                  <Paper key={attachment._id} p="sm" withBorder>
                     <Group justify="space-between">
                       <Group>
                         <IconFile size={20} />

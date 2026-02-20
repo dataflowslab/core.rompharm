@@ -82,7 +82,6 @@ interface PurchaseOrderItem {
 
 interface StockLocation {
   _id: string;
-  pk: number;  // Legacy field for compatibility
   name: string;
   description?: string;
 }
@@ -133,7 +132,7 @@ export function ProcurementDetailPage() {
     // Load current user info
     api.get('/api/auth/me')
       .then(response => {
-        setCurrentUserId(response.data._id || response.data.pk);
+        setCurrentUserId(response.data._id);
         setIsAdmin(response.data.is_staff || response.data.staff || false);
       })
       .catch(error => {

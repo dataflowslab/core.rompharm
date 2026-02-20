@@ -104,8 +104,12 @@ async def get_part_batch_codes(
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
-    """Get available batch codes for a part from MongoDB depo_stocks using ObjectId"""
-    return await fetch_part_batch_codes(current_user, part_id, location_id, db)
+    """Get available batch codes for a part from MongoDB depo_stocks using ObjectId
+    
+    Note: location_id is optional - if not provided, searches all locations
+    """
+    # Don't filter by location - show all available batch codes
+    return await fetch_part_batch_codes(current_user, part_id, None, db)
 
 
 @router.get("/parts/{part_id}/recipe")
@@ -638,7 +642,16 @@ async def update_request(
         except:
             update_data['issue_date'] = datetime.utcnow()
     if request_data.items is not None:
-        update_data['items'] = [item.dict() for item in request_data.items]
+        # Convert items to dict and ensure init_q is set
+        items_data = []
+        for item in request_data.items:
+            item_dict = item.dict()
+            # Ensure init_q is set if not provided
+            if item_dict.get('init_q') is None and item_dict.get('quantity') is not None:
+                item_dict['init_q'] = item_dict['quantity']
+            items_data.append(item_dict)
+        
+        update_data['items'] = items_data
         update_data['line_items'] = len(request_data.items)
     
     # Validate source != destination if both are being updated
@@ -647,10 +660,16 @@ async def update_request(
     if source == destination:
         raise HTTPException(status_code=400, detail="Source and destination cannot be the same")
     
-    requests_collection.update_one(
-        {'_id': req_obj_id},
-        {'$set': update_data}
-    )
+    try:
+        requests_collection.update_one(
+            {'_id': req_obj_id},
+            {'$set': update_data}
+        )
+    except Exception as e:
+        print(f"[ERROR] Failed to update request: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=422, detail=f"Failed to update request: {str(e)}")
     
     # Get updated request
     updated = requests_collection.find_one({'_id': req_obj_id})

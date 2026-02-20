@@ -30,7 +30,6 @@ import { CompanyArticlesTab } from '../components/Company/CompanyArticlesTab';
 
 interface Supplier {
   _id: string;
-  pk?: number;
   name: string;
 
   vatno?: string;
@@ -738,5 +737,4 @@ export function SupplierDetailPage() {
     </Container >
   );
 }
-
 

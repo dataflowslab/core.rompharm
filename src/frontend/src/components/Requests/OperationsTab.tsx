@@ -85,10 +85,15 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const [selectedPartData, setSelectedPartData] = useState<Part | null>(null);
   const [partSearch, setPartSearch] = useState('');
   const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
+  const [batchSelections, setBatchSelections] = useState<Array<{
+    batch_code: string;
+    location_id: string;
+    requested_quantity: number;
+  }>>([]);
   const [newItem, setNewItem] = useState({
     part: '',
     batch_code: '',
-    quantity: 1
+    quantity: 0
   });
 
   useEffect(() => {
@@ -165,12 +170,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
   const searchParts = async (query: string) => {
     if (!query || query.length < 2) {
-      // Keep selected part even when clearing search
-      if (selectedPartData) {
-        setParts([selectedPartData]);
-      } else {
-        setParts([]);
-      }
+      setParts([]);
       return;
     }
     
@@ -179,39 +179,39 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         params: { search: query }
       });
       const results = response.data.results || response.data || [];
-      
-      // Always include selected part in results if it exists
-      if (selectedPartData && !results.some((p: Part) => p._id === selectedPartData._id)) {
-        setParts([selectedPartData, ...results]);
-      } else {
-        setParts(results);
-      }
+      setParts(results);
     } catch (error) {
       console.error('Failed to search parts:', error);
+      setParts([]);
     }
   };
 
   const debouncedSearchParts = debounce(searchParts, 250);
 
   const loadBatchCodes = async (partId: string) => {
-    if (!request || !request.source) {
-      setBatchOptions([]);
-      return;
-    }
-
     try {
+      console.log('[loadBatchCodes] Loading batch codes for part:', partId);
       const url = requestsApi.getPartBatchCodes(partId);
-      const params = `?location_id=${request.source}`;
-      const response = await api.get(`${url}${params}`);
+      // Don't send location_id - search all locations
+      const response = await api.get(url);
       const batchCodes = response.data.batch_codes || [];
+      
+      console.log('[loadBatchCodes] Received batch codes:', batchCodes);
       
       const options = batchCodes.map((batch: any) => ({
         value: batch.batch_code,
-        label: `${batch.batch_code} - ${batch.expiry_date || 'N/A'} - ${batch.quantity} buc`,
+        label: batch.label || `${batch.batch_code} (${batch.quantity} buc) - ${batch.location_name || 'N/A'}`,
         expiry_date: batch.expiry_date,
-        quantity: batch.quantity
+        quantity: batch.quantity,
+        location_name: batch.location_name,
+        location_id: batch.location_id,
+        state_name: batch.state_name,
+        state_id: batch.state_id,
+        is_transferable: batch.is_transferable,
+        is_requestable: batch.is_requestable
       }));
       
+      console.log('[loadBatchCodes] Setting batch options:', options);
       setBatchOptions(options);
     } catch (error) {
       console.error(`Failed to load batch codes for part ${partId}:`, error);
@@ -220,6 +220,9 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   };
 
   const handlePartSelect = (partId: string | null) => {
+    console.log('[handlePartSelect] Selected part:', partId);
+    
+    // Clear batch code when changing part
     setNewItem({ ...newItem, part: partId || '', batch_code: '' });
     setBatchOptions([]);
     
@@ -228,49 +231,101 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
       const selected = parts.find(p => p._id === partId);
       
       if (selected) {
-        // Always ensure selected part is in the array (move to front if exists)
-        const filteredParts = parts.filter(p => p._id !== partId);
-        setParts([selected, ...filteredParts]);
         setSelectedPartData(selected);
+        console.log('[handlePartSelect] Loading batch codes for selected part');
+        loadBatchCodes(partId);
+      } else {
+        console.warn('[handlePartSelect] Selected part not found in parts array');
+        setSelectedPartData(null);
       }
-      
-      loadBatchCodes(partId);
     } else {
       setSelectedPartData(null);
     }
   };
 
+  const handleQuantityChangeGeneral = (value: number) => {
+    const numValue = Number(value) || 0;
+    setNewItem({ ...newItem, quantity: numValue });
+    
+    // If general quantity > 0, clear batch selections
+    if (numValue > 0) {
+      setBatchSelections([]);
+    }
+  };
+
+  const handleBatchSelectionsChange = (selections: Array<{batch_code: string; location_id: string; requested_quantity: number}>) => {
+    setBatchSelections(selections);
+    
+    // If any batch has quantity > 0, reset general quantity to 0
+    const hasQuantity = selections.some(s => s.requested_quantity > 0);
+    if (hasQuantity && newItem.quantity > 0) {
+      setNewItem({ ...newItem, quantity: 0 });
+    }
+  };
+
   const handleAddItem = () => {
-    if (!newItem.part || !newItem.batch_code || !newItem.quantity) {
+    if (!newItem.part) {
       notifications.show({
         title: t('Error'),
-        message: t('Please fill in all fields'),
+        message: t('Please select a part'),
         color: 'red'
       });
       return;
     }
 
     const partDetail = parts.find(p => p._id === newItem.part);
-    const newItemData: ItemWithBatch = {
-      part: newItem.part,
-      part_name: partDetail?.name || String(newItem.part),
-      quantity: newItem.quantity,
-      init_q: newItem.quantity,
-      batch_code: newItem.batch_code,
-      added_in_operations: true
-    };
+    const newItems: ItemWithBatch[] = [];
 
-    setItemsWithBatch([...itemsWithBatch, newItemData]);
+    // Check if using general quantity or batch-specific quantities
+    if (newItem.quantity > 0) {
+      // General quantity - add one item without specific batch
+      newItems.push({
+        part: String(newItem.part),
+        part_name: partDetail?.name || String(newItem.part),
+        quantity: newItem.quantity,
+        init_q: newItem.quantity,
+        batch_code: '', // No specific batch
+        added_in_operations: true
+      });
+    } else {
+      // Batch-specific quantities - add one item per batch with quantity > 0
+      const validSelections = batchSelections.filter(s => s.requested_quantity > 0);
+      
+      if (validSelections.length === 0) {
+        notifications.show({
+          title: t('Error'),
+          message: t('Please specify quantity (general or per batch)'),
+          color: 'red'
+        });
+        return;
+      }
+
+      for (const selection of validSelections) {
+        newItems.push({
+          part: String(newItem.part),
+          part_name: partDetail?.name || String(newItem.part),
+          quantity: selection.requested_quantity,
+          init_q: selection.requested_quantity,
+          batch_code: selection.batch_code,
+          added_in_operations: true
+        });
+      }
+    }
+
+    // Add all new items to the list
+    setItemsWithBatch([...itemsWithBatch, ...newItems]);
     
-    setNewItem({ part: '', batch_code: '', quantity: 1 });
+    // Reset form
+    setNewItem({ part: '', batch_code: '', quantity: 0 });
     setPartSearch('');
     setParts([]);
     setBatchOptions([]);
+    setBatchSelections([]);
     setAddItemModalOpened(false);
 
     notifications.show({
       title: t('Success'),
-      message: t('Item added successfully'),
+      message: t(`${newItems.length} item(s) added successfully`),
       color: 'green'
     });
   };
@@ -297,7 +352,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     try {
       await api.patch(requestsApi.updateRequest(requestId), {
         items: itemsWithBatch.map(item => ({
-          part: item.part,
+          part: String(item.part), // Ensure part is always string
           quantity: item.quantity,
           init_q: item.init_q,
           batch_code: item.batch_code,
@@ -539,19 +594,22 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         opened={addItemModalOpened}
         onClose={() => {
           setAddItemModalOpened(false);
-          setNewItem({ part: '', batch_code: '', quantity: 1 });
+          setNewItem({ part: '', batch_code: '', quantity: 0 });
           setSelectedPartData(null);
           setPartSearch('');
           setParts([]);
           setBatchOptions([]);
+          setBatchSelections([]);
         }}
         parts={parts}
         selectedPartData={selectedPartData}
         batchOptions={batchOptions}
         newItem={newItem}
+        batchSelections={batchSelections}
         onPartSelect={handlePartSelect}
         onBatchCodeChange={(value) => setNewItem({ ...newItem, batch_code: value || '' })}
-        onQuantityChange={(value) => setNewItem({ ...newItem, quantity: value })}
+        onQuantityChange={handleQuantityChangeGeneral}
+        onBatchSelectionsChange={handleBatchSelectionsChange}
         onAdd={handleAddItem}
         onPartSearchChange={(query) => {
           setPartSearch(query);

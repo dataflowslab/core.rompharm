@@ -23,7 +23,6 @@ import { formatDate } from '../../../../src/frontend/src/utils/dateFormat';
 
 interface Client {
   _id: string;
-  pk?: number;
   name: string;
 
   vatno?: string;
@@ -201,8 +200,8 @@ export function ClientsPage() {
           <Table.Tbody>
             {Clients.map((Client) => (
               <Table.Tr key={Client._id}>
-                <Table.Td style={{ fontWeight: 500, color: Client.pk ? 'inherit' : '#868e96' }}>
-                  {Client.pk || 'N/A'}
+                <Table.Td style={{ fontFamily: 'monospace', color: '#868e96' }}>
+                  {Client._id}
                 </Table.Td>
                 <Table.Td>{Client.name}</Table.Td>
                 <Table.Td>{getCountry(Client)}</Table.Td>

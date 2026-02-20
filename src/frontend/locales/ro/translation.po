@@ -8,10 +8,10 @@ msgstr ""
 msgid "${procurementApi.getPurchaseOrder(id!)}/approval-flow"
 msgstr ""
 
-msgid "${procurementApi.getPurchaseOrder(order.pk)}/approval-flow"
+msgid "${procurementApi.getPurchaseOrder(order._id)}/approval-flow"
 msgstr ""
 
-msgid "${procurementApi.getPurchaseOrder(order.pk)}/sign"
+msgid "${procurementApi.getPurchaseOrder(order._id)}/sign"
 msgstr ""
 
 msgid "${url}${params}"

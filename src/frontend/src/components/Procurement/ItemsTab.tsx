@@ -29,7 +29,6 @@ import { ApiSelect } from '../Common/ApiSelect';
 
 interface PurchaseOrderItem {
   _id: string;  // MongoDB ObjectId
-  pk?: number;  // Legacy field
   part: number;
   part_detail?: {
     name: string;
@@ -52,7 +51,6 @@ interface PurchaseOrderItem {
 
 interface Part {
   _id: string;
-  pk?: number; // Legacy field, may not exist,
   name: string;
   description: string;
   IPN?: string;
@@ -60,7 +58,7 @@ interface Part {
 }
 
 interface StockLocation {
-  pk: number;
+  _id: string;
   name: string;
   description?: string;
 }

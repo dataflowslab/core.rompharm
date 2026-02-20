@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Table, Button, Group, Modal, NumberInput, TextInput, ActionIcon, Text, Grid } from '@mantine/core';
+import { Paper, Title, Table, Button, Group, Modal, NumberInput, TextInput, ActionIcon, Text, Grid, Divider } from '@mantine/core';
 import { IconPlus, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
@@ -7,14 +7,30 @@ import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { SafeSelect } from '../Common/SafeSelect';
+import { BatchCodesTable } from './BatchCodesTable';
 
 interface BatchOption {
   value: string;
   label: string;
+  expiry_date?: string;
+  quantity?: number;
+  location_name?: string;
+  location_id?: string;
+  state_name?: string;
+  state_id?: string;
+  state_color?: string;
+  is_transferable?: boolean;
+  is_requestable?: boolean;
+}
+
+interface BatchSelection {
+  batch_code: string;
+  location_id: string;
+  requested_quantity: number;
 }
 
 interface ItemWithBatch {
-  part: number;
+  part: string | number;
   part_name?: string;
   quantity: number;
   batch_code?: string;
@@ -38,11 +54,12 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
   const [partSearch, setPartSearch] = useState('');
   const [newItem, setNewItem] = useState({
     part: '',
-    quantity: 1,
+    quantity: 0,
     batch_code: '',
     notes: ''
   });
   const [newItemBatchOptions, setNewItemBatchOptions] = useState<BatchOption[]>([]);
+  const [batchSelections, setBatchSelections] = useState<BatchSelection[]>([]);
 
   // Check if editable (no signatures in approval flow)
   const [isEditable, setIsEditable] = useState(true);
@@ -92,16 +109,25 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
     }
   };
 
-  const loadBatchCodes = async (partId: number, locationId?: number): Promise<BatchOption[]> => {
+  const loadBatchCodes = async (partId: string | number, locationId?: number): Promise<BatchOption[]> => {
     try {
       const url = requestsApi.getPartBatchCodes(partId);
-      const params = locationId ? `?location_id=${locationId}` : '';
-      const response = await api.get(`${url}${params}`);
+      // Don't filter by location - get all available batch codes
+      const response = await api.get(url);
       const batchCodes = response.data.batch_codes || [];
       
       return batchCodes.map((batch: any) => ({
         value: batch.batch_code,
-        label: `${batch.batch_code} - ${batch.expiry_date || 'N/A'} - ${batch.quantity} buc`
+        label: batch.label || `${batch.batch_code} (${batch.quantity} buc) - ${batch.location_name || 'N/A'}`,
+        expiry_date: batch.expiry_date,
+        quantity: batch.quantity,
+        location_name: batch.location_name,
+        location_id: batch.location_id,
+        state_name: batch.state_name,
+        state_id: batch.state_id,
+        state_color: batch.state_color,
+        is_transferable: batch.is_transferable,
+        is_requestable: batch.is_requestable
       }));
     } catch (error) {
       return [];
@@ -128,7 +154,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
     setNewItem({ ...newItem, part: value || '', batch_code: '' });
     
     if (value) {
-      const batchOptions = await loadBatchCodes(parseInt(value), request.source);
+      const batchOptions = await loadBatchCodes(value, request.source);
       setNewItemBatchOptions(batchOptions);
     } else {
       setNewItemBatchOptions([]);
@@ -136,33 +162,62 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
   };
 
   const handleAddItem = async () => {
-    if (!newItem.part || !newItem.quantity) {
+    if (!newItem.part) {
       notifications.show({
         title: t('Error'),
-        message: t('Please fill in all required fields'),
+        message: t('Please select a part'),
         color: 'red'
       });
       return;
     }
 
-    const partDetail = parts.find(p => String(p.pk) === newItem.part);
-    const batchOptions = await loadBatchCodes(parseInt(newItem.part), request.source);
+    const partDetail = parts.find(p => String(p._id) === newItem.part);
+    const batchOptions = await loadBatchCodes(newItem.part, request.source);
+    const newItems: ItemWithBatch[] = [];
 
-    const updatedItems = [
-      ...items,
-      {
-        part: parseInt(newItem.part),
+    // Check if using general quantity or batch-specific quantities
+    if (newItem.quantity > 0) {
+      // General quantity - add one item without specific batch
+      newItems.push({
+        part: newItem.part,
         part_name: partDetail?.name || String(newItem.part),
         quantity: newItem.quantity,
-        batch_code: newItem.batch_code,
+        batch_code: '', // No specific batch
         notes: newItem.notes,
         batch_options: batchOptions
+      });
+    } else {
+      // Batch-specific quantities - add one item per batch with quantity > 0
+      const validSelections = batchSelections.filter(s => s.requested_quantity > 0);
+      
+      if (validSelections.length === 0) {
+        notifications.show({
+          title: t('Error'),
+          message: t('Please specify quantity (general or per batch)'),
+          color: 'red'
+        });
+        return;
       }
-    ];
 
+      for (const selection of validSelections) {
+        newItems.push({
+          part: newItem.part,
+          part_name: partDetail?.name || String(newItem.part),
+          quantity: selection.requested_quantity,
+          batch_code: selection.batch_code,
+          notes: newItem.notes,
+          batch_options: batchOptions
+        });
+      }
+    }
+
+    // Add all new items to the list
+    const updatedItems = [...items, ...newItems];
     await saveItems(updatedItems);
+    
     setModalOpened(false);
-    setNewItem({ part: '', quantity: 1, batch_code: '', notes: '' });
+    setNewItem({ part: '', quantity: 0, batch_code: '', notes: '' });
+    setBatchSelections([]);
     setNewItemBatchOptions([]);
     setPartSearch('');
     setParts([]);
@@ -310,11 +365,14 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
         opened={modalOpened}
         onClose={() => {
           setModalOpened(false);
-          setNewItem({ part: '', quantity: 1, batch_code: '', notes: '' });
+          setNewItem({ part: '', quantity: 0, batch_code: '', notes: '' });
+          setBatchSelections([]);
           setPartSearch('');
           setParts([]);
+          setNewItemBatchOptions([]);
         }}
         title={t('Add Item')}
+        size="xl"
       >
         <Grid>
           <Grid.Col span={12}>
@@ -340,35 +398,61 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
 
           <Grid.Col span={12}>
             <NumberInput
-              label={t('Quantity')}
-              placeholder="1"
+              label={t('Quantity (General)')}
+              placeholder="0"
+              description={t('Leave at 0 to specify quantities per batch below')}
               value={newItem.quantity}
-              onChange={(value) => setNewItem({ ...newItem, quantity: Number(value) || 1 })}
-              min={1}
+              onChange={(value) => {
+                const numValue = Number(value) || 0;
+                setNewItem({ ...newItem, quantity: numValue });
+                if (numValue > 0) {
+                  setBatchSelections([]);
+                }
+              }}
+              min={0}
               step={1}
-              required
             />
           </Grid.Col>
 
-          <Grid.Col span={12}>
-            <SafeSelect
-              label={t('Batch Code')}
-              placeholder={t('Select batch code (optional)')}
-              data={newItemBatchOptions}
-              value={newItem.batch_code}
-              onChange={(value) => setNewItem({ ...newItem, batch_code: value || '' })}
-              searchable
-              clearable
-              disabled={!newItem.part}
-              debug={true}
-            />
-          </Grid.Col>
+          {newItem.part && (
+            <>
+              <Grid.Col span={12}>
+                <Divider my="sm" label={t('Select Batch Codes')} labelPosition="center" />
+              </Grid.Col>
+
+              <Grid.Col span={12}>
+                <BatchCodesTable
+                  batchCodes={newItemBatchOptions.map(opt => ({
+                    batch_code: opt.value,
+                    quantity: opt.quantity || 0,
+                    location_name: opt.location_name || '',
+                    location_id: opt.location_id || '',
+                    state_name: opt.state_name || '',
+                    state_id: opt.state_id || '',
+                    state_color: opt.state_color,
+                    expiry_date: opt.expiry_date,
+                    is_transferable: opt.is_transferable,
+                    is_requestable: opt.is_requestable
+                  }))}
+                  selections={batchSelections}
+                  onSelectionChange={(selections) => {
+                    setBatchSelections(selections);
+                    const hasQuantity = selections.some(s => s.requested_quantity > 0);
+                    if (hasQuantity && newItem.quantity > 0) {
+                      setNewItem({ ...newItem, quantity: 0 });
+                    }
+                  }}
+                />
+              </Grid.Col>
+            </>
+          )}
         </Grid>
 
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={() => {
             setModalOpened(false);
-            setNewItem({ part: '', quantity: 1, batch_code: '', notes: '' });
+            setNewItem({ part: '', quantity: 0, batch_code: '', notes: '' });
+            setBatchSelections([]);
             setNewItemBatchOptions([]);
             setPartSearch('');
             setParts([]);

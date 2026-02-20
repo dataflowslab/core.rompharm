@@ -19,7 +19,7 @@ export function ReceivedStockTable({ items, canModifyStock, onDeleteStock, getSt
         if (selectedItems.length === items.length) {
             onSelectionChange([]);
         } else {
-            onSelectionChange(items.map(i => i._id || i.pk));
+            onSelectionChange(items.map(i => i._id));
         }
     };
 
@@ -57,11 +57,11 @@ export function ReceivedStockTable({ items, canModifyStock, onDeleteStock, getSt
             </Table.Thead>
             <Table.Tbody>
                 {items.map((item) => (
-                    <Table.Tr key={item._id || item.pk}>
+                    <Table.Tr key={item._id}>
                         <Table.Td>
                             <Checkbox
-                                checked={selectedItems.includes(item._id || item.pk)}
-                                onChange={() => toggleItem(item._id || item.pk)}
+                                checked={selectedItems.includes(item._id)}
+                                onChange={() => toggleItem(item._id)}
                             />
                         </Table.Td>
                         <Table.Td>

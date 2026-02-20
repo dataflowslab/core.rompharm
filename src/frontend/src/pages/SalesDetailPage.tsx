@@ -51,10 +51,10 @@ export function SalesDetailPage() {
       setError(null);
 
       const [orderData, itemsData, shipmentsData, attachmentsData, statusesData] = await Promise.all([
-        salesService.getSalesOrder(Number(id)),
-        salesService.getSalesOrderItems(Number(id)),
-        salesService.getShipments(Number(id)),
-        salesService.getAttachments(Number(id)),
+        salesService.getSalesOrder(id),
+        salesService.getSalesOrderItems(id),
+        salesService.getShipments(id),
+        salesService.getAttachments(id),
         salesService.getOrderStatuses(),
       ]);
 
@@ -75,7 +75,7 @@ export function SalesDetailPage() {
     if (!newStatus || !order) return;
 
     try {
-      await salesService.updateOrderStatus(order.pk, Number(newStatus));
+      await salesService.updateOrderStatus(order._id, Number(newStatus));
       await loadOrderData();
     } catch (err: any) {
       console.error('Failed to update status:', err);
@@ -245,7 +245,7 @@ export function SalesDetailPage() {
                   </Table.Tr>
                 ) : (
                   items.map((item) => (
-                    <Table.Tr key={item.pk}>
+                    <Table.Tr key={item._id}>
                       <Table.Td>
                         <div>
                           <Text size="sm" fw={500}>
@@ -294,7 +294,7 @@ export function SalesDetailPage() {
                   </Table.Tr>
                 ) : (
                   shipments.map((shipment) => (
-                    <Table.Tr key={shipment.pk}>
+                    <Table.Tr key={shipment._id}>
                       <Table.Td>{shipment.reference || '-'}</Table.Td>
                       <Table.Td>{shipment.tracking_number || '-'}</Table.Td>
                       <Table.Td>{shipment.shipment_date || '-'}</Table.Td>
@@ -327,7 +327,7 @@ export function SalesDetailPage() {
                   </Table.Tr>
                 ) : (
                   attachments.map((attachment) => (
-                    <Table.Tr key={attachment.pk}>
+                    <Table.Tr key={attachment._id || attachment.attachment}>
                       <Table.Td>
                         <a href={attachment.attachment} target="_blank" rel="noopener noreferrer">
                           {attachment.attachment?.split('/').pop() || 'File'}

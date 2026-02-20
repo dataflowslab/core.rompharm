@@ -1,6 +1,5 @@
 export interface ReceivedItem {
     _id: string;
-    pk?: number;  // Legacy support
     part: number;
     part_detail?: {
         name: string;
@@ -56,7 +55,6 @@ export interface PurchaseOrderItem {
 
 export interface StockLocation {
     _id: string;
-    pk?: string;
     name: string;
     description?: string;
 }
@@ -77,16 +75,14 @@ export interface ApprovalFlow {
 
 // Consolidating types from ProcurementPage.tsx
 export interface PurchaseOrder {
-    _id?: string;
-    pk?: string;
+    _id: string;
     reference: string;
     description: string;
     supplier?: number; // legacy
     supplier_id?: string;
     supplier_detail?: {
         name: string;
-        pk?: string;
-        _id?: string;
+        _id: string;
     };
     supplier_reference?: string;
     order_currency?: string;
@@ -114,7 +110,6 @@ export interface PurchaseOrder {
 
 export interface Supplier {
     _id?: string;
-    pk?: string;
     name: string;
     currency?: string;
 }

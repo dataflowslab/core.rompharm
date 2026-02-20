@@ -281,7 +281,7 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          await api.delete(`/modules/depo_procurement/api/stock-items/${item._id || item.pk}`);
+          await api.delete(`/modules/depo_procurement/api/stock-items/${item._id}`);
           notifications.show({
             title: t('Success'),
             message: t('Stock item deleted successfully'),
@@ -463,9 +463,9 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
 
   const getSelectedPrintItems = () => {
     return receivedItems
-      .filter(i => selectedReceivedItems.includes(i._id || i.pk))
+      .filter(i => selectedReceivedItems.includes(i._id))
       .map(i => ({
-        id: i._id || i.pk,
+        id: i._id,
         name: i.part_detail?.name || i.part,
         code: i.batch_code || i.batch || '-'
       }));

@@ -10,6 +10,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from src.backend.utils.serializers import serialize_doc
+from src.backend.utils.stock_utils import get_transactionable_state_ids
 
 from src.backend.utils.config import load_config
 
@@ -251,6 +252,7 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
     
     Returns batch codes where state has is_requestable = true
     Also includes state info (is_transferable, name) for frontend validation
+    Groups by batch_code and location_id to show all available locations
     """
     from src.backend.utils.db import get_db
     
@@ -264,22 +266,27 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
         except:
             return {"batch_codes": []}
         
-        # Get all states where is_requestable = true
+        # Get transactionable state IDs (global filter for all stock operations)
+        transactionable_state_ids = get_transactionable_state_ids()
+        
+        # Get state details for these IDs
         requestable_states = list(db.depo_stocks_states.find({
-            "is_requestable": True
+            "_id": {"$in": transactionable_state_ids}
         }))
         
-        # If no requestable states found, return empty
+        # If no states found, return empty
         if not requestable_states:
+            print(f"[BATCH_CODES] No transactionable states found")
             return {"batch_codes": []}
         
-        requestable_state_ids = [state["_id"] for state in requestable_states]
+        print(f"[BATCH_CODES] Found {len(requestable_states)} transactionable states")
         
         # Create state info map for later use
         state_info_map = {}
         for state in requestable_states:
             state_info_map[str(state["_id"])] = {
                 "name": state.get("name", ""),
+                "color": state.get("color", "gray"),
                 "is_transferable": state.get("is_transferable", False),
                 "is_requestable": state.get("is_requestable", False)
             }
@@ -287,7 +294,7 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
         # Build query
         query = {
             "part_id": part_oid,
-            "state_id": {"$in": requestable_state_ids},
+            "state_id": {"$in": transactionable_state_ids},
             "quantity": {"$gt": 0}  # Only stock with quantity > 0
         }
         
@@ -296,20 +303,31 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
             try:
                 location_oid = ObjectId(location_id)
                 query["location_id"] = location_oid
+                print(f"[BATCH_CODES] Filtering by location: {location_id}")
             except:
-                print(f"Warning: Invalid location_id format: {location_id}")
+                print(f"[BATCH_CODES] Warning: Invalid location_id format: {location_id}")
         
         # Query depo_stocks
         stock_records = list(db.depo_stocks.find(query))
+        print(f"[BATCH_CODES] Found {len(stock_records)} stock records for part {part_id}")
         
-        # Group by batch_code and aggregate quantities
-        batch_map = {}
+        # Get location names
+        location_ids = list(set([stock.get("location_id") for stock in stock_records if stock.get("location_id")]))
+        locations = list(db.depo_locations.find({"_id": {"$in": location_ids}}))
+        location_map = {str(loc["_id"]): loc.get("code", loc.get("name", str(loc["_id"]))) for loc in locations}
+        
+        # Group by batch_code and location_id to show separate entries per location
+        batch_location_map = {}
         for stock in stock_records:
             batch_code = stock.get("batch_code", "")
+            location_id = str(stock.get("location_id", ""))
             state_id = str(stock.get("state_id", ""))
             
             if batch_code and batch_code.strip():
-                if batch_code not in batch_map:
+                # Create unique key for batch + location combination
+                key = f"{batch_code}_{location_id}"
+                
+                if key not in batch_location_map:
                     # Get state info
                     state_info = state_info_map.get(state_id, {
                         "name": "Unknown",
@@ -318,29 +336,33 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
                     })
                     
                     expiry = stock.get("expiry_date", "")
+                    location_name = location_map.get(location_id, location_id)
                     
-                    batch_map[batch_code] = {
+                    batch_location_map[key] = {
                         'batch_code': batch_code,
                         'value': batch_code,  # For Select component
                         'expiry_date': expiry,
                         'quantity': 0,
-                        'location_id': str(stock.get("location_id", "")),
+                        'location_id': location_id,
+                        'location_name': location_name,
                         'state_id': state_id,
                         'state_name': state_info.get("name", ""),
+                        'state_color': state_info.get("color", "gray"),
                         'is_transferable': state_info.get("is_transferable", False),
                         'is_requestable': state_info.get("is_requestable", False)
                     }
-                batch_map[batch_code]['quantity'] += stock.get("quantity", 0)
+                batch_location_map[key]['quantity'] += stock.get("quantity", 0)
         
         # Add label after quantity is calculated
         batch_codes = []
-        for batch in batch_map.values():
-            batch['label'] = f"{batch['batch_code']} - Qty: {batch['quantity']} - Exp: {batch['expiry_date'] or 'N/A'}"
+        for batch in batch_location_map.values():
+            batch['label'] = f"{batch['batch_code']} ({batch['quantity']} buc) - {batch['location_name']}"
             batch_codes.append(batch)
         
+        print(f"[BATCH_CODES] Returning {len(batch_codes)} batch codes")
         return {"batch_codes": batch_codes}
     except Exception as e:
-        print(f"Error fetching batch codes: {e}")
+        print(f"[BATCH_CODES] Error fetching batch codes: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch batch codes: {str(e)}")

@@ -28,7 +28,6 @@ import { CompanyArticlesTab } from '../components/Company/CompanyArticlesTab';
 
 interface Manufacturer {
   _id: string;
-  pk?: number;
   name: string;
   vatno?: string;
   regno?: string;
@@ -492,11 +491,13 @@ export function ManufacturerDetailPage() {
     );
   }
 
+  const _idShort = manufacturer._id ? manufacturer._id.slice(-6) : '';
+
   return (
     <Container size="xl">
       <Group justify="space-between" mb="md">
         <Title order={2}>
-          {manufacturer.name} {manufacturer.pk && <Text span c="dimmed" size="lg">({manufacturer.pk})</Text>}
+          {manufacturer.name} <Text span c="dimmed" size="lg">({_idShort})</Text>
         </Title>
         <Button variant="default" onClick={() => navigate('/inventory/manufacturers')}>
           Back

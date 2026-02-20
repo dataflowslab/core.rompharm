@@ -90,7 +90,7 @@ export function PurchaseOrderTable({
 
                         return (
                             <Table.Tr
-                                key={order.pk || order._id}
+                                key={order._id}
                                 style={{ cursor: 'pointer' }}
                                 onClick={() => navigate(`/procurement/${order._id}`)}
                             >

@@ -191,14 +191,14 @@ export function NewPurchaseOrderModal({
                 </Grid.Col>
 
                 <Grid.Col span={12}>
-                    <Select
-                        label={t('Destination')}
-                        placeholder={t('Select stock location')}
-                        data={stockLocations.filter(loc => (loc.pk || loc._id) != null).map(loc => ({
-                            value: String(loc.pk || loc._id),
-                            label: loc.name
-                        }))}
-                        value={formData.destination_id}
+                <Select
+                    label={t('Destination')}
+                    placeholder={t('Select stock location')}
+                    data={stockLocations.filter(loc => loc._id != null).map(loc => ({
+                        value: String(loc._id),
+                        label: loc.name
+                    }))}
+                    value={formData.destination_id}
                         onChange={(value) => setFormData({ ...formData, destination_id: value || '' })}
                         searchable
                     />

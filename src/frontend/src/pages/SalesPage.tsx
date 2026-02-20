@@ -100,9 +100,9 @@ export function SalesPage() {
           ) : (
             orders.map((order) => (
               <Table.Tr
-                key={order.pk}
+                key={order._id}
                 style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/sales/${order.pk}`)}
+                onClick={() => navigate(`/sales/${order._id}`)}
               >
                 <Table.Td>
                   <Text fw={500}>{order.reference}</Text>
@@ -131,7 +131,7 @@ export function SalesPage() {
                     variant="subtle"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(`/sales/${order.pk}`);
+                      navigate(`/sales/${order._id}`);
                     }}
                   >
                     <IconEye size={18} />

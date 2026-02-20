@@ -23,7 +23,6 @@ import { formatDate } from '../../../../src/frontend/src/utils/dateFormat';
 
 interface Manufacturer {
   _id: string;
-  pk?: number;
   name: string;
 
   vatno?: string;
@@ -201,8 +200,8 @@ export function ManufacturersPage() {
           <Table.Tbody>
             {manufacturers.map((manufacturer) => (
               <Table.Tr key={manufacturer._id}>
-                <Table.Td style={{ fontWeight: 500, color: manufacturer.pk ? 'inherit' : '#868e96' }}>
-                  {manufacturer.pk || 'N/A'}
+                <Table.Td style={{ fontFamily: 'monospace', color: '#868e96' }}>
+                  {manufacturer._id}
                 </Table.Td>
                 <Table.Td>{manufacturer.name}</Table.Td>
                 <Table.Td>{getCountry(manufacturer)}</Table.Td>

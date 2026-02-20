@@ -8,6 +8,7 @@ import api from '../services/api';
 import { requestsApi } from '../services/requests';
 import { notifications } from '@mantine/notifications';
 import { ComponentsTable } from '../components/Requests/ComponentsTable';
+import { BatchCodesTable } from '../components/Requests/BatchCodesTable';
 import { debounce } from '../utils/selectHelpers';
 import { sanitizeSelectOptions } from '../utils/selectHelpers';
 import { formatDate } from '../utils/dateFormat';
@@ -23,6 +24,24 @@ interface Part {
   IPN: string;
 }
 
+interface BatchOption {
+  batch_code: string;
+  quantity: number;
+  location_name: string;
+  location_id: string;
+  state_name: string;
+  state_id: string;
+  state_color?: string;
+  expiry_date?: string;
+  is_transferable?: boolean;
+  is_requestable?: boolean;
+}
+
+interface BatchSelection {
+  batch_code: string;
+  location_id: string;
+  requested_quantity: number;
+}
 
 
 interface Request {
@@ -53,6 +72,8 @@ export function RequestsPage() {
   const [stockInfo, setStockInfo] = useState<any>(null);
   const [recipeData, setRecipeData] = useState<any>(null);
   const [componentsData, setComponentsData] = useState<any[]>([]);
+  const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
+  const [batchSelections, setBatchSelections] = useState<BatchSelection[]>([]);
   
   const [formData, setFormData] = useState({
     source: '',
@@ -116,9 +137,23 @@ export function RequestsPage() {
     try {
       const response = await api.get(requestsApi.getPartStockInfo(partId));
       setStockInfo(response.data);
+      const batches = response.data.batches || [];
+      setBatchOptions(batches.map((b: any) => ({
+        batch_code: b.batch_code,
+        quantity: b.quantity,
+        location_name: b.location_name || '',
+        location_id: b.location_id || '',
+        state_name: b.state_name || '',
+        state_id: b.state_id || '',
+        state_color: b.state_color,
+        expiry_date: b.expiry_date,
+        is_transferable: b.is_transferable,
+        is_requestable: b.is_requestable
+      })));
     } catch (error) {
       console.error('Failed to load stock info:', error);
       setStockInfo(null);
+      setBatchOptions([]);
     }
   };
 
@@ -146,11 +181,38 @@ export function RequestsPage() {
       setStockInfo(null);
       setRecipeData(null);
       setPartSearch(''); // Reset search when clearing
+      setBatchOptions([]);
+      setBatchSelections([]);
+    }
+  };
+
+  const handleGeneralQuantityChange = (value: number) => {
+    const qty = Number(value) || 0;
+    setFormData({ ...formData, quantity: qty });
+    if (qty > 0 && batchSelections.length > 0) {
+      setBatchSelections([]);
+    }
+  };
+
+  const handleBatchSelectionsChange = (selections: BatchSelection[]) => {
+    setBatchSelections(selections);
+    const hasQty = selections.some(s => s.requested_quantity > 0);
+    if (hasQty && formData.quantity > 0) {
+      setFormData({ ...formData, quantity: 0 });
     }
   };
 
   const handleCreate = async () => {
-    if (!formData.source || !formData.destination || !formData.part || !formData.quantity) {
+    const hasBatchSelections = batchSelections.some(s => s.requested_quantity > 0);
+    if (recipeData && recipeData.items && recipeData.items.length > 0 && formData.quantity <= 0) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Please set product quantity'),
+        color: 'red'
+      });
+      return;
+    }
+    if (!formData.source || !formData.destination || !formData.part || (!hasBatchSelections && formData.quantity <= 0 && (!componentsData || componentsData.length === 0))) {
       notifications.show({
         title: t('Error'),
         message: t('Please fill in all required fields'),
@@ -173,66 +235,78 @@ export function RequestsPage() {
       // Prepare items list
       let itemsToSend: any[] = [];
 
+      // Helper: push allocations as individual items
+      const pushAllocations = (partId: string, allocations: any[], fallbackQty?: number) => {
+        if (allocations && allocations.length > 0) {
+          allocations
+            .filter(a => a.quantity > 0)
+            .forEach(a => {
+              itemsToSend.push({
+                part: partId,
+                quantity: a.quantity,
+                init_q: a.quantity,
+                batch_code: a.batch_code,
+                notes: formData.notes || undefined
+              });
+            });
+        } else if (fallbackQty && fallbackQty > 0) {
+          itemsToSend.push({
+            part: partId,
+            quantity: fallbackQty,
+            init_q: fallbackQty,
+            notes: formData.notes || undefined
+          });
+        }
+      };
+
       // If recipe/BOM exists with components data from ComponentsTable
       if (componentsData && componentsData.length > 0) {
-        // Process components from ComponentsTable
         for (const component of componentsData) {
           if (component.type === 2 && component.alternatives) {
-            // Alternative group - use selected alternative
             const selectedAlt = component.alternatives[component.selected_alternative || 0];
-            
-            // Calculate total allocated from batches
-            const totalAllocated = selectedAlt.batch_allocations?.reduce((sum: number, b: any) => sum + b.quantity, 0) || 0;
-            
-            // Use batch allocations if available, otherwise use requested_quantity
-            const quantityToUse = totalAllocated > 0 ? totalAllocated : (selectedAlt.requested_quantity || 0);
-            
-            if (quantityToUse > 0) {
-              // Get batch_code from first allocation if available
-              const batchCode = selectedAlt.batch_allocations && selectedAlt.batch_allocations.length > 0 
-                ? selectedAlt.batch_allocations[0].batch_code 
-                : undefined;
-              
-              itemsToSend.push({
-                part: selectedAlt.part_id,
-                quantity: quantityToUse,
-                init_q: quantityToUse,  // Save initial quantity
-                batch_code: batchCode,
-                notes: formData.notes || undefined
-              });
-            }
+            pushAllocations(
+              selectedAlt.part_id,
+              selectedAlt.batch_allocations || [],
+              selectedAlt.requested_quantity
+            );
           } else if (component.type === 1) {
-            // Regular component
-            // Calculate total allocated from batches
-            const totalAllocated = component.batch_allocations?.reduce((sum: number, b: any) => sum + b.quantity, 0) || 0;
-            
-            // Use batch allocations if available, otherwise use requested_quantity
-            const quantityToUse = totalAllocated > 0 ? totalAllocated : (component.requested_quantity || 0);
-            
-            if (quantityToUse > 0) {
-              // Get batch_code from first allocation if available
-              const batchCode = component.batch_allocations && component.batch_allocations.length > 0 
-                ? component.batch_allocations[0].batch_code 
-                : undefined;
-              
-              itemsToSend.push({
-                part: component.part_id,
-                quantity: quantityToUse,
-                init_q: quantityToUse,  // Save initial quantity
-                batch_code: batchCode,
-                notes: formData.notes || undefined
-              });
-            }
+            pushAllocations(
+              component.part_id,
+              component.batch_allocations || [],
+              component.requested_quantity
+            );
           }
         }
       } else {
-        // No recipe/BOM, use the selected part directly
-        itemsToSend = [{
-          part: formData.part,
-          quantity: formData.quantity,
-          init_q: formData.quantity,  // Save initial quantity
-          notes: formData.notes || undefined
-        }];
+        // No recipe/BOM, use the selected part directly with batch selection support
+        const validSelections = batchSelections.filter(s => s.requested_quantity > 0);
+        if (validSelections.length > 0) {
+          validSelections.forEach(sel => {
+            itemsToSend.push({
+              part: formData.part,
+              quantity: sel.requested_quantity,
+              init_q: sel.requested_quantity,
+              batch_code: sel.batch_code,
+              notes: formData.notes || undefined
+            });
+          });
+        } else {
+          itemsToSend = [{
+            part: formData.part,
+            quantity: formData.quantity,
+            init_q: formData.quantity,
+            notes: formData.notes || undefined
+          }];
+        }
+      }
+
+      if (itemsToSend.length === 0) {
+        notifications.show({
+          title: t('Error'),
+          message: t('Please enter at least one quantity'),
+          color: 'red'
+        });
+        return;
       }
 
       const requestPayload: any = {
@@ -268,6 +342,8 @@ export function RequestsPage() {
       setStockInfo(null);
       setRecipeData(null);
       setPartSearch('');
+      setBatchOptions([]);
+      setBatchSelections([]);
       setModalOpened(false);
       loadRequests();
     } catch (error: any) {
@@ -500,12 +576,35 @@ export function RequestsPage() {
               label={t('Quantity')}
               placeholder="1"
               value={formData.quantity}
-              onChange={(value) => setFormData({ ...formData, quantity: Number(value) || 1 })}
-              min={1}
+              onChange={handleGeneralQuantityChange}
+              min={0}
               step={1}
               required
+              description={t('Leave at 0 to pick quantities per batch below')}
             />
           </Grid.Col>
+
+          {/* Batch codes selection for products without recipe */}
+          {(!recipeData || !recipeData.items || recipeData.items.length === 0) && (
+            <Grid.Col span={12}>
+              <BatchCodesTable
+                batchCodes={batchOptions.map(b => ({
+                  batch_code: b.batch_code,
+                  quantity: b.quantity,
+                  location_name: b.location_name,
+                  location_id: b.location_id,
+                  state_name: b.state_name,
+                  state_id: b.state_id,
+                  state_color: b.state_color,
+                  expiry_date: b.expiry_date,
+                  is_transferable: b.is_transferable,
+                  is_requestable: b.is_requestable
+                }))}
+                selections={batchSelections}
+                onSelectionChange={handleBatchSelectionsChange}
+              />
+            </Grid.Col>
+          )}
 
           <Grid.Col span={12}>
             <Textarea

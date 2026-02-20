@@ -26,7 +26,6 @@ import { api } from '../../../../src/frontend/src/services/api';
 
 interface Client {
   _id: string;
-  pk?: number;
   name: string;
 
   vatno?: string;

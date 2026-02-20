@@ -56,8 +56,8 @@ export function MobileSalesDetailPage() {
         setLoading(true);
         try {
             const [orderData, itemsData] = await Promise.all([
-                salesService.getSalesOrder(Number(orderId)),
-                salesService.getSalesOrderItems(Number(orderId))
+                salesService.getSalesOrder(orderId),
+                salesService.getSalesOrderItems(orderId)
             ]);
 
             setOrder(orderData);
@@ -130,7 +130,7 @@ export function MobileSalesDetailPage() {
         try {
             // Dispatch logic: 
             // 1. Update status to 30 (Shipped)
-            await salesService.updateOrderStatus(order.pk, 30);
+            await salesService.updateOrderStatus(order._id, 30);
 
             notifications.show({
                 title: t('Success'),
@@ -203,7 +203,7 @@ export function MobileSalesDetailPage() {
                 <Stack gap="sm">
                     {items.map((item, index) => (
                         <Paper
-                            key={item.pk}
+                            key={item._id}
                             p="md"
                             radius="md"
                             withBorder
