@@ -7,6 +7,7 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv/
 *.egg-info/
 dist/
 build/
@@ -62,7 +63,7 @@ htmlcov/
 *.cache
 
 # Utils folder (local scripts only, not for git)
-utils/
+/utils/
 
 # Old/duplicate project folder
 core-main/
