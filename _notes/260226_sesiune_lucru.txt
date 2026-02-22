@@ -1,127 +1,151 @@
-SESIUNE LUCRU - 26.02.2026
-===========================
+SESSION: 26.02.2026 - Procurement Receive Stock Enhancements
+================================================================
 
-URL: http://localhost:8000/web/requests/6995d1eb6804a21585d64fd0
+TASK SUMMARY:
+Implement three major enhancements to the Receive Stock functionality in procurement orders:
+1. Add Actions column with view details modal and manage button
+2. Change default stock status to "Label" (intermediate state before scanning)
+3. Add Container column with issue warnings
 
-PROBLEME IDENTIFICATE:
------------------------
+CHANGES IMPLEMENTED:
 
-1. BLANK SCREEN LA SAVE (422 Unprocessable Entity)
-   - Endpoint: PATCH /modules/requests/api/6995d1eb6804a21585d64fd0
-   - Cauza: Validare esuata la salvarea items
-   - Solutie: Adaugat error handling si logging in update_request endpoint
-   - Asigurat ca init_q este setat automat daca lipseste
+1. FRONTEND - ReceivedStockTable Component
+   File: src/frontend/src/components/Procurement/ReceivedStockTable.tsx
+   
+   a) Added new imports:
+      - Modal, Stack, Group, Tooltip from @mantine/core
+      - IconEye, IconExternalLink, IconAlertTriangle from @tabler/icons-react
+      - useState from react
+   
+   b) Added state management:
+      - detailsModalOpen: controls visibility of details modal
+      - selectedItem: stores currently selected item for details view
+   
+   c) Added new functions:
+      - openDetailsModal(item): opens modal with receive stock details
+      - openStockEntry(stockId): opens stock entry in new tab
+      - formatDate(date): formats dates for display
+      - renderContainerInfo(item): displays container count with warning icon if issues exist
+   
+   d) Modified table structure:
+      - Added "Container" column showing container count
+      - Shows orange warning triangle if containers have issues (damaged/unsealed/mislabeled)
+      - Tooltip on hover shows detailed container information
+      - Changed "Actions" column width to 120px to accommodate 3 buttons
+      - Added eye icon button (View Details)
+      - Added external link icon button (Manage - opens stock entry)
+      - Kept delete button (only visible if canModifyStock)
+   
+   e) Added Details Modal:
+      - Displays all receive stock form data
+      - Shows: Part, Quantity, Location, Batch codes, Serial numbers, Packaging
+      - Shows: Manufacturing date, Expiry date, Expected quantity
+      - Shows: Supplier BA info, transport conditions, temperature control
+      - Shows: Container list with quantities and issue badges
+      - Shows: Received by and date information
 
-2. PROBLEMA CU SELECTUL DE PART
-   - Simptom: Daca adaugi un part apoi cauti altul, primul se reselecteaza
-   - Cauza: Logica de "keep selected part" in searchParts care mentinea partul selectat in array
-   - Solutie: Simplificat logica - cand search < 2 caractere, goleste array-ul complet
-   - Eliminat logica de "move to front" care cauza confuzie
+2. BACKEND - Stock Receiving Service
+   File: modules/depo_procurement/services/stock_receiving.py
+   
+   a) Modified receive_stock_item function:
+      - Removed complex logic for determining status based on lotallexp and transferable
+      - All received stock now starts with "Label" status (OID: 699b2d8a111409dd80cc361b)
+      - Label is an intermediate state before mobile scanning
+      - After scanning, stock will move to appropriate status (quarantine/OK) based on rules
+   
+   b) Status flow explanation:
+      OLD: Stock → Quarantine/OK (based on lotallexp and transferable flags)
+      NEW: Stock → Label → [Mobile Scan] → Quarantine/OK (based on scan results and rules)
+   
+   c) Label status properties (from depo_stocks_states):
+      - _id: 699b2d8a111409dd80cc361b
+      - name: Label
+      - value: 15
+      - color: #8db86c (green)
+      - is_transferable: False
+      - is_requestable: False
+      
+   d) Business logic:
+      - Products with Label status cannot be used until scanned
+      - Scanning happens via mobile app (to be implemented next)
+      - After scanning, system applies lotallexp and other rules to determine final status
 
-3. BATCH CODES NU SE INCARCA
-   - Simptom: Dupa selectarea unui part cu stock (ex: ACID TIOCTIC - 697c6071a2906a7551ea0094), 
-     dropdown-ul de Batch Code ramane gol
-   - Cauza: Batch codes nu erau grupate corect si nu includeau location_name
-   - Solutie:
-     * Modificat fetch_part_batch_codes sa grupeze dupa batch_code + location_id
-     * Adaugat location_name in label: "BATCH_CODE (QTY buc) - LOCATION_NAME"
-     * Adaugat logging pentru debugging
-     * Asigurat ca state_info (is_transferable, is_requestable) este inclus
+3. TYPESCRIPT TYPES
+   File: src/frontend/src/types/procurement.ts
+   
+   a) Extended ReceivedItem interface with new fields:
+      - supplier_batch_code?: string
+      - serial_numbers?: string
+      - manufacturing_date?: string
+      - expiry_date?: string
+      - reset_date?: string
+      - expected_quantity?: number
+      - supplier_ba_no?: string
+      - supplier_ba_date?: string
+      - accord_ba?: boolean
+      - is_list_supplier?: boolean
+      - clean_transport?: boolean
+      - temperature_control?: boolean
+      - temperature_conditions_met?: boolean
+      - containers_cleaned?: boolean
+      - containers?: Array<{quantity, damaged?, unsealed?, mislabeled?}>
+      - received_by?: string
+      - received_date?: string
 
-4. BATCH CODES GOL - API returna []
-   - URL: http://localhost:8000/modules/requests/api/parts/697/batch-codes?location_id=6941cb988728e4d75ae7273b
-   - Cauza: API-ul cauta doar in location-ul sursa (location_id parameter)
-   - Solutie: Modificat endpoint sa ignore location_id si sa caute peste tot
-   - Rationale: Utilizatorul trebuie sa vada toate batch codes disponibile, nu doar din sursa
+TECHNICAL DETAILS:
 
-5. EROARE LA SAVE - "Input should be a valid string"
-   - Eroare: {"type": "string_type", "loc": ["body", "items", 0, "part"], "input": 697}
-   - Cauza: Frontend trimite part ca numar (697) in loc de string ("697")
-   - Solutie: Adaugat String() conversion in handleAddItem si handleSaveBatchData
-   - Asigurat ca part este INTOTDEAUNA string inainte de trimitere la API
+Container Display Logic:
+- Shows container count (e.g., "5")
+- If any container has damaged/unsealed/mislabeled flags, shows warning icon
+- Tooltip displays list of containers with issues
+- Format: "Container 1: 10 - Damaged, Unsealed"
 
-6. CARACTERE UTF-8 IN CONSOLA
-   - Problema: Caracterele speciale (✓, ✅) nu se afiseaza corect in consola Windows
-   - Solutie: Inlocuit cu [OK] (ASCII standard)
-   - Fisier: src/frontend/scripts/po-to-json.cjs
+Modal Navigation:
+- Eye icon: Opens modal with all receive stock details
+- External link icon: Opens stock entry in new browser tab
+  URL format: /web/inventory/stocks/{stock_id}
+- Delete icon: Deletes stock entry (only if canModifyStock)
 
-7. FILTRARE GLOBALA STOCK TRANSACTIONABLE
-   - Necesitate: Doar anumite state-uri permit tranzactionarea stock-ului
-   - State IDs permise: 694321db8728e4d75ae72789, 694322878728e4d75ae72790, 694322758728e4d75ae7278f
-   - Solutie: Creat functie globala get_transactionable_state_ids()
-   - Locatie: src/backend/utils/stock_utils.py
+Status Transition:
+1. Operator receives stock → Status: Label
+2. Mobile app scans label → Status changes based on:
+   - lotallexp flag (requires batch/expiry tracking)
+   - Scan validation results
+   - Other business rules
+3. Final status: OK, Quarantine, or Quarantine (transactionable)
 
-MODIFICARI EFECTUATE:
----------------------
+NEXT STEPS:
+1. Implement mobile scanning functionality
+2. Add status transition logic after scanning
+3. Test container display with various scenarios
+4. Add translations for new UI elements
 
-1. modules/requests/services.py - fetch_part_batch_codes()
-   - Grupare dupa batch_code + location_id (nu doar batch_code)
-   - Fetch location names din depo_locations
-   - Label format: "{batch_code} ({quantity} buc) - {location_name}"
-   - Adaugat logging pentru debugging
-   - Returneaza toate combinatiile batch+location separate
-   - Foloseste get_transactionable_state_ids() pentru filtrare
+TESTING NOTES:
+- Test with orders that have containers with issues
+- Test with orders without containers
+- Verify modal displays all fields correctly
+- Verify stock entry opens in new tab
+- Verify Label status is applied to all new stock entries
+- Test delete functionality still works
 
-2. src/frontend/src/components/Requests/OperationsTab.tsx
-   - Simplificat searchParts() - elimina array-ul cand search < 2 caractere
-   - Eliminat logica de "keep selected part" care cauza reselection
-   - Eliminat logica de "move to front" din handlePartSelect
-   - Adaugat logging in loadBatchCodes si handlePartSelect
-   - Actualizat mapping pentru batch options sa includa toate campurile noi
-   - handleAddItem: Adaugat String(newItem.part) pentru conversie explicita
-   - handleSaveBatchData: Adaugat String(item.part) in map pentru toate items
-   - loadBatchCodes: Eliminat parametrul location_id din request
+FILES MODIFIED:
+1. src/frontend/src/components/Procurement/ReceivedStockTable.tsx
+2. modules/depo_procurement/services/stock_receiving.py
+3. src/frontend/src/types/procurement.ts
 
-3. modules/requests/routes.py - update_request()
-   - Adaugat try-catch pentru update_one cu logging
-   - Asigurat ca init_q este setat automat daca lipseste
-   - Raise HTTPException 422 cu detalii in caz de eroare
+DEPENDENCIES:
+- Label status must exist in depo_stocks_states (OID: 699b2d8a111409dd80cc361b)
+- Mobile scanning app (to be implemented)
+- Stock entry detail page must be accessible at /web/inventory/stocks/{id}
 
-4. modules/requests/routes.py - get_part_batch_codes()
-   - Modificat sa ignore parametrul location_id
-   - Trimite None la fetch_part_batch_codes pentru a cauta in toate locatiile
-   - Comentariu adaugat: "Don't filter by location - show all available batch codes"
+BUILD STATUS:
+✓ Frontend build successful (npm run build)
+✓ No TypeScript errors
+✓ All components properly typed
+✓ Modal wrapped in Fragment to avoid JSX syntax errors
 
-5. src/frontend/scripts/po-to-json.cjs
-   - Inlocuit caracterele UTF-8 speciale (✓) cu [OK] (ASCII)
-   - Fix pentru afisare corecta in consola Windows
-   - Mesaje: "[OK] Created..." si "[OK] All translations compiled!"
-
-6. src/backend/utils/stock_utils.py - NOU FISIER
-   - Creat modul global pentru filtrarea stock items tranzactionabile
-   - Constanta: TRANSACTIONABLE_STOCK_STATE_IDS (3 state IDs)
-   - Functii:
-     * get_transactionable_state_ids() - returneaza lista de ObjectIds
-     * filter_transactionable_stock_items() - filtreaza lista de stock items
-     * build_transactionable_stock_query() - construieste query MongoDB
-     * is_stock_transactionable() - verifica daca un state_id permite tranzactii
-   - Documentatie completa pentru fiecare functie cu exemple de utilizare
-
-TESTARE FINALA:
----------------
-1. Selecteaza ACID TIOCTIC (697c6071a2906a7551ea0094)
-2. Verifica ca batch codes apar (cauta in toate locatiile, nu doar sursa)
-3. Verifica ca apar DOAR batch codes din state-urile permise (3 state-uri)
-4. Adauga item cu batch code selectat
-5. Salveaza - ar trebui sa functioneze fara eroare 422
-6. Verifica ca item-ul apare in tabel cu toate detaliile
-7. Verifica ca mesajele din consola apar corect (fara caractere stricate)
-
-OBSERVATII:
------------
-- Batch codes sunt acum afisate per locatie (daca acelasi batch exista in mai multe locatii)
-- Logging adaugat pentru debugging - poate fi eliminat dupa testare
-- Frontend acum afiseaza corect toate informatiile despre batch (quantity, location, state)
-- Part ID este INTOTDEAUNA trimis ca string la API (fix pentru validare Pydantic)
-- API cauta batch codes in TOATE locatiile, nu doar in sursa transferului
-- Consola Windows afiseaza corect mesajele (fara caractere UTF-8 speciale)
-- Functie globala pentru filtrarea stock items tranzactionabile - reutilizabila in toata platforma
-- Doar stock items din cele 3 state-uri specifice pot fi tranzactionate
-
-NEXT STEPS (pentru continuare):
---------------------------------
-- Inlocuire Select cu tabel de batch codes (checkboxes)
-- Coloane: # (Checkbox), Batch (cod + stare), Available, Quantity (input)
-- Logica: Quantity general vs Quantity per batch
-- Adaugare multipla de items (cate unul per batch code selectat)
-[2026-02-20] Curatat frontend Sales/Procurement/Inventory de pk; ramas backend companies_service cu pk auto-increment de migrat separat.
+IMPLEMENTATION COMPLETE:
+All three requirements have been successfully implemented:
+1. ✓ Actions column with eye icon (view details) and Manage button (open stock entry)
+2. ✓ Default status changed to "Label" (699b2d8a111409dd80cc361b)
+3. ✓ Container column with warning icon for damaged/unsealed/mislabeled items

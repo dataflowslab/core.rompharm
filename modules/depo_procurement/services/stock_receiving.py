@@ -44,33 +44,15 @@ async def receive_stock_item(order_id: str, stock_data, current_user):
         if not part:
             raise HTTPException(status_code=404, detail="Part not found")
         
-        # Determine status based on part.lotallexp and transferable flag
-        # lotallexp = true means article requires lot/batch tracking with expiry -> goes to quarantine
-        # lotallexp = false or missing means article goes directly to OK status
-        has_lotallexp = part.get('lotallexp', False)
-        is_transferable = getattr(stock_data, 'transferable', False)
-        
-        if not has_lotallexp:
-            # Articles without lotallexp go directly to OK status (no quarantine)
-            state = states_collection.find_one({'_id': ObjectId('694321db8728e4d75ae72789')})
-            if not state:
-                state = states_collection.find_one({'name': 'OK'})
-        elif is_transferable:
-            # Transferable stock goes to Quarantine (transactionable)
-            state = states_collection.find_one({'_id': ObjectId('694322878728e4d75ae72790')})
-            if not state:
-                state = states_collection.find_one({'name': {'$regex': 'quarantine.*transactionable', '$options': 'i'}})
-        else:
-            # Default: Quarantined (not transferable)
-            state = states_collection.find_one({'_id': ObjectId('694322758728e4d75ae7278f')})
-            if not state:
-                state = states_collection.find_one({'name': {'$regex': '^quarantined$', '$options': 'i'}})
+        # All received stock starts with "Label" status (699b2d8a111409dd80cc361b)
+        # This is an intermediate state before the product is scanned via mobile app
+        # After scanning, it will move to quarantine or OK based on lotallexp and other rules
+        state = states_collection.find_one({'_id': ObjectId('699b2d8a111409dd80cc361b')})
+        if not state:
+            state = states_collection.find_one({'name': 'Label'})
         
         if not state:
-            # Ultimate fallback: any quarantine state
-            state = states_collection.find_one({'name': {'$regex': 'quarantin', '$options': 'i'}})
-            if not state:
-                raise HTTPException(status_code=400, detail="No suitable stock state found")
+            raise HTTPException(status_code=400, detail="Label status not found in depo_stocks_states")
         
         # Create separate stock entry in depo_stocks with all supplier batch data
         stock_doc = {

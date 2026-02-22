@@ -25,15 +25,37 @@ export interface ReceivedItem {
     };
     batch?: string;  // Legacy field
     batch_code?: string;  // New field
-    serial: string;
-    packaging: string;
+    supplier_batch_code?: string;
+    serial_numbers?: string;
+    serial?: string;
+    packaging?: string;
     status: number;
     status_detail?: {
         name: string;
         value: number;
         color: string;
     };
-    notes: string;
+    notes?: string;
+    manufacturing_date?: string;
+    expiry_date?: string;
+    reset_date?: string;
+    expected_quantity?: number;
+    supplier_ba_no?: string;
+    supplier_ba_date?: string;
+    accord_ba?: boolean;
+    is_list_supplier?: boolean;
+    clean_transport?: boolean;
+    temperature_control?: boolean;
+    temperature_conditions_met?: boolean;
+    containers_cleaned?: boolean;
+    containers?: Array<{
+        quantity: number;
+        damaged?: boolean;
+        unsealed?: boolean;
+        mislabeled?: boolean;
+    }>;
+    received_by?: string;
+    received_date?: string;
 }
 
 export interface PurchaseOrderItem {
