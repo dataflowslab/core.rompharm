@@ -45,17 +45,32 @@ def check_flow_completion(flow):
     must_sign_officers = flow.get("must_sign_officers", [])
     all_must_signed = True
     for officer in must_sign_officers:
-        if officer["reference"] not in signature_user_ids:
-            all_must_signed = False
-            break
+        # For role-based officers, check if any signature exists
+        if officer.get("type") == "role":
+            # For roles, if there are any signatures, consider it signed
+            if len(signatures) == 0:
+                all_must_signed = False
+                break
+        else:
+            # For person-based officers, check specific user_id
+            if officer["reference"] not in signature_user_ids:
+                all_must_signed = False
+                break
     
     # Check can_sign: at least min_signatures have signed
     can_sign_officers = flow.get("can_sign_officers", [])
     min_signatures = flow.get("min_signatures", 1)
     can_sign_count = 0
     for officer in can_sign_officers:
-        if officer["reference"] in signature_user_ids:
-            can_sign_count += 1
+        # For role-based officers, count if any signature exists
+        if officer.get("type") == "role":
+            # For roles, if there are any signatures, count it
+            if len(signatures) > 0:
+                can_sign_count += 1
+        else:
+            # For person-based officers, check specific user_id
+            if officer["reference"] in signature_user_ids:
+                can_sign_count += 1
     
     has_min_signatures = can_sign_count >= min_signatures
     

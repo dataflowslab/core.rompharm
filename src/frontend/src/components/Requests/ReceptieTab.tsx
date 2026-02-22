@@ -224,7 +224,14 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   };
 
   const handleSubmitStatus = async () => {
+    console.log('[ReceptieTab] handleSubmitStatus called', {
+      finalStatus,
+      refusalReason,
+      availableStates: availableStates.map(s => ({ _id: s._id, name: s.name }))
+    });
+    
     if (!finalStatus) {
+      console.log('[ReceptieTab] No finalStatus selected');
       notifications.show({
         title: t('Error'),
         message: t('Please select a status'),
@@ -235,7 +242,10 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
 
     // Check if selected state needs comment
     const selectedState = availableStates.find(s => s._id === finalStatus);
+    console.log('[ReceptieTab] Selected state:', selectedState);
+    
     if (selectedState?.needs_comment && !refusalReason.trim()) {
+      console.log('[ReceptieTab] Comment required but not provided');
       notifications.show({
         title: t('Error'),
         message: t('Please provide a comment'),
@@ -244,30 +254,35 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
       return;
     }
 
+    console.log('[ReceptieTab] Submitting status update...');
     setSubmitting(true);
     try {
-      await api.patch(requestsApi.updateReceptionStatus(requestId), {
+      const payload = {
         status: finalStatus,
         reason: refusalReason || undefined
-      });
+      };
+      console.log('[ReceptieTab] Payload:', payload);
+      console.log('[ReceptieTab] URL:', requestsApi.updateReceptionStatus(requestId));
+      
+      await api.patch(requestsApi.updateReceptionStatus(requestId), payload);
+
+      // Auto-sign after saving decision
+      console.log('[ReceptieTab] Auto-signing after save decision...');
+      await api.post(requestsApi.signReception(requestId));
 
       notifications.show({
         title: t('Success'),
-        message: t('Status updated successfully'),
+        message: t('Decision saved and signed successfully'),
         color: 'green'
       });
-
-      // DON'T reset status - keep it selected so user can sign
-      // setFinalStatus('');
-      // setRefusalReason('');
       
       await loadReceptionFlow();
       onReload();
     } catch (error: any) {
-      console.error('Failed to update status:', error);
+      console.error('Failed to update status or sign:', error);
       notifications.show({
         title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to update status'),
+        message: error.response?.data?.detail || t('Failed to save decision'),
         color: 'red'
       });
     } finally {
@@ -291,6 +306,41 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     return date.toLocaleString();
   };
 
+  // Check if user is authorized to sign (regardless of whether they already signed)
+  const canUserSignInitially = () => {
+    if (!flow || !username) {
+      return false;
+    }
+    
+    // Check if user can sign - support both username and role-based officers
+    const canSign = flow.can_sign_officers.some(o => {
+      // Direct username match
+      if (o.username === username) return true;
+      
+      // Role-based match: check if user has the role
+      if (o.type === 'role' && o.reference) {
+        // For admin role, always allow (admin can do anything)
+        // Check both isStaff and username containing 'admin'
+        if (o.reference === 'admin' && (isStaff || username.toLowerCase().includes('admin'))) {
+          return true;
+        }
+        // Add other role checks here if needed
+      }
+      
+      return false;
+    });
+    
+    const mustSign = flow.must_sign_officers.some(o => {
+      if (o.username === username) return true;
+      if (o.type === 'role' && o.reference === 'admin' && (isStaff || username.toLowerCase().includes('admin'))) {
+        return true;
+      }
+      return false;
+    });
+    
+    return canSign || mustSign;
+  };
+
   const canUserSign = () => {
     if (!flow || !username) {
       console.log('[ReceptieTab] canUserSign: no flow or username', { flow: !!flow, username });
@@ -303,38 +353,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
       return false;
     }
     
-    // Check if user can sign - support both username and role-based officers
-    const canSign = flow.can_sign_officers.some(o => {
-      // Direct username match
-      if (o.username === username) return true;
-      
-      // Role-based match: check if user has the role
-      if (o.type === 'role' && o.reference) {
-        // For admin role, check if user is staff
-        if (o.reference === 'admin' && isStaff) return true;
-        // Add other role checks here if needed
-      }
-      
-      return false;
-    });
-    
-    const mustSign = flow.must_sign_officers.some(o => {
-      if (o.username === username) return true;
-      if (o.type === 'role' && o.reference === 'admin' && isStaff) return true;
-      return false;
-    });
-    
-    console.log('[ReceptieTab] canUserSign check:', {
-      username,
-      isStaff,
-      canSign,
-      mustSign,
-      can_sign_officers: flow.can_sign_officers,
-      must_sign_officers: flow.must_sign_officers,
-      result: canSign || mustSign
-    });
-    
-    return canSign || mustSign;
+    return canUserSignInitially();
   };
 
   const isFlowCompleted = () => {
@@ -416,16 +435,25 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
           <Grid.Col span={4}>
             <Paper withBorder p="md">
               <Title order={5} mb="md">{t('Decision')}</Title>
-              <DecisionSection
-                status={finalStatus}
-                reason={refusalReason}
-                isCompleted={isFlowCompleted()}
-                availableStates={availableStates}
-                onStatusChange={(value) => setFinalStatus(value || '')}
-                onReasonChange={setRefusalReason}
-                onSubmit={handleSubmitStatus}
-                submitting={submitting}
-              />
+              {/* Only show decision section if user can sign (hasn't signed yet) and flow not completed */}
+              {!hasAnySignature() && canUserSignInitially() && !isFlowCompleted() ? (
+                <DecisionSection
+                  status={finalStatus}
+                  reason={refusalReason}
+                  isCompleted={false}
+                  availableStates={availableStates}
+                  onStatusChange={(value) => setFinalStatus(value || '')}
+                  onReasonChange={setRefusalReason}
+                  onSubmit={handleSubmitStatus}
+                  submitting={submitting}
+                />
+              ) : (
+                <Text size="sm" c="dimmed">
+                  {hasAnySignature() ? t('Decision already made') : 
+                   isFlowCompleted() ? t('Flow completed') : 
+                   t('You are not authorized to make a decision')}
+                </Text>
+              )}
             </Paper>
           </Grid.Col>
 

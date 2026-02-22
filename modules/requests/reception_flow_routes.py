@@ -150,6 +150,11 @@ async def sign_reception(
             requests_collection = db['depo_requests']
             stock_received_signed_state_id = ObjectId("694df205297c9dde6d70664d")
             
+            # Get the state to get its order
+            states_collection = db['depo_requests_states']
+            signed_state = states_collection.find_one({'_id': stock_received_signed_state_id})
+            state_order = signed_state.get('order', 45) if signed_state else 45
+            
             # Create status log entry for signing
             status_log_entry = {
                 'status_id': stock_received_signed_state_id,
@@ -164,6 +169,7 @@ async def sign_reception(
                 {
                     "$set": {
                         "state_id": stock_received_signed_state_id,
+                        "state_order": state_order,
                         "updated_at": timestamp
                     },
                     "$push": {"status_log": status_log_entry}
@@ -193,26 +199,42 @@ async def sign_reception(
             })
             
             if not existing_production_flow:
-                # Use existing production flow ID from config
-                production_flow_id = ObjectId("694a1ae3297c9dde6d70661a")
+                # Get template from approval_templates
+                production_template_id = ObjectId("694a1ae3297c9dde6d70661a")
+                template = db.approval_templates.find_one({"_id": production_template_id})
                 
-                # Get the existing flow to copy its configuration
-                existing_flow = db.approval_flows.find_one({"_id": production_flow_id})
-                
-                if existing_flow:
-                    # Build officers lists from existing flow
-                    can_sign_officers = existing_flow.get('can_sign_officers', [])
-                    must_sign_officers = existing_flow.get('must_sign_officers', [])
+                if template:
+                    # Build officers lists from template
+                    can_sign_officers = []
+                    
+                    # Add officers from template (template already has admin role)
+                    for officer in template.get('officers', []):
+                        can_sign_officers.append({
+                            "type": officer.get('type', 'person'),
+                            "reference": officer.get('reference', ''),
+                            "username": officer.get('username', ''),
+                            "action": "can_sign"
+                        })
+                    
+                    # If template doesn't have admin, add it
+                    has_admin = any(o.get('type') == 'role' and o.get('reference') == 'admin' for o in can_sign_officers)
+                    if not has_admin:
+                        can_sign_officers.append({
+                            "type": "role",
+                            "reference": "admin",
+                            "username": "",
+                            "action": "can_sign"
+                        })
                     
                     production_flow_data = {
                         "object_type": "stock_request_production",
                         "object_source": "depo_request",
                         "object_id": request_id,
                         "flow_type": "production",
-                        "config_slug": existing_flow.get('config_slug', 'production'),
-                        "min_signatures": existing_flow.get('min_signatures', 1),
+                        "template_id": str(production_template_id),
+                        "min_signatures": template.get('min_signatures', 1),
                         "can_sign_officers": can_sign_officers,
-                        "must_sign_officers": must_sign_officers,
+                        "must_sign_officers": [],
                         "signatures": [],
                         "status": "pending",
                         "created_at": timestamp,
@@ -222,7 +244,7 @@ async def sign_reception(
                     db.approval_flows.insert_one(production_flow_data)
                     print(f"[REQUESTS] Auto-created production flow for request {request_id}")
                 else:
-                    print(f"[REQUESTS] Warning: Production flow template {production_flow_id} not found")
+                    print(f"[REQUESTS] Warning: Production template {production_template_id} not found in approval_templates")
         except Exception as e:
             print(f"[REQUESTS] Warning: Failed to auto-create production flow: {e}")
     
@@ -356,9 +378,10 @@ async def update_reception_status(
             'reason': reason if reason else None
         }
         
-        # Update state_id and add to status_log
+        # Update state_id, state_order and add to status_log
         update_data = {
             'state_id': state_id,
+            'state_order': state.get('order', 0),
             'updated_at': timestamp
         }
         
@@ -385,6 +408,154 @@ async def update_reception_status(
         })
         
         print(f"[REQUESTS] Request {request_id} state_id updated to {state.get('name')} ({status})")
+        
+        # If status is "Stock Received", create stock movements from source to destination
+        is_stock_received = 'stock_received' in state.get('slug', '').lower() or 'stock received' in state.get('name', '').lower()
+        
+        if is_stock_received:
+            try:
+                # Get request details
+                request_doc = requests_collection.find_one({'_id': req_obj_id})
+                if not request_doc:
+                    raise Exception("Request not found")
+                
+                source_id = request_doc.get('source')
+                destination_id = request_doc.get('destination')
+                items = request_doc.get('items', [])
+                
+                if not source_id or not destination_id:
+                    raise Exception("Source or destination not found in request")
+                
+                # Convert to ObjectId if needed
+                if isinstance(source_id, str):
+                    source_id = ObjectId(source_id)
+                if isinstance(destination_id, str):
+                    destination_id = ObjectId(destination_id)
+                
+                # Create stock movements for each item
+                stocks_collection = db['depo_stocks']
+                movements_created = 0
+                
+                for item in items:
+                    part_id = item.get('part')
+                    quantity = item.get('quantity', 0)
+                    batch_code = item.get('batch_code', '')
+                    
+                    if not part_id or quantity <= 0:
+                        continue
+                    
+                    # Convert part_id to ObjectId if needed
+                    if isinstance(part_id, str):
+                        part_id = ObjectId(part_id)
+                    
+                    # Find stock at source location with matching part and batch
+                    query = {
+                        'part_id': part_id,
+                        'location_id': source_id,
+                        'quantity': {'$gt': 0}
+                    }
+                    
+                    if batch_code:
+                        query['batch_code'] = batch_code
+                    
+                    source_stocks = list(stocks_collection.find(query).sort('created_at', 1))
+                    
+                    if not source_stocks:
+                        print(f"[REQUESTS] Warning: No stock found at source for part {part_id}, batch {batch_code}")
+                        continue
+                    
+                    # Transfer stock from source to destination
+                    remaining_qty = quantity
+                    
+                    for source_stock in source_stocks:
+                        if remaining_qty <= 0:
+                            break
+                        
+                        available_qty = source_stock.get('quantity', 0)
+                        transfer_qty = min(remaining_qty, available_qty)
+                        
+                        # Reduce quantity at source
+                        stocks_collection.update_one(
+                            {'_id': source_stock['_id']},
+                            {
+                                '$inc': {'quantity': -transfer_qty},
+                                '$set': {'updated_at': timestamp}
+                            }
+                        )
+                        
+                        # Create or update stock at destination
+                        dest_stock_query = {
+                            'part_id': part_id,
+                            'location_id': destination_id,
+                            'batch_code': source_stock.get('batch_code', ''),
+                            'state_id': source_stock.get('state_id')
+                        }
+                        
+                        dest_stock = stocks_collection.find_one(dest_stock_query)
+                        
+                        if dest_stock:
+                            # Update existing stock
+                            stocks_collection.update_one(
+                                {'_id': dest_stock['_id']},
+                                {
+                                    '$inc': {'quantity': transfer_qty},
+                                    '$set': {'updated_at': timestamp}
+                                }
+                            )
+                        else:
+                            # Create new stock entry at destination
+                            new_stock = {
+                                'part_id': part_id,
+                                'location_id': destination_id,
+                                'quantity': transfer_qty,
+                                'batch_code': source_stock.get('batch_code', ''),
+                                'supplier_batch_code': source_stock.get('supplier_batch_code', ''),
+                                'serial_numbers': source_stock.get('serial_numbers', ''),
+                                'packaging': source_stock.get('packaging', ''),
+                                'state_id': source_stock.get('state_id'),
+                                'notes': f"Transferred from request {request_doc.get('reference', request_id)}",
+                                'supplier_id': source_stock.get('supplier_id'),
+                                'supplier_um_id': source_stock.get('supplier_um_id'),
+                                'manufacturing_date': source_stock.get('manufacturing_date'),
+                                'expiry_date': source_stock.get('expiry_date'),
+                                'reset_date': source_stock.get('reset_date'),
+                                'created_at': timestamp,
+                                'updated_at': timestamp,
+                                'created_by': current_user.get('username'),
+                                'updated_by': current_user.get('username'),
+                                'request_id': req_obj_id,
+                                'request_reference': request_doc.get('reference')
+                            }
+                            stocks_collection.insert_one(new_stock)
+                        
+                        # Log the movement
+                        db.logs.insert_one({
+                            'collection': 'depo_stocks',
+                            'action': 'stock_transfer',
+                            'request_id': request_id,
+                            'request_reference': request_doc.get('reference'),
+                            'part_id': str(part_id),
+                            'quantity': transfer_qty,
+                            'from_location': str(source_id),
+                            'to_location': str(destination_id),
+                            'batch_code': source_stock.get('batch_code', ''),
+                            'user': current_user.get('username'),
+                            'timestamp': timestamp
+                        })
+                        
+                        remaining_qty -= transfer_qty
+                        movements_created += 1
+                    
+                    if remaining_qty > 0:
+                        print(f"[REQUESTS] Warning: Could not transfer full quantity for part {part_id}. Remaining: {remaining_qty}")
+                
+                print(f"[REQUESTS] Created {movements_created} stock movements for request {request_id}")
+                
+            except Exception as e:
+                print(f"[REQUESTS] Error creating stock movements: {e}")
+                import traceback
+                traceback.print_exc()
+                # Don't fail the status update if stock movement fails
         
         return {
             "message": f"State updated to {state.get('name')}",

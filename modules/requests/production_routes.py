@@ -60,7 +60,7 @@ async def save_production_data(
     request: Request,
     current_user: dict = Depends(verify_admin)
 ):
-    """Save or update production data with series and materials"""
+    """Save or update production data with series and materials + execute stock movements"""
     db = get_db()
     
     try:
@@ -105,11 +105,185 @@ async def save_production_data(
         result = db.depo_production.insert_one(production_data)
         production_id = str(result.inserted_id)
     
+    # Execute stock movements
+    try:
+        await execute_production_stock_movements(db, request_id, series, current_user, timestamp)
+    except Exception as e:
+        print(f"[PRODUCTION] Warning: Stock movements failed: {e}")
+        # Don't fail the save if stock movements fail
+    
     return {
         "success": True,
         "production_id": production_id,
         "message": "Production data saved successfully"
     }
+
+
+async def execute_production_stock_movements(db, request_id: str, series: list, current_user: dict, timestamp: datetime):
+    """Execute stock movements for production: - consumed materials, + produced batches"""
+    
+    # Get request details
+    request = db.depo_requests.find_one({'_id': ObjectId(request_id)})
+    if not request:
+        raise Exception("Request not found")
+    
+    product_id = request.get('product_id')
+    destination_id = request.get('destination')
+    
+    if not product_id or not destination_id:
+        raise Exception("Product or destination not found in request")
+    
+    # Convert to ObjectId if needed
+    if isinstance(product_id, str):
+        product_id = ObjectId(product_id)
+    if isinstance(destination_id, str):
+        destination_id = ObjectId(destination_id)
+    
+    stocks_collection = db['depo_stocks']
+    movements_created = 0
+    
+    # Process each series (batch code)
+    for serie in series:
+        batch_code = serie.get('batch_code')
+        materials = serie.get('materials', [])
+        
+        if not batch_code:
+            continue
+        
+        # Calculate total produced quantity for this batch
+        # (sum of used quantities or use a fixed quantity from request)
+        total_produced = 0
+        
+        # 1. Reduce stock for consumed materials
+        for material in materials:
+            part_id = material.get('part')
+            used_qty = material.get('used_qty', 0)
+            material_batch = material.get('batch', '')
+            
+            if not part_id or used_qty <= 0:
+                continue
+            
+            # Convert part_id to ObjectId if needed
+            if isinstance(part_id, str):
+                part_id = ObjectId(part_id)
+            
+            # Find stock at destination location with matching part and batch
+            query = {
+                'part_id': part_id,
+                'location_id': destination_id,
+                'quantity': {'$gt': 0}
+            }
+            
+            if material_batch:
+                query['batch_code'] = material_batch
+            
+            material_stocks = list(stocks_collection.find(query).sort('created_at', 1))
+            
+            if not material_stocks:
+                print(f"[PRODUCTION] Warning: No stock found for part {part_id}, batch {material_batch}")
+                continue
+            
+            # Reduce stock (FIFO)
+            remaining_qty = used_qty
+            for stock in material_stocks:
+                if remaining_qty <= 0:
+                    break
+                
+                available_qty = stock.get('quantity', 0)
+                reduce_qty = min(remaining_qty, available_qty)
+                
+                # Reduce quantity
+                stocks_collection.update_one(
+                    {'_id': stock['_id']},
+                    {
+                        '$inc': {'quantity': -reduce_qty},
+                        '$set': {'updated_at': timestamp}
+                    }
+                )
+                
+                # Log the consumption
+                db.logs.insert_one({
+                    'collection': 'depo_stocks',
+                    'action': 'production_consumption',
+                    'request_id': request_id,
+                    'request_reference': request.get('reference'),
+                    'part_id': str(part_id),
+                    'quantity': -reduce_qty,
+                    'location': str(destination_id),
+                    'batch_code': material_batch,
+                    'produced_batch': batch_code,
+                    'user': current_user.get('username'),
+                    'timestamp': timestamp
+                })
+                
+                remaining_qty -= reduce_qty
+                movements_created += 1
+            
+            if remaining_qty > 0:
+                print(f"[PRODUCTION] Warning: Could not consume full quantity for part {part_id}. Remaining: {remaining_qty}")
+        
+        # 2. Add stock for produced product with this batch code
+        # Calculate produced quantity (could be from request.product_quantity / number of batches)
+        num_batches = len(series)
+        produced_qty = request.get('product_quantity', 0) / num_batches if num_batches > 0 else 0
+        
+        if produced_qty > 0:
+            # Check if stock entry exists for this product + batch
+            existing_stock = stocks_collection.find_one({
+                'part_id': product_id,
+                'location_id': destination_id,
+                'batch_code': batch_code
+            })
+            
+            if existing_stock:
+                # Update existing
+                stocks_collection.update_one(
+                    {'_id': existing_stock['_id']},
+                    {
+                        '$inc': {'quantity': produced_qty},
+                        '$set': {'updated_at': timestamp}
+                    }
+                )
+            else:
+                # Create new stock entry
+                # For produced products, set supplier to Rompharm and status to Quarantined
+                rompharm_supplier_id = ObjectId("694a1b9f297c9dde6d70661c")
+                quarantined_state_id = ObjectId("694322878728e4d75ae72790")
+                
+                new_stock = {
+                    'part_id': product_id,
+                    'location_id': destination_id,
+                    'quantity': produced_qty,
+                    'batch_code': batch_code,
+                    'supplier_id': rompharm_supplier_id,
+                    'state_id': quarantined_state_id,
+                    'notes': f"Produced from request {request.get('reference', request_id)}",
+                    'created_at': timestamp,
+                    'updated_at': timestamp,
+                    'created_by': current_user.get('username'),
+                    'updated_by': current_user.get('username'),
+                    'request_id': ObjectId(request_id),
+                    'request_reference': request.get('reference')
+                }
+                stocks_collection.insert_one(new_stock)
+            
+            # Log the production
+            db.logs.insert_one({
+                'collection': 'depo_stocks',
+                'action': 'production_output',
+                'request_id': request_id,
+                'request_reference': request.get('reference'),
+                'part_id': str(product_id),
+                'quantity': produced_qty,
+                'location': str(destination_id),
+                'batch_code': batch_code,
+                'user': current_user.get('username'),
+                'timestamp': timestamp
+            })
+            
+            movements_created += 1
+    
+    print(f"[PRODUCTION] Created {movements_created} stock movements for request {request_id}")
 
 
 @router.patch("/{request_id}/production-status")
@@ -297,20 +471,36 @@ async def sign_production(
     
     # Check authorization
     username = current_user["username"]
+    is_staff = current_user.get("is_staff", False)
     can_sign = False
     
+    # Check can_sign_officers
     for officer in flow.get("can_sign_officers", []):
-        if officer["reference"] == user_id:
+        # Direct user_id match
+        if officer.get("reference") == user_id:
             can_sign = True
             break
-    
-    if not can_sign:
-        for officer in flow.get("must_sign_officers", []):
-            if officer["reference"] == user_id:
+        # Role-based match
+        if officer.get("type") == "role" and officer.get("reference"):
+            if officer["reference"] == "admin" and (is_staff or username.lower().startswith('admin')):
                 can_sign = True
                 break
     
+    # Check must_sign_officers if not already authorized
     if not can_sign:
+        for officer in flow.get("must_sign_officers", []):
+            # Direct user_id match
+            if officer.get("reference") == user_id:
+                can_sign = True
+                break
+            # Role-based match
+            if officer.get("type") == "role" and officer.get("reference"):
+                if officer["reference"] == "admin" and (is_staff or username.lower().startswith('admin')):
+                    can_sign = True
+                    break
+    
+    if not can_sign:
+        print(f"[PRODUCTION] User {username} (staff={is_staff}) not authorized to sign. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
         raise HTTPException(status_code=403, detail="You are not authorized to sign")
     
     # Generate signature

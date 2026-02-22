@@ -52,15 +52,7 @@ export function SignaturesSection({
     <>
       <Group justify="space-between" mb="md">
         <Title order={5}>{t('Signatures')}</Title>
-        {canSign && !isCompleted && (
-          <Button
-            leftSection={<IconSignature size={16} />}
-            onClick={onSign}
-            loading={signing}
-          >
-            {t('Sign')}
-          </Button>
-        )}
+        {/* Sign button hidden - signing happens automatically when saving decision */}
       </Group>
 
       {/* Optional Approvers */}
@@ -72,16 +64,31 @@ export function SignaturesSection({
           <Table striped withTableBorder withColumnBorders mb="md">
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>{t('User')}</Table.Th>
+                <Table.Th>{t('Signer')}</Table.Th>
                 <Table.Th>{t('Status')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {canSignOfficers.map((officer, index) => {
-                const hasSigned = signatures.some(s => s.user_id === officer.reference);
+                // For role-based officers, check if any signature exists (since anyone with that role can sign)
+                // For person-based officers, check if that specific person signed
+                let hasSigned = false;
+                if (officer.type === 'role') {
+                  // For roles, if there are any signatures, consider it signed
+                  hasSigned = signatures.length > 0;
+                } else {
+                  // For specific users, check if that user signed
+                  hasSigned = signatures.some(s => s.user_id === officer.reference);
+                }
+                
+                // Display format: "role: admin" or username
+                const displayName = officer.type === 'role' 
+                  ? `role: ${officer.reference}` 
+                  : (officer.username || officer.reference);
+                
                 return (
                   <Table.Tr key={index}>
-                    <Table.Td>{officer.username}</Table.Td>
+                    <Table.Td>{displayName}</Table.Td>
                     <Table.Td>
                       <Badge color={hasSigned ? 'green' : 'gray'} size="sm">
                         {hasSigned ? t('Signed') : t('Pending')}

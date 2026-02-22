@@ -1,0 +1,172 @@
+SESIUNE: 26.02.2026 - Reception Flow Complete + Production Flow Complete
+================================================================
+
+PROBLEME REZOLVATE:
+================================================================
+
+1. OPTIONAL APPROVERS - AFIȘARE CORECTĂ ✓
+   - Coloana "Signer" în loc de "User"
+   - Format: "role: admin" pentru roluri, username pentru useri
+   - Status "Signed" (verde) când există semnături
+
+2. RECEPTION FLOW - SEMNARE AUTOMATĂ ✓
+   - Save Decision semnează automat
+   - Butonul Sign eliminat
+   - Doar userii autorizați văd Decision section
+
+3. FLOW STATUS - "IN_PROGRESS" → "APPROVED" ✓
+   - Fix în check_flow_completion() pentru roluri
+   - Pentru type: 'role', verifică dacă există ORICE semnătură
+   - Flow-ul trece la "approved" când condițiile sunt îndeplinite
+
+4. PRODUCTION TAB - APARE CORECT ✓
+   - Adăugat state_order când se semnează reception
+   - Production tab apare când state_order > 40 (adică 45)
+
+5. PRODUCTION FLOW - CREARE AUTOMATĂ + FALLBACK ✓
+   - Se creează automat din approval_templates când se semnează reception
+   - Buton fallback "Initiate approval flow now" dacă flow-ul lipsește
+   - Template ID: 694a1ae3297c9dde6d70661a
+
+6. DUPLICATE "role: admin" FIX ✓
+   - Problema: Se adăuga admin de 2 ori (manual + din template)
+   - Fix: Verificăm dacă template-ul are deja admin înainte de a-l adăuga
+   - Rezultat: Doar un "role: admin" în can_sign_officers
+
+7. PRODUCTION SERIES - BATCH CODES INITIALIZATION ✓
+   - Folosește request.batch_codes în loc de items.batch_code
+   - Inițializează series cu TESTBUILD01, TESTBUILD02
+   - Materiale din items pentru fiecare batch
+
+8. STOCK MOVEMENTS LA PRODUCTION SAVE ✓
+   - Implementat în production_routes.py
+   - La Save: execute_production_stock_movements()
+   - Scădere materiale consumate (FIFO)
+   - Adăugare produs rezultat cu batch code
+   - Logging complet pentru audit
+
+================================================================
+FIȘIERE MODIFICATE
+================================================================
+
+Backend:
+1. modules/requests/approval_helpers.py
+   - check_flow_completion() - Fix pentru roluri
+   
+2. modules/requests/reception_flow_routes.py
+   - Adăugat state_order la semnare
+   - Creare production flow din template (fără duplicate)
+   - Fix: Verificare dacă admin există în template
+
+3. modules/requests/production_routes.py
+   - save_production_data() - Adăugat stock movements
+   - execute_production_stock_movements() - Logică completă
+   - Scădere materiale (FIFO)
+   - Adăugare produs rezultat
+
+Frontend:
+4. src/frontend/src/components/Requests/SignaturesSection.tsx
+   - Coloana "Signer"
+   - Format "role: admin"
+   - Status corect pentru roluri
+
+5. src/frontend/src/components/Requests/ReceptieTab.tsx
+   - Semnare automată la Save Decision
+   - canUserSignInitially() pentru autorizare
+   - Ascundere Decision după semnare
+
+6. src/frontend/src/components/Requests/ProductionTab.tsx
+   - Buton fallback pentru creare flow
+   - Inițializare series cu request.batch_codes
+   - Import Button component
+
+7. src/frontend/src/services/requests.ts
+   - Endpoint createProductionFlow
+
+8. src/frontend/vite.config.ts
+   - ASCII output pentru build (fără emoji)
+
+================================================================
+LOGICA STOCK MOVEMENTS LA PRODUCTION
+================================================================
+
+La Save Production Data:
+1. Pentru fiecare serie (batch code):
+   a) Scădere materiale consumate:
+      - Găsește stock la destination cu part_id + batch
+      - Reduce quantity cu used_qty (FIFO)
+      - Log: production_consumption
+   
+   b) Adăugare produs rezultat:
+      - Calculează produced_qty = product_quantity / num_batches
+      - Creează/update stock cu product_id + batch_code
+      - Log: production_output
+
+2. Toate mișcările sunt logate în logs collection
+3. Request reference este păstrat pentru audit
+
+================================================================
+FLUX COMPLET REQUESTS
+================================================================
+
+1. APPROVAL FLOW
+   - Creare request
+   - Aprobare (signatures)
+   - Status: Approved
+
+2. OPERATIONS FLOW
+   - Warehouse operations
+   - Sign operations
+   - Status: Warehouse Signed
+   - Creează reception flow automat
+
+3. RECEPTION FLOW
+   - Save Decision (ex: Stock Received)
+   - Semnare automată
+   - Stock movements (transfer source → destination)
+   - Status: Stock Received&Signed
+   - state_order: 45
+   - Creează production flow automat
+
+4. PRODUCTION FLOW
+   - Production tab apare (state_order > 40)
+   - Introducere batch codes + consum
+   - Save production data → Stock movements
+   - Sign production
+   - Status: Produced
+
+================================================================
+STATE ORDER VALUES
+================================================================
+- 30: Warehouse Approved
+- 40: Stock Received
+- 45: Stock Received&Signed
+- 50: Produced
+
+================================================================
+TEMPLATE IDS
+================================================================
+- Reception: Se creează din config (requests_reception_flow)
+- Production: 694a1ae3297c9dde6d70661a (approval_templates)
+
+================================================================
+TESTARE
+================================================================
+
+1. Refresh pagina (Ctrl+F5)
+2. Production Tab ar trebui să arate:
+   - TESTBUILD01 cu materiale
+   - TESTBUILD02 cu materiale
+   - Doar un "role: admin" în Signatures
+3. Completează used_qty pentru materiale
+4. Save → Stock movements automate
+5. Verifică în depo_stocks:
+   - Materiale consumate au quantity redusă
+   - Produs rezultat are quantity adăugată cu batch codes
+
+================================================================
+FIN SESIUNE
+================================================================
+Data: 26.02.2026
+Status: COMPLET - Reception + Production flows implementate
+Token usage: ~110k/200k

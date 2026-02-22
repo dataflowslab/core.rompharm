@@ -108,8 +108,13 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
       const allStates = response.data.results || [];
       
       // Filter states that have 'operations' in their scenes array
+      // Exclude "warehouse signed" as it's set automatically when flow is complete
       const operationsStates = allStates.filter((state: any) => 
-        state.scenes && Array.isArray(state.scenes) && state.scenes.includes('operations')
+        state.scenes && 
+        Array.isArray(state.scenes) && 
+        state.scenes.includes('operations') &&
+        !state.name.toLowerCase().includes('warehouse signed') &&
+        !state.slug.includes('warehouse_signed')
       );
       
       setAvailableStates(operationsStates);

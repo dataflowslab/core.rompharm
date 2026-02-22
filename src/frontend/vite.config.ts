@@ -4,26 +4,41 @@ import path from 'path';
 
 // Custom plugin to replace UTF-8 checkmarks with ASCII in console output
 function asciiOutputPlugin() {
+  // Intercept console output globally
+  const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
+
+  process.stdout.write = (chunk: any, ...args: any[]) => {
+    if (typeof chunk === 'string') {
+      chunk = chunk
+        .replace(/✓/g, '[OK]')
+        .replace(/✔/g, '[OK]')
+        .replace(/✗/g, '[ERROR]')
+        .replace(/✖/g, '[ERROR]')
+        .replace(/⚠/g, '[WARN]')
+        .replace(/ℹ/g, '[INFO]');
+    }
+    return originalStdoutWrite(chunk, ...args);
+  };
+
+  process.stderr.write = (chunk: any, ...args: any[]) => {
+    if (typeof chunk === 'string') {
+      chunk = chunk
+        .replace(/✓/g, '[OK]')
+        .replace(/✔/g, '[OK]')
+        .replace(/✗/g, '[ERROR]')
+        .replace(/✖/g, '[ERROR]')
+        .replace(/⚠/g, '[WARN]')
+        .replace(/ℹ/g, '[INFO]');
+    }
+    return originalStderrWrite(chunk, ...args);
+  };
+
   return {
     name: 'ascii-output',
-    configureServer(server: any) {
-      // Intercept console output
-      const originalStdoutWrite = process.stdout.write.bind(process.stdout);
-      const originalStderrWrite = process.stderr.write.bind(process.stderr);
-
-      process.stdout.write = (chunk: any, ...args: any[]) => {
-        if (typeof chunk === 'string') {
-          chunk = chunk.replace(/✓/g, '[OK]').replace(/✔/g, '[OK]');
-        }
-        return originalStdoutWrite(chunk, ...args);
-      };
-
-      process.stderr.write = (chunk: any, ...args: any[]) => {
-        if (typeof chunk === 'string') {
-          chunk = chunk.replace(/✓/g, '[OK]').replace(/✔/g, '[OK]');
-        }
-        return originalStderrWrite(chunk, ...args);
-      };
+    // This runs for both dev and build
+    config() {
+      return {};
     }
   };
 }

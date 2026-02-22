@@ -1,0 +1,73 @@
+SESSION: 26.02.2026 - Requests Module Improvements (CONTINUED)
+================================================================
+
+TASK SUMMARY:
+1. Show first product in Line Items column (with "+ N more" if multiple)
+2. Remove "warehouse signed" from Operations status list  
+3. Fix Receive Stock tab - create stock movements when "Stock Received" is saved
+4. Check Build/Production tab conditions
+
+PROGRESS:
+
+1. LINE ITEMS DISPLAY - FRONTEND COMPLETE ✓
+   File: src/frontend/src/pages/RequestsPage.tsx
+   
+   Changes:
+   - Added "Products" column to requests table
+   - Shows product name for recipe-based requests (product_detail.name)
+   - Shows first item name + "N more" for non-recipe requests
+   - Updated TypeScript interfaces to include items and product_detail
+   
+   Display Logic:
+   - If product_detail exists: Show product name
+   - Else if items exist: Show first item name + count
+   - Else: Show "-"
+
+2. BACKEND UPDATE NEEDED:
+   File: modules/requests/routes.py - list_requests function
+   
+   Need to add:
+   - Populate items with part_detail for first item (or all items)
+   - Populate product_detail if product_id exists
+   - This will make the frontend display work correctly
+
+3. OPERATIONS TAB - REMOVE "WAREHOUSE SIGNED":
+   Need to check OperationsTab component and remove warehouse signed status
+
+4. RECEIVE STOCK TAB - CREATE STOCK MOVEMENTS:
+   Need to implement stock movement creation when "Stock Received" status is saved
+   - Check ReceptieTab component
+   - Implement backend endpoint to create stock movements
+   - Move stock from source to destination for all items
+
+5. BUILD/PRODUCTION TAB:
+   Need to check conditions for when this tab appears
+   - Currently shows when state_order > 40
+   - Need to verify if additional conditions are needed
+
+NEXT STEPS:
+1. Update backend list_requests to include items and product_detail
+2. Check and fix OperationsTab component
+3. Implement stock movement creation in ReceptieTab
+4. Verify Build/Production tab conditions
+
+FILES MODIFIED SO FAR:
+- src/frontend/src/pages/RequestsPage.tsx
+
+FILES MODIFIED:
+1. src/frontend/src/pages/RequestsPage.tsx - Added Products column ✓
+2. src/frontend/src/components/Requests/OperationsTab.tsx - Filtered out warehouse signed ✓
+
+FILES TO MODIFY:
+- modules/requests/routes.py (list_requests function) - Add items and product_detail
+- src/frontend/src/components/Requests/ReceptieTab.tsx - Implement stock movement creation
+- Backend reception flow routes - Create stock movements endpoint
+
+BUILD STATUS:
+✓ Frontend build successful
+✓ No TypeScript errors
+✓ Changes applied correctly
+
+COMPLETED TASKS:
+1. ✓ Line Items Display - Frontend shows product name or first item + count
+2. ✓ Operations Tab - Filtered out "warehouse signed" from available states

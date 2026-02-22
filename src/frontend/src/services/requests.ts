@@ -45,6 +45,7 @@ export const requestsApi = {
   getProductionData: (requestId: string) => `${API_PREFIX}/${requestId}/production`,
   saveProductionData: (requestId: string) => `${API_PREFIX}/${requestId}/production`,
   getProductionFlow: (requestId: string) => `${API_PREFIX}/${requestId}/production-flow`,
+  createProductionFlow: (requestId: string) => `${API_PREFIX}/${requestId}/production-flow`,
   signProduction: (requestId: string) => `${API_PREFIX}/${requestId}/production-sign`,
   updateProductionStatus: (requestId: string) => `${API_PREFIX}/${requestId}/production-status`,
 

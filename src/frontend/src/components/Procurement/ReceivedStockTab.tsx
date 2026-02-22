@@ -9,6 +9,7 @@ import { notifications } from '@mantine/notifications';
 import { ReceiveStockForm, ReceiveStockFormData } from '../Common/ReceiveStockForm';
 import { ReceivedStockTable } from './ReceivedStockTable';
 import { ReceivedStockApproval } from './ReceivedStockApproval';
+import { ItemsReceiveHelper } from './ItemsReceiveHelper';
 import { ReceivedItem, PurchaseOrderItem, StockLocation, ApprovalFlow } from '../../types/procurement';
 import { PrintLabelsModal } from '../Common/PrintLabelsModal';
 
@@ -434,6 +435,17 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
     }
   };
 
+  const handleReceiveFromHelper = (itemId: string) => {
+    // Pre-select the item and open the receive modal
+    setFormData(prev => ({ ...prev, line_item: itemId }));
+    const item = items.find(i => i._id === itemId);
+    if (item) {
+      const remaining = item.quantity - (item.received || 0);
+      setFormData(prev => ({ ...prev, expected_quantity: remaining }));
+    }
+    setReceiveModalOpened(true);
+  };
+
   // Get available items (not fully received)
   const availableItems = items.filter(item => (item.received || 0) < item.quantity);
 
@@ -473,7 +485,18 @@ export function ReceivedStockTab({ orderId, items, stockLocations, onReload, sup
 
   return (
     <Paper p="md" withBorder>
+      {/* Items Helper Table */}
       <Group justify="space-between" mb="md">
+        <Title order={4}>{t('Items')}</Title>
+      </Group>
+      <ItemsReceiveHelper
+        items={items}
+        onReceiveClick={handleReceiveFromHelper}
+        canModify={canModifyStock}
+      />
+
+      {/* Received Stock Section */}
+      <Group justify="space-between" mb="md" mt="xl">
         <Title order={4}>{t('Received Stock')}</Title>
         <Group>
           {selectedReceivedItems.length > 0 && (

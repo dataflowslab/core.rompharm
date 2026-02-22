@@ -254,6 +254,39 @@ async def list_requests(
             return {k: fix_oid(v) for k, v in obj.items()}
         return obj
 
+    # Get all unique part ObjectIds from items and product_id
+    part_oids = set()
+    for req in requests_list:
+        # Get parts from items
+        if req.get('items'):
+            for item in req['items']:
+                if item.get('part'):
+                    try:
+                        part_oids.add(ObjectId(item['part']) if isinstance(item['part'], str) else item['part'])
+                    except:
+                        pass
+        # Get product_id
+        if req.get('product_id'):
+            try:
+                part_oids.add(ObjectId(req['product_id']) if isinstance(req['product_id'], str) else req['product_id'])
+            except:
+                pass
+    
+    # Fetch all parts from MongoDB
+    part_map = {}
+    if part_oids:
+        try:
+            parts = list(parts_collection.find({'_id': {'$in': list(part_oids)}}))
+            for part in parts:
+                part_id = str(part['_id'])
+                part_map[part_id] = {
+                    'name': part.get('name', ''),
+                    'IPN': part.get('ipn', ''),
+                    'ipn': part.get('ipn', '')
+                }
+        except Exception as e:
+            print(f"Warning: Failed to fetch parts: {e}")
+    
     # Process each request
     processed_list = []
     
@@ -276,6 +309,20 @@ async def list_requests(
         if dest_id:
             req['destination_name'] = location_map.get(dest_id, dest_id)
 
+        # Populate items with part_detail (at least first item)
+        if req.get('items') and len(req['items']) > 0:
+            for item in req['items']:
+                if item.get('part'):
+                    part_id = str(item['part'])
+                    if part_id in part_map:
+                        item['part_detail'] = part_map[part_id]
+        
+        # Populate product_detail if product_id exists
+        if req.get('product_id'):
+            product_id = str(req['product_id'])
+            if product_id in part_map:
+                req['product_detail'] = part_map[product_id]
+        
         # Get state info from state_id and set status
         # Note: fix_oid already converted state_id to string if it was ObjectId
         if req.get('state_id'):

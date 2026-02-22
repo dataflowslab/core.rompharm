@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Paper, Title, Text, Badge, Grid, Group, Stack } from '@mantine/core';
+import { Paper, Title, Text, Badge, Grid, Group, Stack, Button } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
@@ -77,6 +77,7 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
   const [availableStates, setAvailableStates] = useState<any[]>([]);
   const [stateOrder, setStateOrder] = useState<number>(0);
   const [isCanceled, setIsCanceled] = useState(false);
+  const [hasProductionData, setHasProductionData] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -120,26 +121,24 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
         setRefusalReason(lastProductionStatus.reason || '');
       }
       
-      // Initialize series from request items if no production data exists
+      // Initialize series from request batch_codes if no production data exists
       const items = request.items || [];
-      if (series.length === 0 && items.length > 0) {
-        // Get unique batch codes from items
-        const batchCodes = [...new Set(items.map((item: any) => item.batch_code).filter(Boolean))];
+      const batchCodes = request.batch_codes || [];
+      
+      if (series.length === 0 && batchCodes.length > 0) {
+        // Create a series for each batch code with materials from items
+        const initialSeries = batchCodes.map((batchCode: string) => ({
+          batch_code: batchCode,
+          materials: items.map((item: any) => ({
+            part: item.part,
+            part_name: item.part_detail?.name || item.part,
+            batch: '', // Material batch will be filled by user
+            received_qty: item.received_quantity || item.quantity || 0,
+            used_qty: 0
+          }))
+        }));
         
-        if (batchCodes.length > 0) {
-          const initialSeries = batchCodes.map(batchCode => ({
-            batch_code: batchCode,
-            materials: items.map((item: any) => ({
-              part: item.part,
-              part_name: item.part_detail?.name || item.part,
-              batch: item.batch_code || '',
-              received_qty: item.received_quantity || item.quantity || 0,
-              used_qty: 0
-            }))
-          }));
-          
-          setSeries(initialSeries);
-        }
+        setSeries(initialSeries);
       }
     } catch (error) {
       console.error('Failed to load request data:', error);
@@ -151,9 +150,13 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
       const response = await api.get(requestsApi.getProductionData(requestId));
       if (response.data && response.data.series) {
         setSeries(response.data.series);
+        setHasProductionData(true);
+      } else {
+        setHasProductionData(false);
       }
     } catch (error) {
       console.error('Failed to load production data:', error);
+      setHasProductionData(false);
     }
   };
 
@@ -227,6 +230,7 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
       });
       
       await loadProductionData();
+      setHasProductionData(true);
     } catch (error: any) {
       console.error('Failed to save production data:', error);
       notifications.show({
@@ -267,9 +271,12 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
         reason: refusalReason || undefined
       });
 
+      // Auto-sign after saving decision (like Reception flow)
+      await api.post(requestsApi.signProduction(requestId));
+
       notifications.show({
         title: t('Success'),
-        message: t('Status updated successfully'),
+        message: t('Decision saved and signed successfully'),
         color: 'green'
       });
 
@@ -277,10 +284,10 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
       await loadProductionFlow();
       onReload();
     } catch (error: any) {
-      console.error('Failed to update status:', error);
+      console.error('Failed to update status or sign:', error);
       notifications.show({
         title: t('Error'),
-        message: error.response?.data?.detail || t('Failed to update status'),
+        message: error.response?.data?.detail || t('Failed to save decision'),
         color: 'red'
       });
     } finally {
@@ -454,8 +461,8 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
           <UnusedMaterialsTable unusedMaterials={unusedMaterials} />
         )}
 
-        {/* Decision + Signatures */}
-        {flow && (
+        {/* Decision + Signatures - Only show after production data is saved */}
+        {flow && hasProductionData && (
           <Grid>
             {/* Left Column: Decision (1/3) */}
             <Grid.Col span={4}>
@@ -495,9 +502,32 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
 
         {!flow && (
           <Paper withBorder p="md">
-            <Text c="dimmed" ta="center" py="xl">
-              {t('Waiting for production flow to be created...')}
-            </Text>
+            <Stack align="center" gap="md" py="xl">
+              <Text c="dimmed" ta="center">
+                {t('Approval flow missing')}
+              </Text>
+              <Button
+                onClick={async () => {
+                  try {
+                    await api.post(requestsApi.createProductionFlow(requestId));
+                    notifications.show({
+                      title: t('Success'),
+                      message: t('Production flow created successfully'),
+                      color: 'green'
+                    });
+                    await loadProductionFlow();
+                  } catch (error: any) {
+                    notifications.show({
+                      title: t('Error'),
+                      message: error.response?.data?.detail || t('Failed to create production flow'),
+                      color: 'red'
+                    });
+                  }
+                }}
+              >
+                {t('Initiate approval flow now')}
+              </Button>
+            </Stack>
           </Paper>
         )}
       </Stack>

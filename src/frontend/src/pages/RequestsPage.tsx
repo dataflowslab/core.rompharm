@@ -44,6 +44,15 @@ interface BatchSelection {
 }
 
 
+interface RequestItem {
+  part: string;
+  quantity: number;
+  part_detail?: {
+    name: string;
+    IPN: string;
+  };
+}
+
 interface Request {
   _id: string;
   reference: string;
@@ -55,6 +64,11 @@ interface Request {
   status: string;
   issue_date: string;
   created_at: string;
+  items?: RequestItem[];
+  product_detail?: {
+    name: string;
+    IPN: string;
+  };
 }
 
 export function RequestsPage() {
@@ -422,6 +436,7 @@ export function RequestsPage() {
               <Table.Th>{t('Source')}</Table.Th>
               <Table.Th>{t('Destination')}</Table.Th>
               <Table.Th>{t('Line Items')}</Table.Th>
+              <Table.Th>{t('Products')}</Table.Th>
               <Table.Th>{t('Status')}</Table.Th>
               <Table.Th>{t('Issue Date')}</Table.Th>
               <Table.Th style={{ width: '100px' }}>{t('Actions')}</Table.Th>
@@ -441,6 +456,18 @@ export function RequestsPage() {
                 </Table.Td>
                 <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                   {request.line_items}
+                </Table.Td>
+                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                  {request.product_detail ? (
+                    <Text size="sm">{request.product_detail.name}</Text>
+                  ) : request.items && request.items.length > 0 ? (
+                    <Text size="sm">
+                      {request.items[0].part_detail?.name || request.items[0].part}
+                      {request.items.length > 1 && ` + ${request.items.length - 1} more`}
+                    </Text>
+                  ) : (
+                    <Text size="sm" c="dimmed">-</Text>
+                  )}
                 </Table.Td>
                 <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                   <Badge color={getStatusColor(request.status)}>{request.status}</Badge>
