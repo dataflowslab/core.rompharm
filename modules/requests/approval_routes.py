@@ -157,18 +157,37 @@ async def sign_request(
     
     # Check if user is authorized to sign
     username = current_user["username"]
+    is_staff = current_user.get("is_staff", False)
     can_sign = False
     
     # Check can_sign officers
     for officer in flow.get("can_sign_officers", []):
-        if officer["reference"] == user_id:
+        # Direct user_id match
+        if officer.get("reference") == user_id:
+            can_sign = True
+            break
+        # Fallback to username match (in case references are missing)
+        if officer.get("username") and officer.get("username") == username:
+            can_sign = True
+            break
+        # Role-based match (admin)
+        if officer.get("type") == "role" and officer.get("reference") == "admin" and is_staff:
             can_sign = True
             break
     
     # Check must_sign officers
     if not can_sign:
         for officer in flow.get("must_sign_officers", []):
-            if officer["reference"] == user_id:
+            # Direct user_id match
+            if officer.get("reference") == user_id:
+                can_sign = True
+                break
+            # Fallback to username match
+            if officer.get("username") and officer.get("username") == username:
+                can_sign = True
+                break
+            # Role-based match (admin)
+            if officer.get("type") == "role" and officer.get("reference") == "admin" and is_staff:
                 can_sign = True
                 break
     
@@ -461,6 +480,7 @@ async def sign_operations(
                 break
     
     if not can_sign:
+        print(f"[REQUESTS] User {username} (staff={is_staff}) not authorized to sign operations. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
         raise HTTPException(status_code=403, detail="You are not authorized to sign this operations flow")
     
     # Generate signature
@@ -732,11 +752,41 @@ async def update_operations_status(
         })
         
         print(f"[REQUESTS] Request {request_id} state_id updated to {state.get('name')} ({status})")
-        
+
+        # Auto-sign operations after decision save (if current user can sign)
+        auto_signed = False
+        auto_sign_error = None
+        try:
+            flow = db.approval_flows.find_one({
+                "object_type": "stock_request_operations",
+                "object_id": request_id
+            })
+            if flow:
+                existing_signature = next(
+                    (s for s in flow.get("signatures", []) if s.get("user_id") == str(current_user["_id"])),
+                    None
+                )
+                if not existing_signature:
+                    try:
+                        await sign_operations(request_id, request, current_user)
+                        auto_signed = True
+                    except HTTPException as e:
+                        # Don't fail decision save if sign fails
+                        if e.status_code == 400 and "already signed" in str(e.detail).lower():
+                            auto_signed = True
+                        else:
+                            auto_sign_error = e.detail
+                    except Exception as e:
+                        auto_sign_error = str(e)
+        except Exception as e:
+            auto_sign_error = str(e)
+
         return {
             "message": f"State updated to {state.get('name')}",
             "state_id": str(state_id),
-            "state_name": state.get('name')
+            "state_name": state.get('name'),
+            "auto_signed": auto_signed,
+            "auto_sign_error": auto_sign_error
         }
     except Exception as e:
         print(f"[REQUESTS] Error updating operations decision: {e}")

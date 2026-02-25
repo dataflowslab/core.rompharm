@@ -480,13 +480,29 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         reason: finalStatus === 'Refused' ? refusalReason : undefined
       });
 
+      let signed = false;
+      if (canUserSign()) {
+        try {
+          await api.post(requestsApi.signOperations(requestId));
+          signed = true;
+        } catch (error: any) {
+          console.error('Failed to auto-sign operations:', error);
+          notifications.show({
+            title: t('Warning'),
+            message: error.response?.data?.detail || t('Decision saved, but failed to sign'),
+            color: 'yellow'
+          });
+        }
+      }
+
       notifications.show({
         title: t('Success'),
-        message: t('Decision saved successfully'),
+        message: signed ? t('Decision saved and signed successfully') : t('Decision saved successfully'),
         color: 'green'
       });
 
       await loadRequestItems();
+      await loadOperationsFlow();
       onReload();
     } catch (error: any) {
       console.error('Failed to update status:', error);
