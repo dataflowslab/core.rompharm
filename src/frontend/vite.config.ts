@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 
 // Custom plugin to replace UTF-8 checkmarks with ASCII in console output
 function asciiOutputPlugin() {
@@ -43,9 +44,37 @@ function asciiOutputPlugin() {
   };
 }
 
+function versionedServiceWorker() {
+  const buildVersion = process.env.SW_VERSION
+    || process.env.BUILD_VERSION
+    || new Date().toISOString().replace(/[-:.TZ]/g, '');
+
+  return {
+    name: 'versioned-service-worker',
+    apply: 'build',
+    closeBundle() {
+      const distDir = path.resolve(__dirname, 'dist');
+      const swPath = path.resolve(distDir, 'sw.js');
+
+      if (fs.existsSync(swPath)) {
+        const swContents = fs.readFileSync(swPath, 'utf8');
+        const updated = swContents.replace(/__SW_VERSION__/g, buildVersion);
+        fs.writeFileSync(swPath, updated, 'utf8');
+      }
+
+      const versionPayload = {
+        version: buildVersion,
+        builtAt: new Date().toISOString()
+      };
+      const versionPath = path.resolve(distDir, 'version.json');
+      fs.writeFileSync(versionPath, JSON.stringify(versionPayload, null, 2), 'utf8');
+    }
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), asciiOutputPlugin()],
+  plugins: [react(), asciiOutputPlugin(), versionedServiceWorker()],
   base: '/web/',
   resolve: {
     alias: {

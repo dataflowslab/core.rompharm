@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-02-25 09:33:09
+**Last Updated:** 2026-02-27 12:46:34
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -18,14 +18,25 @@
 - `GET /api/forms/{slug}` - List all forms (requires administrator access)
 
 ### Sales
-- `GET /api/sales/customers` - Stub endpoint for customers list.
-- `GET /api/sales/order-statuses` - Stub endpoint for sales order statuses.
-- `GET /api/sales/sales-orders` - Stub endpoint for sales orders list.
-- `GET /api/sales/sales-orders/{order_id}` - Stub endpoint for sales order detail.
-- `GET /api/sales/sales-orders/{order_id}/attachments` - Stub endpoint for sales order attachments.
-- `GET /api/sales/sales-orders/{order_id}/items` - Stub endpoint for sales order items.
-- `GET /api/sales/sales-orders/{order_id}/shipments` - Stub endpoint for sales order shipments.
-- `PATCH /api/sales/sales-orders/{order_id}/status` - Stub endpoint for updating sales order status.
+- `GET /api/sales/customers`
+- `GET /api/sales/order-statuses`
+- `GET /api/sales/sales-orders`
+- `POST /api/sales/sales-orders`
+- `GET /api/sales/sales-orders/{order_id}`
+- `GET /api/sales/sales-orders/{order_id}/allocations`
+- `POST /api/sales/sales-orders/{order_id}/allocations`
+- `DELETE /api/sales/sales-orders/{order_id}/allocations/{allocation_id}`
+- `PUT /api/sales/sales-orders/{order_id}/allocations/{allocation_id}`
+- `GET /api/sales/sales-orders/{order_id}/attachments`
+- `GET /api/sales/sales-orders/{order_id}/items`
+- `POST /api/sales/sales-orders/{order_id}/items`
+- `DELETE /api/sales/sales-orders/{order_id}/items/{item_id}`
+- `PUT /api/sales/sales-orders/{order_id}/items/{item_id}`
+- `GET /api/sales/sales-orders/{order_id}/shipments`
+- `POST /api/sales/sales-orders/{order_id}/shipments`
+- `DELETE /api/sales/sales-orders/{order_id}/shipments/{shipment_id}`
+- `PUT /api/sales/sales-orders/{order_id}/shipments/{shipment_id}`
+- `PATCH /api/sales/sales-orders/{order_id}/status`
 
 ---
 

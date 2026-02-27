@@ -1,18 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   Container,
-  Title,
-  Paper,
-  Group,
-  Text,
-  Badge,
   Tabs,
   Loader,
   Center,
   Alert,
-  Button,
-  Table,
-  Select,
 } from '@mantine/core';
 import {
   IconAlertCircle,
@@ -20,21 +12,41 @@ import {
   IconPackage,
   IconTruck,
   IconPaperclip,
-  IconArrowLeft,
+  IconBoxSeam,
+  IconReceipt
 } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { salesService, SalesOrder, SalesOrderItem, Shipment } from '../services/sales';
+import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
+
+import { SalesHeader } from '../components/Sales/SalesDetailPage/SalesHeader';
+import { SalesDetailsTab } from '../components/Sales/SalesDetailPage/SalesDetailsTab';
+import { SalesItemsTab } from '../components/Sales/SalesDetailPage/SalesItemsTab';
+import { SalesAllocationTab } from '../components/Sales/SalesDetailPage/SalesAllocationTab';
+import { SalesDeliveryTab } from '../components/Sales/SalesDetailPage/SalesDeliveryTab';
+import { AttachmentsTable } from '../components/Common/AttachmentsTable';
+import { JournalTab } from '../components/Common/JournalTab';
+
+const SALES_APPROVAL_TEMPLATE = '69a1250e4e9208a5d9b2ac04';
+const SALES_DOCUMENT_TEMPLATE = 'X1KXDPICLQGZ';
 
 export function SalesDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
+
   const [order, setOrder] = useState<SalesOrder | null>(null);
   const [items, setItems] = useState<SalesOrderItem[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [allocations, setAllocations] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
+  const [approvalFlow, setApprovalFlow] = useState<any | null>(null);
+  const [allocModalItemId, setAllocModalItemId] = useState<string | null>(null);
+  const [allocModalOpen, setAllocModalOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>('details');
@@ -46,6 +58,7 @@ export function SalesDetailPage() {
   }, [id]);
 
   const loadOrderData = async () => {
+    if (!id) return;
     try {
       setLoading(true);
       setError(null);
@@ -58,11 +71,29 @@ export function SalesDetailPage() {
         salesService.getOrderStatuses(),
       ]);
 
+      // Ensure approval flow exists (lazy create)
+      let flow = await salesService.getApprovalFlow(id);
+      if (!flow) {
+        try {
+          flow = await salesService.createApprovalFlow(id, SALES_APPROVAL_TEMPLATE);
+        } catch (flowErr) {
+          console.error('Failed to create approval flow for sales order', flowErr);
+        }
+      }
+
+      let allocData: any[] = [];
+      try {
+        const res = await (salesService as any).getSalesOrderAllocations?.(id);
+        if (res && res.results) allocData = res.results;
+      } catch (e) { /* ignore */ }
+
       setOrder(orderData);
       setItems(itemsData.results || itemsData || []);
       setShipments(shipmentsData.results || shipmentsData || []);
       setAttachments(attachmentsData.results || attachmentsData || []);
       setStatuses(statusesData.statuses || []);
+      setApprovalFlow(flow || null);
+      setAllocations(allocData);
     } catch (err: any) {
       console.error('Failed to load sales order:', err);
       setError(err.response?.data?.detail || 'Failed to load sales order');
@@ -72,27 +103,50 @@ export function SalesDetailPage() {
   };
 
   const handleStatusChange = async (newStatus: string | null) => {
-    if (!newStatus || !order) return;
-
-    try {
-      await salesService.updateOrderStatus(order._id, Number(newStatus));
-      await loadOrderData();
-    } catch (err: any) {
-      console.error('Failed to update status:', err);
-      alert('Failed to update status');
-    }
+    // left for backward compatibility – status change now handled via issueOrder()
   };
 
-  const getStatusColor = (status: number) => {
-    switch (status) {
-      case 10: return 'yellow'; // Pending
-      case 20: return 'blue';   // In Progress
-      case 30: return 'green';  // Shipped
-      case 40: return 'red';    // Cancelled
-      case 50: return 'gray';   // Lost
-      case 60: return 'orange'; // Returned
-      default: return 'gray';
+  const issueOrder = () => {
+    if (!order) return;
+
+    const issuedStatus = statuses.find(
+      (s: any) => String(s.name || '').toLowerCase().includes('issued')
+    );
+    const stateId = issuedStatus?._id;
+
+    if (!stateId) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Cannot find the "Issued" status in configuration.'),
+        color: 'red',
+      });
+      return;
     }
+
+    modals.openConfirmModal({
+      title: t('Issue Sales Order'),
+      children: t('Are you sure you want to issue this sales order?'),
+      labels: { confirm: t('Issue'), cancel: t('Cancel') },
+      confirmProps: { color: 'green' },
+      onConfirm: async () => {
+        try {
+          await salesService.updateOrderStatus(order._id, undefined, stateId);
+          notifications.show({
+            title: t('Success'),
+            message: t('Sales order issued'),
+            color: 'green',
+          });
+          await loadOrderData();
+        } catch (err: any) {
+          console.error('Failed to issue order:', err);
+          notifications.show({
+            title: t('Error'),
+            message: err.response?.data?.detail || t('Failed to issue order'),
+            color: 'red',
+          });
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -113,42 +167,92 @@ export function SalesDetailPage() {
     );
   }
 
+  const isIssued =
+    (order.state_detail?.name || order.status_text || '').toLowerCase().includes('issued');
+  const isCompleted =
+    (order.state_detail?.name || order.status_text || '').toLowerCase().includes('finish') ||
+    (order.state_detail?.name || order.status_text || '').toLowerCase().includes('complete');
+
+  const findStateIdByName = (match: RegExp) => {
+    const s = statuses.find((st: any) => match.test((st.name || '').toLowerCase()));
+    return s?._id;
+  };
+
+  const getCompletionGaps = () => {
+    const gaps: string[] = [];
+    items.forEach((item) => {
+      const allocated = allocations
+        .filter((a: any) => a.order_item_id === item._id && a.shipment_id)
+        .reduce((sum: number, a: any) => sum + Number(a.quantity || 0), 0);
+      const need = Number(item.quantity || 0);
+      if (allocated + 1e-6 < need) {
+        gaps.push(`${item.part_detail?.name || item.part}: ${allocated}/${need}`);
+      }
+    });
+    return gaps;
+  };
+
+  const completeOrder = () => {
+    const gaps = getCompletionGaps();
+    if (gaps.length > 0) {
+      modals.open({
+        title: t('Cannot complete order'),
+        children: (
+          <div>
+            <p>{t('All items must be fully allocated to deliveries. Missing:')}</p>
+            <ul>
+              {gaps.map((g) => (
+                <li key={g}>{g}</li>
+              ))}
+            </ul>
+          </div>
+        ),
+      });
+      return;
+    }
+
+    const finishedStateId = findStateIdByName(/finish|complete/);
+    if (!finishedStateId) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Cannot find a Finished/Completed state in configuration.'),
+        color: 'red',
+      });
+      return;
+    }
+
+    modals.openConfirmModal({
+      title: t('Complete Sales Order'),
+      children: t('Are you sure you want to mark this order as completed?'),
+      labels: { confirm: t('Complete'), cancel: t('Cancel') },
+      confirmProps: { color: 'teal' },
+      onConfirm: async () => {
+        try {
+          await salesService.updateOrderStatus(order._id, undefined, finishedStateId);
+          notifications.show({ title: t('Success'), message: t('Order completed'), color: 'green' });
+          await loadOrderData();
+        } catch (err: any) {
+          console.error(err);
+          notifications.show({
+            title: t('Error'),
+            message: err.response?.data?.detail || t('Failed to complete order'),
+            color: 'red',
+          });
+        }
+      },
+    });
+  };
+
   return (
     <Container size="xl">
-      <Button
-        leftSection={<IconArrowLeft size={16} />}
-        variant="subtle"
-        onClick={() => navigate('/sales')}
-        mb="md"
-      >
-        {t('Back to Sales Orders')}
-      </Button>
-
-      <Paper shadow="sm" p="md" mb="md">
-        <Group justify="space-between" mb="md">
-          <div>
-            <Title order={2}>{order.reference}</Title>
-            <Text size="sm" c="dimmed">
-              {t('Customer')}: {order.customer_detail?.name || order.customer}
-            </Text>
-          </div>
-          <Group>
-            <Badge size="lg" color={getStatusColor(order.status)}>
-              {order.status_text || `Status ${order.status}`}
-            </Badge>
-            <Select
-              placeholder={t('Change status')}
-              data={statuses.map((s) => ({
-                value: String(s.value),
-                label: s.label,
-              }))}
-              value={String(order.status)}
-              onChange={handleStatusChange}
-              w={200}
-            />
-          </Group>
-        </Group>
-      </Paper>
+      <SalesHeader
+        order={order}
+        statuses={statuses}
+        onStatusChange={handleStatusChange}
+        issueAction={!isIssued ? issueOrder : undefined}
+        completeAction={isIssued && !isCompleted ? completeOrder : undefined}
+        isCompleted={isCompleted}
+      />
 
       <Tabs value={activeTab} onChange={setActiveTab}>
         <Tabs.List>
@@ -158,189 +262,77 @@ export function SalesDetailPage() {
           <Tabs.Tab value="items" leftSection={<IconPackage size={16} />}>
             {t('Items')} ({items.length})
           </Tabs.Tab>
-          <Tabs.Tab value="shipments" leftSection={<IconTruck size={16} />}>
-            {t('Shipments')} ({shipments.length})
+          <Tabs.Tab value="allocation" leftSection={<IconBoxSeam size={16} />}>
+            {t('Allocation')} ({allocations.length})
+          </Tabs.Tab>
+          <Tabs.Tab value="delivery" leftSection={<IconTruck size={16} />}>
+            {t('Delivery')} ({shipments.length})
           </Tabs.Tab>
           <Tabs.Tab value="attachments" leftSection={<IconPaperclip size={16} />}>
             {t('Attachments')} ({attachments.length})
           </Tabs.Tab>
+          <Tabs.Tab value="journal" leftSection={<IconReceipt size={16} />}>
+            {t('Journal')}
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="details" pt="md">
-          <Paper shadow="sm" p="md">
-            <Group grow>
-              <div>
-                <Text size="sm" c="dimmed">{t('Reference')}</Text>
-                <Text fw={500}>{order.reference}</Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed">{t('Customer')}</Text>
-                <Text fw={500}>{order.customer_detail?.name || order.customer}</Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed">{t('Status')}</Text>
-                <Badge color={getStatusColor(order.status)}>
-                  {order.status_text || `Status ${order.status}`}
-                </Badge>
-              </div>
-            </Group>
-
-            <Group grow mt="md">
-              <div>
-                <Text size="sm" c="dimmed">{t('Creation Date')}</Text>
-                <Text>{order.creation_date || '-'}</Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed">{t('Target Date')}</Text>
-                <Text>{order.target_date || '-'}</Text>
-              </div>
-              <div>
-                <Text size="sm" c="dimmed">{t('Shipment Date')}</Text>
-                <Text>{order.shipment_date || '-'}</Text>
-              </div>
-            </Group>
-
-            {order.description && (
-              <div style={{ marginTop: '1rem' }}>
-                <Text size="sm" c="dimmed">{t('Description')}</Text>
-                <Text>{order.description}</Text>
-              </div>
-            )}
-
-            {order.notes && (
-              <div style={{ marginTop: '1rem' }}>
-                <Text size="sm" c="dimmed">{t('Notes')}</Text>
-                <Text>{order.notes}</Text>
-              </div>
-            )}
-
-            {order.total_price && (
-              <div style={{ marginTop: '1rem' }}>
-                <Text size="sm" c="dimmed">{t('Total Price')}</Text>
-                <Text fw={700} size="lg">{order.total_price}</Text>
-              </div>
-            )}
-          </Paper>
+          <SalesDetailsTab
+            order={order}
+            approvalFlow={approvalFlow}
+            documentTemplate={SALES_DOCUMENT_TEMPLATE}
+            onRefresh={loadOrderData}
+          />
         </Tabs.Panel>
 
         <Tabs.Panel value="items" pt="md">
-          <Paper shadow="sm" p="md">
-            <Table striped withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('Part')}</Table.Th>
-                  <Table.Th>{t('Quantity')}</Table.Th>
-                  <Table.Th>{t('Allocated')}</Table.Th>
-                  <Table.Th>{t('Shipped')}</Table.Th>
-                  <Table.Th>{t('Price')}</Table.Th>
-                  <Table.Th>{t('Reference')}</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {items.length === 0 ? (
-                  <Table.Tr>
-                    <Table.Td colSpan={6} style={{ textAlign: 'center' }}>
-                      <Text c="dimmed">{t('No items')}</Text>
-                    </Table.Td>
-                  </Table.Tr>
-                ) : (
-                  items.map((item) => (
-                    <Table.Tr key={item._id}>
-                      <Table.Td>
-                        <div>
-                          <Text size="sm" fw={500}>
-                            {item.part_detail?.name || item.part}
-                          </Text>
-                          {item.part_detail?.IPN && (
-                            <Text size="xs" c="dimmed">
-                              {item.part_detail.IPN}
-                            </Text>
-                          )}
-                        </div>
-                      </Table.Td>
-                      <Table.Td>{item.quantity}</Table.Td>
-                      <Table.Td>{item.allocated || 0}</Table.Td>
-                      <Table.Td>{item.shipped || 0}</Table.Td>
-                      <Table.Td>
-                        {item.sale_price ? `${item.sale_price} ${item.sale_price_currency || ''}` : '-'}
-                      </Table.Td>
-                      <Table.Td>{item.reference || '-'}</Table.Td>
-                    </Table.Tr>
-                  ))
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
+          <SalesItemsTab
+            order={order}
+            items={items}
+            onItemUpdate={loadOrderData}
+            onAllocate={(itemId) => {
+              setActiveTab('allocation');
+              setAllocModalItemId(itemId);
+              setAllocModalOpen(true);
+            }}
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel value="shipments" pt="md">
-          <Paper shadow="sm" p="md">
-            <Table striped withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('Reference')}</Table.Th>
-                  <Table.Th>{t('Tracking Number')}</Table.Th>
-                  <Table.Th>{t('Shipment Date')}</Table.Th>
-                  <Table.Th>{t('Delivery Date')}</Table.Th>
-                  <Table.Th>{t('Notes')}</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {shipments.length === 0 ? (
-                  <Table.Tr>
-                    <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
-                      <Text c="dimmed">{t('No shipments')}</Text>
-                    </Table.Td>
-                  </Table.Tr>
-                ) : (
-                  shipments.map((shipment) => (
-                    <Table.Tr key={shipment._id}>
-                      <Table.Td>{shipment.reference || '-'}</Table.Td>
-                      <Table.Td>{shipment.tracking_number || '-'}</Table.Td>
-                      <Table.Td>{shipment.shipment_date || '-'}</Table.Td>
-                      <Table.Td>{shipment.delivery_date || '-'}</Table.Td>
-                      <Table.Td>{shipment.notes || '-'}</Table.Td>
-                    </Table.Tr>
-                  ))
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
+        <Tabs.Panel value="allocation" pt="md">
+          <SalesAllocationTab
+            order={order}
+            allocations={allocations}
+            items={items}
+            onAllocationUpdate={loadOrderData}
+            prefillItemId={allocModalItemId}
+            openExternalModal={allocModalOpen}
+            onExternalModalHandled={() => setAllocModalOpen(false)}
+          />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="delivery" pt="md">
+          <SalesDeliveryTab
+            order={order}
+            shipments={shipments}
+            items={items}
+            allocations={allocations}
+            onShipmentUpdate={loadOrderData}
+          />
         </Tabs.Panel>
 
         <Tabs.Panel value="attachments" pt="md">
-          <Paper shadow="sm" p="md">
-            <Table striped withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>{t('File')}</Table.Th>
-                  <Table.Th>{t('Comment')}</Table.Th>
-                  <Table.Th>{t('Upload Date')}</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {attachments.length === 0 ? (
-                  <Table.Tr>
-                    <Table.Td colSpan={3} style={{ textAlign: 'center' }}>
-                      <Text c="dimmed">{t('No attachments')}</Text>
-                    </Table.Td>
-                  </Table.Tr>
-                ) : (
-                  attachments.map((attachment) => (
-                    <Table.Tr key={attachment._id || attachment.attachment}>
-                      <Table.Td>
-                        <a href={attachment.attachment} target="_blank" rel="noopener noreferrer">
-                          {attachment.attachment?.split('/').pop() || 'File'}
-                        </a>
-                      </Table.Td>
-                      <Table.Td>{attachment.comment || '-'}</Table.Td>
-                      <Table.Td>{attachment.upload_date || '-'}</Table.Td>
-                    </Table.Tr>
-                  ))
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
+          <AttachmentsTable
+            attachments={attachments}
+            onDownload={(att) => console.log('Download', att)}
+            onDelete={(att) => console.log('Delete', att)}
+          />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="journal" pt="md">
+          <JournalTab
+            entityId={order._id}
+            entityType="sales_order"
+          />
         </Tabs.Panel>
       </Tabs>
     </Container>

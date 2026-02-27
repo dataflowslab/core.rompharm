@@ -389,7 +389,9 @@ export function ItemsTab({ orderId, items, orderCurrency, stockLocations, suppli
                 <Table.Td>{item.quantity}</Table.Td>
                 <Table.Td>{item.received || 0}</Table.Td>
                 <Table.Td>
-                  {item.purchase_price} {item.purchase_price_currency || orderCurrency}
+                  {typeof item.purchase_price === 'number'
+                    ? `${item.purchase_price.toFixed(2)} ${item.purchase_price_currency || orderCurrency}`
+                    : `${Number(item.purchase_price || 0).toFixed(2)} ${item.purchase_price_currency || orderCurrency}`}
                 </Table.Td>
                 <Table.Td>{item.destination_detail?.name || '-'}</Table.Td>
                 <Table.Td>{item.reference || '-'}</Table.Td>

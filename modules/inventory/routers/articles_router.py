@@ -85,6 +85,7 @@ async def get_parts(
     request: Request,
     search: Optional[str] = Query(None),
     supplier_id: Optional[str] = Query(None),
+    is_salable: Optional[bool] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     sort_by: Optional[str] = Query("name"),
@@ -120,6 +121,10 @@ async def get_parts(
                 return {'results': [], 'total': 0, 'skip': skip, 'limit': limit}
         except Exception as e:
             print(f"Invalid supplier_id: {supplier_id}, error: {e}")
+
+    # Filter by salable flag if requested
+    if is_salable is not None:
+        query['is_salable'] = bool(is_salable)
     
     # Build sort
     sort_direction = 1 if sort_order == 'asc' else -1

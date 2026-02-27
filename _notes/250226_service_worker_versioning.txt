@@ -1,0 +1,29 @@
+SESIUNE: 25.02.2026 - Service Worker cu versionare pe build
+================================================================
+
+SCOP
+- Versionare automata per build pentru cache/service worker
+- Control mai bun al versiunilor pe statii individuale
+
+MODIFICARI
+1) Service worker static in public
+- src/frontend/public/sw.js
+- Cache versionat pe build
+- Strategii cache: network-first (navigare), cache-first (assets), SWR (imagini)
+- Curatare cache-uri vechi si navigation preload
+
+2) Inregistrare service worker
+- src/frontend/src/serviceWorker.ts
+- src/frontend/src/main.tsx (registerServiceWorker())
+
+3) Vite build: injectare versiune + version.json
+- src/frontend/vite.config.ts
+- Plugin care inlocuieste __SW_VERSION__ in dist/sw.js
+- Scrie dist/version.json cu { version, builtAt }
+
+NOTES
+- Versiunea este generata automat daca nu exista SW_VERSION/BUILD_VERSION
+- Service worker ruleaza doar in productie
+
+================================================================
+STATUS: COMPLET
