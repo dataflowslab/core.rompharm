@@ -22,6 +22,8 @@ export interface Recipe {
     id?: number;
     rev: number;
     rev_date: string;
+    estimated_production_qty?: number | null;
+    estimated_um_id?: string | null;
     items: RecipeItem[];
     product_detail: PartDetail;
     created_at: string;

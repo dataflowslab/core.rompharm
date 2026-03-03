@@ -43,6 +43,15 @@ interface BatchOption {
   label: string;
   expiry_date?: string;
   quantity?: number;
+  location_name?: string;
+  location_id?: string;
+  location_parent_name?: string;
+  location_parent_id?: string;
+  state_name?: string;
+  state_id?: string;
+  state_color?: string;
+  is_transferable?: boolean;
+  is_requestable?: boolean;
 }
 
 interface Part {
@@ -57,6 +66,13 @@ interface ItemWithBatch {
   quantity: number;
   init_q: number;
   batch_code: string;
+  location_id?: string;
+  available_qty?: number;
+  source_qty?: number;
+  lot_state_name?: string;
+  lot_state_color?: string;
+  location_name?: string;
+  location_parent_name?: string;
   added_in_operations?: boolean;
 }
 
@@ -102,6 +118,27 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     loadAvailableStates();
   }, [requestId]);
 
+  const findBatchInfo = (options: BatchOption[], batchCode?: string, locationId?: string) => {
+    if (!batchCode) return undefined;
+    if (locationId) {
+      return options.find(opt => opt.value === batchCode && opt.location_id === locationId);
+    }
+    return options.find(opt => opt.value === batchCode);
+  };
+
+  const buildSourceQtyMap = (options: BatchOption[], sourceLocationId?: string) => {
+    const result: Record<string, number> = {};
+    if (!sourceLocationId) return result;
+    options.forEach(opt => {
+      const warehouseId = opt.location_parent_id || opt.location_id;
+      if (warehouseId && warehouseId === sourceLocationId) {
+        const key = opt.value;
+        result[key] = (result[key] || 0) + (opt.quantity || 0);
+      }
+    });
+    return result;
+  };
+
   const loadAvailableStates = async () => {
     try {
       const response = await api.get('/modules/requests/api/states');
@@ -138,6 +175,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     try {
       const response = await api.get(requestsApi.getRequest(requestId));
       setRequest(response.data);
+      const sourceLocation = response.data.source;
       
       // Load last status from status_log for operations scene
       const statusLog = response.data.status_log || [];
@@ -152,14 +190,42 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
       }
       
       const items = response.data.items || [];
-      const itemsData: ItemWithBatch[] = items.map((item: any) => ({
-        part: item.part,
-        part_name: item.part_detail?.name || String(item.part),
-        quantity: item.quantity,
-        init_q: item.init_q !== undefined ? item.init_q : item.quantity,
-        batch_code: item.batch_code || '',
-        added_in_operations: item.added_in_operations || false
-      }));
+      const uniqueParts = Array.from(new Set(items.map((item: any) => String(item.part))));
+      const batchOptionsByPart = new Map<string, BatchOption[]>();
+      await Promise.all(
+        uniqueParts.map(async (partId) => {
+          const options = await fetchBatchCodes(partId);
+          batchOptionsByPart.set(partId, options);
+        })
+      );
+
+      const sourceQtyByPart = new Map<string, Record<string, number>>();
+      uniqueParts.forEach(partId => {
+        const options = batchOptionsByPart.get(partId) || [];
+        sourceQtyByPart.set(partId, buildSourceQtyMap(options, sourceLocation));
+      });
+
+      const itemsData: ItemWithBatch[] = items.map((item: any) => {
+        const partId = String(item.part);
+        const options = batchOptionsByPart.get(partId) || [];
+        const batchInfo = findBatchInfo(options, item.batch_code, item.location_id);
+        const sourceQtyMap = sourceQtyByPart.get(partId) || {};
+        return {
+          part: item.part,
+          part_name: item.part_detail?.name || String(item.part),
+          quantity: item.quantity,
+          init_q: item.init_q !== undefined ? item.init_q : item.quantity,
+          batch_code: item.batch_code || '',
+          location_id: item.location_id,
+          available_qty: batchInfo?.quantity,
+          source_qty: batchInfo?.value ? sourceQtyMap[batchInfo.value] : sourceQtyMap[item.batch_code] || 0,
+          lot_state_name: batchInfo?.state_name,
+          lot_state_color: batchInfo?.state_color,
+          location_name: batchInfo?.location_name,
+          location_parent_name: batchInfo?.location_parent_name,
+          added_in_operations: item.added_in_operations || false
+        };
+      });
       
       const sortedItems = itemsData.sort((a, b) => {
         if (a.quantity === 0 && b.quantity !== 0) return 1;
@@ -193,7 +259,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
   const debouncedSearchParts = debounce(searchParts, 250);
 
-  const loadBatchCodes = async (partId: string) => {
+  const fetchBatchCodes = async (partId: string): Promise<BatchOption[]> => {
     try {
       console.log('[loadBatchCodes] Loading batch codes for part:', partId);
       const url = requestsApi.getPartBatchCodes(partId);
@@ -210,18 +276,26 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         quantity: batch.quantity,
         location_name: batch.location_name,
         location_id: batch.location_id,
+        location_parent_name: batch.location_parent_name,
+        location_parent_id: batch.location_parent_id,
         state_name: batch.state_name,
         state_id: batch.state_id,
+        state_color: batch.state_color,
         is_transferable: batch.is_transferable,
         is_requestable: batch.is_requestable
       }));
       
       console.log('[loadBatchCodes] Setting batch options:', options);
-      setBatchOptions(options);
+      return options;
     } catch (error) {
       console.error(`Failed to load batch codes for part ${partId}:`, error);
-      setBatchOptions([]);
+      return [];
     }
+  };
+
+  const loadBatchCodes = async (partId: string) => {
+    const options = await fetchBatchCodes(partId);
+    setBatchOptions(options);
   };
 
   const handlePartSelect = (partId: string | null) => {
@@ -306,12 +380,21 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
       }
 
       for (const selection of validSelections) {
+        const batchInfo = findBatchInfo(batchOptions, selection.batch_code, selection.location_id);
+        const sourceQtyMap = buildSourceQtyMap(batchOptions, request?.source);
         newItems.push({
           part: String(newItem.part),
           part_name: partDetail?.name || String(newItem.part),
           quantity: selection.requested_quantity,
           init_q: selection.requested_quantity,
           batch_code: selection.batch_code,
+          location_id: selection.location_id,
+          available_qty: batchInfo?.quantity,
+          source_qty: batchInfo?.value ? sourceQtyMap[batchInfo.value] : sourceQtyMap[selection.batch_code] || 0,
+          lot_state_name: batchInfo?.state_name,
+          lot_state_color: batchInfo?.state_color,
+          location_name: batchInfo?.location_name,
+          location_parent_name: batchInfo?.location_parent_name,
           added_in_operations: true
         });
       }
@@ -348,7 +431,9 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
 
   const handleQuantityChange = (index: number, value: number) => {
     const newItems = [...itemsWithBatch];
-    newItems[index].quantity = value;
+    const maxQty = newItems[index].available_qty;
+    const clampedValue = maxQty !== undefined ? Math.min(value, maxQty) : value;
+    newItems[index].quantity = clampedValue;
     setItemsWithBatch(newItems);
   };
 
@@ -361,6 +446,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
           quantity: item.quantity,
           init_q: item.init_q,
           batch_code: item.batch_code,
+          location_id: item.location_id || undefined,
           added_in_operations: item.added_in_operations || false
         }))
       });

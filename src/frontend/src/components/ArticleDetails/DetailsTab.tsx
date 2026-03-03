@@ -64,6 +64,7 @@ interface Article {
   system_um_id?: string;
   manufacturer_um_id?: string;
   total_delivery_time?: string;
+  loss_rate_threshold?: number;
 }
 
 interface DetailsTabProps {
@@ -281,6 +282,16 @@ export function DetailsTab({
               ]}
               value={article.selection_method || 'FIFO'}
               onChange={(value) => setArticle({ ...article, selection_method: value || 'FIFO' })}
+            />
+
+            <NumberInput
+              label="Loss rate threshold (%)"
+              placeholder="0"
+              value={article.loss_rate_threshold ?? 0}
+              onChange={(value) => setArticle({ ...article, loss_rate_threshold: Number(value) || 0 })}
+              min={0}
+              step={0.1}
+              decimalScale={2}
             />
           </Stack>
         </Paper>

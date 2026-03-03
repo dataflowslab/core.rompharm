@@ -258,6 +258,8 @@ def get_recipe(
         recipe["_id"] = str(recipe["_id"])
         if part_oid:
             recipe["part_id"] = str(part_oid)
+        if recipe.get("estimated_um_id") and isinstance(recipe.get("estimated_um_id"), ObjectId):
+            recipe["estimated_um_id"] = str(recipe.get("estimated_um_id"))
         recipe["product_detail"] = {
             "name": product.get("name", "Unknown Product") if product else "Unknown Product",
             "IPN": product.get("ipn", "") if product else ""
@@ -315,6 +317,67 @@ def create_recipe(
         )
         
         return {"_id": recipe_id, "message": "Recipe created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/api/recipes/{recipe_id}")
+def update_recipe_meta(
+    recipe_id: str,
+    data: dict,
+    request: Request,
+    current_user: dict = Depends(verify_token),
+    db = Depends(get_db)
+):
+    """Update recipe metadata (estimated production quantity and UM)."""
+    try:
+        recipe = db[RecipeModel.Config.collection_name].find_one({"_id": ObjectId(recipe_id)})
+        if not recipe:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+
+        update_doc = {
+            "updated_at": datetime.utcnow(),
+            "updated_by": current_user["username"]
+        }
+
+        if "estimated_production_qty" in data:
+            qty_val = data.get("estimated_production_qty")
+            if qty_val is None or qty_val == "":
+                update_doc["estimated_production_qty"] = None
+            else:
+                update_doc["estimated_production_qty"] = float(qty_val)
+
+        if "estimated_um_id" in data:
+            um_val = data.get("estimated_um_id")
+            if um_val:
+                update_doc["estimated_um_id"] = ObjectId(um_val)
+            else:
+                update_doc["estimated_um_id"] = None
+
+        if len(update_doc) == 2:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        db[RecipeModel.Config.collection_name].update_one(
+            {"_id": ObjectId(recipe_id)},
+            {"$set": update_doc}
+        )
+
+        log_recipe_change(
+            db=db,
+            recipe_id=recipe_id,
+            action="update_meta",
+            changes={
+                "estimated_production_qty": update_doc.get("estimated_production_qty"),
+                "estimated_um_id": str(update_doc.get("estimated_um_id")) if update_doc.get("estimated_um_id") else None
+            },
+            user=current_user["username"],
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+
+        return {"message": "Recipe updated successfully"}
     except HTTPException:
         raise
     except Exception as e:

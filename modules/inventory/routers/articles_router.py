@@ -34,6 +34,7 @@ class ArticleCreateRequest(BaseModel):
     is_testable: bool = True
     is_salable: bool = False
     is_active: bool = True
+    loss_rate_threshold: Optional[float] = None
 
 
 class ArticleUpdateRequest(BaseModel):
@@ -61,6 +62,7 @@ class ArticleUpdateRequest(BaseModel):
     manufacturer_ipn: Optional[str] = None
     system_um_id: Optional[str] = None
     total_delivery_time: Optional[str] = None
+    loss_rate_threshold: Optional[float] = None
 
 
 class ArticleSupplierRequest(BaseModel):
@@ -249,7 +251,8 @@ async def create_article(
         'storage_conditions': '',
         'regulated': False,
         'lotallexp': False,
-        'selection_method': 'FIFO'
+        'selection_method': 'FIFO',
+        'loss_rate_threshold': article_data.loss_rate_threshold
     }
     
     if article_data.default_location_id:
@@ -290,7 +293,7 @@ async def update_article(
         'is_active': 'is_active', 'storage_conditions': 'storage_conditions',
         'regulated': 'regulated', 'lotallexp': 'lotallexp',
         'selection_method': 'selection_method', 'manufacturer_ipn': 'manufacturer_ipn',
-        'total_delivery_time': 'total_delivery_time'
+        'total_delivery_time': 'total_delivery_time', 'loss_rate_threshold': 'loss_rate_threshold'
     }
     
     for field, db_field in field_mapping.items():

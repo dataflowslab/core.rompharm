@@ -54,6 +54,7 @@ interface Article {
   system_um_id?: string;
   manufacturer_um_id?: string;
   total_delivery_time?: string;
+  loss_rate_threshold?: number;
 }
 
 interface Location {

@@ -7,6 +7,29 @@ from bson import ObjectId
 from typing import Dict, Any
 
 
+FAILED_CANCELED_TOKENS = [
+    'failed', 'fail', 'canceled', 'cancelled', 'anulat', 'anulare',
+    'esuat', 'refuz', 'refused', 'rejected', 'neconform'
+]
+
+
+def _is_failed_or_canceled_state(db, state_id) -> bool:
+    if not state_id:
+        return False
+    try:
+        state_oid = ObjectId(state_id) if isinstance(state_id, str) else state_id
+        state = db.depo_requests_states.find_one({'_id': state_oid})
+        if not state:
+            return False
+        name = (state.get('name') or '').lower()
+        slug = (state.get('slug') or '').lower()
+        label = (state.get('label') or '').lower()
+        haystack = f"{name} {slug} {label}"
+        return any(token in haystack for token in FAILED_CANCELED_TOKENS)
+    except Exception:
+        return False
+
+
 async def execute_production_stock_operations(db, request_id: str, current_user: dict):
     """
     Execute stock operations after production approval
@@ -47,6 +70,11 @@ async def execute_production_stock_operations(db, request_id: str, current_user:
     for serie in series:
         batch_code = serie.get('batch_code')
         materials = serie.get('materials', [])
+        decision_status = serie.get('decision_status')
+
+        if _is_failed_or_canceled_state(db, decision_status):
+            print(f"[PRODUCTION] Skipping serie {batch_code} - decision is failed/canceled")
+            continue
         
         # Calculate produced quantity (sum of used materials or specified)
         produced_qty = serie.get('produced_qty', 0)
@@ -76,6 +104,7 @@ async def execute_production_stock_operations(db, request_id: str, current_user:
                 initial_quantity=produced_qty,
                 location_id=str(destination_location),
                 created_by=username,
+                expiry_date=serie.get('expiry_date'),
                 notes=f"Produced from request {request.get('reference')}",
                 document_type='PRODUCTION_ORDER',
                 document_id=str(request_id)
@@ -91,7 +120,9 @@ async def execute_production_stock_operations(db, request_id: str, current_user:
                             'request_id': str(request_id),
                             'serie_batch': batch_code,
                             'materials_used': materials_used,
-                            'produced_at': datetime.utcnow()
+                            'produced_at': datetime.utcnow(),
+                            'production_step_id': serie.get('production_step_id'),
+                            'decision_status': decision_status
                         }
                     }
                 }

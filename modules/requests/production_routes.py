@@ -8,9 +8,120 @@ from typing import List, Optional
 
 from src.backend.utils.db import get_db
 from src.backend.routes.auth import verify_admin
+from .utils import generate_request_reference
 
 
 router = APIRouter()
+
+
+FAILED_CANCELED_TOKENS = [
+    'failed', 'fail', 'canceled', 'cancelled', 'anulat', 'anulare',
+    'esuat', 'refuz', 'refused', 'rejected', 'neconform'
+]
+
+
+def _is_failed_or_canceled_state(state: Optional[dict]) -> bool:
+    if not state:
+        return False
+    name = (state.get('name') or '').lower()
+    slug = (state.get('slug') or '').lower()
+    label = (state.get('label') or '').lower()
+    haystack = f"{name} {slug} {label}"
+    return any(token in haystack for token in FAILED_CANCELED_TOKENS)
+
+
+def _get_state_by_id(db, state_id: Optional[str]) -> Optional[dict]:
+    if not state_id:
+        return None
+    try:
+        return db.depo_requests_states.find_one({'_id': ObjectId(state_id)})
+    except Exception:
+        return None
+
+
+def _build_unused_material_totals(series: list) -> dict:
+    totals = {}
+    for serie in series or []:
+        for material in serie.get('materials', []):
+            part_id = material.get('part')
+            if not part_id:
+                continue
+            part_key = str(part_id)
+            entry = totals.setdefault(part_key, {
+                'part_id': part_key,
+                'part_name': material.get('part_name', ''),
+                'total_received': 0.0,
+                'total_used': 0.0
+            })
+            entry['total_received'] += float(material.get('received_qty') or 0)
+            entry['total_used'] += float(material.get('used_qty') or 0)
+    return totals
+
+
+def _log_excessive_loss(
+    db,
+    request_doc: dict,
+    series: list,
+    unused_materials: list,
+    timestamp: datetime,
+    current_user: dict
+):
+    product_id = request_doc.get('product_id') or request_doc.get('recipe_part_id')
+    if not product_id:
+        return
+    try:
+        product_oid = ObjectId(product_id) if isinstance(product_id, str) else product_id
+    except Exception:
+        return
+
+    product = db.depo_parts.find_one({'_id': product_oid})
+    if not product:
+        return
+
+    threshold = product.get('loss_rate_threshold')
+    if threshold is None:
+        return
+
+    total_produced = 0.0
+    for serie in series or []:
+        total_produced += float(serie.get('produced_qty') or 0)
+
+    if total_produced <= 0:
+        return
+
+    return_qty_map = {}
+    for item in unused_materials or []:
+        part = item.get('part')
+        if part:
+            return_qty_map[str(part)] = float(item.get('return_qty') or 0)
+
+    totals = _build_unused_material_totals(series)
+    for part_id, data in totals.items():
+        unused_qty = data['total_received'] - data['total_used']
+        return_qty = return_qty_map.get(part_id, unused_qty)
+        loss_qty = unused_qty - return_qty
+
+        if loss_qty <= 0:
+            continue
+
+        loss_percent = (loss_qty / total_produced) * 100
+        if loss_percent <= threshold:
+            continue
+
+        db.logs.insert_one({
+            'collection': 'depo_requests',
+            'object_id': str(request_doc.get('_id')),
+            'action': 'production_loss_excess',
+            'request_reference': request_doc.get('reference'),
+            'part_id': part_id,
+            'part_name': data.get('part_name', ''),
+            'loss_quantity': loss_qty,
+            'loss_percent': loss_percent,
+            'loss_rate_threshold': threshold,
+            'user': current_user.get('username'),
+            'timestamp': timestamp,
+            'message': f"Excessive loss for {data.get('part_name', part_id)} on build order {request_doc.get('reference')}"
+        })
 
 
 @router.get("/{request_id}/production")
@@ -44,12 +155,30 @@ async def get_production_data(
                     # Convert part ObjectId to string if it's an ObjectId
                     if 'part' in material and isinstance(material['part'], ObjectId):
                         material['part'] = str(material['part'])
+            if 'production_step_id' in serie and isinstance(serie['production_step_id'], ObjectId):
+                serie['production_step_id'] = str(serie['production_step_id'])
+            if 'decision_status' in serie and isinstance(serie['decision_status'], ObjectId):
+                serie['decision_status'] = str(serie['decision_status'])
+            if 'signatures' in serie:
+                for signature in serie['signatures']:
+                    if 'user_id' in signature and isinstance(signature['user_id'], ObjectId):
+                        signature['user_id'] = str(signature['user_id'])
+                    if 'signed_at' in signature and isinstance(signature['signed_at'], datetime):
+                        signature['signed_at'] = signature['signed_at'].isoformat()
     
     # Convert datetime to ISO format
     if 'created_at' in production and isinstance(production['created_at'], datetime):
         production['created_at'] = production['created_at'].isoformat()
     if 'updated_at' in production and isinstance(production['updated_at'], datetime):
         production['updated_at'] = production['updated_at'].isoformat()
+
+    if 'unused_materials' in production and production['unused_materials']:
+        for item in production['unused_materials']:
+            if 'part' in item and isinstance(item['part'], ObjectId):
+                item['part'] = str(item['part'])
+
+    if 'return_order_id' in production and isinstance(production['return_order_id'], ObjectId):
+        production['return_order_id'] = str(production['return_order_id'])
     
     return production
 
@@ -71,6 +200,7 @@ async def save_production_data(
     # Get request body
     body = await request.json()
     series = body.get('series', [])  # Array of {batch_code, materials: [{part, batch, received_qty, used_qty}]}
+    unused_materials = body.get('unused_materials', None)
     
     # Check if production data exists
     existing = db.depo_production.find_one({'request_id': req_obj_id})
@@ -84,6 +214,8 @@ async def save_production_data(
             'updated_at': timestamp,
             'updated_by': current_user.get('username')
         }
+        if unused_materials is not None:
+            update_data['unused_materials'] = unused_materials
         
         db.depo_production.update_one(
             {'_id': existing['_id']},
@@ -96,6 +228,7 @@ async def save_production_data(
         production_data = {
             'request_id': req_obj_id,
             'series': series,
+            'unused_materials': unused_materials or [],
             'created_at': timestamp,
             'created_by': current_user.get('username'),
             'updated_at': timestamp,
@@ -111,6 +244,28 @@ async def save_production_data(
     except Exception as e:
         print(f"[PRODUCTION] Warning: Stock movements failed: {e}")
         # Don't fail the save if stock movements fail
+
+    # Loss threshold notification (log)
+    try:
+        request_doc = db.depo_requests.find_one({'_id': req_obj_id})
+        if request_doc:
+            if unused_materials is not None:
+                loss_unused_materials = unused_materials
+            elif existing:
+                loss_unused_materials = existing.get('unused_materials', [])
+            else:
+                loss_unused_materials = []
+
+            _log_excessive_loss(
+                db=db,
+                request_doc=request_doc,
+                series=series,
+                unused_materials=loss_unused_materials,
+                timestamp=timestamp,
+                current_user=current_user
+            )
+    except Exception as e:
+        print(f"[PRODUCTION] Warning: Failed to log loss notification: {e}")
     
     return {
         "success": True,
@@ -146,13 +301,13 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
     for serie in series:
         batch_code = serie.get('batch_code')
         materials = serie.get('materials', [])
+        decision_status = serie.get('decision_status')
+        if _is_failed_or_canceled_state(_get_state_by_id(db, decision_status)):
+            print(f"[PRODUCTION] Skipping serie {batch_code} - decision is failed/canceled")
+            continue
         
         if not batch_code:
             continue
-        
-        # Calculate total produced quantity for this batch
-        # (sum of used quantities or use a fixed quantity from request)
-        total_produced = 0
         
         # 1. Reduce stock for consumed materials
         for material in materials:
@@ -223,9 +378,8 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
                 print(f"[PRODUCTION] Warning: Could not consume full quantity for part {part_id}. Remaining: {remaining_qty}")
         
         # 2. Add stock for produced product with this batch code
-        # Calculate produced quantity (could be from request.product_quantity / number of batches)
-        num_batches = len(series)
-        produced_qty = request.get('product_quantity', 0) / num_batches if num_batches > 0 else 0
+        # Use explicit produced quantity from serie
+        produced_qty = float(serie.get('produced_qty') or 0)
         
         if produced_qty > 0:
             # Check if stock entry exists for this product + batch
@@ -265,6 +419,11 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
                     'request_id': ObjectId(request_id),
                     'request_reference': request.get('reference')
                 }
+                if serie.get('expiry_date'):
+                    try:
+                        new_stock['expiry_date'] = datetime.fromisoformat(str(serie.get('expiry_date')).replace('Z', '+00:00'))
+                    except Exception:
+                        new_stock['expiry_date'] = serie.get('expiry_date')
                 stocks_collection.insert_one(new_stock)
             
             # Log the production
@@ -517,6 +676,7 @@ async def sign_production(
     signature = {
         "user_id": user_id,
         "username": username,
+        "user_name": current_user.get('name') or username,
         "signed_at": timestamp,
         "signature_hash": signature_hash,
         "ip_address": request.client.host,
@@ -573,6 +733,227 @@ async def sign_production(
     flow["_id"] = str(flow["_id"])
     
     return flow
+
+
+@router.post("/{request_id}/production-series-sign")
+async def sign_production_series(
+    request_id: str,
+    request: Request,
+    current_user: dict = Depends(verify_admin)
+):
+    """Sign production series (per batch) using production flow officers"""
+    db = get_db()
+
+    body = await request.json()
+    batch_code = body.get('batch_code')
+    if not batch_code:
+        raise HTTPException(status_code=400, detail="batch_code is required")
+
+    try:
+        req_obj_id = ObjectId(request_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request ID")
+
+    production = db.depo_production.find_one({'request_id': req_obj_id})
+    if not production:
+        raise HTTPException(status_code=404, detail="Production data not found")
+
+    series = production.get('series', [])
+    serie_index = next((i for i, s in enumerate(series) if s.get('batch_code') == batch_code), None)
+    if serie_index is None:
+        raise HTTPException(status_code=404, detail="Production series not found")
+
+    serie = series[serie_index]
+    decision_status = serie.get('decision_status')
+    if not decision_status:
+        raise HTTPException(status_code=400, detail="Decision status is required before signing")
+
+    state = _get_state_by_id(db, decision_status)
+    is_failed_or_canceled = _is_failed_or_canceled_state(state)
+
+    if state and state.get('needs_comment') and not str(serie.get('decision_reason') or '').strip():
+        raise HTTPException(status_code=400, detail="Comment is required for this decision")
+
+    if not is_failed_or_canceled and not serie.get('expiry_date'):
+        raise HTTPException(status_code=400, detail="Expiration date is required")
+    if not serie.get('production_step_id'):
+        raise HTTPException(status_code=400, detail="Production step is required")
+
+    produced_qty = float(serie.get('produced_qty') or 0)
+    if produced_qty <= 0 and not is_failed_or_canceled:
+        raise HTTPException(status_code=400, detail="Produced quantity is required")
+
+    # Get production flow for permission checks
+    flow = db.approval_flows.find_one({
+        "object_type": "stock_request_production",
+        "object_id": request_id
+    })
+
+    if not flow:
+        raise HTTPException(status_code=404, detail="No production flow found")
+
+    user_id = str(current_user["_id"])
+    existing_signature = next(
+        (s for s in serie.get("signatures", []) if s.get("user_id") == user_id),
+        None
+    )
+    if existing_signature:
+        raise HTTPException(status_code=400, detail="You have already signed this series")
+
+    # Check authorization (same logic as production flow)
+    username = current_user["username"]
+    is_staff = current_user.get("is_staff", False)
+    can_sign = False
+
+    for officer in flow.get("can_sign_officers", []):
+        if officer.get("reference") == user_id:
+            can_sign = True
+            break
+        if officer.get("type") == "role" and officer.get("reference") == "admin" and (is_staff or username.lower().startswith('admin')):
+            can_sign = True
+            break
+
+    if not can_sign:
+        for officer in flow.get("must_sign_officers", []):
+            if officer.get("reference") == user_id:
+                can_sign = True
+                break
+            if officer.get("type") == "role" and officer.get("reference") == "admin" and (is_staff or username.lower().startswith('admin')):
+                can_sign = True
+                break
+
+    if not can_sign:
+        raise HTTPException(status_code=403, detail="You are not authorized to sign")
+
+    from src.backend.models.approval_flow_model import ApprovalFlowModel
+
+    timestamp = datetime.utcnow()
+    signature_hash = ApprovalFlowModel.generate_signature_hash(
+        user_id=user_id,
+        object_type="stock_request_production_series",
+        object_id=f"{request_id}:{batch_code}",
+        timestamp=timestamp
+    )
+
+    signature = {
+        "user_id": user_id,
+        "username": username,
+        "signed_at": timestamp,
+        "signature_hash": signature_hash,
+        "ip_address": request.client.host,
+        "user_agent": request.headers.get("user-agent")
+    }
+
+    serie_signatures = serie.get('signatures', [])
+    serie_signatures.append(signature)
+    serie['signatures'] = serie_signatures
+
+    series[serie_index] = serie
+    db.depo_production.update_one(
+        {'_id': production['_id']},
+        {'$set': {
+            'series': series,
+            'updated_at': timestamp,
+            'updated_by': current_user.get('username')
+        }}
+    )
+
+    return {'series': series}
+
+
+@router.post("/{request_id}/production-return-order")
+async def create_production_return_order(
+    request_id: str,
+    current_user: dict = Depends(verify_admin)
+):
+    """Create a return order for unused materials after production"""
+    db = get_db()
+
+    try:
+        req_obj_id = ObjectId(request_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request ID")
+
+    request_doc = db.depo_requests.find_one({'_id': req_obj_id})
+    if not request_doc:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    production = db.depo_production.find_one({'request_id': req_obj_id})
+    if not production:
+        raise HTTPException(status_code=404, detail="Production data not found")
+
+    if production.get('return_order_id'):
+        return {
+            'return_order_id': str(production.get('return_order_id')),
+            'return_order_reference': production.get('return_order_reference')
+        }
+
+    series = production.get('series', [])
+    unused_materials = production.get('unused_materials', [])
+
+    totals = _build_unused_material_totals(series)
+    return_qty_map = {}
+    for item in unused_materials:
+        part = item.get('part')
+        if part:
+            return_qty_map[str(part)] = float(item.get('return_qty') or 0)
+
+    items = []
+    for part_id, data in totals.items():
+        unused_qty = data['total_received'] - data['total_used']
+        return_qty = return_qty_map.get(part_id, unused_qty)
+        return_qty = max(0, min(return_qty, unused_qty))
+        if return_qty <= 0:
+            continue
+        items.append({
+            'part': part_id,
+            'quantity': return_qty,
+            'init_q': return_qty,
+            'notes': f"Return from production order {request_doc.get('reference')}"
+        })
+
+    if not items:
+        raise HTTPException(status_code=400, detail="No return quantities available")
+
+    source = request_doc.get('destination')
+    destination = request_doc.get('source')
+    if not source or not destination:
+        raise HTTPException(status_code=400, detail="Request missing source/destination")
+
+    reference = generate_request_reference(db)
+    timestamp = datetime.utcnow()
+
+    return_request_doc = {
+        'reference': reference,
+        'source': source,
+        'destination': destination,
+        'items': items,
+        'line_items': len(items),
+        'status': 'Pending',
+        'notes': f"Return order for request {request_doc.get('reference')}",
+        'issue_date': timestamp,
+        'created_at': timestamp,
+        'updated_at': timestamp,
+        'created_by': current_user.get('username')
+    }
+
+    result = db.depo_requests.insert_one(return_request_doc)
+    return_order_id = result.inserted_id
+
+    db.depo_production.update_one(
+        {'_id': production['_id']},
+        {'$set': {
+            'return_order_id': return_order_id,
+            'return_order_reference': reference,
+            'updated_at': timestamp,
+            'updated_by': current_user.get('username')
+        }}
+    )
+
+    return {
+        'return_order_id': str(return_order_id),
+        'return_order_reference': reference
+    }
 
 
 async def execute_production_stock_operations(db, request_id: str, current_user: dict):

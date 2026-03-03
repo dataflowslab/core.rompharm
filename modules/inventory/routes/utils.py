@@ -43,6 +43,7 @@ class ArticleCreateRequest(BaseModel):
     is_testable: bool = True
     is_salable: bool = False
     is_active: bool = True
+    loss_rate_threshold: Optional[float] = None
 
 
 class ArticleUpdateRequest(BaseModel):
@@ -72,6 +73,7 @@ class ArticleUpdateRequest(BaseModel):
     manufacturer_um_id: Optional[str] = None
     total_delivery_time: Optional[int] = None
     payment_condition: Optional[int] = None
+    loss_rate_threshold: Optional[float] = None
 
 
 class ArticleSupplierRequest(BaseModel):

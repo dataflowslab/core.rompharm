@@ -121,6 +121,15 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
             }
         
         allowed_state_ids = [state["_id"] for state in requestable_states]
+
+        state_info_map = {}
+        for state in requestable_states:
+            state_info_map[str(state["_id"])] = {
+                "name": state.get("name", ""),
+                "color": state.get("color", "gray"),
+                "is_transferable": state.get("is_transferable", False),
+                "is_requestable": state.get("is_requestable", False)
+            }
         
         # Query depo_stocks using part_id and allowed states
         stock_records = list(db.depo_stocks.find({
@@ -129,6 +138,33 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
         }))
         
         if stock_records:
+            location_ids = list(set([stock.get("location_id") for stock in stock_records if stock.get("location_id")]))
+            locations = list(db.depo_locations.find({"_id": {"$in": location_ids}})) if location_ids else []
+            location_map = {str(loc["_id"]): loc.get("code", loc.get("name", str(loc["_id"]))) for loc in locations}
+
+            parent_ids = set()
+            for loc in locations:
+                if loc.get("parent_id"):
+                    parent_ids.add(loc.get("parent_id"))
+            parents = list(db.depo_locations.find({"_id": {"$in": list(parent_ids)}})) if parent_ids else []
+            parent_map = {str(loc["_id"]): loc.get("code", loc.get("name", str(loc["_id"]))) for loc in parents}
+
+            location_parent_map = {}
+            for loc in locations:
+                loc_id_str = str(loc.get("_id"))
+                parent_id = loc.get("parent_id")
+                if parent_id:
+                    parent_id_str = str(parent_id)
+                    location_parent_map[loc_id_str] = {
+                        "parent_id": parent_id_str,
+                        "parent_name": parent_map.get(parent_id_str, parent_id_str)
+                    }
+                else:
+                    location_parent_map[loc_id_str] = {
+                        "parent_id": None,
+                        "parent_name": None
+                    }
+
             # Calculate totals
             total = sum(s.get("quantity", 0) for s in stock_records)
             
@@ -155,20 +191,24 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
                     else:
                         state_id_str = str(state_id) if state_id else ""
                     
-                    # Get state name
-                    state_name = ""
-                    if state_id:
-                        state = db.depo_stocks_states.find_one({"_id": state_id if isinstance(state_id, ObjectId) else ObjectId(state_id)})
-                        if state:
-                            state_name = state.get("name", "")
+                    # Get state info
+                    state_info = state_info_map.get(state_id_str, {})
+                    location_name = location_map.get(location_id, location_id)
+                    parent_info = location_parent_map.get(location_id, {})
                     
                     batches.append({
                         "batch_code": batch_code,
                         "supplier_batch_code": stock.get("supplier_batch_code", ""),
                         "quantity": quantity,
                         "location_id": location_id,
+                        "location_name": location_name,
+                        "location_parent_id": parent_info.get("parent_id"),
+                        "location_parent_name": parent_info.get("parent_name"),
                         "state_id": state_id_str,
-                        "state_name": state_name,
+                        "state_name": state_info.get("name", ""),
+                        "state_color": state_info.get("color", "gray"),
+                        "is_transferable": state_info.get("is_transferable", False),
+                        "is_requestable": state_info.get("is_requestable", False),
                         "expiry_date": stock.get("expiry_date", ""),
                         "batch_date": stock.get("batch_date", "")
                     })
@@ -313,8 +353,31 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
         
         # Get location names
         location_ids = list(set([stock.get("location_id") for stock in stock_records if stock.get("location_id")]))
-        locations = list(db.depo_locations.find({"_id": {"$in": location_ids}}))
+        locations = list(db.depo_locations.find({"_id": {"$in": location_ids}})) if location_ids else []
         location_map = {str(loc["_id"]): loc.get("code", loc.get("name", str(loc["_id"]))) for loc in locations}
+
+        parent_ids = set()
+        for loc in locations:
+            if loc.get("parent_id"):
+                parent_ids.add(loc.get("parent_id"))
+        parents = list(db.depo_locations.find({"_id": {"$in": list(parent_ids)}})) if parent_ids else []
+        parent_map = {str(loc["_id"]): loc.get("code", loc.get("name", str(loc["_id"]))) for loc in parents}
+
+        location_parent_map = {}
+        for loc in locations:
+            loc_id_str = str(loc.get("_id"))
+            parent_id = loc.get("parent_id")
+            if parent_id:
+                parent_id_str = str(parent_id)
+                location_parent_map[loc_id_str] = {
+                    "parent_id": parent_id_str,
+                    "parent_name": parent_map.get(parent_id_str, parent_id_str)
+                }
+            else:
+                location_parent_map[loc_id_str] = {
+                    "parent_id": None,
+                    "parent_name": None
+                }
         
         # Group by batch_code and location_id to show separate entries per location
         batch_location_map = {}
@@ -337,6 +400,7 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
                     
                     expiry = stock.get("expiry_date", "")
                     location_name = location_map.get(location_id, location_id)
+                    parent_info = location_parent_map.get(location_id, {})
                     
                     batch_location_map[key] = {
                         'batch_code': batch_code,
@@ -345,6 +409,8 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
                         'quantity': 0,
                         'location_id': location_id,
                         'location_name': location_name,
+                        'location_parent_id': parent_info.get("parent_id"),
+                        'location_parent_name': parent_info.get("parent_name"),
                         'state_id': state_id,
                         'state_name': state_info.get("name", ""),
                         'state_color': state_info.get("color", "gray"),

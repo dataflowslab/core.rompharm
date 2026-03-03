@@ -1,0 +1,13 @@
+Date: 2026-03-03
+Task: Production tab refactor + loss threshold field
+
+Summary:
+- Added loss_rate_threshold field to articles (backend models/routes + frontend details UI).
+- Refactored production flow data to store per-lot fields (produced_qty, expiry_date, production_step_id, decision_status/decision_reason, signatures) and unused_materials return quantities.
+- Added production steps endpoint and per-lot signing + return order creation endpoints.
+- Updated production UI to per-lot cards with consumptions + signatures, unused materials return/loss, loss notifications, print labels modal.
+- Updated production stock operations to respect produced_qty, expiry_date, and skip failed/canceled lots.
+
+Notes:
+- Return order is created as a new request (source=original destination, destination=original source) and stored back on production doc.
+- Excessive loss logs are written to db.logs and a UI warning is shown on save.

@@ -20,7 +20,10 @@ export const requestsApi = {
   getParts: () => `${API_PREFIX}/parts`,
   getPartStockInfo: (partId: string) => `${API_PREFIX}/parts/${partId}/stock-info`,
   getPartRecipe: (partId: string) => `${API_PREFIX}/parts/${partId}/recipe`,
-  getPartBatchCodes: (partId: string) => `${API_PREFIX}/parts/${partId}/batch-codes`,
+  getPartBatchCodes: (partId: string, locationId?: string) =>
+    locationId
+      ? `${API_PREFIX}/parts/${partId}/batch-codes?location_id=${locationId}`
+      : `${API_PREFIX}/parts/${partId}/batch-codes`,
   getPartBom: (partId: string) => `${API_PREFIX}/parts/${partId}/bom`,
 
   // Approval Flow
@@ -48,6 +51,9 @@ export const requestsApi = {
   createProductionFlow: (requestId: string) => `${API_PREFIX}/${requestId}/production-flow`,
   signProduction: (requestId: string) => `${API_PREFIX}/${requestId}/production-sign`,
   updateProductionStatus: (requestId: string) => `${API_PREFIX}/${requestId}/production-status`,
+  signProductionSeries: (requestId: string) => `${API_PREFIX}/${requestId}/production-series-sign`,
+  createProductionReturnOrder: (requestId: string) => `${API_PREFIX}/${requestId}/production-return-order`,
+  getProductionSteps: () => `${API_PREFIX}/production-steps`,
 
   // States
   getStates: () => `${API_PREFIX}/states`,

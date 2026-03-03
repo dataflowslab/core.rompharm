@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Paper, Title, Table, Button, Group, Modal, NumberInput, TextInput, ActionIcon, Text, Grid, Divider } from '@mantine/core';
+import { Paper, Title, Table, Button, Group, Modal, NumberInput, TextInput, ActionIcon, Text, Grid, Divider, Badge } from '@mantine/core';
 import { IconPlus, IconTrash, IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
@@ -16,6 +16,8 @@ interface BatchOption {
   quantity?: number;
   location_name?: string;
   location_id?: string;
+  location_parent_name?: string;
+  location_parent_id?: string;
   state_name?: string;
   state_id?: string;
   state_color?: string;
@@ -34,7 +36,11 @@ interface ItemWithBatch {
   part_name?: string;
   quantity: number;
   batch_code?: string;
+  location_id?: string;
   notes?: string;
+  available_qty?: number;
+  lot_state_name?: string;
+  lot_state_color?: string;
   batch_options: BatchOption[];
 }
 
@@ -69,6 +75,23 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
     checkEditability();
   }, [requestId]);
 
+  const getStateColor = (stateName?: string) => {
+    if (!stateName) return 'gray';
+    const lowerName = stateName.toLowerCase();
+    if (lowerName.includes('disponibil') || lowerName.includes('available')) return 'green';
+    if (lowerName.includes('rezervat') || lowerName.includes('reserved')) return 'blue';
+    if (lowerName.includes('blocat') || lowerName.includes('blocked')) return 'red';
+    return 'gray';
+  };
+
+  const findBatchInfo = (options: BatchOption[], batchCode?: string, locationId?: string) => {
+    if (!batchCode) return undefined;
+    if (locationId) {
+      return options.find(opt => opt.value === batchCode && opt.location_id === locationId);
+    }
+    return options.find(opt => opt.value === batchCode);
+  };
+
   const loadItems = async () => {
     try {
       const response = await api.get(requestsApi.getRequest(requestId));
@@ -79,12 +102,17 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
       const itemsWithBatch = await Promise.all(
         itemsData.map(async (item: any) => {
           const batchOptions = await loadBatchCodes(item.part, sourceLocation);
+          const batchInfo = findBatchInfo(batchOptions, item.batch_code, item.location_id);
           return {
             part: item.part,
             part_name: item.part_detail?.name || String(item.part),
             quantity: item.quantity,
             batch_code: item.batch_code || '',
+            location_id: item.location_id,
             notes: item.notes || '',
+            available_qty: batchInfo?.quantity,
+            lot_state_name: batchInfo?.state_name,
+            lot_state_color: batchInfo?.state_color,
             batch_options: batchOptions
           };
         })
@@ -123,6 +151,8 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
         quantity: batch.quantity,
         location_name: batch.location_name,
         location_id: batch.location_id,
+        location_parent_name: batch.location_parent_name,
+        location_parent_id: batch.location_parent_id,
         state_name: batch.state_name,
         state_id: batch.state_id,
         state_color: batch.state_color,
@@ -205,6 +235,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
           part_name: partDetail?.name || String(newItem.part),
           quantity: selection.requested_quantity,
           batch_code: selection.batch_code,
+          location_id: selection.location_id,
           notes: newItem.notes,
           batch_options: batchOptions
         });
@@ -239,7 +270,9 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
   
   const handleQuantityChange = (index: number, value: number) => {
     const updatedItems = [...items];
-    updatedItems[index].quantity = value;
+    const maxQty = updatedItems[index].available_qty;
+    const clampedValue = maxQty !== undefined ? Math.min(value, maxQty) : value;
+    updatedItems[index].quantity = clampedValue;
     setItems(updatedItems);
   };
 
@@ -251,6 +284,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
           part: item.part,
           quantity: item.quantity,
           batch_code: item.batch_code,
+          location_id: item.location_id || undefined,
           notes: item.notes
         }))
       });
@@ -313,6 +347,8 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
           <Table.Tr>
             <Table.Th>{t('Description')}</Table.Th>
             <Table.Th style={{ width: '250px' }}>{t('Batch Code')}</Table.Th>
+            <Table.Th style={{ width: '140px' }}>{t('State')}</Table.Th>
+            <Table.Th style={{ width: '120px' }}>{t('Available')}</Table.Th>
             <Table.Th style={{ width: '120px' }}>{t('Requested Qty')}</Table.Th>
             {isEditable && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
           </Table.Tr>
@@ -320,7 +356,7 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
         <Table.Tbody>
           {items.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={isEditable ? 4 : 3}>
+              <Table.Td colSpan={isEditable ? 6 : 5}>
                 <Text size="sm" c="dimmed" ta="center">{t('No items')}</Text>
               </Table.Td>
             </Table.Tr>
@@ -332,11 +368,32 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
                   {item.batch_code || '-'}
                 </Table.Td>
                 <Table.Td>
+                  {item.batch_code ? (
+                    <Badge
+                      size="sm"
+                      color={item.lot_state_color || getStateColor(item.lot_state_name)}
+                      variant="filled"
+                    >
+                      {item.lot_state_name || t('Unknown')}
+                    </Badge>
+                  ) : (
+                    <Text size="sm" c="dimmed">-</Text>
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  {item.batch_code ? (
+                    <Text size="sm" fw={500}>{item.available_qty ?? '-'}</Text>
+                  ) : (
+                    <Text size="sm" c="dimmed">-</Text>
+                  )}
+                </Table.Td>
+                <Table.Td>
                   {isEditable ? (
                     <NumberInput
                       value={item.quantity}
-                      onChange={(value) => handleQuantityChange(index, Number(value) || 1)}
-                      min={1}
+                      onChange={(value) => handleQuantityChange(index, Number(value) || 0)}
+                      min={0}
+                      max={item.available_qty}
                       size="xs"
                     />
                   ) : (

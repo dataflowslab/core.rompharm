@@ -264,7 +264,8 @@ async def create_article(
         'storage_conditions': '',
         'regulated': False,
         'lotallexp': False,
-        'selection_method': 'FIFO'
+        'selection_method': 'FIFO',
+        'loss_rate_threshold': article_data.loss_rate_threshold
     }
     
     if article_data.default_location_id:
@@ -302,7 +303,7 @@ async def update_article(
                   'minimum_stock', 'conversion_modifier', 'is_component', 'is_assembly', 
                   'is_testable', 'is_salable', 'is_active', 'storage_conditions', 
                   'regulated', 'lotallexp', 'selection_method', 'manufacturer_ipn', 
-                  'total_delivery_time', 'payment_condition']:
+                  'total_delivery_time', 'payment_condition', 'loss_rate_threshold']:
         value = getattr(article_data, field, None)
         if value is not None:
             update_doc[field] = value

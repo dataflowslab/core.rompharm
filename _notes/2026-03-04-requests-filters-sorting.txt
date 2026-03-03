@@ -1,0 +1,6 @@
+Summary:
+- Added filter bar (search, date range, status) and column sorting for Requests list.
+- Requests list now uses server-side filters and client-side sort.
+
+Files:
+- src/frontend/src/pages/RequestsPage.tsx

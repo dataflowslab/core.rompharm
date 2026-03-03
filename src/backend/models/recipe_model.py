@@ -38,6 +38,8 @@ class RecipeModel(BaseModel):
     part_id: str = Field(..., description="Product ObjectId")
     id: Optional[int] = Field(None, description="Legacy product ID")
     items: List[RecipeItem] = Field(default_factory=list, description="Recipe items")
+    estimated_production_qty: Optional[float] = Field(None, description="Estimated production quantity")
+    estimated_um_id: Optional[str] = Field(None, description="Estimated production UM ObjectId")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     created_by: str
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -58,6 +60,8 @@ class RecipeModel(BaseModel):
             "items": [],
             "rev": 0,
             "rev_date": datetime.utcnow(),
+            "estimated_production_qty": None,
+            "estimated_um_id": None,
             "created_at": datetime.utcnow(),
             "created_by": created_by,
             "updated_at": datetime.utcnow(),

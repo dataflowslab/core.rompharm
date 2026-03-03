@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Paper, Title, Table, Button, Group, Modal, Grid, Select, NumberInput, Textarea, Badge, ActionIcon, Text } from '@mantine/core';
-import { IconPlus, IconEye, IconTrash } from '@tabler/icons-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Paper, Title, Table, Button, Group, Modal, Grid, Select, NumberInput, Textarea, Badge, ActionIcon, Text, TextInput, LoadingOverlay } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
+import { IconPlus, IconEye, IconTrash, IconSearch, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
@@ -29,6 +30,8 @@ interface BatchOption {
   quantity: number;
   location_name: string;
   location_id: string;
+  location_parent_name?: string;
+  location_parent_id?: string;
   state_name: string;
   state_id: string;
   state_color?: string;
@@ -47,6 +50,7 @@ interface BatchSelection {
 interface RequestItem {
   part: string;
   quantity: number;
+  location_id?: string;
   part_detail?: {
     name: string;
     IPN: string;
@@ -71,6 +75,8 @@ interface Request {
   };
 }
 
+type SortKey = 'reference' | 'source' | 'destination' | 'line_items' | 'product' | 'status' | 'issue_date';
+
 export function RequestsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -88,6 +94,16 @@ export function RequestsPage() {
   const [componentsData, setComponentsData] = useState<any[]>([]);
   const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
   const [batchSelections, setBatchSelections] = useState<BatchSelection[]>([]);
+
+  const [states, setStates] = useState<any[]>([]);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({
+    key: 'issue_date',
+    direction: 'desc'
+  });
   
   const [formData, setFormData] = useState({
     source: '',
@@ -98,13 +114,29 @@ export function RequestsPage() {
   });
 
   useEffect(() => {
-    loadRequests();
     loadStockLocations();
+    loadStates();
   }, []);
+
+  useEffect(() => {
+    const isDateRangeValid =
+      (dateRange[0] === null && dateRange[1] === null) ||
+      (dateRange[0] !== null && dateRange[1] !== null);
+
+    if (isDateRangeValid) {
+      loadRequests();
+    }
+  }, [search, statusFilter, dateRange]);
 
   const loadRequests = async () => {
     try {
-      const response = await api.get(requestsApi.getRequests());
+      setLoading(true);
+      const params: any = {};
+      if (search) params.search = search;
+      if (statusFilter) params.state_id = statusFilter;
+      if (dateRange[0]) params.date_from = dateRange[0].toISOString().split('T')[0];
+      if (dateRange[1]) params.date_to = dateRange[1].toISOString().split('T')[0];
+      const response = await api.get(requestsApi.getRequests(), { params });
       setRequests(response.data.results || []);
     } catch (error) {
       console.error('Failed to load requests:', error);
@@ -127,6 +159,19 @@ export function RequestsPage() {
       console.error('Failed to load stock locations:', error);
     }
   };
+
+  const loadStates = async () => {
+    try {
+      const response = await api.get(requestsApi.getStates());
+      setStates(response.data.results || []);
+    } catch (error) {
+      console.error('Failed to load request states:', error);
+    }
+  };
+
+  const debouncedSearch = debounce((value: string) => {
+    setSearch(value);
+  }, 300);
 
   const searchParts = async (query: string) => {
     if (!query || query.length < 2) {
@@ -260,6 +305,7 @@ export function RequestsPage() {
                 quantity: a.quantity,
                 init_q: a.quantity,
                 batch_code: a.batch_code,
+                location_id: a.location_id || undefined,
                 notes: formData.notes || undefined
               });
             });
@@ -301,6 +347,7 @@ export function RequestsPage() {
               quantity: sel.requested_quantity,
               init_q: sel.requested_quantity,
               batch_code: sel.batch_code,
+              location_id: sel.location_id || undefined,
               notes: formData.notes || undefined
             });
           });
@@ -415,6 +462,74 @@ export function RequestsPage() {
     }
   };
 
+  const getProductName = (request: Request) => {
+    if (request.product_detail?.name) return request.product_detail.name;
+    if (request.items && request.items.length > 0) {
+      return request.items[0].part_detail?.name || String(request.items[0].part || '');
+    }
+    return '';
+  };
+
+  const sortedRequests = useMemo(() => {
+    const sorted = [...requests];
+    const { key, direction } = sortConfig;
+    const dir = direction === 'asc' ? 1 : -1;
+
+    sorted.sort((a, b) => {
+      const getValue = (req: Request) => {
+        switch (key) {
+          case 'reference':
+            return req.reference || '';
+          case 'source':
+            return req.source_name || String(req.source || '');
+          case 'destination':
+            return req.destination_name || String(req.destination || '');
+          case 'line_items':
+            return req.line_items || 0;
+          case 'product':
+            return getProductName(req);
+          case 'status':
+            return req.status || '';
+          case 'issue_date':
+            return req.issue_date || req.created_at || '';
+          default:
+            return '';
+        }
+      };
+
+      const aVal = getValue(a);
+      const bVal = getValue(b);
+
+      if (key === 'line_items') {
+        return (Number(aVal) - Number(bVal)) * dir;
+      }
+
+      if (key === 'issue_date') {
+        const aTime = aVal ? new Date(aVal as string).getTime() : 0;
+        const bTime = bVal ? new Date(bVal as string).getTime() : 0;
+        return (aTime - bTime) * dir;
+      }
+
+      return String(aVal).localeCompare(String(bVal), undefined, { sensitivity: 'base' }) * dir;
+    });
+
+    return sorted;
+  }, [requests, sortConfig]);
+
+  const toggleSort = (key: SortKey) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />;
+  };
+
   return (
     <Paper p="md">
       <Group justify="space-between" mb="md">
@@ -424,82 +539,154 @@ export function RequestsPage() {
         </Button>
       </Group>
 
-      {loading ? (
-        <Text>{t('Loading...')}</Text>
-      ) : requests.length === 0 ? (
-        <Text size="sm" c="dimmed">{t('No requests found')}</Text>
-      ) : (
-        <Table striped withTableBorder withColumnBorders>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('Reference')}</Table.Th>
-              <Table.Th>{t('Source')}</Table.Th>
-              <Table.Th>{t('Destination')}</Table.Th>
-              <Table.Th>{t('Line Items')}</Table.Th>
-              <Table.Th>{t('Products')}</Table.Th>
-              <Table.Th>{t('Status')}</Table.Th>
-              <Table.Th>{t('Issue Date')}</Table.Th>
-              <Table.Th style={{ width: '100px' }}>{t('Actions')}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {requests.map((request) => (
-              <Table.Tr key={request._id} style={{ cursor: 'pointer' }}>
-                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
-                  {request.reference}
-                </Table.Td>
-                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
-                  {request.source_name || request.source}
-                </Table.Td>
-                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
-                  {request.destination_name || request.destination}
-                </Table.Td>
-                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
-                  {request.line_items}
-                </Table.Td>
-                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
-                  {request.product_detail ? (
-                    <Text size="sm">{request.product_detail.name}</Text>
-                  ) : request.items && request.items.length > 0 ? (
-                    <Text size="sm">
-                      {request.items[0].part_detail?.name || request.items[0].part}
-                      {request.items.length > 1 && ` + ${request.items.length - 1} more`}
-                    </Text>
-                  ) : (
-                    <Text size="sm" c="dimmed">-</Text>
-                  )}
-                </Table.Td>
-                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
-                  <Badge color={getStatusColor(request.status)}>{request.status}</Badge>
-                </Table.Td>
-                <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
-                  {formatDate(request.issue_date)}
-                </Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <ActionIcon
-                      variant="subtle"
-                      color="blue"
-                      onClick={() => navigate(`/requests/${request._id}`)}
-                      title={t('View')}
-                    >
-                      <IconEye size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="subtle"
-                      color="red"
-                      onClick={() => handleDelete(request)}
-                      title={t('Delete')}
-                    >
-                      <IconTrash size={16} />
-                    </ActionIcon>
+      <Paper p="md" mb="md">
+        <Group>
+          <TextInput
+            placeholder={t('Search by reference, notes, batch code...')}
+            leftSection={<IconSearch size={16} />}
+            value={searchInput}
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setSearchInput(value);
+              debouncedSearch(value);
+            }}
+            style={{ flex: 1 }}
+          />
+          <Select
+            placeholder={t('Any status')}
+            data={[
+              { value: '', label: t('Any status') },
+              ...states.map(state => ({ value: state._id, label: state.name }))
+            ]}
+            value={statusFilter}
+            onChange={(value) => setStatusFilter(value || '')}
+            searchable
+            clearable
+            style={{ minWidth: '180px' }}
+          />
+          <DatePickerInput
+            type="range"
+            placeholder={t('Date range')}
+            value={dateRange}
+            onChange={setDateRange}
+            clearable
+            style={{ minWidth: '220px' }}
+          />
+        </Group>
+      </Paper>
+
+      <Paper p="md" pos="relative">
+        <LoadingOverlay visible={loading} />
+        {!loading && sortedRequests.length === 0 ? (
+          <Text size="sm" c="dimmed">{t('No requests found')}</Text>
+        ) : (
+          <Table striped withTableBorder withColumnBorders>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th onClick={() => toggleSort('reference')} style={{ cursor: 'pointer' }}>
+                  <Group gap={6}>
+                    <span>{t('Reference')}</span>
+                    {renderSortIcon('reference')}
                   </Group>
-                </Table.Td>
+                </Table.Th>
+                <Table.Th onClick={() => toggleSort('source')} style={{ cursor: 'pointer' }}>
+                  <Group gap={6}>
+                    <span>{t('Source')}</span>
+                    {renderSortIcon('source')}
+                  </Group>
+                </Table.Th>
+                <Table.Th onClick={() => toggleSort('destination')} style={{ cursor: 'pointer' }}>
+                  <Group gap={6}>
+                    <span>{t('Destination')}</span>
+                    {renderSortIcon('destination')}
+                  </Group>
+                </Table.Th>
+                <Table.Th onClick={() => toggleSort('line_items')} style={{ cursor: 'pointer' }}>
+                  <Group gap={6}>
+                    <span>{t('Line Items')}</span>
+                    {renderSortIcon('line_items')}
+                  </Group>
+                </Table.Th>
+                <Table.Th onClick={() => toggleSort('product')} style={{ cursor: 'pointer' }}>
+                  <Group gap={6}>
+                    <span>{t('Products')}</span>
+                    {renderSortIcon('product')}
+                  </Group>
+                </Table.Th>
+                <Table.Th onClick={() => toggleSort('status')} style={{ cursor: 'pointer' }}>
+                  <Group gap={6}>
+                    <span>{t('Status')}</span>
+                    {renderSortIcon('status')}
+                  </Group>
+                </Table.Th>
+                <Table.Th onClick={() => toggleSort('issue_date')} style={{ cursor: 'pointer' }}>
+                  <Group gap={6}>
+                    <span>{t('Issue Date')}</span>
+                    {renderSortIcon('issue_date')}
+                  </Group>
+                </Table.Th>
+                <Table.Th style={{ width: '100px' }}>{t('Actions')}</Table.Th>
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      )}
+            </Table.Thead>
+            <Table.Tbody>
+              {sortedRequests.map((request) => (
+                <Table.Tr key={request._id} style={{ cursor: 'pointer' }}>
+                  <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                    {request.reference}
+                  </Table.Td>
+                  <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                    {request.source_name || request.source}
+                  </Table.Td>
+                  <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                    {request.destination_name || request.destination}
+                  </Table.Td>
+                  <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                    {request.line_items}
+                  </Table.Td>
+                  <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                    {request.product_detail ? (
+                      <Text size="sm">{request.product_detail.name}</Text>
+                    ) : request.items && request.items.length > 0 ? (
+                      <Text size="sm">
+                        {request.items[0].part_detail?.name || request.items[0].part}
+                        {request.items.length > 1 && ` + ${request.items.length - 1} more`}
+                      </Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                    <Badge color={getStatusColor(request.status)}>{request.status}</Badge>
+                  </Table.Td>
+                  <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                    {formatDate(request.issue_date)}
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <ActionIcon
+                        variant="subtle"
+                        color="blue"
+                        onClick={() => navigate(`/requests/${request._id}`)}
+                        title={t('View')}
+                      >
+                        <IconEye size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={() => handleDelete(request)}
+                        title={t('Delete')}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        )}
+      </Paper>
 
       {/* Create Request Modal */}
       <Modal

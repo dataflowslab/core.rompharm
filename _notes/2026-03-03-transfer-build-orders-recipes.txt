@@ -1,0 +1,10 @@
+Summary:
+- Requests transfer UI: items + operations now show lot state, available qty, source qty, warehouse and location; quantities are clamped to available. New request and recipe allocations carry location_id.
+- Added location_id to request items (backend + frontend) and improved part name resolution for legacy numeric IDs.
+- Batch/stock info now includes state color and location parent details.
+- Build Orders page now filters by production, with search/date/status/extra filters (Open orders).
+- Recipe detail now includes estimated production quantity + UM fields with save.
+
+Files touched (high level):
+- Backend: modules/requests/models.py, modules/requests/routes.py, modules/requests/services.py, src/backend/models/recipe_model.py, src/backend/routes/recipes.py
+- Frontend: Requests items/operations/components tables, BuildOrdersPage, Recipes detail tab, Requests page, requests API

@@ -54,6 +54,22 @@ async def get_request_states(
     return {"results": states}
 
 
+@router.get("/production-steps")
+async def get_production_steps(
+    current_user: dict = Depends(verify_admin),
+    db = Depends(get_db)
+):
+    """Get list of production steps from MongoDB depo_production_steps"""
+    steps_collection = db['depo_production_steps']
+    steps = list(steps_collection.find().sort([('order', 1), ('name', 1)]))
+
+    for step in steps:
+        if '_id' in step:
+            step['_id'] = str(step['_id'])
+
+    return {"results": steps}
+
+
 @router.get("/stock-locations")
 async def get_stock_locations(
     request: Request,
@@ -108,8 +124,8 @@ async def get_part_batch_codes(
     
     Note: location_id is optional - if not provided, searches all locations
     """
-    # Don't filter by location - show all available batch codes
-    return await fetch_part_batch_codes(current_user, part_id, None, db)
+    # Optional location filter
+    return await fetch_part_batch_codes(current_user, part_id, location_id, db)
 
 
 @router.get("/parts/{part_id}/recipe")
@@ -127,10 +143,12 @@ async def get_part_recipe(
 @router.get("/")
 async def list_requests(
     has_batch_codes: Optional[bool] = None,
+    has_production: Optional[bool] = None,
     search: Optional[str] = None,
     state_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    extra: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
     current_user: dict = Depends(verify_admin)
@@ -144,6 +162,47 @@ async def list_requests(
     query = {}
     if has_batch_codes:
         query["items.batch_code"] = {"$exists": True, "$ne": None}
+
+    candidate_ids = None
+
+    if has_production:
+        production_collection = db['depo_production']
+        prod_docs = list(production_collection.find(
+            {"series": {"$exists": True, "$ne": []}},
+            {"request_id": 1}
+        ))
+        prod_ids = [doc.get("request_id") for doc in prod_docs if doc.get("request_id")]
+        candidate_ids = set(prod_ids)
+
+    if extra:
+        extra_value = extra.strip().lower()
+        if extra_value == "open_orders":
+            production_collection = db['depo_production']
+            prod_docs = list(production_collection.find(
+                {"series": {"$exists": True, "$ne": []}},
+                {"request_id": 1, "series": 1, "return_order_id": 1, "return_order_reference": 1}
+            ))
+            open_ids = []
+            for prod in prod_docs:
+                series = prod.get("series", []) or []
+                has_consumption = False
+                for serie in series:
+                    for material in (serie.get("materials") or []):
+                        if (material.get("used_qty") or 0) > 0:
+                            has_consumption = True
+                            break
+                    if has_consumption:
+                        break
+                has_return = prod.get("return_order_id") or prod.get("return_order_reference")
+                if (not has_consumption) or (not has_return):
+                    if prod.get("request_id"):
+                        open_ids.append(prod.get("request_id"))
+
+            extra_ids = set(open_ids)
+            candidate_ids = extra_ids if candidate_ids is None else candidate_ids.intersection(extra_ids)
+
+    if candidate_ids is not None:
+        query["_id"] = {"$in": list(candidate_ids)}
 
     if state_id:
         try:
@@ -425,9 +484,15 @@ async def get_request(
         for item in req['items']:
             if item.get('part'):
                 try:
-                    # Get part from MongoDB using ObjectId
+                    part = None
+                    # Try ObjectId first
                     part_oid = ObjectId(item['part']) if isinstance(item['part'], str) else item['part']
                     part = parts_collection.find_one({"_id": part_oid})
+                    # Fallback to legacy numeric ID
+                    if not part:
+                        part_val = str(item['part'])
+                        if part_val.isdigit():
+                            part = parts_collection.find_one({"id": int(part_val)})
                     if part:
                         item['part_detail'] = {
                             '_id': str(part['_id']),
@@ -444,6 +509,8 @@ async def get_request(
                         }
                 except Exception as e:
                     print(f"Warning: Failed to get part details: {e}")
+            if item.get('location_id') and isinstance(item.get('location_id'), ObjectId):
+                item['location_id'] = str(item['location_id'])
     
     # Get product details if product_id exists (for recipe-based requests)
     if req.get('product_id'):
@@ -744,8 +811,13 @@ async def update_request(
         for item in updated['items']:
             if 'part' in item:
                 try:
+                    part = None
                     part_oid = ObjectId(item['part']) if isinstance(item['part'], str) else item['part']
                     part = parts_collection.find_one({"_id": part_oid})
+                    if not part:
+                        part_val = str(item['part'])
+                        if part_val.isdigit():
+                            part = parts_collection.find_one({"id": int(part_val)})
                     if part:
                         item['part_detail'] = {
                             '_id': str(part['_id']),
@@ -756,6 +828,8 @@ async def update_request(
                         }
                 except:
                     pass
+            if item.get('location_id') and isinstance(item.get('location_id'), ObjectId):
+                item['location_id'] = str(item['location_id'])
     
     # Convert status_log ObjectIds to strings
     if 'status_log' in updated and updated['status_log']:

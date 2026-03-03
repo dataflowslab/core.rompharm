@@ -20,6 +20,7 @@ class ArticleCreateRequest(BaseModel):
     is_testable: bool = True
     is_salable: bool = False
     is_active: bool = True
+    loss_rate_threshold: Optional[float] = None
 
 
 class ArticleUpdateRequest(BaseModel):
@@ -47,6 +48,7 @@ class ArticleUpdateRequest(BaseModel):
     manufacturer_ipn: Optional[str] = None
     system_um_id: Optional[str] = None
     total_delivery_time: Optional[str] = None
+    loss_rate_threshold: Optional[float] = None
 
 
 # Location models

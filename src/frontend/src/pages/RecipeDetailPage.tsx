@@ -140,6 +140,7 @@ export function RecipeDetailPage() {
               setAddAltModalOpened(true);
             }}
             onDeleteAlternative={handleDeleteAlternative}
+            onReload={loadRecipe}
           />
         </Tabs.Panel>
 

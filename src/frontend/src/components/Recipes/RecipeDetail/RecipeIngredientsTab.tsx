@@ -1,6 +1,9 @@
-import { Paper, Group, Title, Button, Table, Text, Badge, ActionIcon, Tooltip } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Paper, Group, Title, Button, Table, Text, Badge, ActionIcon, Tooltip, NumberInput, Select } from '@mantine/core';
 import { IconPlus, IconChevronDown, IconChevronRight, IconEdit, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { notifications } from '@mantine/notifications';
+import api from '../../../services/api';
 import { Recipe, RecipeItem } from '../../../types/recipes';
 
 interface RecipeIngredientsTabProps {
@@ -12,6 +15,7 @@ interface RecipeIngredientsTabProps {
     onDeleteItem: (index: number) => void;
     onAddAlternative: (index: number) => void;
     onDeleteAlternative: (groupIndex: number, altIndex: number) => void;
+    onReload?: () => void;
 }
 
 export function RecipeIngredientsTab({
@@ -23,8 +27,55 @@ export function RecipeIngredientsTab({
     onDeleteItem,
     onAddAlternative,
     onDeleteAlternative,
+    onReload,
 }: RecipeIngredientsTabProps) {
     const { t } = useTranslation();
+    const [estimatedQty, setEstimatedQty] = useState<number | null>(recipe.estimated_production_qty ?? null);
+    const [estimatedUmId, setEstimatedUmId] = useState<string | null>(recipe.estimated_um_id ?? null);
+    const [systemUms, setSystemUms] = useState<Array<{ _id: string; name: string; abrev?: string }>>([]);
+    const [savingMeta, setSavingMeta] = useState(false);
+
+    useEffect(() => {
+        setEstimatedQty(recipe.estimated_production_qty ?? null);
+        setEstimatedUmId(recipe.estimated_um_id ?? null);
+    }, [recipe._id, recipe.estimated_production_qty, recipe.estimated_um_id]);
+
+    useEffect(() => {
+        const loadUms = async () => {
+            try {
+                const response = await api.get('/modules/inventory/api/system-ums');
+                setSystemUms(response.data || []);
+            } catch (error) {
+                console.error('Failed to load UMs:', error);
+            }
+        };
+        loadUms();
+    }, []);
+
+    const handleSaveMeta = async () => {
+        setSavingMeta(true);
+        try {
+            await api.patch(`/api/recipes/${recipe._id}`, {
+                estimated_production_qty: estimatedQty,
+                estimated_um_id: estimatedUmId
+            });
+            notifications.show({
+                title: t('Success'),
+                message: t('Recipe updated successfully'),
+                color: 'green'
+            });
+            onReload?.();
+        } catch (error: any) {
+            console.error('Failed to update recipe:', error);
+            notifications.show({
+                title: t('Error'),
+                message: error.response?.data?.detail || t('Failed to update recipe'),
+                color: 'red'
+            });
+        } finally {
+            setSavingMeta(false);
+        }
+    };
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return '-';
@@ -188,6 +239,40 @@ export function RecipeIngredientsTab({
                     onClick={onAddIngredient}
                 >
                     {t('Add Ingredient')}
+                </Button>
+            </Group>
+
+            <Group p="md" align="end" gap="md">
+                <NumberInput
+                    label={t('Estimated production quantity')}
+                    placeholder="0"
+                    value={estimatedQty ?? ''}
+                    onChange={(value) => {
+                        if (value === '' || value === null) {
+                            setEstimatedQty(null);
+                        } else {
+                            setEstimatedQty(Number(value) || 0);
+                        }
+                    }}
+                    min={0}
+                    step={0.01}
+                    style={{ maxWidth: 260 }}
+                />
+                <Select
+                    label={t('U.M.')}
+                    placeholder={t('Select unit')}
+                    data={systemUms.map(um => ({
+                        value: um._id,
+                        label: um.abrev ? `${um.abrev} - ${um.name}` : um.name
+                    }))}
+                    value={estimatedUmId || ''}
+                    onChange={(value) => setEstimatedUmId(value || null)}
+                    searchable
+                    clearable
+                    style={{ minWidth: 260 }}
+                />
+                <Button onClick={handleSaveMeta} loading={savingMeta}>
+                    {t('Save')}
                 </Button>
             </Group>
 

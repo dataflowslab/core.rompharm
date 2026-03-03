@@ -19,6 +19,7 @@ interface BatchOption {
   location_id?: string;
   state_name?: string;
   state_id?: string;
+  state_color?: string;
   is_transferable?: boolean;
   is_requestable?: boolean;
 }
@@ -122,6 +123,7 @@ export function AddItemModal({
                   location_id: opt.location_id || '',
                   state_name: opt.state_name || '',
                   state_id: opt.state_id || '',
+                  state_color: opt.state_color,
                   expiry_date: opt.expiry_date,
                   is_transferable: opt.is_transferable,
                   is_requestable: opt.is_requestable

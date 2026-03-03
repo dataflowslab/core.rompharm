@@ -1,4 +1,4 @@
-import { Paper, Title, Table, Button, Group, NumberInput, ActionIcon, Text } from '@mantine/core';
+import { Paper, Title, Table, Button, Group, NumberInput, ActionIcon, Text, Badge } from '@mantine/core';
 import { IconPlus, IconDeviceFloppy, IconTrash, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
@@ -9,6 +9,13 @@ interface ItemWithBatch {
   quantity: number;
   init_q: number;
   batch_code: string;
+  location_id?: string;
+  available_qty?: number;
+  source_qty?: number;
+  lot_state_name?: string;
+  lot_state_color?: string;
+  location_name?: string;
+  location_parent_name?: string;
   added_in_operations?: boolean;
 }
 
@@ -32,6 +39,15 @@ export function WarehouseOperationsTable({
   saving
 }: WarehouseOperationsTableProps) {
   const { t } = useTranslation();
+
+  const getStateColor = (stateName?: string) => {
+    if (!stateName) return 'gray';
+    const lowerName = stateName.toLowerCase();
+    if (lowerName.includes('disponibil') || lowerName.includes('available')) return 'green';
+    if (lowerName.includes('rezervat') || lowerName.includes('reserved')) return 'blue';
+    if (lowerName.includes('blocat') || lowerName.includes('blocked')) return 'red';
+    return 'gray';
+  };
 
   // Group items by part and calculate totals
   const getGroupedItems = () => {
@@ -142,6 +158,11 @@ export function WarehouseOperationsTable({
             <Table.Th style={{ width: '120px' }}>{t('Requested')}</Table.Th>
             <Table.Th style={{ width: '120px' }}>{t('Qty')}</Table.Th>
             <Table.Th>{t('Batch Code')}</Table.Th>
+            <Table.Th style={{ width: '140px' }}>{t('State')}</Table.Th>
+            <Table.Th style={{ width: '120px' }}>{t('Available')}</Table.Th>
+            <Table.Th style={{ width: '140px' }}>{t('Source Qty')}</Table.Th>
+            <Table.Th style={{ width: '160px' }}>{t('Warehouse')}</Table.Th>
+            <Table.Th style={{ width: '160px' }}>{t('Location')}</Table.Th>
             {!isReadonly && <Table.Th style={{ width: '60px' }}></Table.Th>}
           </Table.Tr>
         </Table.Thead>
@@ -186,6 +207,7 @@ export function WarehouseOperationsTable({
                         onChange={(value) => onQuantityChange(flatIndex, Number(value) || 0)}
                         disabled={isReadonly}
                         min={0}
+                        max={item.available_qty}
                         size="xs"
                       />
                     )}
@@ -194,6 +216,47 @@ export function WarehouseOperationsTable({
                     <Text size="sm" style={{ color: isZeroQuantity ? '#868e96' : 'inherit' }}>
                       {item.batch_code || '-'}
                     </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {item.batch_code ? (
+                      <Badge
+                        size="sm"
+                        color={item.lot_state_color || getStateColor(item.lot_state_name)}
+                        variant="filled"
+                      >
+                        {item.lot_state_name || t('Unknown')}
+                      </Badge>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {item.batch_code ? (
+                      <Text size="sm" fw={500}>{item.available_qty ?? '-'}</Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {item.batch_code ? (
+                      <Text size="sm" fw={500}>{item.source_qty ?? 0}</Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {item.batch_code ? (
+                      <Text size="sm">{item.location_parent_name || item.location_name || '-'}</Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {item.batch_code ? (
+                      <Text size="sm">{item.location_name || '-'}</Text>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
                   </Table.Td>
                   {!isReadonly && (
                     <Table.Td>

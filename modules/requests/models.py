@@ -12,6 +12,7 @@ class RequestItemCreate(BaseModel):
     notes: Optional[str] = None
     series: Optional[str] = None
     batch_code: Optional[str] = None
+    location_id: Optional[str] = None
     added_in_operations: Optional[bool] = False  # Flag for items added in Operations tab
 
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Table, NumberInput, Text, Paper, Title, Loader, ActionIcon, Group } from '@mantine/core';
+import { Table, NumberInput, Text, Paper, Title, Loader, ActionIcon, Group, Badge } from '@mantine/core';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
@@ -13,6 +13,7 @@ interface Batch {
   location_id: string;
   state_id?: string;
   state_name?: string;
+  state_color?: string;
   expiry_date?: string;
   batch_date?: string;
 }
@@ -20,6 +21,7 @@ interface Batch {
 interface BatchAllocation {
   batch_unique_key: string;
   batch_code: string;
+  location_id?: string;
   quantity: number;
 }
 
@@ -191,6 +193,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
         component.batch_allocations.push({
           batch_unique_key: batchUniqueKey,
           batch_code: batch.batch_code,
+          location_id: batch.location_id,
           quantity: limitedQuantity
         });
       }
@@ -249,7 +252,14 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
           style={{ backgroundColor: '#fafafa' }}
         >
           <Table.Td style={{ paddingLeft: '48px' }}>
-            <Text size="sm">↳ {batch.batch_code}</Text>
+            <Group gap="xs">
+              <Text size="sm">↳ {batch.batch_code}</Text>
+              {batch.state_name && (
+                <Badge size="xs" color={batch.state_color || 'gray'} variant="light">
+                  {batch.state_name}
+                </Badge>
+              )}
+            </Group>
           </Table.Td>
           <Table.Td>
             <Text size="sm">{formatDate(batch.expiry_date)}</Text>
