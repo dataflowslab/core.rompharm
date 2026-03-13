@@ -452,13 +452,16 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
   const canUserSign = () => {
     if (!flow) return false;
 
+    const normalize = (value?: string | null) => (value || '').toString().trim().toLowerCase();
+
     const matchesOfficer = (o: any) => {
       if (username && o.username && o.username === username) return true;
       if (o.reference && userId && o.reference === userId) return true;
       if (o.type === 'role') {
-        if (roleSlug && o.reference === roleSlug) return true;
+        if (roleSlug && normalize(o.reference) === normalize(roleSlug)) return true;
         if (localRole && o.reference === localRole) return true;
-        if (o.reference === 'admin' && isStaff) return true;
+        if (localRole && normalize(o.reference) === normalize(localRole)) return true;
+        if (normalize(o.reference) === 'admin' && isStaff) return true;
       }
       return false;
     };
