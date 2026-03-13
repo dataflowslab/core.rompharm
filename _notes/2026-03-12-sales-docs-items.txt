@@ -1,0 +1,8 @@
+Summary:
+- Sales order items now stored in depo_sales_ordes.items (embedded), with legacy lines backfilled into items when present.
+- Sales order items API now reads/writes embedded items and keeps line_items count updated.
+- Sales and procurement document payloads updated to match new DataFlows Docu template schemas.
+- Sales document generator uses embedded items with fallback to legacy lines.
+
+Notes:
+- Payloads for templates X1KXDPICLQGZ (sales) and ILY5WVAV8SQD (procurement) now use the specified flat keys.

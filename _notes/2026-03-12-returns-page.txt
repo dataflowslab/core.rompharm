@@ -1,0 +1,4 @@
+Summary:
+- Implemented /returns list page and API endpoint for return orders.
+- Added return orders listing endpoint under /api/sales/returns with customer enrichment.
+- Wired frontend route /returns to ReturnsPage and added i18n keys.

@@ -7,27 +7,42 @@ from bson import ObjectId
 from typing import List, Optional
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_admin
+from src.backend.routes.auth import verify_admin, verify_token
 from .utils import generate_request_reference
 
 
 router = APIRouter()
 
 
-FAILED_CANCELED_TOKENS = [
-    'failed', 'fail', 'canceled', 'cancelled', 'anulat', 'anulare',
-    'esuat', 'refuz', 'refused', 'rejected', 'neconform'
+DESTROYED_STATE_ID = "694322538728e4d75ae7278c"
+
+CANCELED_TOKENS = [
+    'canceled', 'cancelled', 'anulat', 'anulare', 'cancel', 'cancelare'
+]
+
+FAILED_TOKENS = [
+    'failed', 'fail', 'esuat', 'refuz', 'refused', 'rejected', 'neconform'
 ]
 
 
-def _is_failed_or_canceled_state(state: Optional[dict]) -> bool:
+def _is_canceled_state(state: Optional[dict]) -> bool:
     if not state:
         return False
     name = (state.get('name') or '').lower()
     slug = (state.get('slug') or '').lower()
     label = (state.get('label') or '').lower()
     haystack = f"{name} {slug} {label}"
-    return any(token in haystack for token in FAILED_CANCELED_TOKENS)
+    return any(token in haystack for token in CANCELED_TOKENS)
+
+
+def _is_failed_state(state: Optional[dict]) -> bool:
+    if not state:
+        return False
+    name = (state.get('name') or '').lower()
+    slug = (state.get('slug') or '').lower()
+    label = (state.get('label') or '').lower()
+    haystack = f"{name} {slug} {label}"
+    return any(token in haystack for token in FAILED_TOKENS) and not _is_canceled_state(state)
 
 
 def _get_state_by_id(db, state_id: Optional[str]) -> Optional[dict]:
@@ -302,8 +317,11 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
         batch_code = serie.get('batch_code')
         materials = serie.get('materials', [])
         decision_status = serie.get('decision_status')
-        if _is_failed_or_canceled_state(_get_state_by_id(db, decision_status)):
-            print(f"[PRODUCTION] Skipping serie {batch_code} - decision is failed/canceled")
+        state = _get_state_by_id(db, decision_status)
+        is_canceled = _is_canceled_state(state)
+        is_failed = _is_failed_state(state)
+        if is_canceled:
+            print(f"[PRODUCTION] Skipping serie {batch_code} - decision is canceled")
             continue
         
         if not batch_code:
@@ -382,6 +400,17 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
         produced_qty = float(serie.get('produced_qty') or 0)
         
         if produced_qty > 0:
+            materials_used = []
+            for material in materials:
+                used_qty = float(material.get('used_qty') or 0)
+                if used_qty <= 0:
+                    continue
+                materials_used.append({
+                    'part_id': str(material.get('part')),
+                    'part_name': material.get('part_name', ''),
+                    'batch': material.get('batch', ''),
+                    'quantity': used_qty
+                })
             # Check if stock entry exists for this product + batch
             existing_stock = stocks_collection.find_one({
                 'part_id': product_id,
@@ -395,7 +424,18 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
                     {'_id': existing_stock['_id']},
                     {
                         '$inc': {'quantity': produced_qty},
-                        '$set': {'updated_at': timestamp}
+                        '$set': {
+                            'updated_at': timestamp,
+                            'state_id': ObjectId(DESTROYED_STATE_ID) if is_failed else existing_stock.get('state_id'),
+                            'production': {
+                                'request_id': request_id,
+                                'serie_batch': batch_code,
+                                'materials_used': materials_used,
+                                'produced_at': timestamp,
+                                'production_step_id': serie.get('production_step_id'),
+                                'decision_status': decision_status
+                            }
+                        }
                     }
                 )
             else:
@@ -403,6 +443,7 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
                 # For produced products, set supplier to Rompharm and status to Quarantined
                 rompharm_supplier_id = ObjectId("694a1b9f297c9dde6d70661c")
                 quarantined_state_id = ObjectId("694322878728e4d75ae72790")
+                destroyed_state_id = ObjectId(DESTROYED_STATE_ID)
                 
                 new_stock = {
                     'part_id': product_id,
@@ -410,14 +451,22 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
                     'quantity': produced_qty,
                     'batch_code': batch_code,
                     'supplier_id': rompharm_supplier_id,
-                    'state_id': quarantined_state_id,
+                    'state_id': destroyed_state_id if is_failed else quarantined_state_id,
                     'notes': f"Produced from request {request.get('reference', request_id)}",
                     'created_at': timestamp,
                     'updated_at': timestamp,
                     'created_by': current_user.get('username'),
                     'updated_by': current_user.get('username'),
                     'request_id': ObjectId(request_id),
-                    'request_reference': request.get('reference')
+                    'request_reference': request.get('reference'),
+                    'production': {
+                        'request_id': request_id,
+                        'serie_batch': batch_code,
+                        'materials_used': materials_used,
+                        'produced_at': timestamp,
+                        'production_step_id': serie.get('production_step_id'),
+                        'decision_status': decision_status
+                    }
                 }
                 if serie.get('expiry_date'):
                     try:
@@ -534,7 +583,7 @@ async def update_production_status(
 @router.get("/{request_id}/production-flow")
 async def get_production_flow(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(verify_token)
 ):
     """Get production approval flow - auto-creates if not exists"""
     db = get_db()
@@ -602,7 +651,7 @@ async def get_production_flow(
 async def sign_production(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(verify_token)
 ):
     """Sign production flow and execute stock operations"""
     db = get_db()
@@ -630,36 +679,19 @@ async def sign_production(
     
     # Check authorization
     username = current_user["username"]
-    is_staff = current_user.get("is_staff", False)
-    can_sign = False
-    
-    # Check can_sign_officers
-    for officer in flow.get("can_sign_officers", []):
-        # Direct user_id match
-        if officer.get("reference") == user_id:
-            can_sign = True
-            break
-        # Role-based match
-        if officer.get("type") == "role" and officer.get("reference"):
-            if officer["reference"] == "admin" and (is_staff or username.lower().startswith('admin')):
-                can_sign = True
-                break
-    
-    # Check must_sign_officers if not already authorized
+    user_role_id = current_user.get("role") or current_user.get("local_role")
+
+    from src.backend.utils.approval_helpers import check_user_can_sign
+    can_sign = check_user_can_sign(
+        db,
+        user_id,
+        user_role_id,
+        flow.get("must_sign_officers", []),
+        flow.get("can_sign_officers", [])
+    )
+
     if not can_sign:
-        for officer in flow.get("must_sign_officers", []):
-            # Direct user_id match
-            if officer.get("reference") == user_id:
-                can_sign = True
-                break
-            # Role-based match
-            if officer.get("type") == "role" and officer.get("reference"):
-                if officer["reference"] == "admin" and (is_staff or username.lower().startswith('admin')):
-                    can_sign = True
-                    break
-    
-    if not can_sign:
-        print(f"[PRODUCTION] User {username} (staff={is_staff}) not authorized to sign. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
+        print(f"[PRODUCTION] User {username} not authorized to sign. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
         raise HTTPException(status_code=403, detail="You are not authorized to sign")
     
     # Generate signature
@@ -739,7 +771,7 @@ async def sign_production(
 async def sign_production_series(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(verify_token)
 ):
     """Sign production series (per batch) using production flow officers"""
     db = get_db()
@@ -769,18 +801,19 @@ async def sign_production_series(
         raise HTTPException(status_code=400, detail="Decision status is required before signing")
 
     state = _get_state_by_id(db, decision_status)
-    is_failed_or_canceled = _is_failed_or_canceled_state(state)
+    is_canceled = _is_canceled_state(state)
+    is_failed = _is_failed_state(state)
 
     if state and state.get('needs_comment') and not str(serie.get('decision_reason') or '').strip():
         raise HTTPException(status_code=400, detail="Comment is required for this decision")
 
-    if not is_failed_or_canceled and not serie.get('expiry_date'):
+    if not (is_canceled or is_failed) and not serie.get('expiry_date'):
         raise HTTPException(status_code=400, detail="Expiration date is required")
-    if not serie.get('production_step_id'):
+    if not is_canceled and not serie.get('production_step_id'):
         raise HTTPException(status_code=400, detail="Production step is required")
 
     produced_qty = float(serie.get('produced_qty') or 0)
-    if produced_qty <= 0 and not is_failed_or_canceled:
+    if produced_qty <= 0 and not is_canceled:
         raise HTTPException(status_code=400, detail="Produced quantity is required")
 
     # Get production flow for permission checks
@@ -802,25 +835,16 @@ async def sign_production_series(
 
     # Check authorization (same logic as production flow)
     username = current_user["username"]
-    is_staff = current_user.get("is_staff", False)
-    can_sign = False
+    user_role_id = current_user.get("role") or current_user.get("local_role")
 
-    for officer in flow.get("can_sign_officers", []):
-        if officer.get("reference") == user_id:
-            can_sign = True
-            break
-        if officer.get("type") == "role" and officer.get("reference") == "admin" and (is_staff or username.lower().startswith('admin')):
-            can_sign = True
-            break
-
-    if not can_sign:
-        for officer in flow.get("must_sign_officers", []):
-            if officer.get("reference") == user_id:
-                can_sign = True
-                break
-            if officer.get("type") == "role" and officer.get("reference") == "admin" and (is_staff or username.lower().startswith('admin')):
-                can_sign = True
-                break
+    from src.backend.utils.approval_helpers import check_user_can_sign
+    can_sign = check_user_can_sign(
+        db,
+        user_id,
+        user_role_id,
+        flow.get("must_sign_officers", []),
+        flow.get("can_sign_officers", [])
+    )
 
     if not can_sign:
         raise HTTPException(status_code=403, detail="You are not authorized to sign")

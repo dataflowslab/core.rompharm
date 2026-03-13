@@ -1,0 +1,4 @@
+Summary:
+- Added returns list filtering (search/date/state) and status display.
+- Return orders now set initial state_id and create approval flows using template 69b39f0d0ec895067fed4e8d.
+- Added SalesFilters component and backend /api/sales/returns filters.

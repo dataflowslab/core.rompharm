@@ -4,6 +4,7 @@ Authentication routes
 from fastapi import APIRouter, Depends, Header, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from bson import ObjectId
 
 from src.backend.services.auth_service import AuthService
 # Use absolute imports
@@ -122,13 +123,27 @@ def get_current_user(user = Depends(verify_token)):
     """
     Get current user information
     """
+    db = get_db()
+    role_value = user.get('local_role') or user.get('role')
+    role_slug = None
+    if role_value:
+        try:
+            role_doc = db['roles'].find_one({'_id': ObjectId(role_value)})
+        except Exception:
+            role_doc = None
+        if role_doc:
+            role_slug = role_doc.get('slug')
+        elif isinstance(role_value, str):
+            role_slug = role_value
+
     return {
         '_id': str(user['_id']),
         'username': user['username'],
         'name': user.get('name'),
         'is_staff': user.get('is_staff', False),
         'staff': user.get('is_staff', False),
-        'local_role': user.get('local_role')
+        'local_role': user.get('local_role'),
+        'role_slug': role_slug
     }
 
 

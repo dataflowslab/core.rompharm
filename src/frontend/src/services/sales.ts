@@ -39,6 +39,31 @@ export interface SalesOrderItem {
   notes?: string;
 }
 
+export interface ReturnOrderItem {
+  _id: string;
+  order_item_id: string;
+  part_id: string;
+  part_detail?: {
+    _id?: string;
+    name?: string;
+    IPN?: string;
+    um?: string;
+  };
+  quantity: number;
+  notes?: string;
+}
+
+export interface ReturnOrder {
+  _id: string;
+  reference: string;
+  sales_order_id: string;
+  issue_date?: string;
+  created_at?: string;
+  notes?: string;
+  items: ReturnOrderItem[];
+  line_items?: number;
+}
+
 export interface Shipment {
   _id: string;
   order: string;
@@ -131,6 +156,21 @@ export const salesService = {
   // Get order statuses
   async getOrderStatuses() {
     const response = await api.get('/api/sales/order-statuses');
+    return response.data;
+  },
+
+  async getReturnOrders(orderId: string) {
+    const response = await api.get(`/api/sales/sales-orders/${orderId}/returns`);
+    return response.data;
+  },
+
+  async createReturnOrder(orderId: string, payload: any) {
+    const response = await api.post(`/api/sales/sales-orders/${orderId}/returns`, payload);
+    return response.data;
+  },
+
+  async getReturnOrdersList(params?: Record<string, string>) {
+    const response = await api.get('/api/sales/returns', params ? { params } : undefined);
     return response.data;
   },
 

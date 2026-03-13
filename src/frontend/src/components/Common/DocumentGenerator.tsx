@@ -29,6 +29,7 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   const [checking, setChecking] = useState<Record<string, boolean>>({});
   const [waitingJobs, setWaitingJobs] = useState<Record<string, boolean>>({});
+  const [downloading, setDownloading] = useState<Record<string, boolean>>({});
   const loadedRef = useRef<string | null>(null); // Track last loaded objectId
 
   useEffect(() => {
@@ -240,8 +241,10 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
   };
 
   const downloadDocument = async (templateCode: string) => {
-    let doc = documents[templateCode];
-    if (!doc) return;
+    const doc = documents[templateCode];
+    if (!doc || downloading[templateCode]) return;
+
+    setDownloading(prev => ({ ...prev, [templateCode]: true }));
 
     console.log('[DocumentGenerator] Attempting download:', {
       templateCode,
@@ -250,28 +253,28 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
       filename: doc.filename
     });
 
-    // Check status before download
-    if (doc.status !== 'done' && doc.status !== 'completed') {
-      console.warn('[DocumentGenerator] Document not ready for download:', doc.status);
-      
-      // Try to refresh status first
-      const newStatus = await checkStatus(templateCode, doc.job_id);
-      
-      // If still not ready after refresh, show warning and return
-      if (!newStatus || (newStatus !== 'done' && newStatus !== 'completed')) {
-        notifications.show({
-          title: t('Warning'),
-          message: `Document not ready. Status: ${newStatus || 'unknown'}`,
-          color: 'orange'
-        });
-        return;
-      }
-      
-      // Status is now ready, continue with download
-      console.log('[DocumentGenerator] Status refreshed, document is ready');
-    }
-
     try {
+      // Check status before download
+      if (doc.status !== 'done' && doc.status !== 'completed') {
+        console.warn('[DocumentGenerator] Document not ready for download:', doc.status);
+        
+        // Try to refresh status first
+        const newStatus = await checkStatus(templateCode, doc.job_id);
+        
+        // If still not ready after refresh, show warning and return
+        if (!newStatus || (newStatus !== 'done' && newStatus !== 'completed')) {
+          notifications.show({
+            title: t('Warning'),
+            message: `Document not ready. Status: ${newStatus || 'unknown'}`,
+            color: 'orange'
+          });
+          return;
+        }
+        
+        // Status is now ready, continue with download
+        console.log('[DocumentGenerator] Status refreshed, document is ready');
+      }
+
       const response = await api.get(`/api/documents/${doc.job_id}/download`, {
         responseType: 'blob'
       });
@@ -298,6 +301,8 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
         message: error.response?.data?.detail || t('Failed to download document'),
         color: 'red'
       });
+    } finally {
+      setDownloading(prev => ({ ...prev, [templateCode]: false }));
     }
   };
 
@@ -380,6 +385,7 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
         const doc = documents[templateCode];
         const isGenerating = generating[templateCode];
         const isChecking = checking[templateCode];
+        const isDownloading = downloading[templateCode];
 
         if (!template) {
           return null;
@@ -428,6 +434,8 @@ export function DocumentGenerator({ objectId, templateCodes, templateNames, onDo
                       variant="filled"
                       color="green"
                       onClick={() => downloadDocument(templateCode)}
+                      loading={isDownloading}
+                      disabled={isDownloading}
                       title={t('Download')}
                     >
                       <IconDownload size={14} />

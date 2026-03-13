@@ -9,7 +9,7 @@ interface Material {
   part_name: string;
   batch: string;
   received_qty: number;
-  used_qty: number;
+  used_qty: number | null;
 }
 
 interface ApprovalOfficer {
@@ -75,7 +75,8 @@ interface ProductionSeriesTableProps {
   currentUsername?: string | null;
 }
 
-const FAILED_CANCELED_TOKENS = ['failed', 'fail', 'canceled', 'cancelled', 'anulat', 'anulare', 'esuat', 'refuz', 'refused', 'rejected', 'neconform'];
+const CANCELED_TOKENS = ['canceled', 'cancelled', 'anulat', 'anulare', 'cancel', 'cancelare'];
+const FAILED_TOKENS = ['failed', 'fail', 'esuat', 'refuz', 'refused', 'rejected', 'neconform'];
 
 export function ProductionSeriesTable({
   series,
@@ -97,7 +98,7 @@ export function ProductionSeriesTable({
     onSeriesChange(newSeries);
   };
 
-  const handleUsedQtyChange = (serieIndex: number, materialIndex: number, value: number) => {
+  const handleUsedQtyChange = (serieIndex: number, materialIndex: number, value: number | null) => {
     const newSeries = [...series];
     newSeries[serieIndex].materials[materialIndex].used_qty = value;
     onSeriesChange(newSeries);
@@ -108,11 +109,18 @@ export function ProductionSeriesTable({
     return availableStates.find(s => s._id === decisionStatus) || null;
   };
 
-  const isFailedOrCanceled = (decisionStatus?: string) => {
+  const isCanceledDecision = (decisionStatus?: string) => {
     const state = getDecisionState(decisionStatus);
     if (!state) return false;
     const haystack = `${state.name || ''} ${state.slug || ''}`.toLowerCase();
-    return FAILED_CANCELED_TOKENS.some(token => haystack.includes(token));
+    return CANCELED_TOKENS.some(token => haystack.includes(token));
+  };
+
+  const isFailedDecision = (decisionStatus?: string) => {
+    const state = getDecisionState(decisionStatus);
+    if (!state) return false;
+    const haystack = `${state.name || ''} ${state.slug || ''}`.toLowerCase();
+    return FAILED_TOKENS.some(token => haystack.includes(token)) && !isCanceledDecision(decisionStatus);
   };
 
   const isSerieCompleted = (signatures: ApprovalSignature[]) => {
@@ -136,32 +144,65 @@ export function ProductionSeriesTable({
     label: step.name || step.label || step.code || step._id
   }));
 
+  const isSerieUsedQtyComplete = (serie: Serie) => {
+    if (isCanceledDecision(serie.decision_status)) {
+      return (serie.signatures || []).length > 0;
+    }
+    if (!serie.materials || serie.materials.length === 0) return true;
+    return serie.materials.every(material => material.used_qty !== null && material.used_qty !== undefined);
+  };
+
+  const firstIncompleteIndex = series.findIndex(serie => !isSerieUsedQtyComplete(serie));
+  const activeSerieIndex = series.length === 0
+    ? -1
+    : (firstIncompleteIndex === -1 ? series.length - 1 : firstIncompleteIndex);
+
+  const getMaterialKey = (material: Material) => `${material.part}__${material.batch || ''}`;
+
   return (
     <Stack gap="xl">
       {series.map((serie, serieIndex) => {
         const decisionState = getDecisionState(serie.decision_status);
         const needsComment = decisionState?.needs_comment === true;
-        const failedOrCanceled = isFailedOrCanceled(serie.decision_status);
-        const expiryRequired = !failedOrCanceled;
-        const producedRequired = !failedOrCanceled;
+        const isCanceledDecisionStatus = isCanceledDecision(serie.decision_status);
+        const isFailedDecisionStatus = isFailedDecision(serie.decision_status);
+        const expiryRequired = !(isCanceledDecisionStatus || isFailedDecisionStatus);
+        const producedRequired = !isCanceledDecisionStatus;
         const signatures = serie.signatures || [];
         const hasAnySignature = signatures.length > 0;
-        const isReadonly = isCanceled || hasAnySignature;
+        const isSerieActive = serieIndex === activeSerieIndex || series.length === 1;
+        const isSerieLocked = isCanceled || hasAnySignature || !isSerieActive;
+        const isDecisionLocked = isCanceled || hasAnySignature;
+        const disableDetails = isSerieLocked || isCanceledDecisionStatus;
         const serieCompleted = isSerieCompleted(signatures);
 
         const hasProducedQty = (serie.produced_qty || 0) > 0 || !producedRequired;
         const hasExpiry = !!serie.expiry_date || !expiryRequired;
-        const hasStep = !!serie.production_step_id;
+        const hasStep = !!serie.production_step_id || isCanceledDecisionStatus;
         const hasDecision = !!serie.decision_status;
         const userAlreadySigned = !!currentUsername && signatures.some(s => s.username === currentUsername);
-        const canSign = canUserSign && hasDecision && hasStep && hasProducedQty && hasExpiry && !serieCompleted && !isCanceled && !userAlreadySigned;
+        const canSign = canUserSign && hasDecision && hasStep && hasProducedQty && hasExpiry && !serieCompleted && !isCanceled && !userAlreadySigned && !hasAnySignature && isSerieActive;
+
+        const signedUsedByKey = new Map<string, number>();
+        series.slice(0, serieIndex).forEach(prevSerie => {
+          if ((prevSerie.signatures || []).length === 0) return;
+          if (isCanceledDecision(prevSerie.decision_status)) return;
+          (prevSerie.materials || []).forEach(material => {
+            const key = getMaterialKey(material);
+            const prevValue = signedUsedByKey.get(key) || 0;
+            signedUsedByKey.set(key, prevValue + (Number(material.used_qty) || 0));
+          });
+        });
 
         return (
           <Paper key={serie.batch_code} withBorder p="md">
             <Group justify="space-between" mb="md">
               <Title order={5}>{t('Batch')}: {serie.batch_code}</Title>
-              {failedOrCanceled && (
-                <Text c="red" fw={600}>{t('Canceled/Failed')}</Text>
+              {isCanceledDecisionStatus && (
+                <Text c="red" fw={600}>{t('Canceled')}</Text>
+              )}
+              {!isCanceledDecisionStatus && isFailedDecisionStatus && (
+                <Text c="red" fw={600}>{t('Failed')}</Text>
               )}
             </Group>
 
@@ -173,7 +214,7 @@ export function ProductionSeriesTable({
                   onChange={(value) => updateSerie(serieIndex, { produced_qty: Number(value) || 0 })}
                   min={0}
                   required={producedRequired}
-                  disabled={isReadonly}
+                  disabled={disableDetails}
                 />
               </Grid.Col>
 
@@ -185,7 +226,7 @@ export function ProductionSeriesTable({
                   onChange={(value) => updateSerie(serieIndex, { expiry_date: value ? value.toISOString() : '' })}
                   required={expiryRequired}
                   clearable={!expiryRequired}
-                  disabled={isReadonly}
+                  disabled={disableDetails}
                 />
               </Grid.Col>
 
@@ -199,7 +240,7 @@ export function ProductionSeriesTable({
                   searchable
                   clearable
                   required
-                  disabled={isReadonly}
+                  disabled={disableDetails}
                 />
               </Grid.Col>
 
@@ -211,9 +252,41 @@ export function ProductionSeriesTable({
                   valueKey="_id"
                   labelKey="name"
                   value={serie.decision_status || ''}
-                  onChange={(value) => updateSerie(serieIndex, { decision_status: value || '' })}
+                  onChange={(value) => {
+                    const nextValue = value || '';
+                    const wasCanceled = isCanceledDecision(serie.decision_status);
+
+                    if (isCanceledDecision(nextValue)) {
+                      const resetMaterials = (serie.materials || []).map(material => ({
+                        ...material,
+                        used_qty: 0
+                      }));
+                      updateSerie(serieIndex, {
+                        decision_status: nextValue,
+                        produced_qty: 0,
+                        expiry_date: '',
+                        production_step_id: '',
+                        materials: resetMaterials
+                      });
+                      return;
+                    }
+
+                    if (wasCanceled && !isCanceledDecision(nextValue)) {
+                      const resetMaterials = (serie.materials || []).map(material => ({
+                        ...material,
+                        used_qty: null
+                      }));
+                      updateSerie(serieIndex, {
+                        decision_status: nextValue,
+                        materials: resetMaterials
+                      });
+                      return;
+                    }
+
+                    updateSerie(serieIndex, { decision_status: nextValue });
+                  }}
                   required
-                  disabled={isReadonly}
+                  disabled={isDecisionLocked}
                 />
               </Grid.Col>
             </Grid>
@@ -227,7 +300,7 @@ export function ProductionSeriesTable({
                 required
                 minRows={2}
                 mb="md"
-                disabled={isReadonly}
+                disabled={isDecisionLocked}
               />
             )}
 
@@ -239,28 +312,42 @@ export function ProductionSeriesTable({
                     <Table.Tr>
                       <Table.Th>{t('Material')}</Table.Th>
                       <Table.Th>{t('Batch')}</Table.Th>
-                      <Table.Th style={{ width: '120px' }}>{t('Received Qty')}</Table.Th>
+                      <Table.Th style={{ width: '120px' }}>{t('Available Qty')}</Table.Th>
                       <Table.Th style={{ width: '140px' }}>{t('Used Qty')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {serie.materials.map((material, materialIndex) => (
-                      <Table.Tr key={`${serie.batch_code}-${materialIndex}`}>
+                    {serie.materials.map((material, materialIndex) => {
+                      const key = getMaterialKey(material);
+                      const signedUsed = signedUsedByKey.get(key) || 0;
+                      const availableQty = Math.max(0, (Number(material.received_qty) || 0) - signedUsed);
+                      const maxQty = availableQty;
+                      return (
+                        <Table.Tr key={`${serie.batch_code}-${materialIndex}`}>
                         <Table.Td>{material.part_name || material.part}</Table.Td>
-                        <Table.Td>{material.batch}</Table.Td>
-                        <Table.Td>{material.received_qty}</Table.Td>
+                        <Table.Td>{material.batch || '-'}</Table.Td>
+                        <Table.Td>{availableQty}</Table.Td>
                         <Table.Td>
                           <NumberInput
-                            value={material.used_qty}
-                            onChange={(value) => handleUsedQtyChange(serieIndex, materialIndex, Number(value) || 0)}
+                            value={material.used_qty ?? ''}
+                            onChange={(value) => {
+                              if (value === null || value === undefined || value === '') {
+                                handleUsedQtyChange(serieIndex, materialIndex, null);
+                                return;
+                              }
+                              const numericValue = Number(value) || 0;
+                              const clampedValue = Math.min(Math.max(numericValue, 0), maxQty);
+                              handleUsedQtyChange(serieIndex, materialIndex, clampedValue);
+                            }}
                             min={0}
-                            max={material.received_qty}
-                            disabled={isReadonly}
+                            max={maxQty}
+                            disabled={isSerieLocked || isCanceledDecisionStatus}
                             size="sm"
                           />
                         </Table.Td>
-                      </Table.Tr>
-                    ))}
+                        </Table.Tr>
+                      );
+                    })}
                   </Table.Tbody>
                 </Table>
               </Grid.Col>

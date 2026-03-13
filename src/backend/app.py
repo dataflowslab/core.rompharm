@@ -29,6 +29,7 @@ from src.backend.routes import external
 from src.backend.routes import approvals
 from src.backend.routes import recipes
 from src.backend.routes import sales
+from src.backend.routes import returns
 from src.backend.utils.db import close_db
 from src.backend.scheduler import get_scheduler
 
@@ -70,6 +71,7 @@ app.include_router(external.router)
 app.include_router(approvals.router)
 app.include_router(recipes.router)
 app.include_router(sales.router)
+app.include_router(returns.router)
 
 # Register modules dynamically
 print("\n=== Loading Modules ===")

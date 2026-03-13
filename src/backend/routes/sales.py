@@ -2,7 +2,7 @@
 Sales API 
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from typing import Optional, Any
+from typing import Optional, Any, List
 from datetime import datetime
 from bson import ObjectId
 from pydantic import BaseModel
@@ -11,6 +11,9 @@ from src.backend.utils.db import get_db
 from src.backend.routes.auth import verify_token
 
 router = APIRouter(prefix="/api/sales", tags=["sales"])
+
+RETURN_ORDER_INITIAL_STATE_ID = "6943a4a6451609dd8a618ce0"
+RETURN_ORDER_APPROVAL_TEMPLATE_ID = "69b39f0d0ec895067fed4e8d"
 
 # --- Models ---
 class SalesOrderRequest(BaseModel):
@@ -34,6 +37,16 @@ class SalesOrderItemRequest(BaseModel):
     sale_price: Optional[float] = None
     sale_price_currency: Optional[str] = None
     reference: Optional[str] = None
+    notes: Optional[str] = None
+
+class ReturnOrderItemRequest(BaseModel):
+    order_item_id: str
+    part_id: str
+    quantity: float
+    notes: Optional[str] = None
+
+class ReturnOrderRequest(BaseModel):
+    items: List[ReturnOrderItemRequest]
     notes: Optional[str] = None
 
 class ShipmentRequest(BaseModel):
@@ -82,6 +95,78 @@ def serialize_doc(doc: Any) -> Any:
                 result[key] = value
         return result
     return doc
+
+
+def _load_sales_order_with_items(db, order_id: str):
+    try:
+        order_oid = ObjectId(order_id)
+    except Exception:
+        return None, None, []
+
+    orders_collection = db['depo_sales_ordes']
+    order = orders_collection.find_one({'_id': order_oid})
+    if not order:
+        orders_collection = db['depo_sales_orders']
+        order = orders_collection.find_one({'_id': order_oid})
+    if not order:
+        return None, None, []
+
+    items = order.get('items', [])
+
+    if not items:
+        legacy_query = {'order_id': {'$in': [order_id, order_oid]}}
+        legacy_items = list(db['depo_sales_order_lines'].find(legacy_query))
+        if legacy_items:
+            mapped_items = []
+            for legacy in legacy_items:
+                mapped_items.append({
+                    '_id': str(legacy.get('_id') or ObjectId()),
+                    'order': order_id,
+                    'part_id': legacy.get('part_id'),
+                    'part': legacy.get('part_id'),
+                    'quantity': legacy.get('quantity', 0),
+                    'allocated': legacy.get('allocated', 0),
+                    'shipped': legacy.get('shipped', 0),
+                    'sale_price': legacy.get('sale_price'),
+                    'sale_price_currency': legacy.get('sale_price_currency'),
+                    'reference': legacy.get('reference', ''),
+                    'notes': legacy.get('notes', '')
+                })
+            items = mapped_items
+            orders_collection.update_one(
+                {'_id': order_oid},
+                {'$set': {'items': items, 'line_items': len(items), 'updated_at': datetime.utcnow()}}
+            )
+
+    for item in items:
+        if '_id' not in item:
+            item['_id'] = str(ObjectId())
+        if not item.get('order'):
+            item['order'] = order_id
+        if not item.get('part') and item.get('part_id'):
+            item['part'] = item.get('part_id')
+        if item.get('part_id'):
+            try:
+                part = db['depo_parts'].find_one({'_id': ObjectId(item['part_id'])})
+            except Exception:
+                part = None
+            if part:
+                item['part_detail'] = {
+                    'name': part.get('name'),
+                    'IPN': part.get('ipn'),
+                    'um': part.get('um')
+                }
+        if item.get('allocated') is None:
+            item['allocated'] = 0
+        if item.get('shipped') is None:
+            item['shipped'] = 0
+
+    orders_collection.update_one(
+        {'_id': order_oid},
+        {'$set': {'items': items, 'updated_at': datetime.utcnow()}}
+    )
+
+    return order, orders_collection, items
 
 
 @router.get("/sales-orders")
@@ -313,12 +398,70 @@ async def get_sales_order_items(
     current_user: dict = Depends(verify_token)
 ):
     db = get_db()
-    items = list(db['depo_sales_order_lines'].find({'order_id': order_id}))
+    orders_collection = db['depo_sales_ordes']
+    order = orders_collection.find_one({'_id': ObjectId(order_id)})
+    if not order:
+        orders_collection = db['depo_sales_orders']
+        order = orders_collection.find_one({'_id': ObjectId(order_id)})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    items = order.get('items', [])
+
+    # Backfill from legacy lines if no embedded items
+    if not items:
+        legacy_items = list(db['depo_sales_order_lines'].find({'order_id': {'$in': [order_id, ObjectId(order_id)]}}))
+        if legacy_items:
+            mapped_items = []
+            for legacy in legacy_items:
+                mapped_items.append({
+                    '_id': str(legacy.get('_id') or ObjectId()),
+                    'order': order_id,
+                    'part_id': legacy.get('part_id'),
+                    'part': legacy.get('part_id'),
+                    'quantity': legacy.get('quantity', 0),
+                    'allocated': legacy.get('allocated', 0),
+                    'shipped': legacy.get('shipped', 0),
+                    'sale_price': legacy.get('sale_price'),
+                    'sale_price_currency': legacy.get('sale_price_currency'),
+                    'reference': legacy.get('reference', ''),
+                    'notes': legacy.get('notes', '')
+                })
+            items = mapped_items
+            orders_collection.update_one(
+                {'_id': ObjectId(order_id)},
+                {'$set': {'items': items, 'line_items': len(items), 'updated_at': datetime.utcnow()}}
+            )
+
+    # Enrich items with part details
     for item in items:
+        if '_id' not in item:
+            item['_id'] = str(ObjectId())
+        if not item.get('order'):
+            item['order'] = order_id
+        if not item.get('part') and item.get('part_id'):
+            item['part'] = item.get('part_id')
         if item.get('part_id'):
-            part = db['depo_parts'].find_one({'_id': ObjectId(item['part_id'])})
+            try:
+                part = db['depo_parts'].find_one({'_id': ObjectId(item['part_id'])})
+            except Exception:
+                part = None
             if part:
-                item['part_detail'] = serialize_doc(part)
+                item['part_detail'] = {
+                    'name': part.get('name'),
+                    'IPN': part.get('ipn'),
+                    'um': part.get('um')
+                }
+        if item.get('allocated') is None:
+            item['allocated'] = 0
+        if item.get('shipped') is None:
+            item['shipped'] = 0
+
+    orders_collection.update_one(
+        {'_id': ObjectId(order_id)},
+        {'$set': {'items': items, 'updated_at': datetime.utcnow()}}
+    )
+
     return {"results": serialize_doc(items)}
 
 
@@ -331,9 +474,11 @@ async def add_sales_order_item(
     db = get_db()
     orders = db['depo_sales_ordes']
     parts = db['depo_parts']
-    lines = db['depo_sales_order_lines']
 
     order = orders.find_one({'_id': ObjectId(order_id)})
+    if not order:
+        orders = db['depo_sales_orders']
+        order = orders.find_one({'_id': ObjectId(order_id)})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -344,8 +489,10 @@ async def add_sales_order_item(
         raise HTTPException(status_code=400, detail="Part is not marked as salable")
 
     doc = {
-        'order_id': order_id,
+        '_id': str(ObjectId()),
+        'order': order_id,
         'part_id': item.part_id,
+        'part': item.part_id,
         'quantity': item.quantity,
         'allocated': 0,
         'shipped': 0,
@@ -353,12 +500,25 @@ async def add_sales_order_item(
         'sale_price_currency': item.sale_price_currency or order.get('currency') or 'EUR',
         'reference': item.reference or '',
         'notes': item.notes or '',
-        'created_at': datetime.utcnow(),
-        'updated_at': datetime.utcnow(),
-        'created_by': current_user.get('username')
+        'part_detail': {
+            'name': part.get('name'),
+            'IPN': part.get('ipn'),
+            'um': part.get('um')
+        }
     }
-    result = lines.insert_one(doc)
-    doc['_id'] = result.inserted_id
+
+    items = order.get('items', [])
+    items.append(doc)
+
+    orders.update_one(
+        {'_id': ObjectId(order_id)},
+        {'$set': {
+            'items': items,
+            'line_items': len(items),
+            'updated_at': datetime.utcnow()
+        }}
+    )
+
     return serialize_doc(doc)
 
 
@@ -370,24 +530,49 @@ async def update_sales_order_item(
     current_user: dict = Depends(verify_token)
 ):
     db = get_db()
-    lines = db['depo_sales_order_lines']
+    orders = db['depo_sales_ordes']
+    parts = db['depo_parts']
 
-    existing = lines.find_one({'_id': ObjectId(item_id), 'order_id': order_id})
-    if not existing:
+    order = orders.find_one({'_id': ObjectId(order_id)})
+    if not order:
+        orders = db['depo_sales_orders']
+        order = orders.find_one({'_id': ObjectId(order_id)})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    items = order.get('items', [])
+    item_index = next((idx for idx, it in enumerate(items) if it.get('_id') == item_id), None)
+    if item_index is None:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    update_fields = {
-        'quantity': item.quantity,
-        'sale_price': item.sale_price,
-        'sale_price_currency': item.sale_price_currency or existing.get('sale_price_currency'),
-        'reference': item.reference or '',
-        'notes': item.notes or '',
-        'updated_at': datetime.utcnow()
-    }
+    existing = items[item_index]
 
-    lines.update_one({'_id': ObjectId(item_id)}, {'$set': update_fields})
-    updated = lines.find_one({'_id': ObjectId(item_id)})
-    return serialize_doc(updated)
+    existing['quantity'] = item.quantity
+    existing['sale_price'] = item.sale_price
+    existing['sale_price_currency'] = item.sale_price_currency or existing.get('sale_price_currency') or order.get('currency')
+    existing['reference'] = item.reference or ''
+    existing['notes'] = item.notes or ''
+
+    if item.part_id and item.part_id != existing.get('part_id'):
+        part = parts.find_one({'_id': ObjectId(item.part_id)})
+        if not part:
+            raise HTTPException(status_code=404, detail="Part not found")
+        existing['part_id'] = item.part_id
+        existing['part'] = item.part_id
+        existing['part_detail'] = {
+            'name': part.get('name'),
+            'IPN': part.get('ipn'),
+            'um': part.get('um')
+        }
+
+    items[item_index] = existing
+
+    orders.update_one(
+        {'_id': ObjectId(order_id)},
+        {'$set': {'items': items, 'updated_at': datetime.utcnow()}}
+    )
+
+    return serialize_doc(existing)
 
 
 @router.delete("/sales-orders/{order_id}/items/{item_id}")
@@ -397,10 +582,29 @@ async def delete_sales_order_item(
     current_user: dict = Depends(verify_token)
 ):
     db = get_db()
-    lines = db['depo_sales_order_lines']
-    result = lines.delete_one({'_id': ObjectId(item_id), 'order_id': order_id})
-    if result.deleted_count == 0:
+    orders = db['depo_sales_ordes']
+
+    order = orders.find_one({'_id': ObjectId(order_id)})
+    if not order:
+        orders = db['depo_sales_orders']
+        order = orders.find_one({'_id': ObjectId(order_id)})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    items = order.get('items', [])
+    new_items = [it for it in items if it.get('_id') != item_id]
+    if len(new_items) == len(items):
         raise HTTPException(status_code=404, detail="Item not found")
+
+    orders.update_one(
+        {'_id': ObjectId(order_id)},
+        {'$set': {
+            'items': new_items,
+            'line_items': len(new_items),
+            'updated_at': datetime.utcnow()
+        }}
+    )
+
     return {"success": True}
 
 
@@ -494,6 +698,184 @@ async def get_sales_order_attachments(
     db = get_db()
     atts = list(db['depo_sales_order_attachments'].find({'order_id': order_id}))
     return {"results": serialize_doc(atts)}
+
+
+@router.get("/sales-orders/{order_id}/returns")
+async def get_sales_order_returns(
+    order_id: str,
+    current_user: dict = Depends(verify_token)
+):
+    db = get_db()
+    coll = db['depo_return_orders']
+    query = {'sales_order_id': order_id}
+    try:
+        query = {'sales_order_id': {'$in': [order_id, ObjectId(order_id)]}}
+    except Exception:
+        pass
+    returns = list(coll.find(query).sort('created_at', -1))
+    return {"results": serialize_doc(returns)}
+
+
+@router.post("/sales-orders/{order_id}/returns")
+async def create_sales_order_return(
+    order_id: str,
+    payload: ReturnOrderRequest,
+    current_user: dict = Depends(verify_token)
+):
+    db = get_db()
+
+    order, _, order_items = _load_sales_order_with_items(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Return must have at least one item")
+
+    coll = db['depo_return_orders']
+
+    returned_by_item = {}
+    try:
+        query = {'sales_order_id': {'$in': [order_id, ObjectId(order_id)]}}
+    except Exception:
+        query = {'sales_order_id': order_id}
+    existing_returns = list(coll.find(query))
+    for ret in existing_returns:
+        for item in ret.get('items', []):
+            key = item.get('order_item_id') or item.get('order_item') or item.get('sales_item_id')
+            if not key:
+                continue
+            returned_by_item[key] = returned_by_item.get(key, 0.0) + float(item.get('quantity') or 0)
+
+    items_by_id = {str(item.get('_id')): item for item in order_items}
+
+    return_items = []
+    for req_item in payload.items:
+        if req_item.quantity is None or req_item.quantity <= 0:
+            continue
+
+        order_item_id = req_item.order_item_id
+        if not order_item_id or order_item_id not in items_by_id:
+            raise HTTPException(status_code=400, detail="Invalid order item")
+
+        source_item = items_by_id[order_item_id]
+        available = float(source_item.get('quantity') or 0) - float(returned_by_item.get(order_item_id, 0.0))
+        if req_item.quantity > available + 1e-6:
+            raise HTTPException(status_code=400, detail="Return quantity exceeds available amount")
+
+        part_id = req_item.part_id or source_item.get('part_id') or source_item.get('part')
+        if not part_id:
+            raise HTTPException(status_code=400, detail="Part not found for item")
+
+        part_detail = source_item.get('part_detail')
+        if not part_detail:
+            try:
+                part_doc = db['depo_parts'].find_one({'_id': ObjectId(part_id)})
+            except Exception:
+                part_doc = None
+            if part_doc:
+                part_detail = {
+                    'name': part_doc.get('name'),
+                    'IPN': part_doc.get('ipn'),
+                    'um': part_doc.get('um')
+                }
+
+        return_items.append({
+            '_id': str(ObjectId()),
+            'order_item_id': order_item_id,
+            'part_id': part_id,
+            'part': part_id,
+            'quantity': req_item.quantity,
+            'received': 0,
+            'stocks': [],
+            'sale_price': source_item.get('sale_price'),
+            'sale_price_currency': source_item.get('sale_price_currency'),
+            'notes': req_item.notes or '',
+            'part_detail': part_detail
+        })
+
+    if not return_items:
+        raise HTTPException(status_code=400, detail="Return must have at least one item")
+
+    reference = None
+    last_order = coll.find_one(
+        {'reference': {'$regex': '^RO-'}},
+        sort=[('reference', -1)]
+    )
+    if last_order and last_order.get('reference'):
+        try:
+            reference = int(last_order['reference'].replace('RO-', ''))
+        except ValueError:
+            reference = None
+    next_ref = (reference or 0) + 1
+    reference = f"RO-{next_ref:04d}"
+
+    doc = {
+        'reference': reference,
+        'sales_order_id': order_id,
+        'sales_order_reference': order.get('reference', ''),
+        'customer_id': order.get('customer_id'),
+        'currency': order.get('currency', ''),
+        'issue_date': datetime.utcnow().strftime('%Y-%m-%d'),
+        'notes': payload.notes or '',
+        'items': return_items,
+        'line_items': len(return_items),
+        'created_at': datetime.utcnow(),
+        'updated_at': datetime.utcnow(),
+        'created_by': current_user.get('username')
+    }
+    try:
+        doc['state_id'] = ObjectId(RETURN_ORDER_INITIAL_STATE_ID)
+    except Exception:
+        doc['state_id'] = RETURN_ORDER_INITIAL_STATE_ID
+
+    result = coll.insert_one(doc)
+    doc['_id'] = result.inserted_id
+
+    try:
+        templates_collection = db['approval_templates']
+        approval_template = templates_collection.find_one({
+            '_id': ObjectId(RETURN_ORDER_APPROVAL_TEMPLATE_ID)
+        })
+
+        if approval_template:
+            officers = approval_template.get('officers', [])
+            required_officers = []
+            optional_officers = []
+
+            for officer in officers:
+                o_data = {
+                    "type": officer.get('type'),
+                    "reference": officer.get('reference'),
+                    "action": officer.get('action'),
+                    "order": officer.get('order', 0)
+                }
+                if officer.get('action') == 'must_sign':
+                    required_officers.append(o_data)
+                elif officer.get('action') == 'can_sign':
+                    optional_officers.append(o_data)
+
+            required_officers.sort(key=lambda x: x.get('order', 0))
+            optional_officers.sort(key=lambda x: x.get('order', 0))
+
+            flow_data = {
+                "object_type": "return_order",
+                "object_source": "depo_returns",
+                "object_id": str(result.inserted_id),
+                "template_id": str(approval_template['_id']),
+                "template_name": approval_template.get('name'),
+                "min_signatures": len(required_officers),
+                "required_officers": required_officers,
+                "optional_officers": optional_officers,
+                "signatures": [],
+                "status": "pending",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            db['approval_flows'].insert_one(flow_data)
+    except Exception as e:
+        print(f"Failed to auto-create approval flow for return order: {e}")
+
+    return serialize_doc(doc)
 
 
 @router.get("/sales-orders/{order_id}/allocations")
@@ -592,6 +974,85 @@ async def get_sales_order_statuses(
     db = get_db()
     states = list(db['depo_sales_ordes_states'].find().sort('value', 1))
     return {"statuses": serialize_doc(states)}
+
+
+@router.get("/returns")
+async def get_return_orders(
+    search: Optional[str] = Query(None),
+    state_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    current_user: dict = Depends(verify_token)
+):
+    db = get_db()
+    coll = db['depo_return_orders']
+
+    query = {}
+    if search:
+        search_val = search.strip()
+        query['$or'] = [
+            {'reference': {'$regex': search_val, '$options': 'i'}},
+            {'sales_order_reference': {'$regex': search_val, '$options': 'i'}},
+            {'notes': {'$regex': search_val, '$options': 'i'}}
+        ]
+    if state_id:
+        try:
+            query['state_id'] = ObjectId(state_id)
+        except Exception:
+            query['state_id'] = state_id
+    if date_from or date_to:
+        query['issue_date'] = {}
+        if date_from:
+            query['issue_date']['$gte'] = date_from
+        if date_to:
+            query['issue_date']['$lte'] = date_to
+
+    returns = list(coll.find(query).sort('created_at', -1))
+
+    for ret in returns:
+        if ret.get('state_id'):
+            try:
+                state_oid = ObjectId(ret['state_id']) if isinstance(ret['state_id'], str) else ret['state_id']
+                state = db['depo_sales_ordes_states'].find_one({'_id': state_oid})
+            except Exception:
+                state = None
+            if state:
+                ret['state_detail'] = {
+                    'name': state.get('name'),
+                    'color': state.get('color', 'gray'),
+                    'value': state.get('value', 0)
+                }
+                ret['status'] = state.get('value', 10)
+                ret['status_text'] = state.get('name')
+
+        customer_detail = None
+        customer_id = ret.get('customer_id')
+        if customer_id:
+            try:
+                customer_oid = ObjectId(customer_id) if isinstance(customer_id, str) else customer_id
+                customer_detail = db['depo_companies'].find_one({'_id': customer_oid})
+            except Exception:
+                customer_detail = None
+        if not customer_detail:
+            sales_order_id = ret.get('sales_order_id')
+            if sales_order_id:
+                try:
+                    order_oid = ObjectId(sales_order_id) if isinstance(sales_order_id, str) else sales_order_id
+                    order_doc = db['depo_sales_ordes'].find_one({'_id': order_oid}) or db['depo_sales_orders'].find_one({'_id': order_oid})
+                except Exception:
+                    order_doc = None
+                if order_doc and order_doc.get('customer_id'):
+                    try:
+                        customer_oid = ObjectId(order_doc['customer_id']) if isinstance(order_doc['customer_id'], str) else order_doc['customer_id']
+                        customer_detail = db['depo_companies'].find_one({'_id': customer_oid})
+                    except Exception:
+                        customer_detail = None
+        if customer_detail:
+            ret['customer_detail'] = serialize_doc(customer_detail)
+        if 'line_items' not in ret:
+            ret['line_items'] = len(ret.get('items', []))
+
+    return {"results": serialize_doc(returns)}
 
 
 @router.patch("/sales-orders/{order_id}/status")

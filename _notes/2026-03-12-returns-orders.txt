@@ -1,0 +1,5 @@
+Summary:
+- Added return orders initiated from sales orders (backend + frontend tab + modal).
+- Added return order endpoints and storage in depo_return_orders with embedded items.
+- Added UI tab with table and modal for return creation.
+- Sanitized document user_name to avoid "None None" and ensured procurement/sales payloads include user_name.

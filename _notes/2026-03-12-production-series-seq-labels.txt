@@ -1,0 +1,10 @@
+Summary:
+- Production tab series now sequentially active based on Used Qty completion, with Available Qty derived from signed prior series.
+- Canceled series disables inputs, resets used qty/production fields, and is excluded from consumption calculations.
+- Failed series creates stock with state_id = 694322538728e4d75ae7278c and keeps consumption.
+- Production step saved to stock production info and displayed read-only in Stock Details.
+- Label generation payload includes production_step from stock production info; user_name prefers full name.
+
+Assumptions:
+- "Only one active series" implemented as only the first incomplete series being editable; later series are disabled until Used Qty filled in current.
+- Expiry date not required for failed series; produced_qty required for failed; production_step required for non-canceled.

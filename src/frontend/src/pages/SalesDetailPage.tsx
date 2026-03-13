@@ -13,7 +13,8 @@ import {
   IconTruck,
   IconPaperclip,
   IconBoxSeam,
-  IconReceipt
+  IconReceipt,
+  IconArrowBack
 } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,7 @@ import { SalesDetailsTab } from '../components/Sales/SalesDetailPage/SalesDetail
 import { SalesItemsTab } from '../components/Sales/SalesDetailPage/SalesItemsTab';
 import { SalesAllocationTab } from '../components/Sales/SalesDetailPage/SalesAllocationTab';
 import { SalesDeliveryTab } from '../components/Sales/SalesDetailPage/SalesDeliveryTab';
+import { SalesReturnsTab } from '../components/Sales/SalesDetailPage/SalesReturnsTab';
 import { AttachmentsTable } from '../components/Common/AttachmentsTable';
 import { JournalTab } from '../components/Common/JournalTab';
 
@@ -42,6 +44,7 @@ export function SalesDetailPage() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [allocations, setAllocations] = useState<any[]>([]);
+  const [returnOrders, setReturnOrders] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
   const [approvalFlow, setApprovalFlow] = useState<any | null>(null);
   const [allocModalItemId, setAllocModalItemId] = useState<string | null>(null);
@@ -63,12 +66,13 @@ export function SalesDetailPage() {
       setLoading(true);
       setError(null);
 
-      const [orderData, itemsData, shipmentsData, attachmentsData, statusesData] = await Promise.all([
+      const [orderData, itemsData, shipmentsData, attachmentsData, statusesData, returnsData] = await Promise.all([
         salesService.getSalesOrder(id),
         salesService.getSalesOrderItems(id),
         salesService.getShipments(id),
         salesService.getAttachments(id),
         salesService.getOrderStatuses(),
+        salesService.getReturnOrders(id)
       ]);
 
       // Ensure approval flow exists (lazy create)
@@ -92,6 +96,7 @@ export function SalesDetailPage() {
       setShipments(shipmentsData.results || shipmentsData || []);
       setAttachments(attachmentsData.results || attachmentsData || []);
       setStatuses(statusesData.statuses || []);
+      setReturnOrders(returnsData.results || returnsData || []);
       setApprovalFlow(flow || null);
       setAllocations(allocData);
     } catch (err: any) {
@@ -271,6 +276,9 @@ export function SalesDetailPage() {
           <Tabs.Tab value="attachments" leftSection={<IconPaperclip size={16} />}>
             {t('Attachments')} ({attachments.length})
           </Tabs.Tab>
+          <Tabs.Tab value="returns" leftSection={<IconArrowBack size={16} />}>
+            {t('Returns')} ({returnOrders.length})
+          </Tabs.Tab>
           <Tabs.Tab value="journal" leftSection={<IconReceipt size={16} />}>
             {t('Journal')}
           </Tabs.Tab>
@@ -325,6 +333,15 @@ export function SalesDetailPage() {
             attachments={attachments}
             onDownload={(att) => console.log('Download', att)}
             onDelete={(att) => console.log('Delete', att)}
+          />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="returns" pt="md">
+          <SalesReturnsTab
+            orderId={order._id}
+            items={items}
+            returns={returnOrders}
+            onRefresh={loadOrderData}
           />
         </Tabs.Panel>
 

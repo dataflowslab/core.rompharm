@@ -1,0 +1,24 @@
+Task: Return orders detail page + returns list + production decision unlock
+Date: 2026-03-13
+
+Summary:
+- Added /api/returns backend router with list, detail, items, receive stock, attachments, approvals, and journal endpoints.
+- Added frontend return order detail page at /returns/:id with Details, Items, Receive Stock, Attachments, Journal tabs.
+- Returns list now mirrors procurement list (filters + sortable table + progress bar).
+- Sales Returns tab rows now navigate to /returns/:id.
+- Production series decision select/comment now stays editable until signatures; switching from canceled resets used_qty to null.
+
+Files touched:
+- src/backend/routes/returns.py
+- src/backend/app.py
+- src/backend/routes/sales.py
+- src/frontend/src/pages/ReturnDetailPage.tsx
+- src/frontend/src/pages/ReturnsPage.tsx
+- src/frontend/src/components/Returns/*
+- src/frontend/src/components/Sales/SalesDetailPage/SalesReturnsTab.tsx
+- src/frontend/src/components/Requests/ProductionSeriesTable.tsx
+- src/frontend/src/services/returns.ts
+- src/frontend/src/components/Common/DocumentManager.tsx
+- src/frontend/src/App.tsx
+- src/frontend/src/i18n/locales/en.json
+- src/frontend/src/i18n/locales/ro.json

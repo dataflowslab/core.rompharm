@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-03-04 00:28:19
+**Last Updated:** 2026-03-13 10:47:27
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -17,9 +17,28 @@
 ### Forms
 - `GET /api/forms/{slug}` - List all forms (requires administrator access)
 
+### Returns
+- `GET /api/returns/order-statuses`
+- `DELETE /api/returns/stock-items/{stock_id}`
+- `GET /api/returns/stock-statuses`
+- `GET /api/returns/{return_id}`
+- `PATCH /api/returns/{return_id}`
+- `GET /api/returns/{return_id}/approval-flow`
+- `POST /api/returns/{return_id}/approval-flow`
+- `GET /api/returns/{return_id}/attachments`
+- `POST /api/returns/{return_id}/attachments`
+- `DELETE /api/returns/{return_id}/attachments/{attachment_id}`
+- `GET /api/returns/{return_id}/items`
+- `GET /api/returns/{return_id}/journal`
+- `POST /api/returns/{return_id}/receive-stock`
+- `GET /api/returns/{return_id}/received-items`
+- `POST /api/returns/{return_id}/sign`
+- `DELETE /api/returns/{return_id}/signatures/{user_id}`
+
 ### Sales
 - `GET /api/sales/customers`
 - `GET /api/sales/order-statuses`
+- `GET /api/sales/returns`
 - `GET /api/sales/sales-orders`
 - `POST /api/sales/sales-orders`
 - `GET /api/sales/sales-orders/{order_id}`
@@ -32,6 +51,8 @@
 - `POST /api/sales/sales-orders/{order_id}/items`
 - `DELETE /api/sales/sales-orders/{order_id}/items/{item_id}`
 - `PUT /api/sales/sales-orders/{order_id}/items/{item_id}`
+- `GET /api/sales/sales-orders/{order_id}/returns`
+- `POST /api/sales/sales-orders/{order_id}/returns`
 - `GET /api/sales/sales-orders/{order_id}/shipments`
 - `POST /api/sales/sales-orders/{order_id}/shipments`
 - `DELETE /api/sales/sales-orders/{order_id}/shipments/{shipment_id}`

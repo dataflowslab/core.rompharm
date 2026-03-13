@@ -6,6 +6,9 @@ interface AuthContextType {
   username: string | null;
   name: string | null;
   isStaff: boolean;
+  userId: string | null;
+  localRole: string | null;
+  roleSlug: string | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -26,22 +29,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isStaff, setIsStaff] = useState<boolean>(
     localStorage.getItem('auth_is_staff') === 'true'
   );
+  const [userId, setUserId] = useState<string | null>(
+    localStorage.getItem('auth_user_id')
+  );
+  const [localRole, setLocalRole] = useState<string | null>(
+    localStorage.getItem('auth_local_role')
+  );
+  const [roleSlug, setRoleSlug] = useState<string | null>(
+    localStorage.getItem('auth_role_slug')
+  );
 
   useEffect(() => {
     if (token) {
       api.defaults.headers.common['Authorization'] = `Token ${token}`;
-      
-      // Verify token and load user info (including name)
-      api.get('/api/auth/verify')
+
+      // Verify token and load user info (including name/role)
+      api.get('/api/auth/me')
         .then(response => {
-          if (response.data.name && !name) {
-            setName(response.data.name);
-            localStorage.setItem('auth_name', response.data.name);
+          const data = response.data || {};
+          if (data.username) {
+            setUsername(data.username);
+            localStorage.setItem('auth_username', data.username);
+          }
+          if (data.name) {
+            setName(data.name);
+            localStorage.setItem('auth_name', data.name);
+          }
+          if (typeof data.is_staff === 'boolean') {
+            setIsStaff(data.is_staff);
+            localStorage.setItem('auth_is_staff', data.is_staff.toString());
+          }
+          if (data._id) {
+            setUserId(data._id);
+            localStorage.setItem('auth_user_id', data._id);
+          }
+          if (data.local_role) {
+            setLocalRole(data.local_role);
+            localStorage.setItem('auth_local_role', data.local_role);
+          }
+          if (data.role_slug) {
+            setRoleSlug(data.role_slug);
+            localStorage.setItem('auth_role_slug', data.role_slug);
           }
         })
         .catch(error => {
           console.error('Failed to verify token:', error);
-          // Token might be invalid, logout
           if (error.response?.status === 401) {
             logout();
           }
@@ -70,6 +102,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Immediately set the token in axios headers
     api.defaults.headers.common['Authorization'] = `Token ${newToken}`;
     console.log('AuthContext: Token set in axios headers');
+
+    // Load additional user info (role, id)
+    try {
+      const meResponse = await api.get('/api/auth/me');
+      const data = meResponse.data || {};
+      if (data.username) {
+        setUsername(data.username);
+        localStorage.setItem('auth_username', data.username);
+      }
+      if (data._id) {
+        setUserId(data._id);
+        localStorage.setItem('auth_user_id', data._id);
+      }
+      if (data.local_role) {
+        setLocalRole(data.local_role);
+        localStorage.setItem('auth_local_role', data.local_role);
+      }
+      if (data.role_slug) {
+        setRoleSlug(data.role_slug);
+        localStorage.setItem('auth_role_slug', data.role_slug);
+      }
+    } catch (error) {
+      console.error('AuthContext: Failed to load user details after login:', error);
+    }
   };
 
   const logout = () => {
@@ -77,10 +133,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsername(null);
     setName(null);
     setIsStaff(false);
+    setUserId(null);
+    setLocalRole(null);
+    setRoleSlug(null);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_username');
     localStorage.removeItem('auth_name');
     localStorage.removeItem('auth_is_staff');
+    localStorage.removeItem('auth_user_id');
+    localStorage.removeItem('auth_local_role');
+    localStorage.removeItem('auth_role_slug');
   };
 
   return (
@@ -90,6 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username,
         name,
         isStaff,
+        userId,
+        localRole,
+        roleSlug,
         login,
         logout,
         isAuthenticated: !!token,

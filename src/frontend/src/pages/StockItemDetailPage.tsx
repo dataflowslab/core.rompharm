@@ -13,6 +13,7 @@ import {
   Stack,
   Table,
   Anchor,
+  Select,
 } from '@mantine/core';
 import {
   IconArrowLeft,
@@ -25,6 +26,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
+import { requestsApi } from '../services/requests';
 import { formatDate } from '../utils/dateFormat';
 import { QualityControlTab } from '../components/Stock/QualityControlTab';
 import { TransfersTab } from '../components/Stock/TransfersTab';
@@ -60,6 +62,10 @@ interface StockDetail {
   created_by: string;
   updated_by: string;
 
+  production?: {
+    production_step_id?: string;
+  };
+
   // Enriched data
   part_detail?: {
     name: string;
@@ -89,12 +95,17 @@ export function StockItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [stock, setStock] = useState<StockDetail | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>('details');
+  const [productionSteps, setProductionSteps] = useState<Array<{ value: string; label: string }>>([]);
 
   useEffect(() => {
     if (id) {
       fetchStockDetails();
     }
   }, [id]);
+
+  useEffect(() => {
+    loadProductionSteps();
+  }, []);
 
   const fetchStockDetails = async () => {
     try {
@@ -109,6 +120,20 @@ export function StockItemDetailPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProductionSteps = async () => {
+    try {
+      const response = await api.get(requestsApi.getProductionSteps());
+      const steps = response.data.results || response.data || [];
+      const options = steps.map((step: any) => ({
+        value: step._id,
+        label: step.name || step.label || step.code || step._id
+      }));
+      setProductionSteps(options);
+    } catch (error) {
+      setProductionSteps([]);
     }
   };
 
@@ -251,6 +276,19 @@ export function StockItemDetailPage() {
                             </Text>
                           )}
                         </Stack>
+                      </Table.Td>
+                    </Table.Tr>
+                    <Table.Tr>
+                      <Table.Td fw={500}>{t('Production step')}</Table.Td>
+                      <Table.Td>
+                        <Select
+                          data={productionSteps}
+                          value={stock.production?.production_step_id || ''}
+                          disabled
+                          placeholder={t('Not set')}
+                          searchable
+                          clearable={false}
+                        />
                       </Table.Td>
                     </Table.Tr>
                   </Table.Tbody>

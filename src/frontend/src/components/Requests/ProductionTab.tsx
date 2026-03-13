@@ -15,7 +15,7 @@ interface Material {
   part_name: string;
   batch: string;
   received_qty: number;
-  used_qty: number;
+  used_qty: number | null;
 }
 
 interface Serie {
@@ -83,9 +83,11 @@ interface ProductionTabProps {
   onReload: () => void;
 }
 
+const CANCELED_TOKENS = ['canceled', 'cancelled', 'anulat', 'anulare', 'cancel', 'cancelare'];
+
 export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
   const { t } = useTranslation();
-  const { username, isStaff } = useAuth();
+  const { username, isStaff, localRole, roleSlug, userId } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [series, setSeries] = useState<Serie[]>([]);
@@ -163,9 +165,9 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
           materials: items.map((item: any) => ({
             part: item.part,
             part_name: item.part_detail?.name || item.part,
-            batch: '',
+            batch: item.batch_code || item.batch || '',
             received_qty: item.received_quantity || item.quantity || 0,
-            used_qty: 0
+            used_qty: null
           }))
         }));
 
@@ -191,6 +193,13 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
     try {
       const response = await api.get(requestsApi.getProductionData(requestId));
       if (response.data && response.data.series) {
+        const normalizeMaterials = (materials: Material[] | undefined) => (materials || []).map(material => ({
+          ...material,
+          batch: material.batch || '',
+          received_qty: Number(material.received_qty) || 0,
+          used_qty: material.used_qty === null || material.used_qty === undefined ? null : Number(material.used_qty) || 0
+        }));
+
         const normalizedSeries = (response.data.series || []).map((serie: Serie) => ({
           ...serie,
           produced_qty: serie.produced_qty || 0,
@@ -198,7 +207,8 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
           production_step_id: serie.production_step_id || '',
           decision_status: serie.decision_status || '',
           decision_reason: serie.decision_reason || '',
-          signatures: serie.signatures || []
+          signatures: serie.signatures || [],
+          materials: normalizeMaterials(serie.materials)
         }));
 
         setSeries(normalizedSeries);
@@ -269,7 +279,18 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
 
     const materialMap = new Map<string, UnusedMaterial>();
 
+    const isCanceledDecision = (decisionStatus?: string) => {
+      if (!decisionStatus) return false;
+      const state = availableStates.find(s => s._id === decisionStatus);
+      if (!state) return false;
+      const haystack = `${state.name || ''} ${state.slug || ''}`.toLowerCase();
+      return CANCELED_TOKENS.some(token => haystack.includes(token));
+    };
+
     series.forEach(serie => {
+      if (isCanceledDecision(serie.decision_status)) {
+        return;
+      }
       serie.materials.forEach(material => {
         if (!materialMap.has(material.part)) {
           materialMap.set(material.part, {
@@ -285,7 +306,7 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
 
         const entry = materialMap.get(material.part)!;
         entry.total_received += material.received_qty;
-        entry.total_used += material.used_qty;
+        entry.total_used += Number(material.used_qty) || 0;
       });
     });
 
@@ -297,7 +318,7 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
     });
 
     return Array.from(materialMap.values());
-  }, [series, returnQuantities]);
+  }, [series, returnQuantities, availableStates]);
 
   const buildUnusedMaterialsPayload = () => {
     return unusedMaterials.map(material => ({
@@ -429,19 +450,21 @@ export function ProductionTab({ requestId, onReload }: ProductionTabProps) {
   };
 
   const canUserSign = () => {
-    if (!flow || !username) return false;
+    if (!flow) return false;
 
-    const canSign = flow.can_sign_officers.some(o => {
-      if (o.username === username) return true;
-      if (o.type === 'role' && o.reference === 'admin' && isStaff) return true;
+    const matchesOfficer = (o: any) => {
+      if (username && o.username && o.username === username) return true;
+      if (o.reference && userId && o.reference === userId) return true;
+      if (o.type === 'role') {
+        if (roleSlug && o.reference === roleSlug) return true;
+        if (localRole && o.reference === localRole) return true;
+        if (o.reference === 'admin' && isStaff) return true;
+      }
       return false;
-    });
+    };
 
-    const mustSign = flow.must_sign_officers.some(o => {
-      if (o.username === username) return true;
-      if (o.type === 'role' && o.reference === 'admin' && isStaff) return true;
-      return false;
-    });
+    const canSign = flow.can_sign_officers.some(matchesOfficer);
+    const mustSign = flow.must_sign_officers.some(matchesOfficer);
 
     return canSign || mustSign;
   };

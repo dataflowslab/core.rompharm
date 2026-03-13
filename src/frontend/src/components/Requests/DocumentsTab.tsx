@@ -26,6 +26,7 @@ export function DocumentsTab({ requestId }: DocumentsTabProps) {
   const [documents, setDocuments] = useState<GeneratedDocument[]>([]);
   const [generating, setGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadDocuments();
@@ -73,6 +74,8 @@ export function DocumentsTab({ requestId }: DocumentsTabProps) {
   };
 
   const handleDownload = async (jobId: string, filename: string) => {
+    if (downloading[jobId]) return;
+    setDownloading(prev => ({ ...prev, [jobId]: true }));
     try {
       const response = await api.get(
         `/api/documents/stock-request/${requestId}/job/${jobId}/download`,
@@ -101,6 +104,8 @@ export function DocumentsTab({ requestId }: DocumentsTabProps) {
         message: error.response?.data?.detail || t('Failed to download document'),
         color: 'red'
       });
+    } finally {
+      setDownloading(prev => ({ ...prev, [jobId]: false }));
     }
   };
 
@@ -174,6 +179,8 @@ export function DocumentsTab({ requestId }: DocumentsTabProps) {
                     leftSection={<IconDownload size={16} />}
                     onClick={() => handleDownload(doc.job_id, doc.filename)}
                     size="sm"
+                    loading={downloading[doc.job_id]}
+                    disabled={downloading[doc.job_id]}
                   >
                     {t('Download')}
                   </Button>

@@ -67,6 +67,20 @@ def _format_expiry(expiry) -> str:
     return str(expiry)
 
 
+def _resolve_production_step_label(db, production_step_id) -> str:
+    """Resolve production step label from depo_production_steps."""
+    if not production_step_id:
+        return ''
+    try:
+        step_oid = ObjectId(production_step_id) if isinstance(production_step_id, str) else production_step_id
+    except Exception:
+        return str(production_step_id)
+    step = db.depo_production_steps.find_one({'_id': step_oid})
+    if not step:
+        return str(production_step_id)
+    return step.get('name') or step.get('label') or step.get('code') or str(step.get('_id'))
+
+
 def _render_label_pdf(
     client: DataFlowsDocuClient,
     template_code: str,
@@ -156,7 +170,7 @@ async def generate_labels_docu(
                 'um': data.get('um', ''),
                 'is_salable': data.get('is_salable', False),
                 'storage_conditions': data.get('storage_conditions', ''),
-                'user_name': current_user.get('username', 'system'),
+                'user_name': current_user.get('name') or current_user.get('username', 'system'),
             }
         
         elif table_name == 'depo_stocks':
@@ -185,6 +199,13 @@ async def generate_labels_docu(
                 state = db.depo_stocks_states.find_one({'_id': data['state_id']})
                 if state:
                     state_name = state.get('label', state.get('name', ''))
+
+            production_step_id = None
+            if data.get('production'):
+                production_step_id = data.get('production', {}).get('production_step_id')
+            if not production_step_id and data.get('production_step_id'):
+                production_step_id = data.get('production_step_id')
+            production_step = _resolve_production_step_label(db, production_step_id)
             
             label_data = {
                 'barcode': barcode,
@@ -193,6 +214,7 @@ async def generate_labels_docu(
                 'part_ipn': part_ipn,
                 'batch_code': batch_code,
                 'expiry_date': _format_expiry(data.get('expiry_date')),
+                'production_step': production_step,
                 'quantity': data.get('initial_quantity', data.get('quantity', 0)),
                 'location_name': location_name,
                 'state_name': state_name,
@@ -200,7 +222,7 @@ async def generate_labels_docu(
                 'um': part.get('um', '') if part else '',
                 'storage_conditions': part.get('storage_conditions', '') if part else '',
                 'purchase_price': data.get('purchase_price', ''),
-                'user_name': current_user.get('username', 'system'),
+                'user_name': current_user.get('name') or current_user.get('username', 'system'),
             }
         
         elif table_name == 'depo_locations':
@@ -217,7 +239,7 @@ async def generate_labels_docu(
                 'location_name': data.get('name', ''),
                 'location_code': loc_code,
                 'location_description': data.get('description', ''),
-                'user_name': current_user.get('username', 'system'),
+                'user_name': current_user.get('name') or current_user.get('username', 'system'),
             }
         
         if label_data:

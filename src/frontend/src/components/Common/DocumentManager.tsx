@@ -29,7 +29,7 @@ interface DocumentTemplate {
 
 interface DocumentManagerProps {
   entityId: string | number;
-  entityType: 'procurement-order' | 'stock-request';
+  entityType: 'procurement-order' | 'stock-request' | 'return-order';
   templates: DocumentTemplate[];
   onDocumentGenerated?: () => void;
 }
@@ -321,6 +321,7 @@ export function DocumentManager({ entityId, entityType, templates, onDocumentGen
                             leftSection={<IconDownload size={14} />}
                             onClick={() => handleDownloadDocument(template.code)}
                             loading={isDownloading}
+                            disabled={isDownloading}
                           >
                             {t('Download')}
                           </Button>

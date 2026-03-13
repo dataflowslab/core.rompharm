@@ -22,6 +22,8 @@ import { ProcurementPage } from './pages/ProcurementPage';
 import { ProcurementDetailPage } from './pages/ProcurementDetailPage';
 import { SalesPage } from './pages/SalesPage';
 import { SalesDetailPage } from './pages/SalesDetailPage';
+import { ReturnsPage } from './pages/ReturnsPage';
+import { ReturnDetailPage } from './pages/ReturnDetailPage';
 import { BuildOrdersPage } from './pages/BuildOrdersPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { ArticlesPage } from './pages/ArticlesPage';
@@ -173,7 +175,8 @@ function App() {
           <Route path="/inventory/clients/:id" element={<ProtectedRoute><ClientDetailPage /></ProtectedRoute>} />
           <Route path="/inventory/stocks" element={<ProtectedRoute><StocksPage /></ProtectedRoute>} />
           <Route path="/inventory/stocks/:id" element={<ProtectedRoute><StockItemDetailPage /></ProtectedRoute>} />
-          <Route path="/returns" element={<ProtectedRoute><div /></ProtectedRoute>} />
+          <Route path="/returns" element={<ProtectedRoute><ReturnsPage /></ProtectedRoute>} />
+          <Route path="/returns/:id" element={<ProtectedRoute><ReturnDetailPage /></ProtectedRoute>} />
           <Route path="/withdrawals" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/deliveries" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/submissions" element={<ProtectedRoute><SubmissionsListPage /></ProtectedRoute>} />
