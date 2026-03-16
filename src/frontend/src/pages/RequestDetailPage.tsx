@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Paper, Title, Tabs, Button, Group, Badge, Text } from '@mantine/core';
 import { IconArrowLeft, IconFileText, IconSignature, IconTruck, IconPackage, IconList, IconTool } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -61,6 +61,7 @@ interface Request {
 export function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const [request, setRequest] = useState<Request | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +72,32 @@ export function RequestDetailPage() {
       loadRequest();
     }
   }, [id]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestedTab = params.get('tab');
+    if (!requestedTab) {
+      return;
+    }
+
+    if (!request) {
+      setActiveTab(requestedTab);
+      return;
+    }
+
+    const allowedTabs = new Set<string>(['details', 'approval', 'items']);
+    if (request.state_order && request.state_order > 20) {
+      allowedTabs.add('operations');
+    }
+    if (request.state_order && request.state_order > 30) {
+      allowedTabs.add('reception');
+    }
+    if (request.state_order && request.state_order > 40) {
+      allowedTabs.add('production');
+    }
+
+    setActiveTab(allowedTabs.has(requestedTab) ? requestedTab : 'details');
+  }, [location.search, request]);
 
   const loadRequest = async () => {
     try {

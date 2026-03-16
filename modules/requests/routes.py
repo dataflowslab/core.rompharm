@@ -22,13 +22,46 @@ from .services import (
     fetch_part_recipe
 )
 from .approval_routes import router as approval_router
+from .build_orders_routes import router as build_orders_router
+from .build_orders_helpers import ensure_build_orders_for_request
 
 
 router = APIRouter(prefix="/modules/requests/api", tags=["requests"])
 
+
+def _normalize_user_locations(locations) -> list:
+    normalized = []
+    if not locations:
+        return normalized
+    for loc in locations:
+        if isinstance(loc, ObjectId):
+            normalized.append(str(loc))
+        elif isinstance(loc, dict) and loc.get("$oid"):
+            normalized.append(str(loc.get("$oid")))
+        elif isinstance(loc, str):
+            normalized.append(loc)
+    return normalized
+
+
+def _get_user_location_ids(db, current_user: dict) -> list:
+    locations = _normalize_user_locations(current_user.get("locations"))
+    if locations:
+        return locations
+    user_id = current_user.get("_id") or current_user.get("user_id")
+    if not user_id:
+        return []
+    try:
+        user_doc = db.users.find_one({"_id": ObjectId(user_id)})
+    except Exception:
+        user_doc = None
+    if not user_doc:
+        return []
+    return _normalize_user_locations(user_doc.get("locations"))
+
 # Include approval routes
 # Include approval routes
 router.include_router(approval_router)
+router.include_router(build_orders_router)
 
 # Include transfer execution routes
 from .transfer_routes import router as transfer_router
@@ -86,21 +119,24 @@ async def get_stock_locations(
 async def get_parts(
     request: Request,
     search: Optional[str] = None,
+    location_id: Optional[str] = None,
+    is_assembly: Optional[bool] = None,
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
     """Get list of parts from MongoDB depo_parts with search"""
-    return await search_parts(db, search)
+    return await search_parts(db, search, location_id, is_assembly)
 
 
 @router.get("/parts/{part_id}/stock-info")
 async def get_part_stock_info_route(
     part_id: str,
+    location_id: Optional[str] = None,
     current_user: dict = Depends(verify_admin),
     db = Depends(get_db)
 ):
     """Get stock information for a part from MongoDB depo_stocks with batches using ObjectId"""
-    return await get_part_stock_info(db, part_id)
+    return await get_part_stock_info(db, part_id, location_id)
 
 
 @router.get("/parts/{part_id}/bom")
@@ -395,6 +431,8 @@ async def list_requests(
                     req['status'] = state.get('name', 'Unknown')
             except Exception as e:
                 print(f"[ERROR] Failed to lookup state for request {req.get('_id')}: {e}")
+        if not req.get('status'):
+            req['status'] = 'Pending'
         
         # Handle dates that might be datetime objects (fix_oid doesn't touch datetime unless we add it)
         # But fix_oid above didn't handle datetime.
@@ -561,6 +599,9 @@ async def get_request(
     else:
         req['state_level'] = 0
         req['state_order'] = 0
+
+    if not req.get('status'):
+        req['status'] = 'Pending'
     
     # Convert state_id if present
     if 'state_id' in req and isinstance(req['state_id'], ObjectId):
@@ -591,6 +632,79 @@ async def get_request(
     return req
 
 
+@router.get("/{request_id}/movements")
+async def get_request_movements(
+    request_id: str,
+    current_user: dict = Depends(verify_admin)
+):
+    """Get stock movements associated with a request (transfer/in-transit)"""
+    db = get_db()
+
+    try:
+        req_oid = ObjectId(request_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request ID")
+
+    movements = list(db.depo_stocks_movements.find({
+        'document_id': {'$in': [req_oid, request_id]},
+        'document_type': {'$regex': 'REQUEST', '$options': 'i'}
+    }))
+
+    if not movements:
+        return {"results": []}
+
+    # Prepare lookups
+    state_ids = set()
+    location_ids = set()
+    for mov in movements:
+        if mov.get('state_id'):
+            state_ids.add(mov.get('state_id'))
+        for loc_key in ('from_location_id', 'to_location_id', 'source_id', 'destination_id'):
+            if mov.get(loc_key):
+                location_ids.add(mov.get(loc_key))
+
+    state_map = {}
+    if state_ids:
+        states = list(db.depo_stocks_states.find({'_id': {'$in': list(state_ids)}}))
+        for st in states:
+            state_map[str(st['_id'])] = {
+                'name': st.get('name', ''),
+                'color': st.get('color', 'gray')
+            }
+
+    location_map = {}
+    if location_ids:
+        locations = list(db.depo_locations.find({'_id': {'$in': list(location_ids)}}))
+        for loc in locations:
+            location_map[str(loc['_id'])] = loc.get('code', loc.get('name', str(loc['_id'])))
+
+    # Serialize + enrich
+    results = []
+    for mov in movements:
+        mov['_id'] = str(mov['_id'])
+        for key in ('stock_id', 'part_id', 'document_id', 'state_id', 'from_location_id', 'to_location_id', 'source_id', 'destination_id'):
+            if mov.get(key):
+                mov[key] = str(mov[key])
+
+        state_detail = state_map.get(mov.get('state_id'))
+        if state_detail:
+            mov['state_detail'] = state_detail
+
+        source_id = mov.get('source_id') or mov.get('from_location_id')
+        dest_id = mov.get('destination_id') or mov.get('to_location_id')
+        mov['source_name'] = location_map.get(source_id, source_id)
+        mov['destination_name'] = location_map.get(dest_id, dest_id)
+
+        if mov.get('created_at') and isinstance(mov.get('created_at'), datetime):
+            mov['created_at'] = mov['created_at'].isoformat()
+        if mov.get('date') and isinstance(mov.get('date'), datetime):
+            mov['date'] = mov['date'].isoformat()
+
+        results.append(mov)
+
+    return {"results": results}
+
+
 @router.post("/")
 async def create_request(
     request_data: RequestCreate,
@@ -603,6 +717,11 @@ async def create_request(
     # Validate source != destination
     if request_data.source == request_data.destination:
         raise HTTPException(status_code=400, detail="Source and destination cannot be the same")
+
+    # Enforce destination access if user has assigned locations
+    allowed_destinations = _get_user_location_ids(db, current_user)
+    if allowed_destinations and str(request_data.destination) not in allowed_destinations:
+        raise HTTPException(status_code=403, detail="Destination location not allowed for current user")
     
     # Generate reference
     reference = generate_request_reference(db)
@@ -612,6 +731,9 @@ async def create_request(
     items_with_init_q = []
     for item in request_data.items:
         item_dict = item.dict()
+        # Enforce item location to match request source if provided
+        if item_dict.get("location_id") and str(item_dict.get("location_id")) != str(request_data.source):
+            raise HTTPException(status_code=400, detail="Item location must match request source")
         if item_dict.get('init_q') is None:
             item_dict['init_q'] = item_dict['quantity']  # Save initial quantity
         items_with_init_q.append(item_dict)
@@ -622,7 +744,6 @@ async def create_request(
         'destination': request_data.destination,
         'items': items_with_init_q,
         'line_items': len(request_data.items),
-        'status': 'Pending',
         'notes': request_data.notes or '',
         'issue_date': datetime.utcnow(),
         'created_at': datetime.utcnow(),
@@ -732,12 +853,32 @@ async def update_request(
     existing = requests_collection.find_one({'_id': req_obj_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Request not found")
+
+    # Determine source for validation (new or existing)
+    existing_source = existing.get('source')
+    if isinstance(existing_source, ObjectId):
+        existing_source = str(existing_source)
+    source_value = request_data.source if request_data.source is not None else existing_source
+
+    # Enforce destination access if user has assigned locations
+    if request_data.destination is not None:
+        allowed_destinations = _get_user_location_ids(db, current_user)
+        if allowed_destinations and str(request_data.destination) not in allowed_destinations:
+            raise HTTPException(status_code=403, detail="Destination location not allowed for current user")
+
+    # Enforce item location to match source if items are provided
+    if request_data.items is not None:
+        for item in request_data.items:
+            loc_id = item.location_id if hasattr(item, "location_id") else None
+            if loc_id and source_value and str(loc_id) != str(source_value):
+                raise HTTPException(status_code=400, detail="Item location must match request source")
     
     # Prepare update
     update_data = {
         'updated_at': datetime.utcnow(),
         'updated_by': current_user.get('username')
     }
+    unset_data = {'status': ""}
     
     if request_data.source is not None:
         update_data['source'] = request_data.source
@@ -747,8 +888,10 @@ async def update_request(
         update_data['notes'] = request_data.notes
     if request_data.batch_codes is not None:
         update_data['batch_codes'] = request_data.batch_codes
-    if request_data.status is not None:
-        update_data['status'] = request_data.status
+        if request_data.batch_codes:
+            update_data['open'] = True
+        else:
+            unset_data['open'] = ""
     if request_data.issue_date is not None:
         # Parse date string to datetime
         try:
@@ -775,9 +918,12 @@ async def update_request(
         raise HTTPException(status_code=400, detail="Source and destination cannot be the same")
     
     try:
+        update_doc = {'$set': update_data}
+        if unset_data:
+            update_doc['$unset'] = unset_data
         requests_collection.update_one(
             {'_id': req_obj_id},
-            {'$set': update_data}
+            update_doc
         )
     except Exception as e:
         print(f"[ERROR] Failed to update request: {e}")
@@ -788,6 +934,19 @@ async def update_request(
     # Get updated request
     updated = requests_collection.find_one({'_id': req_obj_id})
     updated['_id'] = str(updated['_id'])
+
+    # If batch codes were updated and request is already approved, ensure build orders exist
+    try:
+        if request_data.batch_codes is not None and request_data.batch_codes:
+            state_doc = None
+            if updated.get('state_id'):
+                state_doc = db.depo_requests_states.find_one({'_id': updated['state_id']})
+            state_slug = (state_doc.get('slug') if state_doc else '') or ''
+            state_name = (state_doc.get('name') if state_doc else '') or ''
+            if state_slug.lower() == 'approved' or state_name.lower() == 'approved':
+                ensure_build_orders_for_request(db, updated, datetime.utcnow())
+    except Exception as e:
+        print(f"[REQUESTS] Warning: Failed to ensure build orders on update: {e}")
     
     # Convert state_id if present
     if 'state_id' in updated and isinstance(updated['state_id'], ObjectId):

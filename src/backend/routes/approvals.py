@@ -425,8 +425,39 @@ def remove_signature(
 def get_pending_approvals(current_user: dict = Depends(verify_token)):
     """Get pending approvals for current user"""
     db = get_db()
-    user_id = current_user["_id"]
+    user_id = str(current_user["_id"])
     user_role = current_user.get("role") or current_user.get("local_role")
+    user_role = str(user_role) if user_role is not None else None
+
+    def _safe_object_id(value):
+        if not value:
+            return None
+        if isinstance(value, ObjectId):
+            return value
+        try:
+            return ObjectId(str(value))
+        except Exception:
+            return None
+
+    def _split_object_id(value):
+        raw = str(value) if value is not None else ""
+        if ":" in raw:
+            base_id, suffix = raw.split(":", 1)
+            return base_id, suffix
+        return raw, None
+
+    def _format_batch_codes(batch_codes):
+        if not batch_codes:
+            return None
+        if isinstance(batch_codes, str):
+            codes = [batch_codes.strip()]
+        else:
+            codes = [str(code).strip() for code in batch_codes if str(code).strip()]
+        if not codes:
+            return None
+        if len(codes) == 1:
+            return codes[0]
+        return f"{codes[0]} +{len(codes) - 1}"
     
     # metrics for debugging
     # print(f"DEBUG: Finding pending approvals for user {user_id} (Role: {user_role})")
@@ -440,30 +471,32 @@ def get_pending_approvals(current_user: dict = Depends(verify_token)):
     
     for flow in active_flows:
         # Check if already signed
-        if any(s["user_id"] == user_id for s in flow.get("signatures", [])):
+        if any(str(s.get("user_id")) == user_id for s in flow.get("signatures", [])):
             continue
             
         can_sign = False
         officer_type = "optional"
+        required_officers = flow.get("must_sign_officers") or flow.get("required_officers") or []
+        optional_officers = flow.get("can_sign_officers") or flow.get("optional_officers") or []
         
         # Check required officers
-        for officer in flow.get("must_sign_officers", []):
-            if officer["type"] == "person" and str(officer["reference"]) == str(user_id):
+        for officer in required_officers:
+            if officer.get("type") == "person" and str(officer.get("reference")) == user_id:
                 can_sign = True
                 officer_type = "required"
                 break
-            elif officer["type"] == "role" and user_role and str(officer["reference"]) == str(user_role):
+            elif officer.get("type") == "role" and user_role and str(officer.get("reference")) == user_role:
                 can_sign = True
                 officer_type = "required"
                 break
         
         # Check optional officers if not already found
         if not can_sign:
-            for officer in flow.get("can_sign_officers", []):
-                if officer["type"] == "person" and str(officer["reference"]) == str(user_id):
+            for officer in optional_officers:
+                if officer.get("type") == "person" and str(officer.get("reference")) == user_id:
                     can_sign = True
                     break
-                elif officer["type"] == "role" and user_role and str(officer["reference"]) == str(user_role):
+                elif officer.get("type") == "role" and user_role and str(officer.get("reference")) == user_role:
                     can_sign = True
                     break
         
@@ -471,6 +504,8 @@ def get_pending_approvals(current_user: dict = Depends(verify_token)):
             # Add metadata for frontend
             flow["_id"] = str(flow["_id"])
             flow["officer_type"] = officer_type
+            if flow.get("object_id") is not None:
+                flow["object_id"] = str(flow["object_id"])
             
             # Fetch object details for better UI context
             flow["object_details"] = {
@@ -479,9 +514,14 @@ def get_pending_approvals(current_user: dict = Depends(verify_token)):
                 "supplier": "-"
             }
 
-            if flow["object_type"] == "procurement_order" and flow["object_source"] == "depo_procurement":
+            object_type = flow.get("object_type")
+            object_source = flow.get("object_source")
+            base_object_id, series_batch = _split_object_id(flow.get("object_id"))
+
+            if object_type == "procurement_order" and object_source == "depo_procurement":
                 try:
-                    order = db.depo_purchase_orders.find_one({"_id": ObjectId(flow["object_id"])})
+                    order_oid = _safe_object_id(flow.get("object_id"))
+                    order = db.depo_purchase_orders.find_one({"_id": order_oid}) if order_oid else None
                     if order:
                         flow["object_details"]["reference"] = order.get("reference", "Unknown")
                         flow["object_details"]["description"] = order.get("description", "")
@@ -493,14 +533,91 @@ def get_pending_approvals(current_user: dict = Depends(verify_token)):
                 except Exception as e:
                     print(f"Error fetching object details: {e}")
 
-            elif flow["object_type"] == "purchase_request" and flow["object_source"] == "core":
+            elif object_type == "purchase_request" and object_source == "core":
                  try:
-                    request = db.depo_purchase_requests.find_one({"_id": ObjectId(flow["object_id"])})
+                    request_oid = _safe_object_id(flow.get("object_id"))
+                    request = db.depo_purchase_requests.find_one({"_id": request_oid}) if request_oid else None
                     if request:
                         flow["object_details"]["reference"] = request.get("reference", f"Request #{request.get('number', '')}")
                         flow["object_details"]["description"] = request.get("notes", "")
                  except Exception as e:
                     print(f"Error fetching request details: {e}")
+
+            elif object_type in {"stock_request", "stock_request_operations", "stock_request_reception", "stock_request_production", "stock_request_production_series"}:
+                try:
+                    request_oid = _safe_object_id(base_object_id)
+                    request = db.depo_requests.find_one({"_id": request_oid}) if request_oid else None
+                    if request:
+                        request_reference = request.get("reference") or ""
+                        request_notes = request.get("notes") or ""
+                        batch_label = series_batch or _format_batch_codes(request.get("batch_codes"))
+
+                        if object_type == "stock_request":
+                            flow["object_details"]["reference"] = request_reference or flow["object_details"]["reference"]
+                            flow["object_details"]["description"] = request_notes or flow["object_details"]["description"]
+                        else:
+                            if batch_label:
+                                flow["object_details"]["reference"] = batch_label
+                                flow["object_details"]["description"] = request_reference or request_notes or flow["object_details"]["description"]
+                            else:
+                                flow["object_details"]["reference"] = request_reference or flow["object_details"]["reference"]
+                                flow["object_details"]["description"] = request_notes or flow["object_details"]["description"]
+                except Exception as e:
+                    print(f"Error fetching stock request details: {e}")
+
+            elif object_type == "sales_order" and object_source == "depo_sales":
+                try:
+                    order_oid = _safe_object_id(flow.get("object_id"))
+                    order = None
+                    if order_oid:
+                        order = db['depo_sales_ordes'].find_one({"_id": order_oid})
+                        if not order:
+                            order = db['depo_sales_orders'].find_one({"_id": order_oid})
+                    if order:
+                        flow["object_details"]["reference"] = order.get("reference", "Unknown")
+                        flow["object_details"]["description"] = order.get("description", "") or order.get("notes", "")
+                except Exception as e:
+                    print(f"Error fetching sales order details: {e}")
+
+            elif object_type == "return_order":
+                try:
+                    order_oid = _safe_object_id(flow.get("object_id"))
+                    order = db['depo_return_orders'].find_one({"_id": order_oid}) if order_oid else None
+                    if order:
+                        flow["object_details"]["reference"] = order.get("reference", "Unknown")
+                        flow["object_details"]["description"] = order.get("sales_order_reference", "") or order.get("notes", "")
+                except Exception as e:
+                    print(f"Error fetching return order details: {e}")
+
+            elif object_type in {"build_order_production", "build_order_production_series"}:
+                try:
+                    build_oid = _safe_object_id(base_object_id)
+                    build_order = db['depo_build_orders'].find_one({"_id": build_oid}) if build_oid else None
+                    if build_order:
+                        batch_code = build_order.get("batch_code_text") or build_order.get("batch_code")
+                        flow["object_details"]["reference"] = batch_code or flow["object_details"]["reference"]
+                        flow["object_details"]["description"] = build_order.get("reference", "") or flow["object_details"]["description"]
+                except Exception as e:
+                    print(f"Error fetching build order details: {e}")
+
+            elif object_type == "stock_qc":
+                try:
+                    stock_oid = _safe_object_id(flow.get("object_id"))
+                    stock = db.depo_stocks.find_one({"_id": stock_oid}) if stock_oid else None
+                    if stock:
+                        batch_code = stock.get("batch_code") or stock.get("supplier_batch_code")
+                        flow["object_details"]["reference"] = batch_code or flow["object_details"]["reference"]
+                        part_name = ""
+                        part_id = stock.get("part_id")
+                        if part_id:
+                            part_oid = _safe_object_id(part_id)
+                            part = db.depo_parts.find_one({"_id": part_oid}) if part_oid else None
+                            if part:
+                                part_name = part.get("name") or ""
+                        if part_name:
+                            flow["object_details"]["description"] = part_name
+                except Exception as e:
+                    print(f"Error fetching stock details: {e}")
 
             pending_approvals.append(flow)
             

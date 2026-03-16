@@ -21,7 +21,6 @@ def update_request_state(db, request_id: str, state_slug: str, additional_data: 
     update_data = {
         'state_id': state['_id'],
         'workflow_level': state['workflow_level'],
-        'status': state['name'],
         'updated_at': datetime.utcnow()
     }
     
@@ -30,7 +29,10 @@ def update_request_state(db, request_id: str, state_slug: str, additional_data: 
     
     db.depo_requests.update_one(
         {'_id': ObjectId(request_id)},
-        {'$set': update_data}
+        {
+            '$set': update_data,
+            '$unset': {'status': ''}
+        }
     )
     
     return state

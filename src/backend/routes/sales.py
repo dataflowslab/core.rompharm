@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from src.backend.utils.db import get_db
 from src.backend.routes.auth import verify_token
+from modules.inventory.stock_movements import create_movement, MovementType, update_balance
 
 router = APIRouter(prefix="/api/sales", tags=["sales"])
 
@@ -167,6 +168,211 @@ def _load_sales_order_with_items(db, order_id: str):
     )
 
     return order, orders_collection, items
+
+
+def _resolve_allocation_stock(db, part_id: str, batch_code: Optional[str], source_location_id: Optional[str], min_qty: Optional[float] = None):
+    if not part_id or not source_location_id:
+        return None, None
+    try:
+        part_oid = ObjectId(part_id)
+        source_oid = ObjectId(source_location_id)
+    except Exception:
+        return None, None
+
+    qty_filter = {'$gt': 0}
+    if min_qty is not None and min_qty > 0:
+        qty_filter = {'$gte': min_qty}
+
+    balances = list(db.depo_stocks_balances.find({
+        'location_id': source_oid,
+        'quantity': qty_filter
+    }))
+
+    for bal in balances:
+        stock = db.depo_stocks.find_one({
+            '_id': bal.get('stock_id'),
+            'part_id': part_oid,
+            'batch_code': batch_code or ''
+        })
+        if stock:
+            return stock, source_oid
+
+    # Fallback: try stocks directly
+    query = {'part_id': part_oid, 'batch_code': batch_code or ''}
+    stock = db.depo_stocks.find_one(query)
+    return stock, source_oid
+
+
+def _safe_object_id(value):
+    try:
+        return value if isinstance(value, ObjectId) else ObjectId(value)
+    except Exception:
+        return None
+
+
+def _create_sales_allocation_movement(db, order: dict, allocation: dict, current_user: dict):
+    part_id = allocation.get('part_id') or allocation.get('part')
+    batch_code = allocation.get('batch_code') or ''
+    source_location_id = allocation.get('source_location_id')
+    quantity = allocation.get('quantity', 0)
+
+    if not part_id or not source_location_id or quantity <= 0:
+        return None
+
+    stock, source_oid = _resolve_allocation_stock(db, part_id, batch_code, str(source_location_id), quantity)
+    if not stock or not source_oid:
+        return None
+
+    order_oid = _safe_object_id(order.get('_id')) or order.get('_id')
+
+    movement_id = create_movement(
+        db=db,
+        stock_id=stock['_id'],
+        part_id=stock['part_id'],
+        batch_code=batch_code,
+        movement_type=MovementType.CONSUMPTION,
+        quantity=-float(quantity),
+        from_location_id=source_oid,
+        to_location_id=None,
+        document_type='SALES_ORDER',
+        document_id=order_oid,
+        created_by=current_user.get('username', 'system'),
+        notes=allocation.get('notes') or f"Sales order {order.get('reference', '')}"
+    )
+
+    db.depo_stocks_movements.update_one(
+        {'_id': movement_id},
+        {'$set': {
+            'allocation_id': str(allocation.get('_id')),
+            'order_id': order_oid,
+            'order_reference': order.get('reference', ''),
+            'state_id': stock.get('state_id'),
+            'source_id': source_oid,
+            'destination_id': None
+        }}
+    )
+
+    return movement_id
+
+
+def _update_sales_allocation_movement(db, order: dict, allocation_id: str, new_allocation: dict, previous_allocation: dict, current_user: dict):
+    alloc_oid = _safe_object_id(allocation_id)
+    movement = db.depo_stocks_movements.find_one({
+        'allocation_id': {'$in': [allocation_id, alloc_oid]} ,
+        'document_type': 'SALES_ORDER'
+    })
+
+    prev_qty = float(previous_allocation.get('quantity') or 0)
+    new_qty = float(new_allocation.get('quantity') or 0)
+    prev_source = previous_allocation.get('source_location_id')
+    new_source = new_allocation.get('source_location_id')
+    prev_batch = previous_allocation.get('batch_code') or ''
+    new_batch = new_allocation.get('batch_code') or ''
+    prev_part = previous_allocation.get('part_id') or previous_allocation.get('part')
+    new_part = new_allocation.get('part_id') or new_allocation.get('part')
+
+    if new_qty <= 0:
+        if movement and movement.get('from_location_id') and movement.get('stock_id'):
+            try:
+                stock_oid = _safe_object_id(movement.get('stock_id'))
+                loc_oid = _safe_object_id(movement.get('from_location_id'))
+                if stock_oid and loc_oid:
+                    update_balance(
+                        db,
+                        stock_oid,
+                        loc_oid,
+                        abs(float(movement.get('quantity') or 0)),
+                        datetime.utcnow()
+                    )
+            except Exception:
+                pass
+            db.depo_stocks_movements.delete_one({'_id': movement['_id']})
+        return
+
+    if not movement:
+        _create_sales_allocation_movement(db, order, new_allocation, current_user)
+        return
+
+    source_changed = str(prev_source) != str(new_source)
+    batch_changed = (prev_batch or '') != (new_batch or '')
+    part_changed = str(prev_part) != str(new_part)
+
+    # Reverse old balance if source/batch/part changed
+    if source_changed or batch_changed or part_changed:
+        if movement.get('from_location_id') and movement.get('stock_id'):
+            try:
+                stock_oid = _safe_object_id(movement.get('stock_id'))
+                loc_oid = _safe_object_id(movement.get('from_location_id'))
+                if stock_oid and loc_oid:
+                    update_balance(
+                        db,
+                        stock_oid,
+                        loc_oid,
+                        abs(float(movement.get('quantity') or 0)),
+                        datetime.utcnow()
+                    )
+            except Exception:
+                pass
+
+        stock, source_oid = _resolve_allocation_stock(db, new_part, new_batch, str(new_source), new_qty)
+        if not stock or not source_oid:
+            return
+
+        db.depo_stocks_movements.update_one(
+            {'_id': movement['_id']},
+            {'$set': {
+                'stock_id': stock['_id'],
+                'part_id': stock['part_id'],
+                'batch_code': new_batch,
+                'quantity': -float(new_qty),
+                'from_location_id': source_oid,
+                'to_location_id': None,
+                'source_id': source_oid,
+                'destination_id': None,
+                'state_id': stock.get('state_id'),
+                'updated_at': datetime.utcnow(),
+                'updated_by': current_user.get('username', 'system')
+            }}
+        )
+
+        try:
+            update_balance(
+                db,
+                stock['_id'],
+                source_oid,
+                -float(new_qty),
+                datetime.utcnow()
+            )
+        except Exception:
+            pass
+        return
+
+    # Quantity change only
+    if movement.get('from_location_id') and movement.get('stock_id'):
+        delta = new_qty - prev_qty
+        if abs(delta) > 0:
+            try:
+                stock_oid = _safe_object_id(movement.get('stock_id'))
+                loc_oid = _safe_object_id(movement.get('from_location_id'))
+                if stock_oid and loc_oid:
+                    update_balance(
+                        db,
+                        stock_oid,
+                        loc_oid,
+                        -float(delta),
+                        datetime.utcnow()
+                    )
+            except Exception:
+                pass
+
+    db.depo_stocks_movements.update_one(
+        {'_id': movement['_id']},
+        {'$set': {
+            'quantity': -float(new_qty),
+            'updated_at': datetime.utcnow(),
+            'updated_by': current_user.get('username', 'system')
+        }}
+    )
 
 
 @router.get("/sales-orders")
@@ -925,6 +1131,12 @@ async def create_sales_order_allocation(
     }
     result = db['depo_sales_allocations'].insert_one(doc)
     doc['_id'] = result.inserted_id
+    try:
+        order = db['depo_sales_ordes'].find_one({'_id': ObjectId(order_id)}) or db['depo_sales_orders'].find_one({'_id': ObjectId(order_id)})
+        if order:
+            _create_sales_allocation_movement(db, order, doc, current_user)
+    except Exception as e:
+        print(f"[SALES] Warning: Failed to create sales movement: {e}")
     return serialize_doc(doc)
 
 
@@ -950,6 +1162,12 @@ async def update_sales_order_allocation(
     }
     coll.update_one({'_id': ObjectId(allocation_id)}, {'$set': update_fields})
     updated = coll.find_one({'_id': ObjectId(allocation_id)})
+    try:
+        order = db['depo_sales_ordes'].find_one({'_id': ObjectId(order_id)}) or db['depo_sales_orders'].find_one({'_id': ObjectId(order_id)})
+        if order and updated:
+            _update_sales_allocation_movement(db, order, allocation_id, updated, existing, current_user)
+    except Exception as e:
+        print(f"[SALES] Warning: Failed to update sales movement: {e}")
     return serialize_doc(updated)
 
 
@@ -961,9 +1179,30 @@ async def delete_sales_order_allocation(
 ):
     db = get_db()
     coll = db['depo_sales_allocations']
+    existing = coll.find_one({'_id': ObjectId(allocation_id), 'order_id': order_id})
     result = coll.delete_one({'_id': ObjectId(allocation_id), 'order_id': order_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Allocation not found")
+    try:
+        alloc_oid = _safe_object_id(allocation_id)
+        movement = db.depo_stocks_movements.find_one({
+            'allocation_id': {'$in': [allocation_id, alloc_oid]},
+            'document_type': 'SALES_ORDER'
+        })
+        if movement and movement.get('from_location_id') and movement.get('stock_id'):
+            try:
+                update_balance(
+                    db,
+                    movement.get('stock_id'),
+                    movement.get('from_location_id'),
+                    abs(float(movement.get('quantity') or 0)),
+                    datetime.utcnow()
+                )
+            except Exception:
+                pass
+            db.depo_stocks_movements.delete_one({'_id': movement['_id']})
+    except Exception as e:
+        print(f"[SALES] Warning: Failed to remove sales movement: {e}")
     return {"success": True}
 
 

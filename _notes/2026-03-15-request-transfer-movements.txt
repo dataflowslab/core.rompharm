@@ -1,0 +1,5 @@
+2026-03-15
+- Added request transfer movements on Warehouse Approved and state updates on Received.
+- Exposed request movements API and UI uses movement quantities/state first in request Items.
+- Stock movements endpoint now enriches source/destination + request reference.
+- Transfers tab shows source/destination/document.

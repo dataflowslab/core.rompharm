@@ -9,6 +9,7 @@ export const requestsApi = {
   // Requests
   getRequests: () => `${API_PREFIX}/`,
   getRequest: (id: string) => `${API_PREFIX}/${id}`,
+  getRequestMovements: (id: string) => `${API_PREFIX}/${id}/movements`,
   createRequest: () => `${API_PREFIX}/`,
   updateRequest: (id: string) => `${API_PREFIX}/${id}`,
   deleteRequest: (id: string) => `${API_PREFIX}/${id}`,
@@ -18,7 +19,10 @@ export const requestsApi = {
 
   // Parts
   getParts: () => `${API_PREFIX}/parts`,
-  getPartStockInfo: (partId: string) => `${API_PREFIX}/parts/${partId}/stock-info`,
+  getPartStockInfo: (partId: string, locationId?: string) =>
+    locationId
+      ? `${API_PREFIX}/parts/${partId}/stock-info?location_id=${locationId}`
+      : `${API_PREFIX}/parts/${partId}/stock-info`,
   getPartRecipe: (partId: string) => `${API_PREFIX}/parts/${partId}/recipe`,
   getPartBatchCodes: (partId: string, locationId?: string) =>
     locationId
@@ -57,6 +61,15 @@ export const requestsApi = {
 
   // States
   getStates: () => `${API_PREFIX}/states`,
+  // Build Orders
+  getBuildOrders: () => `${API_PREFIX}/build-orders`,
+  getBuildOrder: (id: string) => `${API_PREFIX}/build-orders/${id}`,
+  updateBuildOrder: (id: string) => `${API_PREFIX}/build-orders/${id}`,
+  getBuildOrderStates: () => `${API_PREFIX}/build-orders/states`,
+  getBuildOrderProduction: (id: string) => `${API_PREFIX}/build-orders/${id}/production`,
+  saveBuildOrderProduction: (id: string) => `${API_PREFIX}/build-orders/${id}/production`,
+  getBuildOrderProductionFlow: (id: string) => `${API_PREFIX}/build-orders/${id}/production-flow`,
+  signBuildOrderSeries: (id: string) => `${API_PREFIX}/build-orders/${id}/production-series-sign`,
   // Transfer
   executeTransfer: (requestId: string) => `${API_PREFIX}/${requestId}/execute-transfer`,
 };

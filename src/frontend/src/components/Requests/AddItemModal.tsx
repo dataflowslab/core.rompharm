@@ -22,6 +22,7 @@ interface BatchOption {
   state_color?: string;
   is_transferable?: boolean;
   is_requestable?: boolean;
+  is_transactionable?: boolean;
 }
 
 interface BatchSelection {
@@ -126,7 +127,8 @@ export function AddItemModal({
                   state_color: opt.state_color,
                   expiry_date: opt.expiry_date,
                   is_transferable: opt.is_transferable,
-                  is_requestable: opt.is_requestable
+                  is_requestable: opt.is_requestable,
+                  is_transactionable: opt.is_transactionable
                 }))}
                 selections={batchSelections}
                 onSelectionChange={onBatchSelectionsChange}

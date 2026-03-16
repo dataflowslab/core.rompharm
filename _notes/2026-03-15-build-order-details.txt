@@ -1,0 +1,4 @@
+2026-03-15 - Build order details adjustments
+- Added PATCH /build-orders/{id} to set/clear product_id.
+- Build order details now show read-only info as text, remove Status field, add clearable product select.
+- Moved Journal into Details tab and removed Journal tab.

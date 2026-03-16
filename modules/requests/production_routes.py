@@ -748,13 +748,6 @@ async def sign_production(
         # Execute stock operations
         try:
             await execute_production_stock_operations(db, request_id, current_user)
-            
-            # Update request status to Produced
-            requests_collection.update_one(
-                {"_id": ObjectId(request_id)},
-                {"$set": {"status": "Produced", "updated_at": timestamp}}
-            )
-            
             print(f"[PRODUCTION] Request {request_id} completed successfully")
         except Exception as e:
             print(f"[PRODUCTION] Error executing stock operations: {e}")

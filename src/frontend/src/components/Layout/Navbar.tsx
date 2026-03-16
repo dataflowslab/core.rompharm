@@ -11,7 +11,6 @@ import {
   IconBox,
   IconClipboardList,
   IconFileText,
-  IconTemplate,
   IconChefHat,
   IconPackage,
   IconStack2,
@@ -171,14 +170,6 @@ export function Navbar() {
         rightSection={<IconChevronRight size={14} />}
         active={isActive('/deliveries')}
         onClick={() => navigate('/deliveries')}
-      />
-
-      <NavLink
-        label={t('Templates')}
-        leftSection={<IconTemplate size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/templates')}
-        onClick={() => navigate('/templates')}
       />
 
       <NavLink

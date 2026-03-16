@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button, Container, Group, Title } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { procurementApi } from '../services/procurement';
 import { notifications } from '@mantine/notifications';
@@ -15,6 +16,7 @@ import { NewSupplierModal } from '../components/Procurement/ProcurementPage/NewS
 
 export function ProcurementPage() {
   const { t } = useTranslation();
+  const location = useLocation();
 
   // Data state
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -41,6 +43,13 @@ export function ProcurementPage() {
     loadStockLocations();
     loadOrderStates();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'new') {
+      setOpened(true);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     loadPurchaseOrders();

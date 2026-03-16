@@ -1,8 +1,8 @@
 import { Paper, Title, Text, Grid, Group, Table, NumberInput, Select, Textarea, Stack } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
-import { SafeSelect } from '../Common/SafeSelect';
-import { SeriesSignaturesSection } from './SeriesSignaturesSection';
+import { SeriesSignaturesSection } from '../Requests/SeriesSignaturesSection';
+import { formatDate } from '../../utils/dateFormat';
 
 interface Material {
   part: string;
@@ -10,6 +10,10 @@ interface Material {
   batch: string;
   received_qty: number;
   used_qty: number | null;
+  request_id?: string;
+  request_reference?: string;
+  request_issue_date?: string;
+  request_item_index?: number;
 }
 
 interface ApprovalOfficer {
@@ -62,7 +66,7 @@ interface Serie {
   signatures?: ApprovalSignature[];
 }
 
-interface ProductionSeriesTableProps {
+interface BuildOrderSeriesTableProps {
   series: Serie[];
   onSeriesChange: (series: Serie[]) => void;
   availableStates: RequestState[];
@@ -78,7 +82,7 @@ interface ProductionSeriesTableProps {
 const CANCELED_TOKENS = ['canceled', 'cancelled', 'anulat', 'anulare', 'cancel', 'cancelare'];
 const FAILED_TOKENS = ['failed', 'fail', 'esuat', 'refuz', 'refused', 'rejected', 'neconform'];
 
-export function ProductionSeriesTable({
+export function BuildOrderSeriesTable({
   series,
   onSeriesChange,
   availableStates,
@@ -89,7 +93,7 @@ export function ProductionSeriesTable({
   signingSerie,
   isCanceled,
   currentUsername
-}: ProductionSeriesTableProps) {
+}: BuildOrderSeriesTableProps) {
   const { t } = useTranslation();
 
   const updateSerie = (serieIndex: number, updates: Partial<Serie>) => {
@@ -144,7 +148,27 @@ export function ProductionSeriesTable({
     label: step.name || step.label || step.code || step._id
   }));
 
-  const getMaterialKey = (material: Material) => `${material.part}__${material.batch || ''}`;
+  const isSerieUsedQtyComplete = (serie: Serie) => {
+    if (isCanceledDecision(serie.decision_status)) {
+      return (serie.signatures || []).length > 0;
+    }
+    if (!serie.materials || serie.materials.length === 0) return true;
+    return serie.materials.every(material => material.used_qty !== null && material.used_qty !== undefined);
+  };
+
+  const firstIncompleteIndex = series.findIndex(serie => !isSerieUsedQtyComplete(serie));
+  const activeSerieIndex = series.length === 0
+    ? -1
+    : (firstIncompleteIndex === -1 ? series.length - 1 : firstIncompleteIndex);
+
+  const getMaterialKey = (material: Material) =>
+    `${material.part}__${material.batch || ''}__${material.request_id || ''}__${material.request_item_index ?? ''}`;
+
+  const formatRequestLabel = (material: Material) => {
+    if (!material.request_id) return '-';
+    const dateLabel = material.request_issue_date ? formatDate(material.request_issue_date) : '';
+    return dateLabel ? `${material.request_reference || material.request_id} • ${dateLabel}` : (material.request_reference || material.request_id);
+  };
 
   return (
     <Stack gap="xl">
@@ -157,9 +181,10 @@ export function ProductionSeriesTable({
         const producedRequired = !isCanceledDecisionStatus;
         const signatures = serie.signatures || [];
         const hasAnySignature = signatures.length > 0;
-        const isSerieLocked = isCanceled || hasAnySignature;
+        const isSerieActive = serieIndex === activeSerieIndex || series.length === 1;
+        const isSerieLocked = isCanceled || hasAnySignature || !isSerieActive;
         const isDecisionLocked = isCanceled || hasAnySignature;
-        const disableDetails = isSerieLocked;
+        const disableDetails = isSerieLocked || isCanceledDecisionStatus;
         const serieCompleted = isSerieCompleted(signatures);
 
         const hasProducedQty = (serie.produced_qty || 0) > 0 || !producedRequired;
@@ -167,7 +192,7 @@ export function ProductionSeriesTable({
         const hasStep = !!serie.production_step_id || isCanceledDecisionStatus;
         const hasDecision = !!serie.decision_status;
         const userAlreadySigned = !!currentUsername && signatures.some(s => s.username === currentUsername);
-        const canSign = canUserSign && hasDecision && hasStep && hasProducedQty && hasExpiry && !serieCompleted && !isCanceled && !userAlreadySigned && !hasAnySignature;
+        const canSign = canUserSign && hasDecision && hasStep && hasProducedQty && hasExpiry && !serieCompleted && !isCanceled && !userAlreadySigned && !hasAnySignature && isSerieActive;
 
         const signedUsedByKey = new Map<string, number>();
         series.slice(0, serieIndex).forEach(prevSerie => {
@@ -221,85 +246,103 @@ export function ProductionSeriesTable({
                   label={t('Production step')}
                   placeholder={t('Select step')}
                   data={stepOptions}
-                  value={serie.production_step_id || ''}
+                  value={serie.production_step_id || null}
                   onChange={(value) => updateSerie(serieIndex, { production_step_id: value || '' })}
-                  searchable
-                  clearable
                   required
+                  searchable
                   disabled={disableDetails}
                 />
               </Grid.Col>
 
               <Grid.Col span={3}>
-                <SafeSelect
+                <Select
                   label={t('Decision')}
                   placeholder={t('Select status')}
-                  data={availableStates}
-                  valueKey="_id"
-                  labelKey="name"
-                  value={serie.decision_status || undefined}
-                  onChange={(value) => updateSerie(serieIndex, { decision_status: value || '' })}
+                  data={availableStates.map(s => ({ value: s._id, label: s.name }))}
+                  value={serie.decision_status || null}
+                  onChange={(value) => {
+                    const updates: Partial<Serie> = { decision_status: value || '' };
+                    if (isCanceledDecision(serie.decision_status)) {
+                      (serie.materials || []).forEach((material, materialIndex) => {
+                        handleUsedQtyChange(serieIndex, materialIndex, null);
+                      });
+                    }
+                    updateSerie(serieIndex, updates);
+                  }}
                   required
-                  clearable
+                  searchable
                   disabled={isDecisionLocked}
                 />
               </Grid.Col>
-            </Grid>
 
-            {needsComment && (
-              <Textarea
-                label={t('Comment')}
-                placeholder={t('Enter comment')}
-                value={serie.decision_reason || ''}
-                onChange={(e) => updateSerie(serieIndex, { decision_reason: e.target.value })}
-                required
-                minRows={2}
-                mb="md"
-                disabled={isDecisionLocked}
-              />
-            )}
+              {needsComment && (
+                <Grid.Col span={12}>
+                  <Textarea
+                    label={t('Comment')}
+                    value={serie.decision_reason || ''}
+                    onChange={(event) => updateSerie(serieIndex, { decision_reason: event.currentTarget.value })}
+                    disabled={isDecisionLocked}
+                    minRows={2}
+                  />
+                </Grid.Col>
+              )}
+            </Grid>
 
             <Grid gutter="md">
               <Grid.Col span={9}>
-                <Text size="sm" fw={600} mb="xs">{t('Consumptions')}</Text>
+                <Text fw={600} mb="xs">{t('Consumptions')}</Text>
                 <Table striped withTableBorder withColumnBorders>
                   <Table.Thead>
                     <Table.Tr>
                       <Table.Th>{t('Material')}</Table.Th>
                       <Table.Th>{t('Batch')}</Table.Th>
-                      <Table.Th style={{ width: '120px' }}>{t('Available Qty')}</Table.Th>
-                      <Table.Th style={{ width: '140px' }}>{t('Used Qty')}</Table.Th>
+                      <Table.Th>{t('Request')}</Table.Th>
+                      <Table.Th>{t('Available Qty')}</Table.Th>
+                      <Table.Th>{t('Used Qty')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {serie.materials.map((material, materialIndex) => {
+                    {(serie.materials || []).map((material, materialIndex) => {
                       const key = getMaterialKey(material);
                       const signedUsed = signedUsedByKey.get(key) || 0;
                       const availableQty = Math.max(0, (Number(material.received_qty) || 0) - signedUsed);
                       const maxQty = availableQty;
                       return (
                         <Table.Tr key={`${serie.batch_code}-${materialIndex}`}>
-                        <Table.Td>{material.part_name || material.part}</Table.Td>
-                        <Table.Td>{material.batch || '-'}</Table.Td>
-                        <Table.Td>{availableQty}</Table.Td>
-                        <Table.Td>
-                          <NumberInput
-                            value={material.used_qty ?? ''}
-                            onChange={(value) => {
-                              if (value === null || value === undefined || value === '') {
-                                handleUsedQtyChange(serieIndex, materialIndex, null);
-                                return;
-                              }
-                              const numericValue = Number(value) || 0;
-                              const clampedValue = Math.min(Math.max(numericValue, 0), maxQty);
-                              handleUsedQtyChange(serieIndex, materialIndex, clampedValue);
-                            }}
-                            min={0}
-                            max={maxQty}
-                            disabled={isSerieLocked || isCanceledDecisionStatus}
-                            size="sm"
-                          />
-                        </Table.Td>
+                          <Table.Td>{material.part_name || material.part}</Table.Td>
+                          <Table.Td>{material.batch || '-'}</Table.Td>
+                          <Table.Td>
+                            {material.request_id ? (
+                              <Text
+                                size="sm"
+                                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                                onClick={() => window.open(`/web/requests/${material.request_id}`, '_blank')}
+                              >
+                                {formatRequestLabel(material)}
+                              </Text>
+                            ) : (
+                              '-'
+                            )}
+                          </Table.Td>
+                          <Table.Td>{availableQty}</Table.Td>
+                          <Table.Td>
+                            <NumberInput
+                              value={material.used_qty ?? ''}
+                              onChange={(value) => {
+                                if (value === null || value === undefined || value === '') {
+                                  handleUsedQtyChange(serieIndex, materialIndex, null);
+                                  return;
+                                }
+                                const numericValue = Number(value) || 0;
+                                const clampedValue = Math.min(Math.max(numericValue, 0), maxQty);
+                                handleUsedQtyChange(serieIndex, materialIndex, clampedValue);
+                              }}
+                              min={0}
+                              max={maxQty}
+                              disabled={isSerieLocked || isCanceledDecisionStatus}
+                              size="sm"
+                            />
+                          </Table.Td>
                         </Table.Tr>
                       );
                     })}

@@ -1,0 +1,3 @@
+2026-03-15 - Simplified Request Production tab
+- Replaced complex production workflow UI with a single card linking to build order.
+- ProductionTab now resolves build order by request linkage or batch code and navigates to /build-orders/{id}.

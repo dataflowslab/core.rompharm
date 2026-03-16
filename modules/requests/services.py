@@ -10,7 +10,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from src.backend.utils.serializers import serialize_doc
-from src.backend.utils.stock_utils import get_transactionable_state_ids
+from src.backend.utils.stock_utils import get_transactionable_state_ids, is_stock_transactionable
 
 from src.backend.utils.config import load_config
 
@@ -43,8 +43,13 @@ async def fetch_stock_locations(current_user: dict, db=None) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock locations: {str(e)}")
 
 
-async def search_parts(db, search: Optional[str] = None) -> Dict[str, Any]:
-    """Get list of parts from MongoDB depo_parts with search"""
+async def search_parts(
+    db,
+    search: Optional[str] = None,
+    location_id: Optional[str] = None,
+    is_assembly: Optional[bool] = None
+) -> Dict[str, Any]:
+    """Get list of parts from MongoDB depo_parts with search, optionally filtered by location stock"""
     if not search or len(search.strip()) < 2:
         return {"results": [], "count": 0}
     
@@ -58,6 +63,37 @@ async def search_parts(db, search: Optional[str] = None) -> Dict[str, Any]:
                 {"ipn": {"$regex": search_term, "$options": "i"}}
             ]
         }
+
+        if is_assembly is not None:
+            query["is_assembly"] = is_assembly
+
+        # Optional filter: only parts that have requestable stock in a specific location
+        if location_id:
+            try:
+                location_oid = ObjectId(location_id)
+                location_values = [location_oid, location_id]
+            except Exception:
+                return {"results": [], "count": 0}
+
+            requestable_states = list(db.depo_stocks_states.find({
+                "is_requestable": True
+            }, {"_id": 1}))
+            if not requestable_states:
+                return {"results": [], "count": 0}
+
+            allowed_state_ids = [state["_id"] for state in requestable_states]
+            part_ids = db.depo_stocks.distinct(
+                "part_id",
+                {
+                    "location_id": {"$in": location_values},
+                    "state_id": {"$in": allowed_state_ids},
+                    "quantity": {"$gt": 0}
+                }
+            )
+            if not part_ids:
+                return {"results": [], "count": 0}
+
+            query["_id"] = {"$in": part_ids}
         
         parts = list(db.depo_parts.find(query).limit(30))
         
@@ -82,7 +118,7 @@ async def search_parts(db, search: Optional[str] = None) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to fetch parts: {str(e)}")
 
 
-async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
+async def get_part_stock_info(db, part_id: str, location_id: Optional[str] = None) -> Dict[str, Any]:
     """Get stock information for a part from MongoDB depo_stocks with batches
     
     Shows stock with states where is_requestable = true
@@ -131,11 +167,95 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
                 "is_requestable": state.get("is_requestable", False)
             }
         
-        # Query depo_stocks using part_id and allowed states
-        stock_records = list(db.depo_stocks.find({
+        # Optional location filter
+        location_oid = None
+        if location_id:
+            try:
+                location_oid = ObjectId(location_id)
+            except Exception:
+                return {
+                    "part_id": part_id,
+                    "total": 0,
+                    "in_sales": 0,
+                    "in_builds": 0,
+                    "in_procurement": 0,
+                    "available": 0,
+                    "batches": []
+                }
+
+        base_query = {
             "part_id": part_oid,
             "state_id": {"$in": allowed_state_ids}
-        }))
+        }
+
+        stock_records = list(db.depo_stocks.find(base_query))
+        stock_map = {s.get('_id'): s for s in stock_records if s.get('_id')}
+
+        balances = []
+        receipt_stock_ids = set()
+        if stock_map:
+            balances_query: Dict[str, Any] = {
+                "stock_id": {"$in": list(stock_map.keys())}
+            }
+            if location_oid:
+                balances_query["location_id"] = location_oid
+            balances = list(db.depo_stocks_balances.find(balances_query))
+
+            movements = list(db.depo_stocks_movements.find(
+                {"stock_id": {"$in": list(stock_map.keys())}},
+                {"stock_id": 1, "movement_type": 1}
+            ))
+            for mov in movements:
+                if str(mov.get("movement_type", "")).upper() == "RECEIPT":
+                    receipt_stock_ids.add(mov.get("stock_id"))
+
+        balances_by_stock: Dict[ObjectId, Dict[ObjectId, float]] = {}
+        for bal in balances:
+            stock_id = bal.get("stock_id")
+            loc_id = bal.get("location_id")
+            if not stock_id or not loc_id:
+                continue
+            if location_oid and loc_id != location_oid:
+                continue
+            balances_by_stock.setdefault(stock_id, {})
+            balances_by_stock[stock_id][loc_id] = balances_by_stock[stock_id].get(loc_id, 0) + bal.get("quantity", 0)
+
+        stock_records = []
+        for stock in stock_map.values():
+            stock_id = stock.get("_id")
+            base_qty = stock.get("quantity")
+            if base_qty is None:
+                base_qty = stock.get("initial_quantity", 0)
+            base_qty = base_qty or 0
+            base_location = stock.get("location_id") or stock.get("initial_location_id")
+
+            has_receipt = stock_id in receipt_stock_ids
+            stock_balances = balances_by_stock.get(stock_id, {})
+
+            if stock_balances:
+                for loc_id, bal_qty in stock_balances.items():
+                    qty = bal_qty
+                    if not has_receipt and base_location and loc_id == base_location:
+                        qty += base_qty
+                    if qty > 0:
+                        stock_copy = stock.copy()
+                        stock_copy["location_id"] = loc_id
+                        stock_copy["quantity"] = qty
+                        stock_records.append(stock_copy)
+
+                if not has_receipt and base_location and base_location not in stock_balances and base_qty > 0:
+                    if not location_oid or base_location == location_oid:
+                        stock_copy = stock.copy()
+                        stock_copy["location_id"] = base_location
+                        stock_copy["quantity"] = base_qty
+                        stock_records.append(stock_copy)
+            else:
+                if base_location and base_qty > 0:
+                    if not location_oid or base_location == location_oid:
+                        stock_copy = stock.copy()
+                        stock_copy["location_id"] = base_location
+                        stock_copy["quantity"] = base_qty
+                        stock_records.append(stock_copy)
         
         if stock_records:
             location_ids = list(set([stock.get("location_id") for stock in stock_records if stock.get("location_id")]))
@@ -190,6 +310,8 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
                         state_id_str = str(state_id)
                     else:
                         state_id_str = str(state_id) if state_id else ""
+
+                    is_transactionable = is_stock_transactionable(state_id)
                     
                     # Get state info
                     state_info = state_info_map.get(state_id_str, {})
@@ -209,6 +331,7 @@ async def get_part_stock_info(db, part_id: str) -> Dict[str, Any]:
                         "state_color": state_info.get("color", "gray"),
                         "is_transferable": state_info.get("is_transferable", False),
                         "is_requestable": state_info.get("is_requestable", False),
+                        "is_transactionable": is_transactionable,
                         "expiry_date": stock.get("expiry_date", ""),
                         "batch_date": stock.get("batch_date", "")
                     })
@@ -331,25 +454,93 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
                 "is_requestable": state.get("is_requestable", False)
             }
         
-        # Build query
-        query = {
+        # Build base query (ledger-first; no quantity filter here)
+        base_query = {
             "part_id": part_oid,
-            "state_id": {"$in": transactionable_state_ids},
-            "quantity": {"$gt": 0}  # Only stock with quantity > 0
+            "state_id": {"$in": transactionable_state_ids}
         }
-        
-        # Filter by location if provided (location_id is now ObjectId string)
+
+        stock_records = list(db.depo_stocks.find(base_query))
+        stock_map = {s.get('_id'): s for s in stock_records if s.get('_id')}
+
+        balances = []
+        receipt_stock_ids = set()
+        location_oid = None
+
         if location_id:
             try:
                 location_oid = ObjectId(location_id)
-                query["location_id"] = location_oid
                 print(f"[BATCH_CODES] Filtering by location: {location_id}")
             except:
                 print(f"[BATCH_CODES] Warning: Invalid location_id format: {location_id}")
-        
-        # Query depo_stocks
-        stock_records = list(db.depo_stocks.find(query))
-        print(f"[BATCH_CODES] Found {len(stock_records)} stock records for part {part_id}")
+                location_oid = None
+
+        if stock_map:
+            balances_query: Dict[str, Any] = {
+                "stock_id": {"$in": list(stock_map.keys())}
+            }
+            if location_oid:
+                balances_query["location_id"] = location_oid
+            balances = list(db.depo_stocks_balances.find(balances_query))
+
+            # Identify stocks that already have RECEIPT movements (ledger initialized)
+            movements = list(db.depo_stocks_movements.find(
+                {"stock_id": {"$in": list(stock_map.keys())}},
+                {"stock_id": 1, "movement_type": 1}
+            ))
+            for mov in movements:
+                if str(mov.get("movement_type", "")).upper() == "RECEIPT":
+                    receipt_stock_ids.add(mov.get("stock_id"))
+
+        balances_by_stock: Dict[ObjectId, Dict[ObjectId, float]] = {}
+        for bal in balances:
+            stock_id = bal.get("stock_id")
+            loc_id = bal.get("location_id")
+            if not stock_id or not loc_id:
+                continue
+            if location_oid and loc_id != location_oid:
+                continue
+            balances_by_stock.setdefault(stock_id, {})
+            balances_by_stock[stock_id][loc_id] = balances_by_stock[stock_id].get(loc_id, 0) + bal.get("quantity", 0)
+
+        stock_records = []
+        for stock in stock_map.values():
+            stock_id = stock.get("_id")
+            base_qty = stock.get("quantity")
+            if base_qty is None:
+                base_qty = stock.get("initial_quantity", 0)
+            base_qty = base_qty or 0
+            base_location = stock.get("location_id") or stock.get("initial_location_id")
+
+            has_receipt = stock_id in receipt_stock_ids
+            stock_balances = balances_by_stock.get(stock_id, {})
+
+            if stock_balances:
+                for loc_id, bal_qty in stock_balances.items():
+                    qty = bal_qty
+                    if not has_receipt and base_location and loc_id == base_location:
+                        qty += base_qty
+                    if qty > 0:
+                        stock_copy = stock.copy()
+                        stock_copy["location_id"] = loc_id
+                        stock_copy["quantity"] = qty
+                        stock_records.append(stock_copy)
+
+                if not has_receipt and base_location and base_location not in stock_balances and base_qty > 0:
+                    if not location_oid or base_location == location_oid:
+                        stock_copy = stock.copy()
+                        stock_copy["location_id"] = base_location
+                        stock_copy["quantity"] = base_qty
+                        stock_records.append(stock_copy)
+            else:
+                if base_location and base_qty > 0:
+                    if not location_oid or base_location == location_oid:
+                        stock_copy = stock.copy()
+                        stock_copy["location_id"] = base_location
+                        stock_copy["quantity"] = base_qty
+                        stock_records.append(stock_copy)
+
+        print(f"[BATCH_CODES] Computed {len(stock_records)} stock records for part {part_id}")
         
         # Get location names
         location_ids = list(set([stock.get("location_id") for stock in stock_records if stock.get("location_id")]))
@@ -401,6 +592,7 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
                     expiry = stock.get("expiry_date", "")
                     location_name = location_map.get(location_id, location_id)
                     parent_info = location_parent_map.get(location_id, {})
+                    is_transactionable = is_stock_transactionable(stock.get("state_id"))
                     
                     batch_location_map[key] = {
                         'batch_code': batch_code,
@@ -415,7 +607,8 @@ async def fetch_part_batch_codes(current_user: dict, part_id: str, location_id: 
                         'state_name': state_info.get("name", ""),
                         'state_color': state_info.get("color", "gray"),
                         'is_transferable': state_info.get("is_transferable", False),
-                        'is_requestable': state_info.get("is_requestable", False)
+                        'is_requestable': state_info.get("is_requestable", False),
+                        'is_transactionable': is_transactionable
                     }
                 batch_location_map[key]['quantity'] += stock.get("quantity", 0)
         

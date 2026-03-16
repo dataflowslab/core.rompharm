@@ -13,7 +13,7 @@ import {
   Button
 } from '@mantine/core';
 import { IconAlertCircle, IconEye, IconPlus } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { salesService, SalesOrder } from '../services/sales';
 import { CreateSalesOrderModal } from '../components/Sales/CreateSalesOrderModal';
@@ -21,6 +21,7 @@ import { CreateSalesOrderModal } from '../components/Sales/CreateSalesOrderModal
 export function SalesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,13 @@ export function SalesPage() {
   useEffect(() => {
     loadOrders();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'new') {
+      setIsModalOpen(true);
+    }
+  }, [location.search]);
 
   const loadOrders = async () => {
     try {

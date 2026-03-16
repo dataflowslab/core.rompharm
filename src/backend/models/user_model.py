@@ -11,9 +11,11 @@ class UserCreate(BaseModel):
     """Model pentru creare user"""
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=6)
+    name: Optional[str] = None
     firstname: str = Field(..., min_length=1)
     lastname: str = Field(..., min_length=1)
     role_id: str  # ObjectId as string
+    locations: Optional[list[str]] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     is_active: bool = True
@@ -23,9 +25,13 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     """Model pentru update user"""
+    username: Optional[str] = None
+    name: Optional[str] = None
     firstname: Optional[str] = None
     lastname: Optional[str] = None
     role_id: Optional[str] = None
+    local_role: Optional[str] = None
+    locations: Optional[list[str]] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     is_active: Optional[bool] = None

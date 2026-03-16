@@ -1,4 +1,4 @@
-import { Table, Checkbox, NumberInput, Badge, Text, Box } from '@mantine/core';
+import { Table, Checkbox, NumberInput, Badge, Text, Box, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 
 interface BatchCodeItem {
@@ -12,6 +12,7 @@ interface BatchCodeItem {
   expiry_date?: string;
   is_transferable?: boolean;
   is_requestable?: boolean;
+  is_transactionable?: boolean;
 }
 
 interface BatchSelection {
@@ -81,6 +82,22 @@ export function BatchCodesTable({
     const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
     const clampedValue = Math.max(0, Math.min(numValue, batch.quantity));
 
+    const existing = selections.find(
+      s => s.batch_code === batch.batch_code && s.location_id === batch.location_id
+    );
+
+    if (!existing && clampedValue > 0) {
+      onSelectionChange([
+        ...selections,
+        {
+          batch_code: batch.batch_code,
+          location_id: batch.location_id,
+          requested_quantity: clampedValue
+        }
+      ]);
+      return;
+    }
+
     const newSelections = selections.map(s => {
       if (s.batch_code === batch.batch_code && s.location_id === batch.location_id) {
         return { ...s, requested_quantity: clampedValue };
@@ -114,6 +131,11 @@ export function BatchCodesTable({
         {batchCodes.map((batch, index) => {
           const selected = isSelected(batch.batch_code, batch.location_id);
           const requestedQty = getRequestedQuantity(batch.batch_code, batch.location_id);
+          const hasExplicitBlock = batch.is_transferable === false && batch.is_requestable === false;
+          const isTransactionable = batch.is_transactionable !== undefined
+            ? batch.is_transactionable
+            : !hasExplicitBlock;
+          const isRowDisabled = disabled || !isTransactionable;
 
           return (
             <Table.Tr key={`${batch.batch_code}_${batch.location_id}`}>
@@ -121,7 +143,7 @@ export function BatchCodesTable({
                 <Checkbox
                   checked={selected}
                   onChange={(e) => handleCheckboxChange(batch, e.currentTarget.checked)}
-                  disabled={disabled}
+                  disabled={isRowDisabled}
                 />
               </Table.Td>
               <Table.Td>
@@ -136,13 +158,16 @@ export function BatchCodesTable({
                 </Box>
               </Table.Td>
               <Table.Td>
-                <Badge
-                  size="sm"
-                  color={batch.state_color || getStateColor(batch.state_name)}
-                  variant="filled"
-                >
-                  {batch.state_name}
-                </Badge>
+                <Tooltip label={batch.state_name} withArrow>
+                  <Badge
+                    size="sm"
+                    color={batch.state_color || getStateColor(batch.state_name)}
+                    variant="filled"
+                    title={batch.state_name}
+                  >
+                    {batch.state_name}
+                  </Badge>
+                </Tooltip>
               </Table.Td>
               <Table.Td style={{ textAlign: 'right' }}>
                 <Text fw={500} size="sm">
@@ -156,7 +181,7 @@ export function BatchCodesTable({
                   min={0}
                   max={batch.quantity}
                   step={1}
-                  disabled={!selected || disabled}
+                  disabled={isRowDisabled}
                   placeholder="0"
                   size="sm"
                   styles={{

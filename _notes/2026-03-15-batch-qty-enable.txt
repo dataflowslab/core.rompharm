@@ -1,0 +1,4 @@
+2026-03-15 - Fix batch quantity inputs disabled
+- Added is_transactionable to batch code payloads from requests services (stock-info + batch-codes).
+- BatchCodesTable now enables rows based on is_transactionable when present, fallback to previous flags.
+- Propagated is_transactionable through RequestsPage, ItemsTab, OperationsTab, AddItemModal.

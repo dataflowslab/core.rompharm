@@ -1,0 +1,4 @@
+2026-03-15 - Production tab fixes
+- Production decision select is clearable; removed auto-locking based on active series/canceled decision.
+- Series inputs remain editable until signatures exist.
+- verify_admin now accepts role admin via roles slug when is_staff missing.

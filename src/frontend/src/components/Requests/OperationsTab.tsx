@@ -52,6 +52,7 @@ interface BatchOption {
   state_color?: string;
   is_transferable?: boolean;
   is_requestable?: boolean;
+  is_transactionable?: boolean;
 }
 
 interface Part {
@@ -282,7 +283,8 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
         state_id: batch.state_id,
         state_color: batch.state_color,
         is_transferable: batch.is_transferable,
-        is_requestable: batch.is_requestable
+        is_requestable: batch.is_requestable,
+        is_transactionable: batch.is_transactionable
       }));
       
       console.log('[loadBatchCodes] Setting batch options:', options);

@@ -1,0 +1,2 @@
+2026-03-15 - Production tab multiple build orders
+- ProductionTab now renders one card per build order matching request batch codes (or request linkage fallback).

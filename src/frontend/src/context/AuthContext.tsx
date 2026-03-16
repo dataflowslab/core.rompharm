@@ -9,6 +9,7 @@ interface AuthContextType {
   userId: string | null;
   localRole: string | null;
   roleSlug: string | null;
+  locations: string[];
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -38,6 +39,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roleSlug, setRoleSlug] = useState<string | null>(
     localStorage.getItem('auth_role_slug')
   );
+  const [locations, setLocations] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('auth_locations');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     if (token) {
@@ -70,6 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (data.role_slug) {
             setRoleSlug(data.role_slug);
             localStorage.setItem('auth_role_slug', data.role_slug);
+          }
+          if (Array.isArray(data.locations)) {
+            setLocations(data.locations);
+            localStorage.setItem('auth_locations', JSON.stringify(data.locations));
           }
         })
         .catch(error => {
@@ -123,6 +136,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRoleSlug(data.role_slug);
         localStorage.setItem('auth_role_slug', data.role_slug);
       }
+      if (Array.isArray(data.locations)) {
+        setLocations(data.locations);
+        localStorage.setItem('auth_locations', JSON.stringify(data.locations));
+      }
     } catch (error) {
       console.error('AuthContext: Failed to load user details after login:', error);
     }
@@ -136,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserId(null);
     setLocalRole(null);
     setRoleSlug(null);
+    setLocations([]);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_username');
     localStorage.removeItem('auth_name');
@@ -143,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('auth_user_id');
     localStorage.removeItem('auth_local_role');
     localStorage.removeItem('auth_role_slug');
+    localStorage.removeItem('auth_locations');
   };
 
   return (
@@ -155,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId,
         localRole,
         roleSlug,
+        locations,
         login,
         logout,
         isAuthenticated: !!token,

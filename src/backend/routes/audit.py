@@ -3,6 +3,7 @@ Audit log routes
 """
 from fastapi import APIRouter, Depends, Query
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 from src.backend.utils.db import get_db
 from src.backend.models.audit_log_model import AuditLogModel
@@ -17,6 +18,9 @@ def get_audit_logs(
     skip: int = Query(0, ge=0),
     action: Optional[str] = None,
     username: Optional[str] = None,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     user = Depends(verify_admin)
 ) -> Dict[str, Any]:
     """
@@ -32,6 +36,36 @@ def get_audit_logs(
         filter_query['action'] = action
     if username:
         filter_query['username'] = username
+
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            try:
+                if len(date_from) == 10:
+                    date_query["$gte"] = datetime.fromisoformat(f"{date_from}T00:00:00")
+                else:
+                    date_query["$gte"] = datetime.fromisoformat(date_from)
+            except Exception:
+                pass
+        if date_to:
+            try:
+                if len(date_to) == 10:
+                    date_query["$lte"] = datetime.fromisoformat(f"{date_to}T23:59:59")
+                else:
+                    date_query["$lte"] = datetime.fromisoformat(date_to)
+            except Exception:
+                pass
+        if date_query:
+            filter_query["timestamp"] = date_query
+
+    if search:
+        search = search.strip()
+        if search:
+            filter_query["$or"] = [
+                {"action": {"$regex": search, "$options": "i"}},
+                {"username": {"$regex": search, "$options": "i"}},
+                {"ip_address": {"$regex": search, "$options": "i"}}
+            ]
     
     # Get total count
     total = audit_collection.count_documents(filter_query)

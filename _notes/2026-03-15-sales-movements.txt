@@ -1,0 +1,3 @@
+2026-03-15
+- Added sales order allocation movements (SALES_ORDER) with source-only and balance adjustments.
+- Stock movements endpoint now enriches sales order references.

@@ -22,6 +22,15 @@ interface Movement {
   notes?: string;
   created_by?: string;
   created_at: string;
+  from_location_id?: string;
+  to_location_id?: string;
+  source_id?: string;
+  destination_id?: string;
+  source_name?: string;
+  destination_name?: string;
+  document_type?: string;
+  document_id?: string;
+  document_reference?: string;
 }
 
 interface TransfersTabProps {
@@ -91,6 +100,9 @@ export function TransfersTab({ stockId }: TransfersTabProps) {
               <Table.Th>{t('Date')}</Table.Th>
               <Table.Th>{t('Type')}</Table.Th>
               <Table.Th>{t('Quantity')}</Table.Th>
+              <Table.Th>{t('Source')}</Table.Th>
+              <Table.Th>{t('Destination')}</Table.Th>
+              <Table.Th>{t('Document')}</Table.Th>
               <Table.Th>{t('Notes')}</Table.Th>
               <Table.Th>{t('Created By')}</Table.Th>
             </Table.Tr>
@@ -101,6 +113,13 @@ export function TransfersTab({ stockId }: TransfersTabProps) {
                 <Table.Td>{formatDateTime(movement.date)}</Table.Td>
                 <Table.Td>{movement.movement_type}</Table.Td>
                 <Table.Td>{movement.quantity}</Table.Td>
+                <Table.Td>{movement.source_name || movement.source_id || movement.from_location_id || '-'}</Table.Td>
+                <Table.Td>{movement.destination_name || movement.destination_id || movement.to_location_id || '-'}</Table.Td>
+                <Table.Td>
+                  {movement.document_reference
+                    ? `${movement.document_type || ''} ${movement.document_reference}`
+                    : (movement.document_type || movement.document_id || '-')}
+                </Table.Td>
                 <Table.Td>{movement.notes || '-'}</Table.Td>
                 <Table.Td>{movement.created_by || '-'}</Table.Td>
               </Table.Tr>

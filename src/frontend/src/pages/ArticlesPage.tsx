@@ -118,6 +118,13 @@ export function ArticlesPage() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'new' && !opened) {
+      openCreateModal();
+    }
+  }, [searchParams, opened]);
+
   const fetchArticles = async () => {
     setLoading(true);
     try {

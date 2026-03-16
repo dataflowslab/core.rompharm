@@ -159,9 +159,12 @@ def create_movement(
         'quantity': quantity,
         'from_location_id': from_location_id,
         'to_location_id': to_location_id,
+        'source_id': from_location_id,
+        'destination_id': to_location_id,
         'document_type': document_type,
         'document_id': document_id,
         'transfer_group_id': transfer_group_id,
+        'date': timestamp,
         'created_at': timestamp,
         'created_by': created_by,
         'notes': notes

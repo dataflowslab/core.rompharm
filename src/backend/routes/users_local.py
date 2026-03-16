@@ -15,6 +15,56 @@ from src.backend.routes.auth import verify_admin
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
+def _normalize_locations(value) -> list:
+    normalized = []
+    if not value:
+        return normalized
+    for loc in value:
+        if isinstance(loc, ObjectId):
+            normalized.append(str(loc))
+        elif isinstance(loc, dict) and loc.get("$oid"):
+            normalized.append(str(loc.get("$oid")))
+        elif isinstance(loc, str):
+            normalized.append(loc)
+    return normalized
+
+
+def _coerce_locations(value) -> list:
+    normalized = []
+    if not value:
+        return normalized
+    for loc in value:
+        if isinstance(loc, ObjectId):
+            normalized.append(loc)
+            continue
+        if isinstance(loc, dict) and loc.get("$oid"):
+            try:
+                normalized.append(ObjectId(loc.get("$oid")))
+            except Exception:
+                continue
+            continue
+        if isinstance(loc, str):
+            try:
+                normalized.append(ObjectId(loc))
+            except Exception:
+                continue
+    return normalized
+
+
+def _resolve_role_id(user_doc: dict) -> Optional[ObjectId]:
+    role_value = user_doc.get('role') or user_doc.get('role_id')
+    if not role_value:
+        return None
+    if isinstance(role_value, ObjectId):
+        return role_value
+    if isinstance(role_value, dict) and role_value.get("$oid"):
+        return ObjectId(role_value.get("$oid"))
+    try:
+        return ObjectId(role_value)
+    except Exception:
+        return None
+
+
 @router.get("/")
 def list_users(
     current_user: dict = Depends(verify_admin)
@@ -29,25 +79,29 @@ def list_users(
     # Populate role info
     for user in users:
         user['_id'] = str(user['_id'])
+        user['id'] = user['_id']
         
         # Remove sensitive data
         user.pop('password', None)
         user.pop('salt', None)
         user.pop('token', None)
         
-        # Get role
-        if user.get('role_id'):
+        # Get role (support both role and role_id)
+        role_id = _resolve_role_id(user)
+        if role_id:
             try:
-                role = roles_collection.find_one({'_id': ObjectId(user['role_id'])})
+                role = roles_collection.find_one({'_id': role_id})
                 if role:
                     user['role'] = {
                         '_id': str(role['_id']),
                         'name': role.get('name'),
                         'slug': role.get('slug')
                     }
-                user['role_id'] = str(user['role_id'])
-            except:
+                user['role_id'] = str(role_id)
+            except Exception:
                 pass
+
+        user['locations'] = _normalize_locations(user.get('locations'))
         
         # Format dates
         if user.get('created_at'):
@@ -79,25 +133,29 @@ def get_user(
         raise HTTPException(status_code=404, detail="User not found")
     
     user['_id'] = str(user['_id'])
+    user['id'] = user['_id']
     
     # Remove sensitive data
     user.pop('password', None)
     user.pop('salt', None)
     user.pop('token', None)
     
-    # Get role
-    if user.get('role_id'):
+    # Get role (support both role and role_id)
+    role_id = _resolve_role_id(user)
+    if role_id:
         try:
-            role = roles_collection.find_one({'_id': ObjectId(user['role_id'])})
+            role = roles_collection.find_one({'_id': role_id})
             if role:
                 user['role'] = {
                     '_id': str(role['_id']),
                     'name': role.get('name'),
                     'slug': role.get('slug')
                 }
-            user['role_id'] = str(user['role_id'])
-        except:
+            user['role_id'] = str(role_id)
+        except Exception:
             pass
+
+    user['locations'] = _normalize_locations(user.get('locations'))
     
     # Format dates
     if user.get('created_at'):
@@ -120,6 +178,7 @@ def create_new_user(
         user = create_user(
             username=user_data.username,
             password=user_data.password,
+            name=user_data.name,
             firstname=user_data.firstname,
             lastname=user_data.lastname,
             role_id=user_data.role_id,
@@ -127,7 +186,8 @@ def create_new_user(
             phone=user_data.phone,
             is_staff=user_data.is_staff,
             is_active=user_data.is_active,
-            mobile=user_data.mobile
+            mobile=user_data.mobile,
+            locations=user_data.locations
         )
         
         # Remove sensitive data
@@ -161,25 +221,68 @@ def update_user(
     if not existing:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Build update
+    payload = user_data.dict(exclude_unset=True)
     update_data = {'updated_at': datetime.utcnow()}
-    
-    if user_data.firstname is not None:
-        update_data['firstname'] = user_data.firstname
-    if user_data.lastname is not None:
-        update_data['lastname'] = user_data.lastname
-    if user_data.role_id is not None:
-        update_data['role_id'] = ObjectId(user_data.role_id)
-    if user_data.email is not None:
-        update_data['email'] = user_data.email
-    if user_data.phone is not None:
-        update_data['phone'] = user_data.phone
-    if user_data.is_active is not None:
-        update_data['is_active'] = user_data.is_active
-    if user_data.is_staff is not None:
-        update_data['is_staff'] = user_data.is_staff
-    if user_data.mobile is not None:
-        update_data['mobile'] = user_data.mobile
+    unset_data = {}
+
+    def _should_unset(value: Optional[str]) -> bool:
+        if value is None:
+            return True
+        if isinstance(value, str) and value.strip() == '':
+            return True
+        return False
+
+    if 'username' in payload and payload.get('username') is not None and payload.get('username') != existing.get('username'):
+        username_exists = users_collection.find_one({'username': payload.get('username')})
+        if username_exists:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        update_data['username'] = payload.get('username')
+
+    if 'name' in payload:
+        if _should_unset(payload.get('name')):
+            unset_data['name'] = ''
+        else:
+            update_data['name'] = payload.get('name')
+
+    if 'firstname' in payload:
+        if _should_unset(payload.get('firstname')):
+            unset_data['firstname'] = ''
+        else:
+            update_data['firstname'] = payload.get('firstname')
+
+    if 'lastname' in payload:
+        if _should_unset(payload.get('lastname')):
+            unset_data['lastname'] = ''
+        else:
+            update_data['lastname'] = payload.get('lastname')
+
+    if 'local_role' in payload:
+        if _should_unset(payload.get('local_role')):
+            unset_data['local_role'] = ''
+        else:
+            update_data['local_role'] = payload.get('local_role')
+
+    if 'role_id' in payload:
+        role_id_value = payload.get('role_id')
+        if role_id_value:
+            update_data['role'] = ObjectId(role_id_value)
+            update_data['role_id'] = ObjectId(role_id_value)
+
+    if 'email' in payload:
+        update_data['email'] = payload.get('email')
+    if 'phone' in payload:
+        update_data['phone'] = payload.get('phone')
+    if 'is_active' in payload:
+        update_data['is_active'] = payload.get('is_active')
+    if 'is_staff' in payload:
+        if payload.get('is_staff') is None:
+            unset_data['is_staff'] = ''
+        else:
+            update_data['is_staff'] = payload.get('is_staff')
+    if 'mobile' in payload:
+        update_data['mobile'] = payload.get('mobile')
+    if 'locations' in payload:
+        update_data['locations'] = _coerce_locations(payload.get('locations'))
     
     # Update password if provided
     if user_data.password:
@@ -188,11 +291,11 @@ def update_user(
         update_data['password'] = hashed_password
         update_data['salt'] = salt
     
-    # Update
-    users_collection.update_one(
-        {'_id': user_oid},
-        {'$set': update_data}
-    )
+    update_doc = {'$set': update_data}
+    if unset_data:
+        update_doc['$unset'] = unset_data
+
+    users_collection.update_one({'_id': user_oid}, update_doc)
     
     # Get updated user -- MANUAL CALL INSTEAD OF ASYNC AWAIT
     return get_user(user_id, current_user)

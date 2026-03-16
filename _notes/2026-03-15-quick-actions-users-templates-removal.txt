@@ -1,0 +1,5 @@
+Changes:
+- Users API update supports unsetting local_role/firstname/lastname/is_staff when explicitly cleared.
+- Dashboard Quick Actions now load from user.quick_actions and render buttons.
+- Added ?action=new modal auto-open for Sales, Procurement, Requests, and Inventory Articles pages.
+- Removed /web/templates section and /api/templates backend; Submission + Forms now use /api/documents/templates.

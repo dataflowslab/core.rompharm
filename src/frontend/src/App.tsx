@@ -25,7 +25,7 @@ import { SalesDetailPage } from './pages/SalesDetailPage';
 import { ReturnsPage } from './pages/ReturnsPage';
 import { ReturnDetailPage } from './pages/ReturnDetailPage';
 import { BuildOrdersPage } from './pages/BuildOrdersPage';
-import { TemplatesPage } from './pages/TemplatesPage';
+import { BuildOrderDetailPage } from './pages/BuildOrderDetailPage';
 import { ArticlesPage } from './pages/ArticlesPage';
 import { ArticleDetailPage } from './pages/ArticleDetailPage';
 import { StockItemDetailPage } from './pages/StockItemDetailPage';
@@ -158,6 +158,7 @@ function App() {
           <Route path="/recipes/new" element={<ProtectedRoute><NewRecipePage /></ProtectedRoute>} />
           <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetailPage /></ProtectedRoute>} />
           <Route path="/build-orders" element={<ProtectedRoute><BuildOrdersPage /></ProtectedRoute>} />
+          <Route path="/build-orders/:id" element={<ProtectedRoute><BuildOrderDetailPage /></ProtectedRoute>} />
           <Route path="/build-simulation" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/procurement" element={<ProtectedRoute><ProcurementPage /></ProtectedRoute>} />
           <Route path="/procurement/:id" element={<ProtectedRoute><ProcurementDetailPage /></ProtectedRoute>} />
@@ -181,7 +182,6 @@ function App() {
           <Route path="/deliveries" element={<ProtectedRoute><div /></ProtectedRoute>} />
           <Route path="/submissions" element={<ProtectedRoute><SubmissionsListPage /></ProtectedRoute>} />
           <Route path="/submission/:submissionId" element={<ProtectedRoute><SubmissionDetailPage /></ProtectedRoute>} />
-          <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
           <Route path="/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />

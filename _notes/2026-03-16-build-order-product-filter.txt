@@ -1,0 +1,3 @@
+2026-03-16 - Build order product select filter
+- Added is_assembly filter to requests parts search endpoint.
+- Build order product select now requests only is_assembly=true parts.

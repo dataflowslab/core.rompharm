@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { Paper, Title, Table, Button, Group, Modal, Grid, Select, NumberInput, Textarea, Badge, ActionIcon, Text, TextInput, LoadingOverlay } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { IconPlus, IconEye, IconTrash, IconSearch, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { modals } from '@mantine/modals';
 import api from '../services/api';
 import { requestsApi } from '../services/requests';
 import { notifications } from '@mantine/notifications';
+import { useAuth } from '../context/AuthContext';
 import { ComponentsTable } from '../components/Requests/ComponentsTable';
 import { BatchCodesTable } from '../components/Requests/BatchCodesTable';
 import { debounce } from '../utils/selectHelpers';
@@ -38,6 +39,7 @@ interface BatchOption {
   expiry_date?: string;
   is_transferable?: boolean;
   is_requestable?: boolean;
+  is_transactionable?: boolean;
 }
 
 interface BatchSelection {
@@ -73,6 +75,7 @@ interface Request {
     name: string;
     IPN: string;
   };
+  open?: boolean;
 }
 
 type SortKey = 'reference' | 'source' | 'destination' | 'line_items' | 'product' | 'status' | 'issue_date';
@@ -80,6 +83,8 @@ type SortKey = 'reference' | 'source' | 'destination' | 'line_items' | 'product'
 export function RequestsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { locations: userLocations } = useAuth();
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpened, setModalOpened] = useState(false);
@@ -113,10 +118,35 @@ export function RequestsPage() {
     notes: ''
   });
 
+  const defaultDestination = userLocations && userLocations.length > 0 ? userLocations[0] : '';
+  const allowedDestinationLocations = useMemo(() => {
+    if (!userLocations || userLocations.length === 0) {
+      return [];
+    }
+    return stockLocations.filter(loc => userLocations.includes(loc._id));
+  }, [stockLocations, userLocations]);
+  const sourceLocationId = formData.source ? String(formData.source) : '';
+  const destinationOptions = useMemo(() => (
+    allowedDestinationLocations.filter(loc => String(loc._id) !== sourceLocationId)
+  ), [allowedDestinationLocations, sourceLocationId]);
+
   useEffect(() => {
     loadStockLocations();
     loadStates();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('action') === 'new') {
+      setModalOpened(true);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (modalOpened && !formData.destination && defaultDestination && defaultDestination !== formData.source) {
+      setFormData(prev => ({ ...prev, destination: defaultDestination }));
+    }
+  }, [modalOpened, defaultDestination, formData.destination, formData.source]);
 
   useEffect(() => {
     const isDateRangeValid =
@@ -174,6 +204,11 @@ export function RequestsPage() {
   }, 300);
 
   const searchParts = async (query: string) => {
+    if (!formData.source) {
+      setParts([]);
+      return;
+    }
+
     if (!query || query.length < 2) {
       setParts([]);
       return;
@@ -181,7 +216,7 @@ export function RequestsPage() {
     
     try {
       const response = await api.get(requestsApi.getParts(), {
-        params: { search: query }
+        params: { search: query, location_id: formData.source }
       });
       const results = response.data.results || response.data || [];
       setParts(results);
@@ -194,7 +229,7 @@ export function RequestsPage() {
 
   const loadStockInfo = async (partId: string) => {
     try {
-      const response = await api.get(requestsApi.getPartStockInfo(partId));
+      const response = await api.get(requestsApi.getPartStockInfo(partId, formData.source || undefined));
       setStockInfo(response.data);
       const batches = response.data.batches || [];
       setBatchOptions(batches.map((b: any) => ({
@@ -207,7 +242,8 @@ export function RequestsPage() {
         state_color: b.state_color,
         expiry_date: b.expiry_date,
         is_transferable: b.is_transferable,
-        is_requestable: b.is_requestable
+        is_requestable: b.is_requestable,
+        is_transactionable: b.is_transactionable
       })));
     } catch (error) {
       console.error('Failed to load stock info:', error);
@@ -235,6 +271,8 @@ export function RequestsPage() {
       setSelectedPartData(selected || null);
       loadStockInfo(value);  // Pass _id directly
       loadRecipe(value);  // Pass _id directly
+      setBatchSelections([]);
+      setComponentsData([]);
     } else {
       setSelectedPartData(null);
       setStockInfo(null);
@@ -242,7 +280,26 @@ export function RequestsPage() {
       setPartSearch(''); // Reset search when clearing
       setBatchOptions([]);
       setBatchSelections([]);
+      setComponentsData([]);
     }
+  };
+
+  const handleSourceChange = (value: string | null) => {
+    const nextSource = value || '';
+    setFormData(prev => ({
+      ...prev,
+      source: nextSource,
+      destination: prev.destination === nextSource ? '' : prev.destination,
+      part: ''
+    }));
+    setSelectedPartData(null);
+    setStockInfo(null);
+    setRecipeData(null);
+    setComponentsData([]);
+    setParts([]);
+    setPartSearch('');
+    setBatchOptions([]);
+    setBatchSelections([]);
   };
 
   const handleGeneralQuantityChange = (value: number) => {
@@ -275,6 +332,24 @@ export function RequestsPage() {
       notifications.show({
         title: t('Error'),
         message: t('Please fill in all required fields'),
+        color: 'red'
+      });
+      return;
+    }
+
+    if (!userLocations || userLocations.length === 0) {
+      notifications.show({
+        title: t('Error'),
+        message: t('No destination locations assigned to user'),
+        color: 'red'
+      });
+      return;
+    }
+
+    if (userLocations && userLocations.length > 0 && !userLocations.includes(formData.destination)) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Destination location not allowed for current user'),
         color: 'red'
       });
       return;
@@ -656,7 +731,21 @@ export function RequestsPage() {
                     )}
                   </Table.Td>
                   <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
-                    <Badge color={getStatusColor(request.status)}>{request.status}</Badge>
+                    <Group gap="xs">
+                      <Badge color={getStatusColor(request.status)}>{request.status}</Badge>
+                      {typeof request.open === 'boolean' && (
+                        <span
+                          title={request.open ? t('Open') : t('Closed')}
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: request.open ? '#fa5252' : '#40c057',
+                            display: 'inline-block'
+                          }}
+                        />
+                      )}
+                    </Group>
                   </Table.Td>
                   <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                     {formatDate(request.issue_date)}
@@ -707,31 +796,40 @@ export function RequestsPage() {
               placeholder={t('Select source location')}
               data={stockLocations.map(loc => ({ value: loc._id, label: loc.name }))}
               value={formData.source}
-              onChange={(value) => setFormData({ ...formData, source: value || '' })}
+              onChange={handleSourceChange}
               searchable
               required
             />
           </Grid.Col>
 
           <Grid.Col span={12}>
-            <Select
-              label={t('Destination Location')}
-              placeholder={t('Select destination location')}
-              data={stockLocations
-                .filter(loc => loc._id !== formData.source)
-                .map(loc => ({ value: loc._id, label: loc.name }))}
-              value={formData.destination}
-              onChange={(value) => setFormData({ ...formData, destination: value || '' })}
-              searchable
-              required
-              disabled={!formData.source}
-            />
+          <Select
+            label={t('Destination Location')}
+            placeholder={
+              allowedDestinationLocations.length === 0
+                ? t('No destination locations assigned to user')
+                : t('Select destination location')
+            }
+            data={destinationOptions.map(loc => ({ value: loc._id, label: loc.name }))}
+            value={formData.destination}
+            onChange={(value) => {
+              const nextDestination = value || '';
+              if (nextDestination && sourceLocationId && nextDestination === sourceLocationId) {
+                setFormData({ ...formData, destination: '' });
+                return;
+              }
+              setFormData({ ...formData, destination: nextDestination });
+            }}
+            searchable
+            required
+            disabled={!formData.source || allowedDestinationLocations.length === 0}
+          />
           </Grid.Col>
 
           <Grid.Col span={12}>
             <Select
               label={t('Part')}
-              placeholder={t('Search for part...')}
+              placeholder={formData.source ? t('Search for part...') : t('Select source location first')}
               data={sanitizeSelectOptions([
                 // Include selected part first if exists
                 ...(selectedPartData ? [{
@@ -755,6 +853,7 @@ export function RequestsPage() {
               searchable
               clearable
               required
+              disabled={!formData.source}
             />
           </Grid.Col>
 
@@ -778,6 +877,7 @@ export function RequestsPage() {
               <ComponentsTable
                 recipeData={recipeData}
                 productQuantity={formData.quantity}
+                sourceLocationId={formData.source}
                 onComponentsChange={(components) => {
                   setComponentsData(components);
                 }}
@@ -812,7 +912,8 @@ export function RequestsPage() {
                   state_color: b.state_color,
                   expiry_date: b.expiry_date,
                   is_transferable: b.is_transferable,
-                  is_requestable: b.is_requestable
+                  is_requestable: b.is_requestable,
+                  is_transactionable: b.is_transactionable
                 }))}
                 selections={batchSelections}
                 onSelectionChange={handleBatchSelectionsChange}

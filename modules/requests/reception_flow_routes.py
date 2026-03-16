@@ -435,6 +435,9 @@ async def update_reception_status(
                 # Create stock movements for each item
                 stocks_collection = db['depo_stocks']
                 movements_created = 0
+                movement_state_map = {}
+                ok_state_id = ObjectId("694321db8728e4d75ae72789")
+                qt_state_id = ObjectId("694322878728e4d75ae72790")
                 
                 for item in items:
                     part_id = item.get('part')
@@ -466,6 +469,7 @@ async def update_reception_status(
                     
                     # Transfer stock from source to destination
                     remaining_qty = quantity
+                    first_state_id = None
                     
                     for source_stock in source_stocks:
                         if remaining_qty <= 0:
@@ -473,6 +477,8 @@ async def update_reception_status(
                         
                         available_qty = source_stock.get('quantity', 0)
                         transfer_qty = min(remaining_qty, available_qty)
+                        if first_state_id is None:
+                            first_state_id = source_stock.get('state_id')
                         
                         # Reduce quantity at source
                         stocks_collection.update_one(
@@ -548,8 +554,34 @@ async def update_reception_status(
                     
                     if remaining_qty > 0:
                         print(f"[REQUESTS] Warning: Could not transfer full quantity for part {part_id}. Remaining: {remaining_qty}")
+
+                    # Track desired movement state
+                    if first_state_id == qt_state_id:
+                        movement_state_map[(part_id, batch_code)] = qt_state_id
+                    else:
+                        movement_state_map[(part_id, batch_code)] = ok_state_id
                 
                 print(f"[REQUESTS] Created {movements_created} stock movements for request {request_id}")
+
+                # Update transfer movements to OK/Quarantined Transactionable
+                try:
+                    for (part_id, batch_code), state_id in movement_state_map.items():
+                        db.depo_stocks_movements.update_many(
+                            {
+                                'document_id': req_obj_id,
+                                'document_type': 'REQUEST_TRANSFER',
+                                'part_id': part_id,
+                                'batch_code': batch_code
+                            },
+                            {
+                                '$set': {
+                                    'state_id': state_id,
+                                    'updated_at': timestamp
+                                }
+                            }
+                        )
+                except Exception as e:
+                    print(f"[REQUESTS] Warning: Failed to update movement states: {e}")
                 
             except Exception as e:
                 print(f"[REQUESTS] Error creating stock movements: {e}")

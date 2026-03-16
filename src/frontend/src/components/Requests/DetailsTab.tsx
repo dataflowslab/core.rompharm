@@ -8,6 +8,7 @@ import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
 import { DocumentGenerator } from '../Common/DocumentGenerator';
+import { useAuth } from '../../context/AuthContext';
 
 interface StockLocation {
   _id: string;
@@ -41,6 +42,7 @@ interface Request {
   issue_date: string;
   created_at: string;
   created_by: string;
+  open?: boolean;
   source_detail?: StockLocation;
   destination_detail?: StockLocation;
   product_id?: string;
@@ -60,6 +62,7 @@ interface DetailsTabProps {
 
 export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
   const { t } = useTranslation();
+  const { locations: userLocations } = useAuth();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
@@ -83,6 +86,10 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
     quantity: 1,
     notes: ''
   });
+
+  const allowedDestinationLocations = userLocations && userLocations.length > 0
+    ? stockLocations.filter(loc => userLocations.includes(String(loc._id)))
+    : [];
 
   useEffect(() => {
     loadStockLocations();
@@ -299,6 +306,11 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
             <Text size="sm" c="dimmed">
               {t('Product Quantity')}: {request.product_quantity || 0}
             </Text>
+            {typeof request.open === 'boolean' && (
+              <Text size="sm" c="dimmed">
+                {t('Open')}: {request.open ? 'true' : 'false'}
+              </Text>
+            )}
           </Paper>
         )}
 
@@ -375,7 +387,12 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
           {editing ? (
             <Select
               label={t('Destination Location')}
-              data={stockLocations
+              placeholder={
+                allowedDestinationLocations.length === 0
+                  ? t('No destination locations assigned to user')
+                  : t('Select destination location')
+              }
+              data={allowedDestinationLocations
                 .filter(loc => String(loc._id) !== formData.source)
                 .map(loc => ({ value: String(loc._id), label: loc.name }))}
               value={formData.destination}
@@ -384,7 +401,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
               }}
               searchable
               required
-              disabled={stockLocations.length === 0}
+              disabled={allowedDestinationLocations.length === 0}
             />
           ) : (
             <TextInput

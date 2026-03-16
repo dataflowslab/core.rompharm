@@ -10,6 +10,7 @@ from src.backend.routes.auth import verify_admin
 from src.backend.models.approval_flow_model import ApprovalFlowModel
 
 from .approval_helpers import get_state_by_slug, update_request_state, check_flow_completion, get_flow_config, build_officers_lists
+from .build_orders_helpers import ensure_build_orders_for_request
 from .reception_flow_routes import router as reception_router
 from .production_routes import router as production_router
 
@@ -260,7 +261,7 @@ async def sign_request(
             }
         )
         
-        # Update request status to "Approved"
+        # Update request state to "Approved"
         try:
             req_obj_id = ObjectId(request_id)
         except:
@@ -269,6 +270,17 @@ async def sign_request(
         if req_obj_id:
             update_request_state(db, request_id, "approved")
             print(f"[REQUESTS] Request {request_id} status updated to Approved")
+
+            try:
+                request_doc = requests_collection.find_one({'_id': req_obj_id})
+                if request_doc and request_doc.get('batch_codes'):
+                    requests_collection.update_one(
+                        {'_id': req_obj_id},
+                        {'$set': {'open': True, 'updated_at': timestamp}}
+                    )
+                    ensure_build_orders_for_request(db, request_doc, timestamp)
+            except Exception as e:
+                print(f"[REQUESTS] Warning: Failed to create build orders: {e}")
             
             # Auto-create operations flow when request is approved
             try:
@@ -376,29 +388,8 @@ async def remove_request_signature(
             {"_id": ObjectId(flow["_id"])},
             {"$set": {"status": "pending"}}
         )
-        
-        # Update request status back to Pending
-        try:
-            req_obj_id = ObjectId(request_id)
-            requests_collection.update_one(
-                {"_id": req_obj_id},
-                {"$set": {"status": "Pending", "updated_at": datetime.utcnow()}}
-            )
-            print(f"[REQUESTS] Request {request_id} status updated to Pending after signature removal")
-        except Exception as e:
-            print(f"[REQUESTS] Warning: Failed to update request status: {e}")
     else:
-        # Still has signatures but not approved anymore
-        # Update request status to In Progress
-        try:
-            req_obj_id = ObjectId(request_id)
-            requests_collection.update_one(
-                {"_id": req_obj_id},
-                {"$set": {"status": "In Progress", "updated_at": datetime.utcnow()}}
-            )
-            print(f"[REQUESTS] Request {request_id} status updated to In Progress after signature removal")
-        except Exception as e:
-            print(f"[REQUESTS] Warning: Failed to update request status: {e}")
+        pass
     
     return {"message": "Signature removed successfully"}
 
@@ -752,6 +743,74 @@ async def update_operations_status(
         })
         
         print(f"[REQUESTS] Request {request_id} state_id updated to {state.get('name')} ({status})")
+
+        # If Warehouse Approved, create "in transfer" movement entries
+        try:
+            state_name = (state.get('name') or '').lower()
+            state_slug = (state.get('slug') or '').lower()
+            is_warehouse_approved = ('warehouse' in state_name and 'approved' in state_name) or ('warehouse' in state_slug and 'approved' in state_slug)
+
+            if is_warehouse_approved:
+                transfer_state_id = ObjectId("69b6a5a8fff405998c9f97b4")  # In transfer
+                request_doc = requests_collection.find_one({'_id': req_obj_id})
+
+                if request_doc:
+                    existing_transfer = db.depo_stocks_movements.find_one({
+                        'document_id': req_obj_id,
+                        'document_type': 'REQUEST_TRANSFER'
+                    })
+
+                    if not existing_transfer:
+                        source_id = request_doc.get('source')
+                        destination_id = request_doc.get('destination')
+                        items = request_doc.get('items', [])
+
+                        if source_id and destination_id:
+                            source_oid = ObjectId(source_id) if isinstance(source_id, str) else source_id
+                            dest_oid = ObjectId(destination_id) if isinstance(destination_id, str) else destination_id
+                            username = current_user.get('username', 'system')
+
+                            for item in items:
+                                part_id = item.get('part')
+                                quantity = item.get('quantity', 0)
+                                batch_code = item.get('batch_code', '')
+
+                                if not part_id or quantity <= 0:
+                                    continue
+
+                                part_oid = ObjectId(part_id) if isinstance(part_id, str) else part_id
+
+                                stock_id = None
+                                if batch_code:
+                                    stock_doc = db.depo_stocks.find_one({
+                                        'part_id': part_oid,
+                                        'batch_code': batch_code
+                                    })
+                                    if stock_doc:
+                                        stock_id = stock_doc.get('_id')
+
+                                movement_doc = {
+                                    'stock_id': stock_id,
+                                    'part_id': part_oid,
+                                    'batch_code': batch_code,
+                                    'movement_type': 'REQUEST_TRANSFER',
+                                    'quantity': quantity,
+                                    'from_location_id': source_oid,
+                                    'to_location_id': dest_oid,
+                                    'source_id': source_oid,
+                                    'destination_id': dest_oid,
+                                    'state_id': transfer_state_id,
+                                    'document_type': 'REQUEST_TRANSFER',
+                                    'document_id': req_obj_id,
+                                    'request_id': req_obj_id,
+                                    'request_reference': request_doc.get('reference'),
+                                    'created_at': timestamp,
+                                    'created_by': username,
+                                    'date': timestamp
+                                }
+                                db.depo_stocks_movements.insert_one(movement_doc)
+        except Exception as e:
+            print(f"[REQUESTS] Warning: Failed to create transfer movements: {e}")
 
         # Auto-sign operations after decision save (if current user can sign)
         auto_signed = False

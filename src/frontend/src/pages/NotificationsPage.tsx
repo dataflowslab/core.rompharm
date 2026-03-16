@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Container, Title, Alert, Loader, Text, Stack, Button, Badge, Table, Paper, Tabs } from '@mantine/core';
-import { IconAlertCircle, IconInfoCircle, IconAlertTriangle, IconCheck, IconFileCheck, IconBell, IconSignature } from '@tabler/icons-react';
+import { IconAlertCircle, IconInfoCircle, IconAlertTriangle, IconCheck, IconBell, IconSignature } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { getApprovalRoute, getApprovalTypeLabelKey } from '../utils/approvalHelpers';
 
 interface Notification {
   type: 'info' | 'warning' | 'error' | 'success';
@@ -88,10 +89,10 @@ export function NotificationsPage() {
   };
 
   const handleOpenDocument = (approval: ApprovalFlow) => {
-    if (approval.object_type === 'procurement_order') {
-      navigate(`/procurement/${approval.object_id}`);
-    } else if (approval.object_type === 'purchase_request') {
-      navigate(`/requests/${approval.object_id}`);
+    const target = getApprovalRoute(approval);
+    if (target) {
+      navigate(target);
+      return;
     }
   };
 
@@ -146,11 +147,13 @@ export function NotificationsPage() {
                   {approvals.map((approval) => (
                     <Table.Tr key={approval._id}>
                       <Table.Td>
-                        <Text size="sm" fw={500}>{t(approval.object_type)}</Text>
+                        <Text size="sm" fw={500}>{t(getApprovalTypeLabelKey(approval.object_type))}</Text>
                       </Table.Td>
                       <Table.Td>
-                        <Text size="sm" fw={700}>{approval.object_details?.reference}</Text>
-                        <Text size="xs" c="dimmed">{approval.object_details?.description}</Text>
+                        <Text size="sm" fw={700}>{approval.object_details?.reference || approval.object_id}</Text>
+                        {approval.object_details?.description ? (
+                          <Text size="xs" c="dimmed">{approval.object_details.description}</Text>
+                        ) : null}
                       </Table.Td>
                       <Table.Td>
                         <Badge color="yellow" variant="light">{t(approval.status)}</Badge>
@@ -168,7 +171,6 @@ export function NotificationsPage() {
                           size="xs"
                           variant="light"
                           onClick={() => handleOpenDocument(approval)}
-                          leftSection={<IconFileCheck size={14} />}
                         >
                           {t('Review')}
                         </Button>

@@ -23,6 +23,7 @@ interface BatchOption {
   state_color?: string;
   is_transferable?: boolean;
   is_requestable?: boolean;
+  is_transactionable?: boolean;
 }
 
 interface BatchSelection {
@@ -95,6 +96,32 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
   const loadItems = async () => {
     try {
       const response = await api.get(requestsApi.getRequest(requestId));
+      const movementsResponse = await api.get(requestsApi.getRequestMovements(requestId));
+      const movementEntries = movementsResponse.data?.results || [];
+      const movementMap = new Map<string, { quantity: number; state_name?: string; state_color?: string }>();
+
+      movementEntries.forEach((mov: any) => {
+        const partId = String(mov.part_id || '');
+        const batchCode = mov.batch_code || '';
+        const key = `${partId}_${batchCode}`;
+        const existing = movementMap.get(key);
+        const qty = Number(mov.quantity) || 0;
+        const stateName = mov.state_detail?.name || mov.state_name;
+        const stateColor = mov.state_detail?.color || mov.state_color;
+
+        if (existing) {
+          existing.quantity += qty;
+          existing.state_name = existing.state_name || stateName;
+          existing.state_color = existing.state_color || stateColor;
+        } else {
+          movementMap.set(key, {
+            quantity: qty,
+            state_name: stateName,
+            state_color: stateColor
+          });
+        }
+      });
+
       const itemsData = response.data.items || [];
       const sourceLocation = response.data.source;
       
@@ -103,6 +130,12 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
         itemsData.map(async (item: any) => {
           const batchOptions = await loadBatchCodes(item.part, sourceLocation);
           const batchInfo = findBatchInfo(batchOptions, item.batch_code, item.location_id);
+          const sourceLocationId = sourceLocation ? String(sourceLocation) : '';
+          const totalAvailable = batchOptions
+            .filter(opt => (sourceLocationId ? String(opt.location_id) === sourceLocationId : true))
+            .reduce((sum, opt) => sum + (opt.quantity || 0), 0);
+          const movementKey = `${String(item.part)}_${item.batch_code || ''}`;
+          const movementInfo = movementMap.get(movementKey);
           return {
             part: item.part,
             part_name: item.part_detail?.name || String(item.part),
@@ -110,9 +143,11 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
             batch_code: item.batch_code || '',
             location_id: item.location_id,
             notes: item.notes || '',
-            available_qty: batchInfo?.quantity,
-            lot_state_name: batchInfo?.state_name,
-            lot_state_color: batchInfo?.state_color,
+            available_qty: movementInfo
+              ? movementInfo.quantity
+              : (item.batch_code ? batchInfo?.quantity : totalAvailable),
+            lot_state_name: movementInfo?.state_name || batchInfo?.state_name,
+            lot_state_color: movementInfo?.state_color || batchInfo?.state_color,
             batch_options: batchOptions
           };
         })
@@ -157,7 +192,8 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
         state_id: batch.state_id,
         state_color: batch.state_color,
         is_transferable: batch.is_transferable,
-        is_requestable: batch.is_requestable
+        is_requestable: batch.is_requestable,
+        is_transactionable: batch.is_transactionable
       }));
     } catch (error) {
       return [];
@@ -381,8 +417,8 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
                   )}
                 </Table.Td>
                 <Table.Td>
-                  {item.batch_code ? (
-                    <Text size="sm" fw={500}>{item.available_qty ?? '-'}</Text>
+                  {item.available_qty !== undefined ? (
+                    <Text size="sm" fw={500}>{item.available_qty}</Text>
                   ) : (
                     <Text size="sm" c="dimmed">-</Text>
                   )}
@@ -489,7 +525,8 @@ export function ItemsTab({ requestId, request, onReload }: ItemsTabProps) {
                     state_color: opt.state_color,
                     expiry_date: opt.expiry_date,
                     is_transferable: opt.is_transferable,
-                    is_requestable: opt.is_requestable
+                    is_requestable: opt.is_requestable,
+                    is_transactionable: opt.is_transactionable
                   }))}
                   selections={batchSelections}
                   onSelectionChange={(selections) => {

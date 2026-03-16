@@ -1,0 +1,5 @@
+Updated approvals UX:
+- Backend pending approvals now resolve object details for sales/returns/stock requests/build orders/stock QC and use batch codes for stock-related flows.
+- Frontend approvals list uses friendly type labels and direct routes (incl. stock/operations tabs); Review buttons no longer show icons.
+- Request/Build Order detail pages accept ?tab= for deep-linking.
+- Added i18n key: "Purchase".

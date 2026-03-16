@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-03-13 10:47:27
+**Last Updated:** 2026-03-15 23:53:38
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -132,6 +132,7 @@
 - `DELETE /modules/requests/api/{request_id}` - Delete a request
 - `GET /modules/requests/api/{request_id}` - Get a specific request by ID with location and part details from MongoDB
 - `PATCH /modules/requests/api/{request_id}` - Update a request
+- `GET /modules/requests/api/{request_id}/movements` - Get stock movements associated with a request (transfer/in-transit)
 
 ---
 

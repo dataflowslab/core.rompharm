@@ -89,6 +89,18 @@ def _normalize_user_data(user: dict) -> dict:
         # Ensure both 'role' and 'local_role' are set for compatibility
         if 'local_role' not in normalized:
             normalized['local_role'] = normalized['role']
+
+    # Normalize locations list
+    if 'locations' in normalized:
+        normalized_locations = []
+        for loc in normalized.get('locations') or []:
+            if isinstance(loc, ObjectId):
+                normalized_locations.append(str(loc))
+            elif isinstance(loc, dict) and loc.get("$oid"):
+                normalized_locations.append(str(loc.get("$oid")))
+            elif isinstance(loc, str):
+                normalized_locations.append(loc)
+        normalized['locations'] = normalized_locations
     
     return normalized
 
@@ -99,8 +111,20 @@ def verify_admin(authorization: Optional[str] = Header(None)):
     """
     user = verify_token(authorization)
     
-    if not user.get('is_staff', False):
-        raise HTTPException(status_code=403, detail="Administrator access required")
+    if user.get('is_staff', False):
+        return user
+
+    role_value = user.get('role') or user.get('local_role')
+    if role_value:
+        db = get_db()
+        try:
+            role_doc = db['roles'].find_one({'_id': ObjectId(role_value)})
+        except Exception:
+            role_doc = None
+        if role_doc and role_doc.get('slug') == 'admin':
+            return user
+
+    raise HTTPException(status_code=403, detail="Administrator access required")
     
     return user
 
@@ -136,6 +160,9 @@ def get_current_user(user = Depends(verify_token)):
         elif isinstance(role_value, str):
             role_slug = role_value
 
+    locations = user.get('locations') or []
+    default_location = locations[0] if locations else None
+
     return {
         '_id': str(user['_id']),
         'username': user['username'],
@@ -143,7 +170,10 @@ def get_current_user(user = Depends(verify_token)):
         'is_staff': user.get('is_staff', False),
         'staff': user.get('is_staff', False),
         'local_role': user.get('local_role'),
-        'role_slug': role_slug
+        'role_slug': role_slug,
+        'locations': locations,
+        'default_location': default_location,
+        'quick_actions': user.get('quick_actions') or []
     }
 
 

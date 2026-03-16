@@ -14,6 +14,20 @@ from .db import get_db
 from .config import load_config
 
 
+def _normalize_locations(locations):
+    if not locations:
+        return []
+    normalized = []
+    for loc in locations:
+        if isinstance(loc, ObjectId):
+            normalized.append(str(loc))
+        elif isinstance(loc, dict) and loc.get("$oid"):
+            normalized.append(str(loc.get("$oid")))
+        elif isinstance(loc, str):
+            normalized.append(loc)
+    return normalized
+
+
 def generate_salt() -> str:
     """Generează salt pentru parole"""
     return secrets.token_hex(16)
@@ -119,16 +133,21 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
             }
     
     # Return user data
+    display_name = user.get('name') or f"{user.get('firstname', '')} {user.get('lastname', '')}".strip()
+
     return {
         '_id': str(user['_id']),
         'username': user['username'],
         'firstname': user.get('firstname', ''),
         'lastname': user.get('lastname', ''),
-        'name': f"{user.get('firstname', '')} {user.get('lastname', '')}".strip(),
+        'name': display_name,
         'email': user.get('email'),
         'is_active': user.get('is_active', True),
         'mobile': user.get('mobile', True),  # Default True as requested
+        'locations': _normalize_locations(user.get('locations')),
         'role': role_data,
+        'local_role': user.get('local_role'),
+        'quick_actions': user.get('quick_actions') or [],
         'token': token,
         'access_token': token  # Alias pentru compatibilitate
     }
@@ -176,23 +195,29 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         except:
             pass
     
+    display_name = user.get('name') or f"{user.get('firstname', '')} {user.get('lastname', '')}".strip()
+
     return {
         '_id': str(user['_id']),
         'username': user['username'],
         'firstname': user.get('firstname', ''),
         'lastname': user.get('lastname', ''),
-        'name': f"{user.get('firstname', '')} {user.get('lastname', '')}".strip(),
+        'name': display_name,
         'email': user.get('email'),
         'is_staff': user.get('is_staff', False),
         'is_active': user.get('is_active', True),
         'mobile': user.get('mobile', True),  # Default True as requested
-        'role': role_data
+        'locations': _normalize_locations(user.get('locations')),
+        'role': role_data,
+        'local_role': user.get('local_role'),
+        'quick_actions': user.get('quick_actions') or []
     }
 
 
 def create_user(
     username: str,
     password: str,
+    name: Optional[str],
     firstname: str,
     lastname: str,
     role_id: str,
@@ -200,7 +225,8 @@ def create_user(
     phone: Optional[str] = None,
     is_staff: bool = False,
     is_active: bool = True,
-    mobile: bool = True
+    mobile: bool = True,
+    locations: Optional[list[str]] = None
 ) -> Dict[str, Any]:
     """
     Creare user nou
@@ -218,10 +244,13 @@ def create_user(
     hashed_password = hash_password(password, salt)
     
     # Create user document
+    display_name = name or f"{firstname} {lastname}".strip()
+
     user_doc = {
         'username': username,
         'password': hashed_password,
         'salt': salt,
+        'name': display_name,
         'firstname': firstname,
         'lastname': lastname,
         'role': ObjectId(role_id),  # Use 'role' not 'role_id'
@@ -233,6 +262,15 @@ def create_user(
         'created_at': datetime.utcnow(),
         'updated_at': datetime.utcnow()
     }
+
+    if locations:
+        normalized_locations = []
+        for loc in locations:
+            try:
+                normalized_locations.append(ObjectId(loc))
+            except Exception:
+                continue
+        user_doc['locations'] = normalized_locations
     
     result = users_collection.insert_one(user_doc)
     user_doc['_id'] = str(result.inserted_id)

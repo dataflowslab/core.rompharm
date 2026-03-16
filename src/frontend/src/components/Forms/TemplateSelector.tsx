@@ -27,7 +27,7 @@ export function TemplateSelector({ value, onChange }: TemplateSelectorProps) {
 
   const loadTemplates = async () => {
     try {
-      const response = await api.get('/api/templates');
+      const response = await api.get('/api/documents/templates');
       setTemplates(response.data);
       setError('');
     } catch (err: any) {

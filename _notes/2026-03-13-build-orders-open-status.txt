@@ -1,0 +1,11 @@
+Date: 2026-03-13
+Task: Requests open flag + build orders system
+
+Summary:
+- Requests: stop persisting status string; add open flag when batch_codes set/approved; create build orders on approval.
+- Backend: added build orders API (/modules/requests/api/build-orders) with list/detail/states and production endpoints; build order production aggregates materials from open requests and closes requests when fully consumed.
+- Frontend: open indicator in Requests list/details; new Build Orders list with grouping + expand requests; new Build Order detail page with Details/Production/Journal; build order production UI + series table with Request column.
+
+Notes:
+- Build orders created per batch_code (dedupe by batch_code_text) and grouped by prefix.
+- Production flow for build orders uses approval template 694a1ae3297c9dde6d70661a.

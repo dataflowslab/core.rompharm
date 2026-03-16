@@ -117,7 +117,7 @@ export function SubmissionDetailPage() {
       
       if (templateCodes.length > 0) {
         // Load template details
-        const templatesResponse = await api.get('/api/templates');
+        const templatesResponse = await api.get('/api/documents/templates');
         const allTemplates = templatesResponse.data;
         
         const formTemplates = allTemplates.filter((t: any) => 

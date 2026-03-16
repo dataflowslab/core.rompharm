@@ -43,10 +43,11 @@ interface Component {
 interface ComponentsTableProps {
   recipeData: any;
   productQuantity: number;
+  sourceLocationId?: string;
   onComponentsChange: (components: Component[]) => void;
 }
 
-export function ComponentsTable({ recipeData, productQuantity, onComponentsChange }: ComponentsTableProps) {
+export function ComponentsTable({ recipeData, productQuantity, sourceLocationId, onComponentsChange }: ComponentsTableProps) {
   const { t } = useTranslation();
   const [components, setComponents] = useState<Component[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +57,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     if (recipeData && recipeData.items) {
       loadComponents();
     }
-  }, [recipeData, productQuantity]);
+  }, [recipeData, productQuantity, sourceLocationId]);
 
   const loadComponents = async () => {
     setLoading(true);
@@ -79,7 +80,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
                 type: 1,
                 batches,
                 batch_allocations: [],
-                requested_quantity: batches.length > 0 ? 0 : alt.quantity * productQuantity
+                requested_quantity: 0
               };
             })
           );
@@ -111,7 +112,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
             type: 1,
             batches,
             batch_allocations: [],
-            requested_quantity: batches.length > 0 ? 0 : item.quantity * productQuantity
+            requested_quantity: 0
           });
         }
       }
@@ -127,7 +128,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
 
   const loadBatches = async (partId: string): Promise<Batch[]> => {
     try {
-      const response = await api.get(requestsApi.getPartStockInfo(partId));
+      const response = await api.get(requestsApi.getPartStockInfo(partId, sourceLocationId));
       return response.data.batches || [];
     } catch (error) {
       console.error(`Failed to load batches for part ${partId}:`, error);
@@ -153,7 +154,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     if (component.alternatives) {
       component.alternatives.forEach(alt => {
         alt.batch_allocations = [];
-        alt.requested_quantity = alt.batches && alt.batches.length > 0 ? 0 : alt.required_quantity;
+        alt.requested_quantity = 0;
       });
     }
 
@@ -199,21 +200,6 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
       }
     }
 
-    setComponents(updated);
-    onComponentsChange(updated);
-  };
-
-  const handleRequestedQuantityChange = (
-    componentIndex: number,
-    quantity: number,
-    alternativeIndex?: number
-  ) => {
-    const updated = [...components];
-    const component = alternativeIndex !== undefined
-      ? updated[componentIndex].alternatives![alternativeIndex]
-      : updated[componentIndex];
-
-    component.requested_quantity = quantity;
     setComponents(updated);
     onComponentsChange(updated);
   };
@@ -293,7 +279,6 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     const isExpanded = expandedRows.has(componentIndex);
     const totalAllocated = getTotalAllocated(component);
     const isFullyAllocated = hasBatches && totalAllocated === component.required_quantity;
-    const requestedQty = component.requested_quantity || 0;
 
     const rows = [];
 
@@ -339,13 +324,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
               {totalAllocated}
             </Text>
           ) : (
-            <NumberInput
-              size="xs"
-              value={requestedQty}
-              onChange={(val) => handleRequestedQuantityChange(componentIndex, Number(val) || 0)}
-              min={0}
-              style={{ width: '100px' }}
-            />
+            <Text size="sm" c="dimmed">-</Text>
           )}
         </Table.Td>
       </Table.Tr>
@@ -367,7 +346,6 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
     const isExpanded = expandedRows.has(componentIndex);
     const totalAllocated = getTotalAllocated(selectedAlt);
     const isFullyAllocated = hasBatches && totalAllocated === selectedAlt.required_quantity;
-    const requestedQty = selectedAlt.requested_quantity || 0;
 
     const rows = [];
 
@@ -422,17 +400,7 @@ export function ComponentsTable({ recipeData, productQuantity, onComponentsChang
               {totalAllocated}
             </Text>
           ) : (
-            <NumberInput
-              size="xs"
-              value={requestedQty}
-              onChange={(val) => handleRequestedQuantityChange(
-                componentIndex,
-                Number(val) || 0,
-                component.selected_alternative || 0
-              )}
-              min={0}
-              style={{ width: '100px' }}
-            />
+            <Text size="sm" c="dimmed">-</Text>
           )}
         </Table.Td>
       </Table.Tr>
