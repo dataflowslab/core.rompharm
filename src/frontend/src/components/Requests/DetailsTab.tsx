@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Grid, TextInput, Textarea, Select, Button, Group, Title, Table, Text, ActionIcon, NumberInput, Modal, TagsInput, Paper } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
+import { Grid, TextInput, Textarea, Select, Button, Group, Title, Text, NumberInput, Modal, TagsInput, Paper } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
-import { IconDeviceFloppy, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconDeviceFloppy } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
@@ -63,7 +62,6 @@ interface DetailsTabProps {
 export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
   const { t } = useTranslation();
   const { locations: userLocations } = useAuth();
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stockLocations, setStockLocations] = useState<StockLocation[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
@@ -244,7 +242,6 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
         color: 'green'
       });
 
-      setEditing(false);
       onUpdate();
     } catch (error: any) {
       console.error('Failed to update request:', error);
@@ -267,7 +264,6 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
       batch_codes: request.batch_codes || [],
       items: [...request.items]
     });
-    setEditing(false);
   };
 
   const formatDate = (dateString: string) => {
@@ -315,24 +311,17 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
         )}
 
         <Group justify="flex-end" mb="md">
-          {!editing ? (
-            <Button onClick={() => setEditing(true)} disabled={!canEdit}>
-              {t('Edit')}
-            </Button>
-          ) : (
-            <>
-              <Button variant="default" onClick={handleCancel}>
-                {t('Cancel')}
-              </Button>
-              <Button
-                leftSection={<IconDeviceFloppy size={16} />}
-                onClick={handleSave}
-                loading={saving}
-              >
-                {t('Save')}
-              </Button>
-            </>
-          )}
+          <Button variant="default" onClick={handleCancel} disabled={!canEdit || saving}>
+            {t('Cancel')}
+          </Button>
+          <Button
+            leftSection={<IconDeviceFloppy size={16} />}
+            onClick={handleSave}
+            loading={saving}
+            disabled={!canEdit}
+          >
+            {t('Save')}
+          </Button>
         </Group>
 
         {!canEdit && !checkingSignatures && (
@@ -344,25 +333,18 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
         <Grid>
         {/* Batch Codes - First field */}
         <Grid.Col span={12}>
-          {editing ? (
-            <TagsInput
-              label={t('Batch Codes')}
-              placeholder={t('Add batch codes')}
-              value={formData.batch_codes}
-              onChange={(value) => setFormData({ ...formData, batch_codes: value })}
-            />
-          ) : (
-            <TagsInput
-              label={t('Batch Codes')}
-              value={request.batch_codes || []}
-              disabled
-            />
-          )}
+          <TagsInput
+            label={t('Batch Codes')}
+            placeholder={t('Add batch codes')}
+            value={formData.batch_codes}
+            onChange={(value) => setFormData({ ...formData, batch_codes: value })}
+            disabled={!canEdit}
+          />
         </Grid.Col>
 
         {/* Source and Destination */}
         <Grid.Col span={6}>
-          {editing ? (
+          {canEdit ? (
             <Select
               label={t('Source Location')}
               data={stockLocations.map(loc => ({ value: String(loc._id), label: loc.name }))}
@@ -384,7 +366,7 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
         </Grid.Col>
 
         <Grid.Col span={6}>
-          {editing ? (
+          {canEdit ? (
             <Select
               label={t('Destination Location')}
               placeholder={
@@ -414,21 +396,13 @@ export function DetailsTab({ request, onUpdate }: DetailsTabProps) {
 
         {/* Notes */}
         <Grid.Col span={12}>
-          {editing ? (
-            <Textarea
-              label={t('Notes')}
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              minRows={3}
-            />
-          ) : (
-            <Textarea
-              label={t('Notes')}
-              value={request.notes || ''}
-              disabled
-              minRows={3}
-            />
-          )}
+          <Textarea
+            label={t('Notes')}
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            minRows={3}
+            disabled={!canEdit}
+          />
         </Grid.Col>
 
         {/* Metadata section - separated by divider */}

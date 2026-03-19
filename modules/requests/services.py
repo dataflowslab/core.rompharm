@@ -68,6 +68,7 @@ async def search_parts(
             query["is_assembly"] = is_assembly
 
         # Optional filter: only parts that have requestable stock in a specific location
+        # Special case: allow assemblies regardless of location availability
         if location_id:
             try:
                 location_oid = ObjectId(location_id)
@@ -78,22 +79,26 @@ async def search_parts(
             requestable_states = list(db.depo_stocks_states.find({
                 "is_requestable": True
             }, {"_id": 1}))
-            if not requestable_states:
-                return {"results": [], "count": 0}
-
             allowed_state_ids = [state["_id"] for state in requestable_states]
-            part_ids = db.depo_stocks.distinct(
-                "part_id",
-                {
-                    "location_id": {"$in": location_values},
-                    "state_id": {"$in": allowed_state_ids},
-                    "quantity": {"$gt": 0}
-                }
-            )
-            if not part_ids:
-                return {"results": [], "count": 0}
+            part_ids = []
+            if allowed_state_ids:
+                part_ids = db.depo_stocks.distinct(
+                    "part_id",
+                    {
+                        "location_id": {"$in": location_values},
+                        "state_id": {"$in": allowed_state_ids},
+                        "quantity": {"$gt": 0}
+                    }
+                )
 
-            query["_id"] = {"$in": part_ids}
+            # Include assemblies regardless of location stock availability
+            location_or_assembly = {
+                "$or": [
+                    {"_id": {"$in": part_ids}},
+                    {"is_assembly": True}
+                ]
+            }
+            query = {"$and": [query, location_or_assembly]}
         
         parts = list(db.depo_parts.find(query).limit(30))
         
