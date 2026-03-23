@@ -1,5 +1,5 @@
-import { Title, Button, Group, Text, Table, Badge, ActionIcon } from '@mantine/core';
-import { IconSignature, IconTrash } from '@tabler/icons-react';
+import { Title, Group, Text, Table, Badge, ActionIcon } from '@mantine/core';
+import { IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 
 interface ApprovalOfficer {
@@ -23,7 +23,7 @@ interface SignaturesSectionProps {
   canSignOfficers: ApprovalOfficer[];
   minSignatures: number;
   signatures: ApprovalSignature[];
-  isStaff: boolean;
+  canRemoveSignatures: boolean;
   onSign: () => void;
   onRemoveSignature: (userId: string, username: string) => void;
   signing: boolean;
@@ -35,7 +35,7 @@ export function SignaturesSection({
   canSignOfficers,
   minSignatures,
   signatures,
-  isStaff,
+  canRemoveSignatures,
   onSign,
   onRemoveSignature,
   signing
@@ -81,7 +81,7 @@ export function SignaturesSection({
                   hasSigned = signatures.some(s => s.user_id === officer.reference);
                 }
                 
-                // Display format: "role: admin" or username
+                // Display format: "role: <reference>" or username
                 const displayName = officer.type === 'role' 
                   ? `role: ${officer.reference}` 
                   : (officer.username || officer.reference);
@@ -111,7 +111,7 @@ export function SignaturesSection({
               <Table.Tr>
                 <Table.Th>{t('User')}</Table.Th>
                 <Table.Th>{t('Date')}</Table.Th>
-                {isStaff && <Table.Th style={{ width: '40px' }}></Table.Th>}
+                {canRemoveSignatures && <Table.Th style={{ width: '40px' }}></Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -119,7 +119,7 @@ export function SignaturesSection({
                 <Table.Tr key={index}>
                   <Table.Td>{signature.user_name || signature.username}</Table.Td>
                   <Table.Td>{formatDate(signature.signed_at)}</Table.Td>
-                  {isStaff && (
+                  {canRemoveSignatures && (
                     <Table.Td>
                       <ActionIcon
                         color="red"

@@ -1,0 +1,19 @@
+Date: 2026-03-23
+Task: Remove staff concept from app
+Summary:
+- Replaced all frontend role gating from isStaff to roleSlug/localRole === "admin".
+- Updated requests/procurement/returns signatures tables to use admin-only remove actions.
+- Removed remaining is_staff/isStaff references across repo.
+Files touched:
+- src/frontend/src/components/Requests/SignaturesSection.tsx
+- src/frontend/src/components/Requests/OperationsTab.tsx
+- src/frontend/src/components/Requests/ReceptieTab.tsx
+- src/frontend/src/components/Requests/ApprovalsTab.tsx
+- src/frontend/src/components/Procurement/ApprovalsTab.tsx
+- src/frontend/src/components/Procurement/DetailsTab.tsx
+- src/frontend/src/components/Returns/DetailsTab.tsx
+- src/frontend/src/pages/AuditLogPage.tsx
+- src/frontend/src/pages/DataListPage.tsx
+- src/frontend/src/pages/FormsPage.tsx
+Notes:
+- Admin is now determined strictly by role slug/local role "admin".

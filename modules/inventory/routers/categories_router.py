@@ -9,7 +9,7 @@ from datetime import datetime
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 
 import sys
 import os
@@ -35,7 +35,7 @@ class CategoryUpdateRequest(BaseModel):
 async def get_categories(
     request: Request,
     search: Optional[str] = Query(None),
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/categories")),
     db = Depends(get_db)
 ):
     """Get list of categories from MongoDB with parent details populated"""
@@ -66,7 +66,7 @@ async def get_categories(
 async def create_category(
     request: Request,
     category_data: CategoryCreateRequest,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/categories")),
     db = Depends(get_db)
 ):
     """Create a new category"""
@@ -106,7 +106,7 @@ async def update_category(
     request: Request,
     category_id: str,
     category_data: CategoryUpdateRequest,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/categories")),
     db = Depends(get_db)
 ):
     """Update an existing category"""
@@ -183,7 +183,7 @@ async def update_category(
 async def delete_category(
     request: Request,
     category_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/categories")),
     db = Depends(get_db)
 ):
     """Delete a category (only if it has no children and no articles)"""

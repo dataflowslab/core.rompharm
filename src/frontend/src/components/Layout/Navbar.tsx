@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { NavLink, Stack, Badge } from '@mantine/core';
 import {
   IconDashboard,
@@ -11,19 +11,25 @@ import {
   IconBox,
   IconClipboardList,
   IconFileText,
+  IconFileCheck,
+  IconFileDescription,
+  IconFileInvoice,
   IconChefHat,
   IconPackage,
   IconStack2,
+  IconShieldLock,
 } from '@tabler/icons-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
   const [notificationCount, setNotificationCount] = useState(0);
+  const { roleMenuItems } = useAuth();
 
   useEffect(() => {
     // Check notifications 
@@ -37,145 +43,45 @@ export function Navbar() {
   const isActive = (path: string) => location.pathname === path;
   const isInSection = (basePath: string) => location.pathname.startsWith(basePath);
 
+  const iconMap: Record<string, any> = useMemo(() => ({
+    IconDashboard,
+    IconUsers,
+    IconBell,
+    IconChevronRight,
+    IconTruckDelivery,
+    IconShoppingCart,
+    IconArrowsExchange,
+    IconBox,
+    IconClipboardList,
+    IconFileText,
+    IconFileCheck,
+    IconFileDescription,
+    IconFileInvoice,
+    IconChefHat,
+    IconPackage,
+    IconStack2,
+    IconShieldLock,
+    IconFileContract: IconFileText,
+  }), []);
+
+  const renderIcon = (iconName?: string) => {
+    if (!iconName) return null;
+    const IconComponent = iconMap[iconName];
+    if (!IconComponent) return null;
+    return <IconComponent size={20} />;
+  };
+
+  const menuItems = useMemo(() => {
+    if (!Array.isArray(roleMenuItems)) return [];
+    return [...roleMenuItems].sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0));
+  }, [roleMenuItems]);
+
   return (
     <Stack gap={0}>
-      <NavLink
-        label="Dashboard"
-        leftSection={<IconDashboard size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/dashboard')}
-        onClick={() => navigate('/dashboard')}
-      />
-
-      <NavLink
-        label={t('Requests')}
-        leftSection={<IconClipboardList size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/requests')}
-        onClick={() => navigate('/requests')}
-      />
-
-      <NavLink
-        label={t('Recipes')}
-        leftSection={<IconChefHat size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/recipes')}
-        onClick={() => navigate('/recipes')}
-      />
-
-      <NavLink
-        label={t('Build orders')}
-        leftSection={<IconBox size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/build-orders')}
-        onClick={() => navigate('/build-orders')}
-      />
-
-      <NavLink
-        label={t('Build simulation')}
-        leftSection={<IconArrowsExchange size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/build-simulation')}
-        onClick={() => navigate('/build-simulation')}
-      />
-
-      <NavLink
-        label={t('Stocks')}
-        leftSection={<IconStack2 size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/inventory/stocks')}
-        onClick={() => navigate('/inventory/stocks')}
-      />
-
-      <NavLink
-        label={t('Inventory')}
-        leftSection={<IconPackage size={20} />}
-        childrenOffset={28}
-        defaultOpened={isInSection('/inventory')}
-        active={isInSection('/inventory')}
-      >
-        <NavLink
-          label={t('Articles')}
-          active={isActive('/inventory/articles')}
-          onClick={() => navigate('/inventory/articles')}
-          style={{ fontWeight: isActive('/inventory/articles') ? 'bold' : 'normal' }}
-        />
-        <NavLink
-          label={t('Suppliers')}
-          active={isActive('/inventory/suppliers')}
-          onClick={() => navigate('/inventory/suppliers')}
-          style={{ fontWeight: isActive('/inventory/suppliers') ? 'bold' : 'normal' }}
-        />
-        <NavLink
-          label={t('Manufacturers')}
-          active={isActive('/inventory/manufacturers')}
-          onClick={() => navigate('/inventory/manufacturers')}
-          style={{ fontWeight: isActive('/inventory/manufacturers') ? 'bold' : 'normal' }}
-        />
-        <NavLink
-          label={t('Clients')}
-          active={isActive('/inventory/clients')}
-          onClick={() => navigate('/inventory/clients')}
-          style={{ fontWeight: isActive('/inventory/clients') ? 'bold' : 'normal' }}
-        />
-        <NavLink
-          label={t('Locations')}
-          active={isActive('/inventory/locations')}
-          onClick={() => navigate('/inventory/locations')}
-          style={{ fontWeight: isActive('/inventory/locations') ? 'bold' : 'normal' }}
-        />
-        <NavLink
-          label={t('Categories')}
-          active={isActive('/inventory/categories')}
-          onClick={() => navigate('/inventory/categories')}
-          style={{ fontWeight: isActive('/inventory/categories') ? 'bold' : 'normal' }}
-        />
-      </NavLink>
-
-      <NavLink
-        label={t('Procurement')}
-        leftSection={<IconShoppingCart size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/procurement')}
-        onClick={() => navigate('/procurement')}
-      />
-
-      <NavLink
-        label={t('Sales')}
-        leftSection={<IconTruckDelivery size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/sales')}
-        onClick={() => navigate('/sales')}
-      />
-
-      <NavLink
-        label={t('Returns')}
-        leftSection={<IconArrowsExchange size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/returns')}
-        onClick={() => navigate('/returns')}
-      />
-
-      <NavLink
-        label={t('Withdrawals')}
-        leftSection={<IconBox size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/withdrawals')}
-        onClick={() => navigate('/withdrawals')}
-      />
-
-      <NavLink
-        label={t('Deliveries')}
-        leftSection={<IconTruckDelivery size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/deliveries')}
-        onClick={() => navigate('/deliveries')}
-      />
-
-      <NavLink
-        label={t('Notifications')}
-        leftSection={<IconBell size={20} />}
-        rightSection={
+      {menuItems.map((item) => {
+        const hasSubmenu = Array.isArray(item.submenu) && item.submenu.length > 0;
+        const itemPath = item.path || '';
+        const rightSection = item.id === 'notifications' ? (
           notificationCount > 0 ? (
             <Badge size="sm" color="red" variant="filled">
               {notificationCount}
@@ -183,26 +89,45 @@ export function Navbar() {
           ) : (
             <IconChevronRight size={14} />
           )
+        ) : (
+          <IconChevronRight size={14} />
+        );
+
+        if (hasSubmenu) {
+          return (
+            <NavLink
+              key={item.id || itemPath}
+              label={t(item.label || item.id || '')}
+              leftSection={renderIcon(item.icon)}
+              childrenOffset={28}
+              defaultOpened={itemPath ? isInSection(itemPath) : false}
+              active={itemPath ? isInSection(itemPath) : false}
+            >
+              {item.submenu.map((child: any) => (
+                <NavLink
+                  key={child.id || child.path}
+                  label={t(child.label || child.id || '')}
+                  leftSection={renderIcon(child.icon)}
+                  active={child.path ? isActive(child.path) : false}
+                  onClick={() => child.path && navigate(child.path)}
+                  style={{ fontWeight: child.path && isActive(child.path) ? 'bold' : 'normal' }}
+                />
+              ))}
+            </NavLink>
+          );
         }
-        active={isActive('/notifications')}
-        onClick={() => navigate('/notifications')}
-      />
 
-      <NavLink
-        label={t('Users')}
-        leftSection={<IconUsers size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/users')}
-        onClick={() => navigate('/users')}
-      />
-
-      <NavLink
-        label={t('Audit Log')}
-        leftSection={<IconFileText size={20} />}
-        rightSection={<IconChevronRight size={14} />}
-        active={isActive('/audit')}
-        onClick={() => navigate('/audit')}
-      />
+        return (
+          <NavLink
+            key={item.id || itemPath}
+            label={t(item.label || item.id || '')}
+            leftSection={renderIcon(item.icon)}
+            rightSection={rightSection}
+            active={itemPath ? isActive(itemPath) : false}
+            onClick={() => itemPath && navigate(itemPath)}
+          />
+        );
+      })}
     </Stack>
   );
 }

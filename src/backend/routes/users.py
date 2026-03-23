@@ -6,13 +6,13 @@ from typing import List, Dict, Any, Optional
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_admin
+from src.backend.utils.sections_permissions import require_section
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 @router.get("/")
-def list_users(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
+def list_users(user = Depends(require_section("users"))) -> List[Dict[str, Any]]:
     """
     List all users with their last login information
     Requires administrator access
@@ -23,7 +23,6 @@ def list_users(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
     
     users = list(users_collection.find({}, {
         'username': 1,
-        'is_staff': 1,
         'name': 1,
         'firstname': 1,
         'lastname': 1,

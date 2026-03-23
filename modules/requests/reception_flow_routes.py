@@ -6,8 +6,9 @@ from datetime import datetime
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_admin
+from src.backend.utils.sections_permissions import require_section
 from src.backend.models.approval_flow_model import ApprovalFlowModel
+from src.backend.utils.approval_helpers import check_user_can_sign
 
 from .approval_helpers import check_flow_completion, enrich_flow_with_user_details
 
@@ -18,7 +19,7 @@ router = APIRouter()
 @router.get("/{request_id}/reception-flow")
 async def get_request_reception_flow(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Get reception flow for a request"""
     db = get_db()
@@ -41,7 +42,7 @@ async def get_request_reception_flow(
 async def sign_reception(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Sign reception flow for a request"""
     db = get_db()
@@ -66,36 +67,17 @@ async def sign_reception(
     
     # Check if user is authorized to sign
     username = current_user["username"]
-    is_staff = current_user.get("is_staff", False)
-    can_sign = False
-    
-    # Check can_sign_officers
-    for officer in flow.get("can_sign_officers", []):
-        # Direct user_id match
-        if officer.get("reference") == user_id:
-            can_sign = True
-            break
-        # Role-based match
-        if officer.get("type") == "role" and officer.get("reference"):
-            if officer["reference"] == "admin" and is_staff:
-                can_sign = True
-                break
-    
-    # Check must_sign_officers if not already authorized
+    user_role_id = current_user.get("role")
+    can_sign = check_user_can_sign(
+        db,
+        user_id,
+        user_role_id,
+        flow.get("must_sign_officers", []),
+        flow.get("can_sign_officers", [])
+    )
+
     if not can_sign:
-        for officer in flow.get("must_sign_officers", []):
-            # Direct user_id match
-            if officer.get("reference") == user_id:
-                can_sign = True
-                break
-            # Role-based match
-            if officer.get("type") == "role" and officer.get("reference"):
-                if officer["reference"] == "admin" and is_staff:
-                    can_sign = True
-                    break
-    
-    if not can_sign:
-        print(f"[REQUESTS] User {username} (staff={is_staff}) not authorized to sign. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
+        print(f"[REQUESTS] User {username} not authorized to sign. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
         raise HTTPException(status_code=403, detail="You are not authorized to sign this reception flow")
     
     # Generate signature
@@ -207,22 +189,12 @@ async def sign_reception(
                     # Build officers lists from template
                     can_sign_officers = []
                     
-                    # Add officers from template (template already has admin role)
+                    # Add officers from template
                     for officer in template.get('officers', []):
                         can_sign_officers.append({
                             "type": officer.get('type', 'person'),
                             "reference": officer.get('reference', ''),
                             "username": officer.get('username', ''),
-                            "action": "can_sign"
-                        })
-                    
-                    # If template doesn't have admin, add it
-                    has_admin = any(o.get('type') == 'role' and o.get('reference') == 'admin' for o in can_sign_officers)
-                    if not has_admin:
-                        can_sign_officers.append({
-                            "type": "role",
-                            "reference": "admin",
-                            "username": "",
                             "action": "can_sign"
                         })
                     
@@ -259,9 +231,9 @@ async def sign_reception(
 async def remove_reception_signature(
     request_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
-    """Remove signature from reception flow (admin only)"""
+    """Remove signature from reception flow"""
     db = get_db()
     requests_collection = db['depo_requests']
     
@@ -336,7 +308,7 @@ async def remove_reception_signature(
 async def update_reception_status(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Update reception final status (after all signatures)"""
     db = get_db()

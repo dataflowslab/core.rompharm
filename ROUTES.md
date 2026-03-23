@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-03-19 13:57:34
+**Last Updated:** 2026-03-24 00:32:51
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes
@@ -99,7 +99,7 @@
 - `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/received-stock-signatures/{user_id}` - Remove signature from received stock approval flow
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/sign` - Sign a purchase order approval flow
 - `POST /modules/depo_procurement/api/purchase-orders/{order_id}/sign-received-stock` - Sign received stock approval flow
-- `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/signatures/{user_id}` - Remove signature from purchase order approval flow (admin only)
+- `DELETE /modules/depo_procurement/api/purchase-orders/{order_id}/signatures/{user_id}` - Remove signature from purchase order approval flow
 - `PATCH /modules/depo_procurement/api/purchase-orders/{order_id}/state` - Update purchase order state
 
 **Stock Items**
@@ -139,7 +139,7 @@
 ## 📝 Notes
 
 - All routes except `/api/auth/login` require authentication
-- Admin-only routes require `is_staff` or `is_superuser` flag
+- Admin-only routes require role slug `admin`
 - Module routes follow pattern: `/modules/{module_name}/api/{resource}`
 - Global routes follow pattern: `/api/{resource}`
 

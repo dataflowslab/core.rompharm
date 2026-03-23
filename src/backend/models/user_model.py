@@ -3,7 +3,7 @@ User Model
 Local authentication system
 """
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, Dict, List, Any
 from datetime import datetime
 
 
@@ -19,7 +19,6 @@ class UserCreate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     is_active: bool = True
-    is_staff: bool = False
     mobile: bool = True  # Default to True as requested
 
 
@@ -35,7 +34,6 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     is_active: Optional[bool] = None
-    is_staff: Optional[bool] = None
     mobile: Optional[bool] = None
     password: Optional[str] = None  # Doar dacă se schimbă parola
 
@@ -51,6 +49,8 @@ class RoleCreate(BaseModel):
     name: str = Field(..., min_length=1)
     slug: str = Field(..., min_length=1, max_length=50)
     description: Optional[str] = None
+    sections: Optional[Dict[str, List[str]]] = None
+    menu_items: Optional[List[Dict[str, Any]]] = None
 
 
 class RoleUpdate(BaseModel):
@@ -58,7 +58,8 @@ class RoleUpdate(BaseModel):
     name: Optional[str] = None
     slug: Optional[str] = None
     description: Optional[str] = None
-    items: Optional[list[str]] = None  # Array de permission slugs
+    sections: Optional[Dict[str, List[str]]] = None
+    menu_items: Optional[List[Dict[str, Any]]] = None
 
 
 class PermissionItem(BaseModel):

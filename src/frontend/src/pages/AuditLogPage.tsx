@@ -5,6 +5,7 @@ import { IconAlertCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { hasSectionPermission } from '../utils/permissions';
 import { debounce } from '../utils/selectHelpers';
 
 interface AuditLog {
@@ -18,7 +19,7 @@ interface AuditLog {
 }
 
 export function AuditLogPage() {
-  const { isStaff } = useAuth();
+  const { roleSections } = useAuth();
   const { t } = useTranslation();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,8 +30,9 @@ export function AuditLogPage() {
   const [search, setSearch] = useState('');
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
 
+  const canViewAudit = hasSectionPermission(roleSections, 'audit', 'get');
   const loadLogs = () => {
-    if (!isStaff) {
+    if (!canViewAudit) {
       setLoading(false);
       return;
     }
@@ -50,7 +52,7 @@ export function AuditLogPage() {
 
   useEffect(() => {
     loadLogs();
-  }, [isStaff, skip, search, dateRange]);
+  }, [canViewAudit, skip, search, dateRange]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
@@ -76,11 +78,11 @@ export function AuditLogPage() {
     );
   }
 
-  if (!isStaff) {
+  if (!canViewAudit) {
     return (
       <Container size="md" mt={50}>
         <Alert icon={<IconAlertCircle size={16} />} title={t('Access Denied')} color="red">
-          {t('Administrator access required to view this page.')}
+          {t('Access Denied')}
         </Alert>
       </Container>
     );

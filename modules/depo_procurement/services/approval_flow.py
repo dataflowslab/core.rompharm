@@ -8,6 +8,7 @@ from bson import ObjectId
 from src.backend.utils.db import get_db
 from src.backend.models.approval_flow_model import ApprovalFlowModel
 from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
+from src.backend.utils.sections_permissions import get_section_permissions, is_action_allowed
 from ..utils import serialize_doc
 
 
@@ -239,12 +240,14 @@ async def sign_purchase_order(order_id: str, action: str, current_user: dict, re
 
 
 async def remove_order_signature(order_id: str, user_id: str, current_user: dict):
-    """Remove signature from purchase order approval flow (admin only)"""
+    """Remove signature from purchase order approval flow"""
     db = get_db()
     
-    is_admin = current_user.get('is_staff', False) or current_user.get('is_superuser', False)
-    if not is_admin:
-        raise HTTPException(status_code=403, detail="Only admin can remove signatures")
+    current_user_id = str(current_user["_id"])
+    perms = get_section_permissions(db, current_user, "procurement")
+    can_delete = is_action_allowed(perms, "delete")
+    if not can_delete and current_user_id != user_id:
+        raise HTTPException(status_code=403, detail="You can only remove your own signature")
     
     flow = db.approval_flows.find_one({
         "object_type": "procurement_order",

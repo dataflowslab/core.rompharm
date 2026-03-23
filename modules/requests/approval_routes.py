@@ -6,8 +6,9 @@ from datetime import datetime
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_admin
+from src.backend.utils.sections_permissions import require_section
 from src.backend.models.approval_flow_model import ApprovalFlowModel
+from src.backend.utils.approval_helpers import check_user_can_sign
 
 from .approval_helpers import get_state_by_slug, update_request_state, check_flow_completion, get_flow_config, build_officers_lists
 from .build_orders_helpers import ensure_build_orders_for_request
@@ -27,7 +28,7 @@ router.include_router(production_router)
 @router.get("/{request_id}/approval-flow")
 async def get_request_approval_flow(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Get approval flow for a request"""
     db = get_db()
@@ -55,7 +56,7 @@ async def get_request_approval_flow(
 @router.post("/{request_id}/approval-flow")
 async def create_request_approval_flow(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Create approval flow for a request using config from MongoDB"""
     db = get_db()
@@ -131,7 +132,7 @@ async def create_request_approval_flow(
 async def sign_request(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Sign a request approval flow"""
     db = get_db()
@@ -158,40 +159,15 @@ async def sign_request(
     
     # Check if user is authorized to sign
     username = current_user["username"]
-    is_staff = current_user.get("is_staff", False)
-    can_sign = False
-    
-    # Check can_sign officers
-    for officer in flow.get("can_sign_officers", []):
-        # Direct user_id match
-        if officer.get("reference") == user_id:
-            can_sign = True
-            break
-        # Fallback to username match (in case references are missing)
-        if officer.get("username") and officer.get("username") == username:
-            can_sign = True
-            break
-        # Role-based match (admin)
-        if officer.get("type") == "role" and officer.get("reference") == "admin" and is_staff:
-            can_sign = True
-            break
-    
-    # Check must_sign officers
-    if not can_sign:
-        for officer in flow.get("must_sign_officers", []):
-            # Direct user_id match
-            if officer.get("reference") == user_id:
-                can_sign = True
-                break
-            # Fallback to username match
-            if officer.get("username") and officer.get("username") == username:
-                can_sign = True
-                break
-            # Role-based match (admin)
-            if officer.get("type") == "role" and officer.get("reference") == "admin" and is_staff:
-                can_sign = True
-                break
-    
+    user_role_id = current_user.get("role")
+    can_sign = check_user_can_sign(
+        db,
+        user_id,
+        user_role_id,
+        flow.get("must_sign_officers", []),
+        flow.get("can_sign_officers", [])
+    )
+
     if not can_sign:
         raise HTTPException(status_code=403, detail="You are not authorized to sign this request")
     
@@ -354,9 +330,9 @@ async def sign_request(
 async def remove_request_signature(
     request_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
-    """Remove signature from request approval flow (admin only)"""
+    """Remove signature from request approval flow"""
     db = get_db()
     requests_collection = db['depo_requests']
     
@@ -399,7 +375,7 @@ async def remove_request_signature(
 @router.get("/{request_id}/operations-flow")
 async def get_request_operations_flow(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Get operations flow for a request"""
     db = get_db()
@@ -428,7 +404,7 @@ async def get_request_operations_flow(
 async def sign_operations(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Sign operations flow for a request"""
     db = get_db()
@@ -471,7 +447,7 @@ async def sign_operations(
                 break
     
     if not can_sign:
-        print(f"[REQUESTS] User {username} (staff={is_staff}) not authorized to sign operations. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
+        print(f"[REQUESTS] User {username} not authorized to sign operations. Officers: {flow.get('can_sign_officers', [])} + {flow.get('must_sign_officers', [])}")
         raise HTTPException(status_code=403, detail="You are not authorized to sign this operations flow")
     
     # Generate signature
@@ -629,9 +605,9 @@ async def sign_operations(
 async def remove_operations_signature(
     request_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
-    """Remove signature from operations flow (admin only)"""
+    """Remove signature from operations flow"""
     db = get_db()
     
     # Get flow
@@ -670,7 +646,7 @@ async def remove_operations_signature(
 async def update_operations_status(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Update operations decision (can be set before all signatures)"""
     db = get_db()

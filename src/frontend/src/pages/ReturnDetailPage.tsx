@@ -28,6 +28,8 @@ import {
   AttachmentsTab,
   JournalTab,
 } from '../components/Returns';
+import { useAuth } from '../context/AuthContext';
+import { hasSectionPermission } from '../utils/permissions';
 
 const RETURN_PENDING_STATE_ID = '6943a4a6451609dd8a618ce0';
 
@@ -35,7 +37,8 @@ export function ReturnDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { roleSections } = useAuth();
+  const canEditReturns = hasSectionPermission(roleSections, 'returns', 'patch');
 
   const [order, setOrder] = useState<ReturnOrder | null>(null);
   const [items, setItems] = useState<ReturnOrderItem[]>([]);
@@ -44,16 +47,6 @@ export function ReturnDetailPage() {
   const [approvalFlow, setApprovalFlow] = useState<ApprovalFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string | null>('details');
-
-  useEffect(() => {
-    api.get('/api/auth/me')
-      .then(response => {
-        setIsAdmin(response.data.is_staff || response.data.staff || false);
-      })
-      .catch(error => {
-        console.error('Failed to load user info:', error);
-      });
-  }, []);
 
   useEffect(() => {
     if (id) {
@@ -144,12 +137,8 @@ export function ReturnDetailPage() {
       return false;
     }
 
-    if (isAdmin) {
-      return true;
-    }
-
     if (!approvalFlow || approvalFlow.signatures.length === 0) {
-      return true;
+      return canEditReturns;
     }
 
     return false;
@@ -241,7 +230,7 @@ export function ReturnDetailPage() {
             items={items}
             stockLocations={stockLocations}
             onReload={loadItems}
-            canModify={true}
+            canModify={canEditReturns}
           />
         </Tabs.Panel>
 

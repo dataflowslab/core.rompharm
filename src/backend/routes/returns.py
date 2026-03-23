@@ -8,7 +8,12 @@ from bson import ObjectId
 from pydantic import BaseModel
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import (
+    require_section,
+    get_section_permissions,
+    apply_scope_to_query,
+    is_doc_in_scope
+)
 from src.backend.models.approval_flow_model import ApprovalFlowModel
 from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
 
@@ -16,6 +21,23 @@ router = APIRouter(prefix="/api/returns", tags=["returns"])
 
 RETURN_ORDER_INITIAL_STATE_ID = "6943a4a6451609dd8a618ce0"
 RETURN_ORDER_APPROVAL_TEMPLATE_ID = "69b39f0d0ec895067fed4e8d"
+
+
+def _ensure_return_scope(db, current_user: dict, order_doc: dict) -> None:
+    perms = get_section_permissions(db, current_user, "returns")
+    if not is_doc_in_scope(db, current_user, perms, order_doc, created_by_field="created_by"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _get_return_order_or_404(db, return_id: str) -> dict:
+    try:
+        return_oid = ObjectId(return_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid return ID")
+    order = db['depo_return_orders'].find_one({'_id': return_oid})
+    if not order:
+        raise HTTPException(status_code=404, detail="Return order not found")
+    return order
 
 
 class ReturnReceiveStockRequest(BaseModel):
@@ -152,7 +174,7 @@ async def get_return_orders(
     date_to: Optional[str] = Query(None),
     skip: Optional[int] = Query(None, ge=0),
     limit: Optional[int] = Query(None, ge=1, le=200),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     coll = db['depo_return_orders']
@@ -174,6 +196,9 @@ async def get_return_orders(
             query['issue_date']['$gte'] = date_from
         if date_to:
             query['issue_date']['$lte'] = date_to
+
+    perms = get_section_permissions(db, current_user, "returns")
+    query = apply_scope_to_query(db, current_user, perms, query, created_by_field="created_by")
 
     cursor = coll.find(query).sort('created_at', -1)
     total = coll.count_documents(query)
@@ -202,7 +227,7 @@ async def get_return_orders(
 
 @router.get("/order-statuses")
 async def get_return_order_statuses(
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     collection = db['depo_sales_ordes_states']
@@ -212,7 +237,7 @@ async def get_return_order_statuses(
 
 @router.get("/stock-statuses")
 async def get_stock_statuses(
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     collection = db['depo_stocks_states']
@@ -223,12 +248,16 @@ async def get_stock_statuses(
 @router.get("/{return_id}")
 async def get_return_order(
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     order = db['depo_return_orders'].find_one({'_id': ObjectId(return_id)})
     if not order:
         raise HTTPException(status_code=404, detail="Return order not found")
+
+    _ensure_return_scope(db, current_user, order)
+
+    _ensure_return_scope(db, current_user, order)
 
     _enrich_return_order(db, order)
 
@@ -239,10 +268,15 @@ async def get_return_order(
 async def update_return_order(
     request: Request,
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     body = await request.json()
+
+    existing = db['depo_return_orders'].find_one({'_id': ObjectId(return_id)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Return order not found")
+    _ensure_return_scope(db, current_user, existing)
 
     body.pop('_id', None)
     body.pop('created_at', None)
@@ -268,7 +302,7 @@ async def update_return_order(
 @router.get("/{return_id}/items")
 async def get_return_order_items(
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     order = db['depo_return_orders'].find_one({'_id': ObjectId(return_id)})
@@ -324,7 +358,7 @@ async def get_return_order_items(
 async def receive_return_stock(
     return_id: str,
     stock_data: ReturnReceiveStockRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     orders_collection = db['depo_return_orders']
@@ -334,6 +368,7 @@ async def receive_return_stock(
     order = orders_collection.find_one({'_id': ObjectId(return_id)})
     if not order:
         raise HTTPException(status_code=404, detail="Return order not found")
+    _ensure_return_scope(db, current_user, order)
 
     items = order.get('items', [])
     item = None
@@ -447,10 +482,13 @@ async def receive_return_stock(
 @router.get("/{return_id}/received-items")
 async def get_received_items(
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     stocks_collection = db['depo_stocks']
+
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
 
     cursor = stocks_collection.find({'return_order_id': ObjectId(return_id)}).sort('received_date', -1)
     stocks = list(cursor)
@@ -509,7 +547,7 @@ async def get_received_items(
 @router.delete("/stock-items/{stock_id}")
 async def delete_stock_item(
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     stocks_collection = db['depo_stocks']
@@ -521,6 +559,7 @@ async def delete_stock_item(
     if return_order_id:
         order = db['depo_return_orders'].find_one({'_id': return_order_id})
         if order:
+            _ensure_return_scope(db, current_user, order)
             items = order.get('items', [])
             for item in items:
                 if 'stocks' in item and ObjectId(stock_id) in item['stocks']:
@@ -544,10 +583,16 @@ async def delete_stock_item(
 @router.get("/{return_id}/attachments")
 async def get_attachments(
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
     collection = db['depo_return_order_attachments']
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
     cursor = collection.find({'order_id': ObjectId(return_id)}).sort('created_at', -1)
     attachments = list(cursor)
 
@@ -566,7 +611,7 @@ async def upload_attachment(
     return_id: str,
     file: UploadFile = File(...),
     comment: Optional[str] = Form(None),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     import os
     import hashlib
@@ -607,7 +652,7 @@ async def upload_attachment(
 async def delete_attachment(
     return_id: str,
     attachment_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     import os
 
@@ -631,9 +676,11 @@ async def delete_attachment(
 @router.get("/{return_id}/approval-flow")
 async def get_approval_flow(
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
     return_oid = _safe_object_id(return_id)
     object_ids = [return_id]
     if return_oid:
@@ -659,9 +706,11 @@ async def get_approval_flow(
 @router.post("/{return_id}/approval-flow")
 async def create_approval_flow(
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
     return_oid = _safe_object_id(return_id)
     object_ids = [return_id]
     if return_oid:
@@ -723,9 +772,11 @@ async def create_approval_flow(
 async def sign_return_order(
     request: Request,
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
     body = await request.json()
     action = body.get('action', 'issue')
 
@@ -839,12 +890,11 @@ async def sign_return_order(
 async def remove_signature(
     return_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
-    is_admin = current_user.get('is_staff', False) or current_user.get('is_superuser', False)
-    if not is_admin:
-        raise HTTPException(status_code=403, detail="Only admin can remove signatures")
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
 
     return_oid = _safe_object_id(return_id)
     object_ids = [return_id]
@@ -911,9 +961,11 @@ async def remove_signature(
 @router.get("/{return_id}/journal")
 async def get_return_order_journal(
     return_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("returns"))
 ):
     db = get_db()
+    order = _get_return_order_or_404(db, return_id)
+    _ensure_return_scope(db, current_user, order)
     logs = list(db.logs.find({
         'collection': 'depo_return_orders',
         'object_id': return_id

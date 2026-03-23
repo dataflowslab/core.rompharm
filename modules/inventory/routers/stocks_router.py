@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 
 from modules.inventory.models.stock_models import (
     StockCreateRequest,
@@ -39,7 +39,7 @@ async def list_stocks(
     part_id: Optional[str] = Query(None, description="Filtrare după part"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Get list of stocks cu balances
@@ -56,7 +56,7 @@ async def list_stocks(
 @router.get("/{stock_id}")
 async def get_stock(
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Get stock by ID cu balances și istoric movements
@@ -73,7 +73,7 @@ async def get_stock(
 @router.post("/")
 async def create_new_stock(
     stock_data: StockCreateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Creare stock nou cu ledger system
@@ -110,7 +110,7 @@ async def create_new_stock(
 async def update_existing_stock(
     stock_id: str,
     stock_data: StockUpdateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Update stock metadata (NU cantitate!)
@@ -142,7 +142,7 @@ async def update_existing_stock(
 async def transfer_stock_between_locations(
     stock_id: str,
     transfer_data: StockTransferRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Transfer stock între locații
@@ -174,7 +174,7 @@ async def transfer_stock_between_locations(
 async def adjust_stock_quantity(
     stock_id: str,
     adjustment_data: StockAdjustmentRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Ajustare inventar (+ sau -)
@@ -205,7 +205,7 @@ async def adjust_stock_quantity(
 async def consume_stock_quantity(
     stock_id: str,
     consumption_data: StockConsumptionRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Consum stock (producție, vânzare, etc)
@@ -235,7 +235,7 @@ async def consume_stock_quantity(
 async def get_stock_movement_history(
     stock_id: str,
     limit: int = Query(100, ge=1, le=500),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Get istoric complet mișcări pentru un stock
@@ -262,7 +262,7 @@ async def get_stock_movement_history(
 async def get_stock_balance_info(
     stock_id: str,
     location_id: Optional[str] = Query(None, description="ID locație (optional)"),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """
     Get balance pentru un stock

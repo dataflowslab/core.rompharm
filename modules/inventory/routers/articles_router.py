@@ -13,7 +13,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 from modules.inventory.services.common import serialize_doc
 
 router = APIRouter(prefix="/articles", tags=["articles"])
@@ -35,6 +35,7 @@ class ArticleCreateRequest(BaseModel):
     is_salable: bool = False
     is_active: bool = True
     loss_rate_threshold: Optional[float] = None
+    production_step_id: Optional[str] = None
 
 
 class ArticleUpdateRequest(BaseModel):
@@ -63,6 +64,7 @@ class ArticleUpdateRequest(BaseModel):
     system_um_id: Optional[str] = None
     total_delivery_time: Optional[str] = None
     loss_rate_threshold: Optional[float] = None
+    production_step_id: Optional[str] = None
 
 
 class ArticleSupplierRequest(BaseModel):
@@ -92,7 +94,7 @@ async def get_parts(
     limit: int = Query(100, ge=1, le=1000),
     sort_by: Optional[str] = Query("name"),
     sort_order: Optional[str] = Query("asc"),
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Get list of parts (alias for articles) from MongoDB with search, pagination and sorting"""
@@ -156,7 +158,7 @@ async def get_articles(
     limit: int = Query(100, ge=1, le=1000),
     sort_by: Optional[str] = Query("name"),
     sort_order: Optional[str] = Query("asc"),
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Get list of articles from MongoDB with search, category filter, pagination and sorting"""
@@ -213,7 +215,7 @@ async def get_articles(
 async def get_article(
     request: Request,
     article_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Get a specific article by ID"""
@@ -230,7 +232,7 @@ async def get_article(
 async def create_article(
     request: Request,
     article_data: ArticleCreateRequest,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Create a new article"""
@@ -263,6 +265,11 @@ async def create_article(
         doc['minimum_stock'] = article_data.minimum_stock
     if article_data.supplier_id:
         doc['supplier_id'] = ObjectId(article_data.supplier_id)
+    if article_data.production_step_id:
+        try:
+            doc['production_step_id'] = ObjectId(article_data.production_step_id)
+        except Exception:
+            doc['production_step_id'] = article_data.production_step_id
     
     try:
         result = db['depo_parts'].insert_one(doc)
@@ -277,7 +284,7 @@ async def update_article(
     request: Request,
     article_id: str,
     article_data: ArticleUpdateRequest,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Update an existing article"""
@@ -310,6 +317,8 @@ async def update_article(
         update_doc['manufacturer_id'] = ObjectId(article_data.manufacturer_id) if article_data.manufacturer_id else None
     if article_data.system_um_id is not None:
         update_doc['system_um_id'] = ObjectId(article_data.system_um_id) if article_data.system_um_id else None
+    if article_data.production_step_id is not None:
+        update_doc['production_step_id'] = ObjectId(article_data.production_step_id) if article_data.production_step_id else None
     
     if not update_doc:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -331,7 +340,7 @@ async def update_article(
 async def delete_article(
     request: Request,
     article_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Delete an article"""
@@ -351,7 +360,7 @@ async def delete_article(
 async def get_article_recipes(
     request: Request,
     article_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Get all recipes that use this article"""
@@ -382,7 +391,7 @@ async def get_article_recipes(
 async def get_article_stock_calculations(
     request: Request,
     article_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Calculate stock metrics for an article"""
@@ -441,7 +450,7 @@ async def get_article_allocations(
     request: Request,
     article_id: str,
     order_type: Optional[str] = Query(None),
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Get allocations for an article from sales and purchase orders"""
@@ -491,7 +500,7 @@ async def get_article_allocations(
 async def get_article_suppliers(
     request: Request,
     article_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Get all suppliers for an article"""
@@ -514,7 +523,7 @@ async def add_article_supplier(
     request: Request,
     article_id: str,
     supplier_data: ArticleSupplierRequest,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Add a supplier to an article"""
@@ -558,7 +567,7 @@ async def update_article_supplier(
     article_id: str,
     supplier_relation_id: str,
     supplier_data: ArticleSupplierUpdateRequest,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Update supplier information for an article"""
@@ -608,7 +617,7 @@ async def remove_article_supplier(
     request: Request,
     article_id: str,
     supplier_relation_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/articles")),
     db = Depends(get_db)
 ):
     """Remove a supplier from an article"""

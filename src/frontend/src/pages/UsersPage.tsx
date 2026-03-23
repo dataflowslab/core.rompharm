@@ -5,13 +5,13 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { notifications } from '@mantine/notifications';
+import { hasSectionPermission } from '../utils/permissions';
 
 interface User {
   id?: string;
   _id?: string;
   username: string;
   name?: string;
-  is_staff: boolean;
   last_login?: string;
   created_at: string;
   role?: {
@@ -32,8 +32,10 @@ interface LocationItem {
 }
 
 export function UsersPage() {
-  const { isStaff } = useAuth();
+  const { roleSections } = useAuth();
   const { t } = useTranslation();
+  const canViewUsers = hasSectionPermission(roleSections, 'users', 'get');
+  const canEditUsers = hasSectionPermission(roleSections, 'users', 'patch');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<Array<{ _id: string; name: string }>>([]);
@@ -50,7 +52,7 @@ export function UsersPage() {
   });
 
   useEffect(() => {
-    if (isStaff) {
+    if (canViewUsers) {
       api.get('/api/users/')
         .then((response) => {
           const data = response.data?.results || response.data || [];
@@ -67,7 +69,7 @@ export function UsersPage() {
     } else {
       setLoading(false);
     }
-  }, [isStaff]);
+  }, [canViewUsers]);
 
   const objectIdRegex = useMemo(() => /^[0-9a-fA-F]{24}$/, []);
 
@@ -177,11 +179,11 @@ export function UsersPage() {
     );
   }
 
-  if (!isStaff) {
+  if (!canViewUsers) {
     return (
       <Container size="md" mt={50}>
         <Alert icon={<IconAlertCircle size={16} />} title={t('Access Denied')} color="red">
-          {t('Administrator access required to view this page.')}
+          {t('Access Denied')}
         </Alert>
       </Container>
     );
@@ -215,21 +217,23 @@ export function UsersPage() {
                       {user.role?.name ? (
                         <Badge color="blue">{user.role.name}</Badge>
                       ) : (
-                        <Badge color={user.is_staff ? 'blue' : 'gray'}>
-                          {user.is_staff ? t('Admin') : t('User')}
+                        <Badge color="gray">
+                          {t('User')}
                         </Badge>
                       )}
                     </Table.Td>
                     <Table.Td>{formatDate(user.last_login)}</Table.Td>
                     <Table.Td>
-                      <ActionIcon
-                        variant="subtle"
-                        color="blue"
-                        onClick={() => openEditModal(user)}
-                        title={t('Edit')}
-                      >
-                        <IconEdit size={16} />
-                      </ActionIcon>
+                      {canEditUsers && (
+                        <ActionIcon
+                          variant="subtle"
+                          color="blue"
+                          onClick={() => openEditModal(user)}
+                          title={t('Edit')}
+                        >
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                      )}
                     </Table.Td>
                   </Table.Tr>
                 ))}

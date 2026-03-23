@@ -12,7 +12,7 @@ from src.backend.utils.dataflows_docu import DataFlowsDocuClient
 from src.backend.utils.db import get_db
 from src.backend.models.job_model import JobModel
 from src.backend.scheduler import get_scheduler
-from src.backend.routes.auth import verify_admin
+from src.backend.utils.sections_permissions import require_section
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -147,7 +147,7 @@ def get_system_notifications() -> Dict[str, Any]:
 
 
 @router.get("/system/jobs")
-def list_jobs(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
+def list_jobs(user = Depends(require_section("system"))) -> List[Dict[str, Any]]:
     """
     List all configured jobs
     Requires admin access
@@ -160,7 +160,7 @@ def list_jobs(user = Depends(verify_admin)) -> List[Dict[str, Any]]:
 
 
 @router.post("/system/jobs")
-def create_job(job_data: JobCreate, user = Depends(verify_admin)) -> Dict[str, Any]:
+def create_job(job_data: JobCreate, user = Depends(require_section("system"))) -> Dict[str, Any]:
     """
     Create a new job configuration
     Requires admin access
@@ -196,7 +196,7 @@ def create_job(job_data: JobCreate, user = Depends(verify_admin)) -> Dict[str, A
 
 
 @router.put("/system/jobs/{job_name}")
-def update_job(job_name: str, job_data: JobUpdate, user = Depends(verify_admin)) -> Dict[str, Any]:
+def update_job(job_name: str, job_data: JobUpdate, user = Depends(require_section("system"))) -> Dict[str, Any]:
     """
     Update job configuration
     Requires admin access
@@ -238,7 +238,7 @@ def update_job(job_name: str, job_data: JobUpdate, user = Depends(verify_admin))
 
 
 @router.post("/system/jobs/{job_name}/run")
-def run_job_now(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
+def run_job_now(job_name: str, user = Depends(require_section("system"))) -> Dict[str, Any]:
     """
     Manually trigger a job to run immediately
     Requires admin access
@@ -263,7 +263,7 @@ def run_job_now(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
 
 
 @router.delete("/system/jobs/{job_name}")
-def delete_job(job_name: str, user = Depends(verify_admin)) -> Dict[str, Any]:
+def delete_job(job_name: str, user = Depends(require_section("system"))) -> Dict[str, Any]:
     """
     Delete a job configuration
     Requires admin access

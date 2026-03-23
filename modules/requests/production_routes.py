@@ -7,7 +7,8 @@ from bson import ObjectId
 from typing import List, Optional
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_admin, verify_token
+from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 from .utils import generate_request_reference
 
 
@@ -142,7 +143,7 @@ def _log_excessive_loss(
 @router.get("/{request_id}/production")
 async def get_production_data(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Get production data for a request"""
     db = get_db()
@@ -202,7 +203,7 @@ async def get_production_data(
 async def save_production_data(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Save or update production data with series and materials + execute stock movements"""
     db = get_db()
@@ -498,7 +499,7 @@ async def execute_production_stock_movements(db, request_id: str, series: list, 
 async def update_production_status(
     request_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Update production status"""
     db = get_db()
@@ -881,7 +882,7 @@ async def sign_production_series(
 @router.post("/{request_id}/production-return-order")
 async def create_production_return_order(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Create a return order for unused materials after production"""
     db = get_db()

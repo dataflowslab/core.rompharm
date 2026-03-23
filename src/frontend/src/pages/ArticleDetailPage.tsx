@@ -16,6 +16,7 @@ import { Link } from '@mantine/tiptap';
 import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { api } from '../services/api';
+import { requestsApi } from '../services/requests';
 import { AddStockModal } from '../components/AddStockModal';
 import { RecipesTable } from '../components/RecipesTable';
 import {
@@ -55,6 +56,7 @@ interface Article {
   manufacturer_um_id?: string;
   total_delivery_time?: string;
   loss_rate_threshold?: number;
+  production_step_id?: string;
 }
 
 interface Location {
@@ -88,6 +90,7 @@ export function ArticleDetailPage() {
   const [manufacturers, setManufacturers] = useState<Company[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [systemUMs, setSystemUMs] = useState<UnitOfMeasure[]>([]);
+  const [productionSteps, setProductionSteps] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [stocks, setStocks] = useState<any[]>([]);
@@ -127,6 +130,7 @@ export function ArticleDetailPage() {
       fetchManufacturers();
       fetchCategories();
       fetchSystemUMs();
+      fetchProductionSteps();
       fetchRecipes();
     }
   }, [id]);
@@ -195,6 +199,15 @@ export function ArticleDetailPage() {
       setSystemUMs(response.data || []);
     } catch (error) {
       console.error('Failed to fetch system UMs:', error);
+    }
+  };
+
+  const fetchProductionSteps = async () => {
+    try {
+      const response = await api.get(requestsApi.getProductionSteps());
+      setProductionSteps(response.data.results || []);
+    } catch (error) {
+      console.error('Failed to fetch production steps:', error);
     }
   };
 
@@ -451,6 +464,7 @@ export function ArticleDetailPage() {
               manufacturers={manufacturers}
               categories={categories}
               systemUMs={systemUMs}
+              productionSteps={productionSteps}
               editor={editor}
             />
           </Tabs.Panel>

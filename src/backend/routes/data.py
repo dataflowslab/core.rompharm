@@ -12,7 +12,8 @@ import os
 from src.backend.utils.db import get_db
 from src.backend.models.data_model import DataModel
 from src.backend.models.form_state_model import FormStateModel
-from src.backend.routes.auth import verify_token, verify_admin
+from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 from src.backend.utils.audit import log_action
 from src.backend.utils.file_handler import save_upload_file, get_file_path
 
@@ -161,7 +162,7 @@ def submit_data(submission: DataSubmit, request: Request, authorization: Optiona
 
 
 @router.get("/{form_id}")
-def get_form_data(form_id: str, user = Depends(verify_admin)):
+def get_form_data(form_id: str, user = Depends(require_section("forms"))):
     """
     Get all submissions for a form (requires administrator access)
     """
@@ -174,7 +175,7 @@ def get_form_data(form_id: str, user = Depends(verify_admin)):
 
 
 @router.get("/submission/{submission_id}")
-def get_submission(submission_id: str, user = Depends(verify_admin)):
+def get_submission(submission_id: str, user = Depends(require_section("forms"))):
     """
     Get a specific submission (requires administrator access)
     """
@@ -201,7 +202,7 @@ def get_submission(submission_id: str, user = Depends(verify_admin)):
 
 
 @router.delete("/submission/{submission_id}")
-def delete_submission(submission_id: str, request: Request, user = Depends(verify_admin)):
+def delete_submission(submission_id: str, request: Request, user = Depends(require_section("forms"))):
     """
     Delete a submission (requires administrator access)
     """
@@ -239,7 +240,7 @@ class StateUpdate(BaseModel):
 
 
 @router.get("/submissions/stats")
-def get_submissions_stats(user = Depends(verify_admin)):
+def get_submissions_stats(user = Depends(require_section("forms"))):
     """
     Get submission statistics (requires administrator access)
     """
@@ -272,7 +273,7 @@ def get_submissions_stats(user = Depends(verify_admin)):
 
 
 @router.get("/submissions/all")
-def get_all_submissions(user = Depends(verify_admin)):
+def get_all_submissions(user = Depends(require_section("forms"))):
     """
     Get all submissions across all forms (requires administrator access)
     """
@@ -298,7 +299,7 @@ def update_submission_state(
     submission_id: str,
     state_update: StateUpdate,
     request: Request,
-    user = Depends(verify_admin)
+    user = Depends(require_section("forms"))
 ):
     """
     Update submission state (requires administrator access)
@@ -362,7 +363,7 @@ def update_submission_state(
 
 
 @router.get("/submission/{submission_id}/history")
-def get_submission_history(submission_id: str, user = Depends(verify_admin)):
+def get_submission_history(submission_id: str, user = Depends(require_section("forms"))):
     """
     Get state change history for a submission
     """

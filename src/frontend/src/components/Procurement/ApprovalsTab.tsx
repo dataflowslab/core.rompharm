@@ -3,6 +3,7 @@ import { Paper, Button, Group, Table, Badge, Text, Stack, Alert, Modal } from '@
 import { IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { hasSectionPermission } from '../../utils/permissions';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
@@ -20,6 +21,7 @@ interface ApprovalSignature {
 interface ApprovalOfficer {
   type: string; // "person" or "role"
   reference: string; // user_id or role_name
+  username?: string;
   action: string; // "can_sign" or "must_sign"
   order?: number;
 }
@@ -52,13 +54,14 @@ interface ApprovalsTabProps {
 
 export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
   const { t } = useTranslation();
-  const { username, isStaff } = useAuth();
+  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [signModalOpened, setSignModalOpened] = useState(false);
   const [removeModalOpened, setRemoveModalOpened] = useState(false);
   const [userToRemove, setUserToRemove] = useState<string | null>(null);
+  const canRemoveSignatures = hasSectionPermission(roleSections, 'procurement', 'delete');
 
   const orderId = order._id;
 
@@ -181,12 +184,24 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
     const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
 
-    // For now, we'll check by username since we don't have user_id in context
-    // In a real implementation, you'd check against user_id and roles
     const allOfficers = [...flow.required_officers, ...flow.optional_officers];
-    
-    // This is a simplified check - in production you'd need to check user_id and roles properly
-    return allOfficers.length > 0;
+
+    const normalize = (value?: string | null) => (value || '').toString().trim().toLowerCase();
+
+    const matchesOfficer = (officer: ApprovalOfficer) => {
+      if (officer.type === 'person') {
+        if (userId && officer.reference === userId) return true;
+        if (username && officer.username && officer.username === username) return true;
+      }
+      if (officer.type === 'role') {
+        if (localRole && officer.reference === localRole) return true;
+        if (roleSlug && normalize(officer.reference) === normalize(roleSlug)) return true;
+        if (localRole && normalize(officer.reference) === normalize(localRole)) return true;
+      }
+      return false;
+    };
+
+    return allOfficers.some(matchesOfficer);
   };
 
   const getStatusColor = (status: string) => {
@@ -326,7 +341,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
                   <Table.Th>{t('User')}</Table.Th>
                   <Table.Th>{t('Signed At')}</Table.Th>
                   <Table.Th>{t('Signature Hash')}</Table.Th>
-                  {isStaff && <Table.Th>{t('Actions')}</Table.Th>}
+                  {canRemoveSignatures && <Table.Th>{t('Actions')}</Table.Th>}
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -339,7 +354,7 @@ export function ApprovalsTab({ order, onOrderUpdate }: ApprovalsTabProps) {
                         {signature.signature_hash.substring(0, 16)}...
                       </Text>
                     </Table.Td>
-                    {isStaff && (
+                    {canRemoveSignatures && (
                       <Table.Td>
                         <Button 
                           size="xs" 

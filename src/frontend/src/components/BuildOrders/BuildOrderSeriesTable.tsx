@@ -1,4 +1,4 @@
-import { Paper, Title, Text, Grid, Group, Table, NumberInput, Select, Textarea, Stack } from '@mantine/core';
+import { Paper, Title, Text, Grid, Group, Table, NumberInput, Select, Textarea, Stack, Button, Badge } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useTranslation } from 'react-i18next';
 import { SeriesSignaturesSection } from '../Requests/SeriesSignaturesSection';
@@ -41,13 +41,6 @@ interface ProductionFlow {
   min_signatures: number;
 }
 
-interface ProductionStep {
-  _id: string;
-  name?: string;
-  label?: string;
-  code?: string;
-}
-
 interface RequestState {
   _id: string;
   name: string;
@@ -64,17 +57,20 @@ interface Serie {
   decision_status?: string;
   decision_reason?: string;
   signatures?: ApprovalSignature[];
+  saved_at?: string | null;
+  saved_by?: string | null;
 }
 
 interface BuildOrderSeriesTableProps {
   series: Serie[];
   onSeriesChange: (series: Serie[]) => void;
   availableStates: RequestState[];
-  productionSteps: ProductionStep[];
   flow: ProductionFlow | null;
   canUserSign: boolean;
-  onSignSerie: (batchCode: string) => void;
+  onSignSerie: (batchCode: string, serie: Serie) => void;
+  onSaveSerie: (batchCode: string, serie: Serie) => void;
   signingSerie: string | null;
+  savingSerie: string | null;
   isCanceled: boolean;
   currentUsername?: string | null;
 }
@@ -86,11 +82,12 @@ export function BuildOrderSeriesTable({
   series,
   onSeriesChange,
   availableStates,
-  productionSteps,
   flow,
   canUserSign,
   onSignSerie,
+  onSaveSerie,
   signingSerie,
+  savingSerie,
   isCanceled,
   currentUsername
 }: BuildOrderSeriesTableProps) {
@@ -130,36 +127,21 @@ export function BuildOrderSeriesTable({
   const isSerieCompleted = (signatures: ApprovalSignature[]) => {
     if (!flow) return false;
 
-    const allMustSigned = flow.must_sign_officers.every(officer =>
+    const mustPersons = flow.must_sign_officers.filter(o => o.type === 'person');
+    const mustRoles = flow.must_sign_officers.filter(o => o.type === 'role');
+
+    const mustPersonsOk = mustPersons.every(officer =>
       signatures.some(s => s.user_id === officer.reference)
     );
+    const mustRolesOk = signatures.length >= mustRoles.length;
 
-    const signatureCount = signatures.filter(s =>
-      flow.can_sign_officers.some(o => o.reference === s.user_id)
-    ).length;
+    const hasMinSignatures = signatures.length >= flow.min_signatures;
 
-    const hasMinSignatures = signatureCount >= flow.min_signatures;
-
-    return allMustSigned && hasMinSignatures;
+    return mustPersonsOk && mustRolesOk && hasMinSignatures;
   };
 
-  const stepOptions = productionSteps.map(step => ({
-    value: step._id,
-    label: step.name || step.label || step.code || step._id
-  }));
-
-  const isSerieUsedQtyComplete = (serie: Serie) => {
-    if (isCanceledDecision(serie.decision_status)) {
-      return (serie.signatures || []).length > 0;
-    }
-    if (!serie.materials || serie.materials.length === 0) return true;
-    return serie.materials.every(material => material.used_qty !== null && material.used_qty !== undefined);
-  };
-
-  const firstIncompleteIndex = series.findIndex(serie => !isSerieUsedQtyComplete(serie));
-  const activeSerieIndex = series.length === 0
-    ? -1
-    : (firstIncompleteIndex === -1 ? series.length - 1 : firstIncompleteIndex);
+  const firstUnsavedIndex = series.findIndex(serie => !serie.saved_at);
+  const activeSerieIndex = series.length === 0 ? -1 : firstUnsavedIndex;
 
   const getMaterialKey = (material: Material) =>
     `${material.part}__${material.batch || ''}__${material.request_id || ''}__${material.request_item_index ?? ''}`;
@@ -180,10 +162,9 @@ export function BuildOrderSeriesTable({
         const expiryRequired = !(isCanceledDecisionStatus || isFailedDecisionStatus);
         const producedRequired = !isCanceledDecisionStatus;
         const signatures = serie.signatures || [];
-        const hasAnySignature = signatures.length > 0;
-        const isSerieActive = serieIndex === activeSerieIndex || series.length === 1;
-        const isSerieLocked = isCanceled || hasAnySignature || !isSerieActive;
-        const isDecisionLocked = isCanceled || hasAnySignature;
+        const isSerieActive = serieIndex === activeSerieIndex || (series.length === 1 && !serie.saved_at);
+        const isSerieLocked = isCanceled || !!serie.saved_at || (!isSerieActive && series.length > 1);
+        const isDecisionLocked = isCanceled || !!serie.saved_at || (!isSerieActive && series.length > 1);
         const disableDetails = isSerieLocked || isCanceledDecisionStatus;
         const serieCompleted = isSerieCompleted(signatures);
 
@@ -192,16 +173,15 @@ export function BuildOrderSeriesTable({
         const hasStep = !!serie.production_step_id || isCanceledDecisionStatus;
         const hasDecision = !!serie.decision_status;
         const userAlreadySigned = !!currentUsername && signatures.some(s => s.username === currentUsername);
-        const canSign = canUserSign && hasDecision && hasStep && hasProducedQty && hasExpiry && !serieCompleted && !isCanceled && !userAlreadySigned && !hasAnySignature && isSerieActive;
+        const canSign = canUserSign && hasDecision && hasStep && hasProducedQty && hasExpiry && !serieCompleted && !isCanceled && !userAlreadySigned && isSerieActive && !serie.saved_at;
 
-        const signedUsedByKey = new Map<string, number>();
+        const usedByKey = new Map<string, number>();
         series.slice(0, serieIndex).forEach(prevSerie => {
-          if ((prevSerie.signatures || []).length === 0) return;
           if (isCanceledDecision(prevSerie.decision_status)) return;
           (prevSerie.materials || []).forEach(material => {
             const key = getMaterialKey(material);
-            const prevValue = signedUsedByKey.get(key) || 0;
-            signedUsedByKey.set(key, prevValue + (Number(material.used_qty) || 0));
+            const prevValue = usedByKey.get(key) || 0;
+            usedByKey.set(key, prevValue + (Number(material.used_qty) || 0));
           });
         });
 
@@ -209,16 +189,35 @@ export function BuildOrderSeriesTable({
           <Paper key={serie.batch_code} withBorder p="md">
             <Group justify="space-between" mb="md">
               <Title order={5}>{t('Batch')}: {serie.batch_code}</Title>
-              {isCanceledDecisionStatus && (
-                <Text c="red" fw={600}>{t('Canceled')}</Text>
-              )}
-              {!isCanceledDecisionStatus && isFailedDecisionStatus && (
-                <Text c="red" fw={600}>{t('Failed')}</Text>
-              )}
+              <Group>
+                {serie.saved_at && (
+                  <Badge color="green" size="sm">
+                    {t('Saved')}
+                  </Badge>
+                )}
+                {isCanceledDecisionStatus && (
+                  <Badge color="red" size="sm">
+                    {t('Canceled')}
+                  </Badge>
+                )}
+                {!isCanceledDecisionStatus && isFailedDecisionStatus && (
+                  <Badge color="red" size="sm">
+                    {t('Failed')}
+                  </Badge>
+                )}
+                <Button
+                  size="xs"
+                  onClick={() => onSaveSerie(serie.batch_code, serie)}
+                  loading={savingSerie === serie.batch_code}
+                  disabled={!serieCompleted || !!serie.saved_at || !isSerieActive}
+                >
+                  {t('Save')}
+                </Button>
+              </Group>
             </Group>
 
             <Grid gutter="md" mb="md">
-              <Grid.Col span={3}>
+              <Grid.Col span={4}>
                 <NumberInput
                   label={t('Produced quantity')}
                   value={serie.produced_qty || 0}
@@ -229,7 +228,7 @@ export function BuildOrderSeriesTable({
                 />
               </Grid.Col>
 
-              <Grid.Col span={3}>
+              <Grid.Col span={4}>
                 <DatePickerInput
                   label={t('Expiration date')}
                   placeholder={t('Pick date')}
@@ -241,20 +240,7 @@ export function BuildOrderSeriesTable({
                 />
               </Grid.Col>
 
-              <Grid.Col span={3}>
-                <Select
-                  label={t('Production step')}
-                  placeholder={t('Select step')}
-                  data={stepOptions}
-                  value={serie.production_step_id || null}
-                  onChange={(value) => updateSerie(serieIndex, { production_step_id: value || '' })}
-                  required
-                  searchable
-                  disabled={disableDetails}
-                />
-              </Grid.Col>
-
-              <Grid.Col span={3}>
+              <Grid.Col span={4}>
                 <Select
                   label={t('Decision')}
                   placeholder={t('Select status')}
@@ -304,8 +290,8 @@ export function BuildOrderSeriesTable({
                   <Table.Tbody>
                     {(serie.materials || []).map((material, materialIndex) => {
                       const key = getMaterialKey(material);
-                      const signedUsed = signedUsedByKey.get(key) || 0;
-                      const availableQty = Math.max(0, (Number(material.received_qty) || 0) - signedUsed);
+                      const usedQty = usedByKey.get(key) || 0;
+                      const availableQty = Math.max(0, (Number(material.received_qty) || 0) - usedQty);
                       const maxQty = availableQty;
                       return (
                         <Table.Tr key={`${serie.batch_code}-${materialIndex}`}>
@@ -357,7 +343,7 @@ export function BuildOrderSeriesTable({
                   canSignOfficers={flow?.can_sign_officers || []}
                   minSignatures={flow?.min_signatures || 1}
                   signatures={signatures}
-                  onSign={() => onSignSerie(serie.batch_code)}
+                  onSign={() => onSignSerie(serie.batch_code, serie)}
                   signing={signingSerie === serie.batch_code}
                 />
               </Grid.Col>

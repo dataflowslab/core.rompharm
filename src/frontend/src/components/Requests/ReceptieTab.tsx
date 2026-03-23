@@ -8,6 +8,7 @@ import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
 import { DecisionSection } from './DecisionSection';
 import { SignaturesSection } from './SignaturesSection';
+import { hasSectionPermission } from '../../utils/permissions';
 
 interface ApprovalOfficer {
   type: string;
@@ -53,7 +54,7 @@ interface ReceptieTabProps {
 
 export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   const { t } = useTranslation();
-  const { username, isStaff } = useAuth();
+  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
   const [flow, setFlow] = useState<ReceptionFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
@@ -63,6 +64,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   const [submitting, setSubmitting] = useState(false);
   const [stateOrder, setStateOrder] = useState<number>(0);
   const [availableStates, setAvailableStates] = useState<any[]>([]);
+  const canRemoveSignatures = hasSectionPermission(roleSections, 'requests', 'delete');
 
   useEffect(() => {
     loadReceptionFlow();
@@ -311,33 +313,23 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     if (!flow || !username) {
       return false;
     }
-    
-    // Check if user can sign - support both username and role-based officers
-    const canSign = flow.can_sign_officers.some(o => {
-      // Direct username match
-      if (o.username === username) return true;
-      
-      // Role-based match: check if user has the role
-      if (o.type === 'role' && o.reference) {
-        // For admin role, always allow (admin can do anything)
-        // Check both isStaff and username containing 'admin'
-        if (o.reference === 'admin' && (isStaff || username.toLowerCase().includes('admin'))) {
-          return true;
-        }
-        // Add other role checks here if needed
+
+    const normalize = (value?: string | null) => (value || '').toString().trim().toLowerCase();
+    const matchesOfficer = (o: ApprovalOfficer) => {
+      if (o.type === 'person') {
+        if (userId && o.reference === userId) return true;
+        if (o.username === username) return true;
       }
-      
-      return false;
-    });
-    
-    const mustSign = flow.must_sign_officers.some(o => {
-      if (o.username === username) return true;
-      if (o.type === 'role' && o.reference === 'admin' && (isStaff || username.toLowerCase().includes('admin'))) {
-        return true;
+      if (o.type === 'role') {
+        if (localRole && o.reference === localRole) return true;
+        if (roleSlug && normalize(o.reference) === normalize(roleSlug)) return true;
+        if (localRole && normalize(o.reference) === normalize(localRole)) return true;
       }
       return false;
-    });
-    
+    };
+
+    const canSign = flow.can_sign_officers.some(matchesOfficer);
+    const mustSign = flow.must_sign_officers.some(matchesOfficer);
     return canSign || mustSign;
   };
 
@@ -466,7 +458,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
                 canSignOfficers={flow.can_sign_officers}
                 minSignatures={flow.min_signatures}
                 signatures={flow.signatures}
-                isStaff={isStaff}
+                canRemoveSignatures={canRemoveSignatures}
                 onSign={handleSign}
                 onRemoveSignature={handleRemoveSignature}
                 signing={signing}

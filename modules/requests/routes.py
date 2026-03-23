@@ -9,7 +9,12 @@ from bson import ObjectId
 
 from src.backend.utils.db import get_db
 from src.backend.utils.config import load_config
-from src.backend.routes.auth import verify_admin
+from src.backend.utils.sections_permissions import (
+    require_section,
+    get_section_permissions,
+    apply_scope_to_query,
+    is_doc_in_scope
+)
 
 from .models import RequestCreate, RequestUpdate
 from .utils import generate_request_reference
@@ -58,6 +63,12 @@ def _get_user_location_ids(db, current_user: dict) -> list:
         return []
     return _normalize_user_locations(user_doc.get("locations"))
 
+
+def _ensure_request_scope(db, current_user: dict, request_doc: dict) -> None:
+    perms = get_section_permissions(db, current_user, "requests")
+    if not is_doc_in_scope(db, current_user, perms, request_doc, created_by_field="created_by"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
 # Include approval routes
 # Include approval routes
 router.include_router(approval_router)
@@ -72,7 +83,7 @@ router.include_router(transfer_router)
 
 @router.get("/states")
 async def get_request_states(
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Get list of request states from MongoDB depo_requests_states"""
     db = get_db()
@@ -89,7 +100,7 @@ async def get_request_states(
 
 @router.get("/production-steps")
 async def get_production_steps(
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(require_section("requests")),
     db = Depends(get_db)
 ):
     """Get list of production steps from MongoDB depo_production_steps"""
@@ -106,7 +117,7 @@ async def get_production_steps(
 @router.get("/stock-locations")
 async def get_stock_locations(
     request: Request,
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(require_section("requests")),
     db = Depends(get_db)
 ):
     """Get list of stock locations from MongoDB depo_locations"""
@@ -121,7 +132,7 @@ async def get_parts(
     search: Optional[str] = None,
     location_id: Optional[str] = None,
     is_assembly: Optional[bool] = None,
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(require_section("requests")),
     db = Depends(get_db)
 ):
     """Get list of parts from MongoDB depo_parts with search"""
@@ -132,7 +143,7 @@ async def get_parts(
 async def get_part_stock_info_route(
     part_id: str,
     location_id: Optional[str] = None,
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(require_section("requests")),
     db = Depends(get_db)
 ):
     """Get stock information for a part from MongoDB depo_stocks with batches using ObjectId"""
@@ -142,7 +153,7 @@ async def get_part_stock_info_route(
 @router.get("/parts/{part_id}/bom")
 async def get_part_bom(
     part_id: str,
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(require_section("requests")),
     db = Depends(get_db)
 ):
     """Get BOM (Bill of Materials) for a part from MongoDB depo_bom using ObjectId"""
@@ -153,7 +164,7 @@ async def get_part_bom(
 async def get_part_batch_codes(
     part_id: str,
     location_id: Optional[str] = None,
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(require_section("requests")),
     db = Depends(get_db)
 ):
     """Get available batch codes for a part from MongoDB depo_stocks using ObjectId
@@ -167,7 +178,7 @@ async def get_part_batch_codes(
 @router.get("/parts/{part_id}/recipe")
 async def get_part_recipe(
     part_id: str,
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(require_section("requests")),
     db = Depends(get_db)
 ):
     """Get recipe for a part (with fallback to BOM if no recipe exists) using ObjectId"""
@@ -187,7 +198,7 @@ async def list_requests(
     extra: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """List all requests with location names from depo_locations"""
     db = get_db()
@@ -304,6 +315,9 @@ async def list_requests(
                 or_clauses.append({'items.part': {'$in': part_variants}})
 
             query["$or"] = or_clauses
+
+    perms = get_section_permissions(db, current_user, "requests")
+    query = apply_scope_to_query(db, current_user, perms, query, created_by_field="created_by")
 
     total = requests_collection.count_documents(query)
     requests_list = list(
@@ -460,7 +474,7 @@ async def list_requests(
 @router.get("/{request_id}")
 async def get_request(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Get a specific request by ID with location and part details from MongoDB"""
     db = get_db()
@@ -476,6 +490,8 @@ async def get_request(
     
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+
+    _ensure_request_scope(db, current_user, req)
     
     # Convert source and destination ObjectIds to strings
     if req.get('source'):
@@ -635,7 +651,7 @@ async def get_request(
 @router.get("/{request_id}/movements")
 async def get_request_movements(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Get stock movements associated with a request (transfer/in-transit)"""
     db = get_db()
@@ -644,6 +660,11 @@ async def get_request_movements(
         req_oid = ObjectId(request_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid request ID")
+
+    req_doc = db.depo_requests.find_one({"_id": req_oid})
+    if not req_doc:
+        raise HTTPException(status_code=404, detail="Request not found")
+    _ensure_request_scope(db, current_user, req_doc)
 
     movements = list(db.depo_stocks_movements.find({
         'document_id': {'$in': [req_oid, request_id]},
@@ -708,7 +729,7 @@ async def get_request_movements(
 @router.post("/")
 async def create_request(
     request_data: RequestCreate,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Create a new request"""
     db = get_db()
@@ -838,7 +859,7 @@ async def create_request(
 async def update_request(
     request_id: str,
     request_data: RequestUpdate,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Update a request"""
     db = get_db()
@@ -853,6 +874,8 @@ async def update_request(
     existing = requests_collection.find_one({'_id': req_obj_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Request not found")
+
+    _ensure_request_scope(db, current_user, existing)
 
     # Determine source for validation (new or existing)
     existing_source = existing.get('source')
@@ -1012,7 +1035,7 @@ async def update_request(
 @router.delete("/{request_id}")
 async def delete_request(
     request_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """Delete a request"""
     db = get_db()
@@ -1022,9 +1045,14 @@ async def delete_request(
         req_obj_id = ObjectId(request_id)
     except:
         raise HTTPException(status_code=400, detail="Invalid request ID")
-    
+
+    existing = requests_collection.find_one({'_id': req_obj_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Request not found")
+    _ensure_request_scope(db, current_user, existing)
+
     result = requests_collection.delete_one({'_id': req_obj_id})
-    
+
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Request not found")
     

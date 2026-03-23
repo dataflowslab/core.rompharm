@@ -10,7 +10,7 @@ from datetime import datetime
 from src.backend.utils.db import get_db
 from src.backend.utils.local_auth import create_user, hash_password, generate_salt
 from src.backend.models.user_model import UserCreate, UserUpdate
-from src.backend.routes.auth import verify_admin
+from src.backend.utils.sections_permissions import require_section
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -67,7 +67,7 @@ def _resolve_role_id(user_doc: dict) -> Optional[ObjectId]:
 
 @router.get("/")
 def list_users(
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("users"))
 ):
     """List all users"""
     db = get_db()
@@ -117,7 +117,7 @@ def list_users(
 @router.get("/{user_id}")
 def get_user(
     user_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("users"))
 ):
     """Get user by ID"""
     db = get_db()
@@ -171,7 +171,7 @@ def get_user(
 @router.post("/")
 def create_new_user(
     user_data: UserCreate,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("users"))
 ):
     """Create new user"""
     try:
@@ -184,7 +184,6 @@ def create_new_user(
             role_id=user_data.role_id,
             email=user_data.email,
             phone=user_data.phone,
-            is_staff=user_data.is_staff,
             is_active=user_data.is_active,
             mobile=user_data.mobile,
             locations=user_data.locations
@@ -205,7 +204,7 @@ def create_new_user(
 def update_user(
     user_id: str,
     user_data: UserUpdate,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("users"))
 ):
     """Update user"""
     db = get_db()
@@ -274,11 +273,6 @@ def update_user(
         update_data['phone'] = payload.get('phone')
     if 'is_active' in payload:
         update_data['is_active'] = payload.get('is_active')
-    if 'is_staff' in payload:
-        if payload.get('is_staff') is None:
-            unset_data['is_staff'] = ''
-        else:
-            update_data['is_staff'] = payload.get('is_staff')
     if 'mobile' in payload:
         update_data['mobile'] = payload.get('mobile')
     if 'locations' in payload:
@@ -304,7 +298,7 @@ def update_user(
 @router.delete("/{user_id}")
 def delete_user(
     user_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("users"))
 ):
     """Delete user"""
     db = get_db()

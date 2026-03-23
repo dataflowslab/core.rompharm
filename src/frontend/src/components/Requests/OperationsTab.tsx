@@ -12,6 +12,7 @@ import { WarehouseOperationsTable } from './WarehouseOperationsTable';
 import { AddItemModal } from './AddItemModal';
 import { DecisionSection } from './DecisionSection';
 import { SignaturesSection } from './SignaturesSection';
+import { hasSectionPermission } from '../../utils/permissions';
 
 interface ApprovalOfficer {
   type: string;
@@ -84,7 +85,7 @@ interface OperationsTabProps {
 
 export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const { t } = useTranslation();
-  const { username, isStaff } = useAuth();
+  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
   const [flow, setFlow] = useState<OperationsFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
@@ -95,6 +96,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
   const [submitting, setSubmitting] = useState(false);
   const [request, setRequest] = useState<any>(null);
   const [availableStates, setAvailableStates] = useState<any[]>([]);
+  const canRemoveSignatures = hasSectionPermission(roleSections, 'requests', 'delete');
   
   // Add Item Modal state
   const [addItemModalOpened, setAddItemModalOpened] = useState(false);
@@ -620,27 +622,22 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
     const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
     
-    // Check if user can sign - support both username and role-based officers
-    const canSign = flow.can_sign_officers.some(o => {
-      // Direct username match
-      if (o.username === username) return true;
-      
-      // Role-based match: check if user has the role
-      if (o.type === 'role' && o.reference) {
-        // For admin role, check if user is staff
-        if (o.reference === 'admin' && isStaff) return true;
-        // Add other role checks here if needed
+    const normalize = (value?: string | null) => (value || '').toString().trim().toLowerCase();
+    const matchesOfficer = (o: ApprovalOfficer) => {
+      if (o.type === 'person') {
+        if (userId && o.reference === userId) return true;
+        if (o.username === username) return true;
       }
-      
+      if (o.type === 'role') {
+        if (localRole && o.reference === localRole) return true;
+        if (roleSlug && normalize(o.reference) === normalize(roleSlug)) return true;
+        if (localRole && normalize(o.reference) === normalize(localRole)) return true;
+      }
       return false;
-    });
-    
-    const mustSign = flow.must_sign_officers.some(o => {
-      if (o.username === username) return true;
-      if (o.type === 'role' && o.reference === 'admin' && isStaff) return true;
-      return false;
-    });
-    
+    };
+
+    const canSign = flow.can_sign_officers.some(matchesOfficer);
+    const mustSign = flow.must_sign_officers.some(matchesOfficer);
     return canSign || mustSign;
   };
 
@@ -767,7 +764,7 @@ export function OperationsTab({ requestId, onReload }: OperationsTabProps) {
               canSignOfficers={flow.can_sign_officers}
               minSignatures={flow.min_signatures}
               signatures={flow.signatures}
-              isStaff={isStaff}
+              canRemoveSignatures={canRemoveSignatures}
               onSign={handleSign}
               onRemoveSignature={handleRemoveSignature}
               signing={signing}

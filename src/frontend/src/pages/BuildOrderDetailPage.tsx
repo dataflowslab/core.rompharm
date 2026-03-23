@@ -14,6 +14,7 @@ interface BuildOrder {
   _id: string;
   batch_code?: string;
   batch_code_text?: string;
+  product_id?: string;
   state_detail?: {
     name: string;
   };
@@ -92,6 +93,13 @@ export function BuildOrderDetailPage() {
   }
 
   const batchCode = buildOrder.batch_code_text || buildOrder.batch_code || '';
+  const productLabel = buildOrder.product_detail
+    ? `${buildOrder.product_detail.name}${buildOrder.product_detail.ipn ? ` (${buildOrder.product_detail.ipn})` : ''}`
+    : '';
+  const titleLabel = productLabel ? `${batchCode} - ${productLabel}` : batchCode;
+  const groupCodes = buildOrder.grup?.batch_codes || [];
+  const isCampaign = buildOrder.campaign ?? (groupCodes.length > 1);
+  const hasSavedProduct = !!(buildOrder.product_id || buildOrder.product_detail?._id);
 
   return (
     <Paper p="md">
@@ -104,10 +112,15 @@ export function BuildOrderDetailPage() {
           >
             {t('Back')}
           </Button>
-          <Title order={2}>{batchCode}</Title>
+          <Title order={2}>{titleLabel}</Title>
           <Badge color={getStatusColor(buildOrder.state_detail?.name)} size="lg">
             {buildOrder.state_detail?.name || '-'}
           </Badge>
+          {isCampaign && (
+            <Badge color="blue" size="lg" variant="light">
+              {t('Campaign')}
+            </Badge>
+          )}
         </Group>
       </Group>
 
@@ -116,7 +129,7 @@ export function BuildOrderDetailPage() {
           <Tabs.Tab value="details" leftSection={<IconFileText size={16} />}>
             {t('Details')}
           </Tabs.Tab>
-          <Tabs.Tab value="production" leftSection={<IconTool size={16} />}>
+          <Tabs.Tab value="production" leftSection={<IconTool size={16} />} disabled={!hasSavedProduct}>
             {t('Production')}
           </Tabs.Tab>
         </Tabs.List>
@@ -128,7 +141,13 @@ export function BuildOrderDetailPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="production" pt="md">
-          {id ? <BuildOrderProductionTab buildOrderId={id} /> : null}
+          {id && hasSavedProduct ? <BuildOrderProductionTab buildOrderId={id} /> : (
+            <Paper p="md" withBorder>
+              <Text c="dimmed">
+                {t('Select and save a product in Details before using Production.')}
+              </Text>
+            </Paper>
+          )}
         </Tabs.Panel>
 
       </Tabs>

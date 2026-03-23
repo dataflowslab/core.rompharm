@@ -276,6 +276,11 @@ async def create_article(
         doc['minimum_stock'] = article_data.minimum_stock
     if article_data.supplier_id:
         doc['supplier_id'] = ObjectId(article_data.supplier_id)
+    if article_data.production_step_id:
+        try:
+            doc['production_step_id'] = ObjectId(article_data.production_step_id)
+        except Exception:
+            doc['production_step_id'] = article_data.production_step_id
     
     try:
         result = collection.insert_one(doc)
@@ -309,7 +314,7 @@ async def update_article(
             update_doc[field] = value
     
     # ObjectId fields
-    for field in ['default_location_id', 'category_id', 'manufacturer_id', 'system_um_id', 'manufacturer_um_id']:
+    for field in ['default_location_id', 'category_id', 'manufacturer_id', 'system_um_id', 'manufacturer_um_id', 'production_step_id']:
         value = getattr(article_data, field, None)
         if value is not None:
             update_doc[field] = ObjectId(value) if value else None

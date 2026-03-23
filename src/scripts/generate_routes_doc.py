@@ -196,7 +196,7 @@ def generate_markdown(platform_routes: Dict, module_routes: Dict) -> str:
     md.append("---\n\n")
     md.append("## 📝 Notes\n\n")
     md.append("- All routes except `/api/auth/login` require authentication\n")
-    md.append("- Admin-only routes require `is_staff` or `is_superuser` flag\n")
+    md.append("- Admin-only routes require role slug `admin`\n")
     md.append("- Module routes follow pattern: `/modules/{module_name}/api/{resource}`\n")
     md.append("- Global routes follow pattern: `/api/{resource}`\n\n")
     

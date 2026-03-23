@@ -30,13 +30,12 @@ class AuthService:
             action='login',
             username=username,
             request=request,
-            details={'is_staff': user_info.get('is_staff', False), 'identity_server': 'localhost'}
+            details={'identity_server': 'localhost'}
         )
         
         return {
             "token": user_info['access_token'],
             "username": user_info['username'],
-            "is_staff": user_info.get('is_staff', False),
             "name": user_info.get('name'),
             "message": "Login successful"
         }

@@ -8,7 +8,12 @@ from bson import ObjectId
 
 # Import from core
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import (
+    require_section,
+    get_section_permissions,
+    apply_scope_to_query,
+    is_doc_in_scope
+)
 
 # Import from module
 from modules.depo_procurement.models import (
@@ -24,6 +29,23 @@ from modules.depo_procurement.utils import serialize_doc
 router = APIRouter(prefix="/modules/depo_procurement/api", tags=["depo_procurement"])
 
 
+def _ensure_procurement_scope(db, current_user: dict, order_doc: dict) -> None:
+    perms = get_section_permissions(db, current_user, "procurement")
+    if not is_doc_in_scope(db, current_user, perms, order_doc, created_by_field="created_by"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _get_purchase_order_or_404(db, order_id: str) -> dict:
+    try:
+        order_oid = ObjectId(order_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+    order = db['depo_purchase_orders'].find_one({'_id': order_oid})
+    if not order:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    return order
+
+
 
 
 @router.get("/purchase-orders")
@@ -35,20 +57,27 @@ async def get_purchase_orders(
     date_to: Optional[str] = Query(None),
     skip: Optional[int] = Query(None, ge=0),
     limit: Optional[int] = Query(None, ge=1, le=200),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get list of purchase orders from MongoDB with filters"""
     from modules.depo_procurement.services import get_purchase_orders_list
-    return await get_purchase_orders_list(search, state_id, date_from, date_to, skip, limit)
+    db = get_db()
+    base_query = {}
+    perms = get_section_permissions(db, current_user, "procurement")
+    base_query = apply_scope_to_query(db, current_user, perms, base_query, created_by_field="created_by")
+    return await get_purchase_orders_list(search, state_id, date_from, date_to, skip, limit, base_query=base_query)
 
 
 @router.get("/purchase-orders/{order_id}")
 async def get_purchase_order(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get a specific purchase order from MongoDB"""
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     from modules.depo_procurement.services import get_purchase_order_by_id
     return await get_purchase_order_by_id(order_id)
 
@@ -57,7 +86,7 @@ async def get_purchase_order(
 async def create_purchase_order(
     request: Request,
     order_data: PurchaseOrderRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Create a new purchase order in MongoDB"""
     from modules.depo_procurement.services import create_new_purchase_order
@@ -68,10 +97,12 @@ async def create_purchase_order(
 async def update_purchase_order(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Update a purchase order in MongoDB"""
     db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     
     # Get the JSON body
     body = await request.json()
@@ -104,10 +135,12 @@ async def update_purchase_order(
 async def update_order_documents(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Update documents field in purchase order"""
     db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     
     # Get the JSON body with documents
     body = await request.json()
@@ -136,9 +169,12 @@ async def update_order_documents(
 async def get_purchase_order_items(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get items for a purchase order"""
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     from modules.depo_procurement.services import get_order_items
     return await get_order_items(order_id)
 
@@ -148,9 +184,12 @@ async def add_purchase_order_item(
     request: Request,
     order_id: str,
     item_data: PurchaseOrderItemRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Add an item to a purchase order"""
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     from modules.depo_procurement.services import add_order_item
     return await add_order_item(order_id, item_data)
 
@@ -161,9 +200,12 @@ async def update_purchase_order_item(
     order_id: str,
     item_id: str,
     item_data: PurchaseOrderItemUpdateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Update an item in a purchase order by item _id"""
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     from modules.depo_procurement.services import update_order_item_by_id
     return await update_order_item_by_id(order_id, item_id, item_data)
 
@@ -173,9 +215,12 @@ async def delete_purchase_order_item(
     request: Request,
     order_id: str,
     item_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Delete an item from a purchase order by item _id"""
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     from modules.depo_procurement.services import delete_order_item_by_id
     return await delete_order_item_by_id(order_id, item_id)
 
@@ -184,7 +229,7 @@ async def delete_purchase_order_item(
 async def get_parts(
     request: Request,
     search: Optional[str] = Query(None),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get list of parts from MongoDB"""
     db = get_db()
@@ -211,10 +256,13 @@ async def receive_stock(
     request: Request,
     order_id: str,
     stock_data: ReceiveStockRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Receive stock items for a purchase order line"""
     from modules.depo_procurement.services import receive_stock_item
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await receive_stock_item(order_id, stock_data, current_user)
 
 
@@ -222,10 +270,13 @@ async def receive_stock(
 async def get_received_items(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get received stock items for a purchase order"""
     from modules.depo_procurement.services import get_received_stock_items
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await get_received_stock_items(order_id)
 
 
@@ -233,7 +284,7 @@ async def get_received_items(
 async def delete_stock_item(
     request: Request,
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Delete a received stock item"""
     db = get_db()
@@ -249,6 +300,7 @@ async def delete_stock_item(
         if order_id:
             order = db.depo_purchase_orders.find_one({'_id': order_id})
             if order:
+                _ensure_procurement_scope(db, current_user, order)
                 # Remove stock_id from items.stocks array
                 items = order.get('items', [])
                 for item in items:
@@ -282,7 +334,7 @@ async def delete_stock_item(
 @router.get("/order-statuses")
 async def get_order_statuses(
     request: Request,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get available purchase order statuses/states"""
     db = get_db()
@@ -299,7 +351,7 @@ async def get_order_statuses(
 @router.get("/document-templates")
 async def get_document_templates(
     request: Request,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get document template codes for procurement orders"""
     db = get_db()
@@ -318,7 +370,7 @@ async def get_document_templates(
 @router.get("/stock-statuses")
 async def get_stock_statuses(
     request: Request,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get available stock statuses from depo_stocks_states collection"""
     db = get_db()
@@ -337,45 +389,17 @@ async def update_order_state(
     order_id: str,
     state_name: str,
     reason: Optional[str] = None,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Update purchase order state"""
     from modules.depo_procurement.services import change_order_state
     
-    # Check permissions
     db = get_db()
-    order = db['depo_purchase_orders'].find_one({'_id': ObjectId(order_id)})
-    if not order:
-        raise HTTPException(status_code=404, detail="Purchase order not found")
-    
-    # Check if user can change state
-    is_admin = current_user.get('is_staff', False) or current_user.get('is_superuser', False)
-    is_creator = order.get('created_by') == current_user.get('username')
-    
-    # For Cancel: admin or creator can cancel
-    if state_name == 'Canceled':
-        if not (is_admin or is_creator):
-            raise HTTPException(status_code=403, detail="Only admin or creator can cancel the order")
-    
-    # For Refuse: must be admin or must_sign user
-    elif state_name == 'Refused':
-        if not is_admin:
-            # Check if user is in must_sign list
-            config = db['config'].find_one({'slug': 'procurement_approval_flows'})
-            if config and config.get('items'):
-                flow_config = next((item for item in config['items'] if item.get('slug') == 'referate'), None)
-                if flow_config:
-                    must_sign_users = [u.get('username') for u in flow_config.get('must_sign', [])]
-                    if current_user.get('username') not in must_sign_users:
-                        raise HTTPException(status_code=403, detail="Only admin or must_sign users can refuse the order")
-        
-        if not reason:
-            raise HTTPException(status_code=400, detail="Reason is required when refusing an order")
-    
-    # For Finish: only admin can manually finish
-    elif state_name == 'Finished':
-        if not is_admin:
-            raise HTTPException(status_code=403, detail="Only admin can manually finish the order")
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
+
+    if state_name == 'Refused' and not reason:
+        raise HTTPException(status_code=400, detail="Reason is required when refusing an order")
     
     return await change_order_state(order_id, state_name, current_user, reason)
 
@@ -384,10 +408,13 @@ async def update_order_state(
 async def get_attachments(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get attachments for a purchase order"""
     from modules.depo_procurement.services import get_order_attachments
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await get_order_attachments(order_id)
 
 
@@ -397,10 +424,13 @@ async def upload_attachment(
     order_id: str,
     file: UploadFile = File(...),
     comment: Optional[str] = Form(None),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Upload an attachment to a purchase order"""
     from modules.depo_procurement.services import upload_order_attachment
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await upload_order_attachment(order_id, file, comment, current_user)
 
 
@@ -409,10 +439,13 @@ async def delete_attachment(
     request: Request,
     order_id: str,
     attachment_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Delete an attachment from a purchase order"""
     from modules.depo_procurement.services import delete_order_attachment
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await delete_order_attachment(attachment_id)
 
 
@@ -420,10 +453,13 @@ async def delete_attachment(
 async def get_qc_records_endpoint(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get QC records for a purchase order"""
     from modules.depo_procurement.services import get_qc_records
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await get_qc_records(order_id)
 
 
@@ -431,10 +467,13 @@ async def get_qc_records_endpoint(
 async def create_qc_record_endpoint(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Create a new QC record for a purchase order"""
     from modules.depo_procurement.services import create_qc_record
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     body = await request.json()
     return await create_qc_record(order_id, body, current_user)
 
@@ -444,10 +483,13 @@ async def update_qc_record_endpoint(
     request: Request,
     order_id: str,
     qc_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Update a QC record"""
     from modules.depo_procurement.services import update_qc_record
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     body = await request.json()
     return await update_qc_record(order_id, qc_id, body, current_user)
     
@@ -457,10 +499,13 @@ async def update_qc_record_endpoint(
 async def get_approval_flow_endpoint(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get approval flow for a purchase order"""
     from modules.depo_procurement.services import get_order_approval_flow
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await get_order_approval_flow(order_id)
 
 
@@ -468,10 +513,13 @@ async def get_approval_flow_endpoint(
 async def create_approval_flow_endpoint(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Create approval flow for a purchase order using approval_templates"""
     from modules.depo_procurement.services import create_order_approval_flow
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await create_order_approval_flow(order_id)
 
 
@@ -479,10 +527,13 @@ async def create_approval_flow_endpoint(
 async def sign_order_endpoint(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Sign a purchase order approval flow"""
     from modules.depo_procurement.services import sign_purchase_order
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     body = await request.json()
     action = body.get('action', 'issue')
     return await sign_purchase_order(
@@ -496,10 +547,13 @@ async def remove_signature_endpoint(
     request: Request,
     order_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
-    """Remove signature from purchase order approval flow (admin only)"""
+    """Remove signature from purchase order approval flow"""
     from modules.depo_procurement.services import remove_order_signature
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await remove_order_signature(order_id, user_id, current_user)
 
 # ==================== RECEIVED STOCK APPROVAL FLOW ENDPOINTS ====================
@@ -508,10 +562,13 @@ async def remove_signature_endpoint(
 async def get_received_stock_approval_flow_endpoint(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get approval flow for received stock"""
     from modules.depo_procurement.services import get_received_stock_approval_flow
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await get_received_stock_approval_flow(order_id)
 
 
@@ -519,10 +576,13 @@ async def get_received_stock_approval_flow_endpoint(
 async def create_received_stock_approval_flow_endpoint(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Create approval flow for received stock"""
     from modules.depo_procurement.services import create_received_stock_approval_flow
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await create_received_stock_approval_flow(order_id)
 
 
@@ -530,10 +590,13 @@ async def create_received_stock_approval_flow_endpoint(
 async def sign_received_stock_endpoint(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Sign received stock approval flow"""
     from modules.depo_procurement.services import sign_received_stock
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     body = await request.json()
     target_state_id = body.get('target_state_id')
     return await sign_received_stock(
@@ -547,10 +610,13 @@ async def remove_received_stock_signature_endpoint(
     request: Request,
     order_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Remove signature from received stock approval flow"""
     from modules.depo_procurement.services import remove_received_stock_signature
+    db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     return await remove_received_stock_signature(order_id, user_id, current_user)
 
 
@@ -560,13 +626,12 @@ async def remove_received_stock_signature_endpoint(
 async def get_order_journal(
     request: Request,
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("procurement"))
 ):
     """Get activity journal for purchase order"""
-    from src.backend.utils.db import get_db
-    from bson import ObjectId
-    
     db = get_db()
+    order = _get_purchase_order_or_404(db, order_id)
+    _ensure_procurement_scope(db, current_user, order)
     
     # Get logs for this order
     logs = list(db.logs.find({

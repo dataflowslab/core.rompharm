@@ -8,13 +8,34 @@ from bson import ObjectId
 from pydantic import BaseModel
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import (
+    require_section,
+    get_section_permissions,
+    apply_scope_to_query,
+    is_doc_in_scope
+)
 from modules.inventory.stock_movements import create_movement, MovementType, update_balance
 
 router = APIRouter(prefix="/api/sales", tags=["sales"])
 
 RETURN_ORDER_INITIAL_STATE_ID = "6943a4a6451609dd8a618ce0"
 RETURN_ORDER_APPROVAL_TEMPLATE_ID = "69b39f0d0ec895067fed4e8d"
+
+
+def _ensure_sales_scope(db, current_user: dict, order_doc: dict) -> None:
+    perms = get_section_permissions(db, current_user, "sales")
+    if not is_doc_in_scope(db, current_user, perms, order_doc, created_by_field="created_by"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _get_sales_order_or_404(db, current_user: dict, order_id: str) -> dict:
+    order = db['depo_sales_ordes'].find_one({'_id': ObjectId(order_id)})
+    if not order:
+        order = db['depo_sales_orders'].find_one({'_id': ObjectId(order_id)})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    _ensure_sales_scope(db, current_user, order)
+    return order
 
 # --- Models ---
 class SalesOrderRequest(BaseModel):
@@ -384,7 +405,7 @@ async def get_sales_orders(
     date_to: Optional[str] = Query(None),
     skip: Optional[int] = Query(None, ge=0),
     limit: Optional[int] = Query(None, ge=1, le=200),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     collection = db['depo_sales_ordes']
@@ -420,6 +441,9 @@ async def get_sales_orders(
             query['issue_date']['$gte'] = date_from
         if date_to:
             query['issue_date']['$lte'] = date_to
+
+    perms = get_section_permissions(db, current_user, "sales")
+    query = apply_scope_to_query(db, current_user, perms, query, created_by_field="created_by")
             
     try:
         cursor = collection.find(query).sort('created_at', -1)
@@ -466,7 +490,7 @@ async def get_sales_orders(
 @router.post("/sales-orders")
 async def create_sales_order(
     order_data: SalesOrderRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     collection = db['depo_sales_ordes']
@@ -564,13 +588,15 @@ async def create_sales_order(
 @router.get("/sales-orders/{order_id}")
 async def get_sales_order(
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     try:
         order = db['depo_sales_ordes'].find_one({'_id': ObjectId(order_id)})
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+
+        _ensure_sales_scope(db, current_user, order)
             
         if order.get('customer_id'):
             customer = db['depo_companies'].find_one({'_id': ObjectId(order['customer_id'])})
@@ -601,7 +627,7 @@ async def get_sales_order(
 @router.get("/sales-orders/{order_id}/items")
 async def get_sales_order_items(
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     orders_collection = db['depo_sales_ordes']
@@ -611,6 +637,8 @@ async def get_sales_order_items(
         order = orders_collection.find_one({'_id': ObjectId(order_id)})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    _ensure_sales_scope(db, current_user, order)
 
     items = order.get('items', [])
 
@@ -675,7 +703,7 @@ async def get_sales_order_items(
 async def add_sales_order_item(
     order_id: str,
     item: SalesOrderItemRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     orders = db['depo_sales_ordes']
@@ -687,6 +715,10 @@ async def add_sales_order_item(
         order = orders.find_one({'_id': ObjectId(order_id)})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    _ensure_sales_scope(db, current_user, order)
+
+    _ensure_sales_scope(db, current_user, order)
 
     part = parts.find_one({'_id': ObjectId(item.part_id)})
     if not part:
@@ -733,7 +765,7 @@ async def update_sales_order_item(
     order_id: str,
     item_id: str,
     item: SalesOrderItemRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     orders = db['depo_sales_ordes']
@@ -745,6 +777,8 @@ async def update_sales_order_item(
         order = orders.find_one({'_id': ObjectId(order_id)})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    _ensure_sales_scope(db, current_user, order)
 
     items = order.get('items', [])
     item_index = next((idx for idx, it in enumerate(items) if it.get('_id') == item_id), None)
@@ -785,7 +819,7 @@ async def update_sales_order_item(
 async def delete_sales_order_item(
     order_id: str,
     item_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     orders = db['depo_sales_ordes']
@@ -817,9 +851,10 @@ async def delete_sales_order_item(
 @router.get("/sales-orders/{order_id}/shipments")
 async def get_sales_order_shipments(
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
+    _get_sales_order_or_404(db, current_user, order_id)
     shipments = list(db['depo_sales_shipments'].find({'order_id': order_id}))
     return {"results": serialize_doc(shipments)}
 
@@ -828,12 +863,10 @@ async def get_sales_order_shipments(
 async def create_sales_order_shipment(
     order_id: str,
     shipment: ShipmentRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
-    orders = db['depo_sales_ordes']
-    if not orders.find_one({'_id': ObjectId(order_id)}):
-        raise HTTPException(status_code=404, detail="Order not found")
+    _get_sales_order_or_404(db, current_user, order_id)
 
     doc = {
         'order_id': order_id,
@@ -859,10 +892,11 @@ async def update_sales_order_shipment(
     order_id: str,
     shipment_id: str,
     shipment: ShipmentRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     coll = db['depo_sales_shipments']
+    _get_sales_order_or_404(db, current_user, order_id)
     existing = coll.find_one({'_id': ObjectId(shipment_id), 'order_id': order_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Shipment not found")
@@ -886,10 +920,11 @@ async def update_sales_order_shipment(
 async def delete_sales_order_shipment(
     order_id: str,
     shipment_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     coll = db['depo_sales_shipments']
+    _get_sales_order_or_404(db, current_user, order_id)
     result = coll.delete_one({'_id': ObjectId(shipment_id), 'order_id': order_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Shipment not found")
@@ -899,9 +934,10 @@ async def delete_sales_order_shipment(
 @router.get("/sales-orders/{order_id}/attachments")
 async def get_sales_order_attachments(
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
+    _get_sales_order_or_404(db, current_user, order_id)
     atts = list(db['depo_sales_order_attachments'].find({'order_id': order_id}))
     return {"results": serialize_doc(atts)}
 
@@ -909,9 +945,10 @@ async def get_sales_order_attachments(
 @router.get("/sales-orders/{order_id}/returns")
 async def get_sales_order_returns(
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
+    _get_sales_order_or_404(db, current_user, order_id)
     coll = db['depo_return_orders']
     query = {'sales_order_id': order_id}
     try:
@@ -926,13 +963,14 @@ async def get_sales_order_returns(
 async def create_sales_order_return(
     order_id: str,
     payload: ReturnOrderRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
 
     order, _, order_items = _load_sales_order_with_items(db, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    _ensure_sales_scope(db, current_user, order)
 
     if not payload.items:
         raise HTTPException(status_code=400, detail="Return must have at least one item")
@@ -1087,9 +1125,10 @@ async def create_sales_order_return(
 @router.get("/sales-orders/{order_id}/allocations")
 async def get_sales_order_allocations(
     order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
+    _get_sales_order_or_404(db, current_user, order_id)
     allocs = list(db['depo_sales_allocations'].find({'order_id': order_id}))
     for alloc in allocs:
         if alloc.get('part_id'):
@@ -1107,12 +1146,10 @@ async def get_sales_order_allocations(
 async def create_sales_order_allocation(
     order_id: str,
     allocation: AllocationRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
-    orders = db['depo_sales_ordes']
-    if not orders.find_one({'_id': ObjectId(order_id)}):
-        raise HTTPException(status_code=404, detail="Order not found")
+    _get_sales_order_or_404(db, current_user, order_id)
 
     if allocation.quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be greater than zero")
@@ -1145,9 +1182,10 @@ async def update_sales_order_allocation(
     order_id: str,
     allocation_id: str,
     allocation: AllocationRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
+    _get_sales_order_or_404(db, current_user, order_id)
     coll = db['depo_sales_allocations']
     existing = coll.find_one({'_id': ObjectId(allocation_id), 'order_id': order_id})
     if not existing:
@@ -1175,9 +1213,10 @@ async def update_sales_order_allocation(
 async def delete_sales_order_allocation(
     order_id: str,
     allocation_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
+    _get_sales_order_or_404(db, current_user, order_id)
     coll = db['depo_sales_allocations']
     existing = coll.find_one({'_id': ObjectId(allocation_id), 'order_id': order_id})
     result = coll.delete_one({'_id': ObjectId(allocation_id), 'order_id': order_id})
@@ -1208,7 +1247,7 @@ async def delete_sales_order_allocation(
 
 @router.get("/order-statuses")
 async def get_sales_order_statuses(
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     states = list(db['depo_sales_ordes_states'].find().sort('value', 1))
@@ -1221,7 +1260,7 @@ async def get_return_orders(
     state_id: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     coll = db['depo_return_orders']
@@ -1298,9 +1337,10 @@ async def get_return_orders(
 async def update_sales_order_status(
     order_id: str,
     update_data: StatusUpdateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
+    _get_sales_order_or_404(db, current_user, order_id)
     collection = db['depo_sales_ordes']
     
     update_fields = {}
@@ -1323,7 +1363,7 @@ async def update_sales_order_status(
 @router.get("/customers")
 async def get_sales_customers(
     search: Optional[str] = Query(None),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("sales"))
 ):
     db = get_db()
     query = {"is_client": True} # Fetch clients specifically

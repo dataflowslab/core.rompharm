@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DataListPage } from './pages/DataListPage';
 import { UsersPage } from './pages/UsersPage';
+import { RolesPage } from './pages/RolesPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SubmissionsListPage } from './pages/SubmissionsListPage';
@@ -183,6 +184,7 @@ function App() {
           <Route path="/submissions" element={<ProtectedRoute><SubmissionsListPage /></ProtectedRoute>} />
           <Route path="/submission/:submissionId" element={<ProtectedRoute><SubmissionDetailPage /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+          <Route path="/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
           <Route path="/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/data/:formId" element={<ProtectedRoute><DataListPage /></ProtectedRoute>} />

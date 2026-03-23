@@ -8,7 +8,9 @@ from datetime import datetime
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_admin, verify_token
+from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
+from src.backend.utils.approval_helpers import normalize_officers
 from src.backend.models.approval_template_model import (
     ApprovalTemplateModel,
     ApprovalTemplateCreate,
@@ -32,7 +34,7 @@ def list_templates(
     object_type: Optional[str] = None,
     object_source: Optional[str] = None,
     active: Optional[bool] = None,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("approvals"))
 ):
     """List approval templates"""
     db = get_db()
@@ -56,7 +58,7 @@ def list_templates(
 @router.post("/templates")
 def create_template(
     template: ApprovalTemplateCreate,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("approvals"))
 ):
     """Create approval template"""
     db = get_db()
@@ -74,6 +76,8 @@ def create_template(
         )
     
     template_data = template.dict()
+    if template_data.get("officers") is not None:
+        template_data["officers"] = normalize_officers(db, template_data.get("officers") or [])
     template_data["created_at"] = datetime.utcnow()
     template_data["updated_at"] = datetime.utcnow()
     
@@ -87,7 +91,7 @@ def create_template(
 @router.get("/templates/{template_id}")
 def get_template(
     template_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("approvals"))
 ):
     """Get approval template"""
     db = get_db()
@@ -106,7 +110,7 @@ def get_template(
 def update_template(
     template_id: str,
     update: ApprovalTemplateUpdate,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("approvals"))
 ):
     """Update approval template"""
     db = get_db()
@@ -116,6 +120,8 @@ def update_template(
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
     
+    if "officers" in update_data:
+        update_data["officers"] = normalize_officers(db, update_data.get("officers") or [])
     update_data["updated_at"] = datetime.utcnow()
     
     result = db.approval_templates.update_one(
@@ -135,7 +141,7 @@ def update_template(
 @router.delete("/templates/{template_id}")
 def delete_template(
     template_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("approvals"))
 ):
     """Delete approval template"""
     db = get_db()
@@ -388,9 +394,9 @@ def sign_flow(
 def remove_signature(
     flow_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("approvals"))
 ):
-    """Remove signature from flow (admin only)"""
+    """Remove signature from flow"""
     db = get_db()
     
     # Get flow

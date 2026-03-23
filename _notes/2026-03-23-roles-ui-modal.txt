@@ -1,0 +1,12 @@
+Date: 2026-03-23
+Task: Roles edit modal with Menu/Rights tabs.
+Changes:
+- Added RolesPage with role CRUD plus access modal (Menu + Rights) and wider modal.
+- Menu tab uses admin menu template (fallback) with checkbox selection; Rights tab shows get/post/patch/delete/own/dep table and global access toggle.
+- Added /roles route and Role menu icon support.
+- Updated admin menu template to include Roles item.
+Files: src/frontend/src/pages/RolesPage.tsx, src/frontend/src/App.tsx, src/frontend/src/components/Layout/Navbar.tsx, _tools/migrate_roles_sections.py
+
+Notes:
+- Access modal saves sections/menu_items via PUT /api/roles/:id.
+- If admin menu in DB lacks Roles, re-run migration or edit admin menu via the new UI.

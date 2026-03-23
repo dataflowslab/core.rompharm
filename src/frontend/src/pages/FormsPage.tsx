@@ -35,6 +35,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { hasSectionPermission } from '../utils/permissions';
 import { ConfirmModal } from '../components/Common/ConfirmModal';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { TemplateSelector } from '../components/Forms/TemplateSelector';
@@ -60,7 +61,7 @@ interface Form {
 }
 
 export function FormsPage() {
-  const { isStaff } = useAuth();
+  const { roleSections } = useAuth();
   const { t } = useTranslation();
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +93,11 @@ export function FormsPage() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
+  const canViewForms = hasSectionPermission(roleSections, 'forms', 'get');
+  const canCreateForms = hasSectionPermission(roleSections, 'forms', 'post');
+  const canEditForms = hasSectionPermission(roleSections, 'forms', 'patch');
+  const canDeleteForms = hasSectionPermission(roleSections, 'forms', 'delete');
+
   const loadForms = async () => {
     try {
       const response = await api.get('/api/forms/');
@@ -101,7 +107,7 @@ export function FormsPage() {
       if (error.response?.status === 403) {
         notifications.show({
           title: t('Error'),
-          message: t('Administrator access required'),
+          message: t('Access Denied'),
           color: 'red',
         });
       } else {
@@ -117,12 +123,12 @@ export function FormsPage() {
   };
 
   useEffect(() => {
-    if (isStaff) {
+    if (canViewForms) {
       loadForms();
     } else {
       setLoading(false);
     }
-  }, [isStaff]);
+  }, [canViewForms]);
 
   const loadMailTemplates = async () => {
     try {
@@ -276,11 +282,11 @@ export function FormsPage() {
     );
   }
 
-  if (!isStaff) {
+  if (!canViewForms) {
     return (
       <Container size="md" mt={50}>
         <Alert icon={<IconAlertCircle size={16} />} title={t('Access Denied')} color="red">
-          {t('Administrator access required to view this page.')}
+          {t('Access Denied')}
         </Alert>
       </Container>
     );
@@ -301,13 +307,15 @@ export function FormsPage() {
         <Stack>
           <Group justify="space-between">
             <Title order={isMobile ? 3 : 2}>{t('Forms Management')}</Title>
-            <Button
-              leftSection={<IconPlus size={16} />}
-              onClick={openCreateModal}
-              size={isMobile ? 'sm' : 'md'}
-            >
-              {isMobile ? t('Create') : t('Create Form')}
-            </Button>
+            {canCreateForms && (
+              <Button
+                leftSection={<IconPlus size={16} />}
+                onClick={openCreateModal}
+                size={isMobile ? 'sm' : 'md'}
+              >
+                {isMobile ? t('Create') : t('Create Form')}
+              </Button>
+            )}
           </Group>
 
           {forms.length === 0 ? (
@@ -367,24 +375,28 @@ export function FormsPage() {
                             >
                               <IconEye size={isMobile ? 20 : 16} />
                             </ActionIcon>
-                            <ActionIcon
-                              variant="subtle"
-                              color="cyan"
-                              onClick={() => openEditModal(form)}
-                              title={t('Edit form')}
-                              size={isMobile ? 'lg' : 'md'}
-                            >
-                              <IconEdit size={isMobile ? 20 : 16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="subtle"
-                              color="red"
-                              onClick={() => openDeleteModal(form.id)}
-                              title={t('Delete form')}
-                              size={isMobile ? 'lg' : 'md'}
-                            >
-                              <IconTrash size={isMobile ? 20 : 16} />
-                            </ActionIcon>
+                            {canEditForms && (
+                              <ActionIcon
+                                variant="subtle"
+                                color="cyan"
+                                onClick={() => openEditModal(form)}
+                                title={t('Edit form')}
+                                size={isMobile ? 'lg' : 'md'}
+                              >
+                                <IconEdit size={isMobile ? 20 : 16} />
+                              </ActionIcon>
+                            )}
+                            {canDeleteForms && (
+                              <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                onClick={() => openDeleteModal(form.id)}
+                                title={t('Delete form')}
+                                size={isMobile ? 'lg' : 'md'}
+                              >
+                                <IconTrash size={isMobile ? 20 : 16} />
+                              </ActionIcon>
+                            )}
                           </Group>
                         </Table.Td>
                       </Table.Tr>

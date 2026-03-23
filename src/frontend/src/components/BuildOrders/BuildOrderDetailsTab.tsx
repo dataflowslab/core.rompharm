@@ -1,4 +1,4 @@
-import { Grid, Paper, Text, Stack } from '@mantine/core';
+import { Grid, Paper, Text, Stack, Group, Button, Anchor } from '@mantine/core';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
@@ -22,6 +22,7 @@ interface BuildOrder {
     name: string;
     ipn: string;
     description?: string;
+    production_step_id?: string | null;
   };
   state_detail?: {
     name: string;
@@ -48,6 +49,11 @@ export function BuildOrderDetailsTab({ buildOrder, onUpdated }: BuildOrderDetail
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [savingProduct, setSavingProduct] = useState(false);
   const [selectedProductOption, setSelectedProductOption] = useState<any | null>(null);
+  const [productionSteps, setProductionSteps] = useState<any[]>([]);
+
+  const savedProductId = buildOrder.product_id || buildOrder.product_detail?._id || null;
+  const productDirty = (selectedProductId || null) !== (savedProductId || null);
+  const productLocked = !!savedProductId && !productDirty;
 
   useEffect(() => {
     const initialProductId = buildOrder.product_id || buildOrder.product_detail?._id || null;
@@ -67,6 +73,19 @@ export function BuildOrderDetailsTab({ buildOrder, onUpdated }: BuildOrderDetail
       setParts([]);
     }
   }, [buildOrder.product_id, buildOrder.product_detail]);
+
+  useEffect(() => {
+    const loadSteps = async () => {
+      try {
+        const response = await api.get(requestsApi.getProductionSteps());
+        setProductionSteps(response.data.results || []);
+      } catch (error) {
+        console.error('Failed to load production steps:', error);
+      }
+    };
+
+    loadSteps();
+  }, []);
 
   const infoRows = useMemo(() => ([
     { label: t('Batch Code'), value: batchCode },
@@ -103,7 +122,7 @@ export function BuildOrderDetailsTab({ buildOrder, onUpdated }: BuildOrderDetail
 
   const debouncedSearchParts = debounce(searchParts, 250);
 
-  const handleProductChange = async (value: string | null) => {
+  const handleProductChange = (value: string | null) => {
     if (value === selectedProductId) {
       return;
     }
@@ -114,10 +133,16 @@ export function BuildOrderDetailsTab({ buildOrder, onUpdated }: BuildOrderDetail
     if (matchedOption) {
       setSelectedProductOption(matchedOption);
     }
+  };
+
+  const handleProductSave = async () => {
+    if (!productDirty) {
+      return;
+    }
     setSavingProduct(true);
     try {
       await api.patch(requestsApi.updateBuildOrder(buildOrder._id), {
-        product_id: value || null
+        product_id: selectedProductId || null
       });
       notifications.show({
         title: t('Success'),
@@ -138,18 +163,40 @@ export function BuildOrderDetailsTab({ buildOrder, onUpdated }: BuildOrderDetail
     }
   };
 
+  const productionStepLabel = (() => {
+    const stepId = buildOrder.product_detail?.production_step_id;
+    if (!stepId) return '-';
+    const match = productionSteps.find((step: any) => String(step._id) === String(stepId));
+    return match?.name || match?.label || match?.code || String(stepId);
+  })();
+
   return (
     <Paper p="md">
       {buildOrder.product_detail && (
         <Paper p="md" mb="md" withBorder style={{ backgroundColor: '#f8f9fa' }}>
-          <Text size="lg" fw={600} mb="xs">
-            {buildOrder.product_detail.name} ({buildOrder.product_detail.ipn})
-          </Text>
+          <Group gap="xs" align="center" mb="xs">
+            <Text size="lg" fw={600}>
+              {buildOrder.product_detail.name} ({buildOrder.product_detail.ipn})
+            </Text>
+            {(buildOrder.product_detail._id || buildOrder.product_id) && (
+              <Anchor
+                href={`/web/inventory/articles/${buildOrder.product_detail._id || buildOrder.product_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                size="xs"
+              >
+                {t('View product')}
+              </Anchor>
+            )}
+          </Group>
           {buildOrder.product_detail.description && (
             <Text size="sm" c="dimmed">
               {buildOrder.product_detail.description}
             </Text>
           )}
+          <Text size="sm" c="dimmed" mt={6}>
+            {t('Production step')}: {productionStepLabel}
+          </Text>
         </Paper>
       )}
 
@@ -162,23 +209,33 @@ export function BuildOrderDetailsTab({ buildOrder, onUpdated }: BuildOrderDetail
             </Stack>
           </Grid.Col>
         ))}
-        <Grid.Col span={6}>
-          <SafeSelect
-            label={t('Product')}
-            placeholder={t('Select production product')}
-            data={parts}
-            value={selectedProductId || undefined}
-            onChange={handleProductChange}
-            onSearchChange={(query) => {
-              setPartSearch(query);
-              debouncedSearchParts(query);
-            }}
-            searchValue={partSearch}
-            searchable
-            clearable
-            disabled={savingProduct}
-            labelKey="label"
-          />
+        <Grid.Col span={8}>
+          <Group align="flex-end" gap="sm" wrap="nowrap">
+            <SafeSelect
+              label={t('Product')}
+              placeholder={t('Select production product')}
+              data={parts}
+              value={selectedProductId || undefined}
+              onChange={handleProductChange}
+              onSearchChange={(query) => {
+                setPartSearch(query);
+                debouncedSearchParts(query);
+              }}
+              searchValue={partSearch}
+              searchable
+              clearable
+              disabled={savingProduct || productLocked}
+              labelKey="label"
+              style={{ flex: 1 }}
+            />
+            <Button
+              onClick={handleProductSave}
+              loading={savingProduct}
+              disabled={!productDirty}
+            >
+              {t('Save')}
+            </Button>
+          </Group>
         </Grid.Col>
         {groupCodes.length > 0 && (
           <Grid.Col span={12}>

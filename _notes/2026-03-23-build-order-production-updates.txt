@@ -1,0 +1,9 @@
+Date: 2026-03-23
+Task: Build order production workflow updates (per-batch save, product step, sequential batches)
+
+Changes:
+- Added production step selection to article details (stored on product) and display it on build order details.
+- Build order production: per-series Save endpoint with signed-only enforcement and stock movements on save.
+- Series UI: per-batch Save button, editable until saved, sequential activation, and real-time available qty from prior batches.
+- Added Campaign badge and product name in build order header; Production tab gated until product saved.
+- Fixed admin/staff signing authorization handling in approval helpers.

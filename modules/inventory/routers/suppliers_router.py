@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 
 router = APIRouter(tags=["suppliers"])
 
@@ -46,7 +46,7 @@ async def get_suppliers(
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/suppliers"))
 ):
     """Get list of suppliers (companies with is_supplier=true)"""
     from ..services import get_suppliers_list
@@ -57,7 +57,7 @@ async def get_suppliers(
 async def get_supplier(
     request: Request,
     supplier_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/suppliers"))
 ):
     """Get a specific supplier by ID"""
     from ..services import get_supplier_by_id
@@ -68,7 +68,7 @@ async def get_supplier(
 async def create_supplier(
     request: Request,
     supplier_data: SupplierCreateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/suppliers"))
 ):
     """Create a new supplier"""
     from ..services import create_supplier as create_supplier_service
@@ -80,7 +80,7 @@ async def update_supplier(
     request: Request,
     supplier_id: str,
     supplier_data: SupplierUpdateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/suppliers"))
 ):
     """Update an existing supplier"""
     from ..services import update_supplier as update_supplier_service
@@ -92,7 +92,7 @@ async def update_supplier(
 async def delete_supplier(
     request: Request,
     supplier_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/suppliers"))
 ):
     """Delete a supplier"""
     from ..services import delete_supplier as delete_supplier_service
@@ -106,7 +106,7 @@ async def get_manufacturers(
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/manufacturers"))
 ):
     """Get list of manufacturers (companies with is_manufacturer=true)"""
     from ..services import get_manufacturers_list
@@ -117,7 +117,7 @@ async def get_manufacturers(
 async def get_manufacturer(
     request: Request,
     manufacturer_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/manufacturers"))
 ):
     """Get a specific manufacturer by ID"""
     from ..services import get_supplier_by_id
@@ -128,7 +128,7 @@ async def get_manufacturer(
 async def create_manufacturer(
     request: Request,
     manufacturer_data: SupplierCreateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/manufacturers"))
 ):
     """Create a new manufacturer"""
     from ..services import create_supplier as create_supplier_service
@@ -140,7 +140,7 @@ async def update_manufacturer(
     request: Request,
     manufacturer_id: str,
     manufacturer_data: SupplierUpdateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/manufacturers"))
 ):
     """Update an existing manufacturer"""
     from ..services import update_supplier as update_supplier_service
@@ -152,7 +152,7 @@ async def update_manufacturer(
 async def delete_manufacturer(
     request: Request,
     manufacturer_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/manufacturers"))
 ):
     """Delete a manufacturer"""
     from ..services import delete_supplier as delete_supplier_service
@@ -166,7 +166,7 @@ async def get_clients(
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/clients"))
 ):
     """Get list of clients (companies with is_client=true)"""
     from ..services import get_clients_list
@@ -177,7 +177,7 @@ async def get_clients(
 async def get_client(
     request: Request,
     client_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/clients"))
 ):
     """Get a specific client by ID"""
     from ..services import get_supplier_by_id
@@ -188,7 +188,7 @@ async def get_client(
 async def create_client(
     request: Request,
     client_data: SupplierCreateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/clients"))
 ):
     """Create a new client"""
     from ..services import create_supplier as create_supplier_service
@@ -200,7 +200,7 @@ async def update_client(
     request: Request,
     client_id: str,
     client_data: SupplierUpdateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/clients"))
 ):
     """Update an existing client"""
     from ..services import update_supplier as update_supplier_service
@@ -212,7 +212,7 @@ async def update_client(
 async def delete_client(
     request: Request,
     client_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/clients"))
 ):
     """Delete a client"""
     from ..services import delete_supplier as delete_supplier_service

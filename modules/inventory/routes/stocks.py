@@ -7,7 +7,7 @@ from datetime import datetime
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 from .utils import serialize_doc, StockCreateRequest, StockUpdateRequest
 
 router = APIRouter()
@@ -27,7 +27,7 @@ async def get_stocks(
     has_expiry: Optional[bool] = Query(None),  # Filter by expiry date existence
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/stocks")),
     db = Depends(get_db)
 ):
     """Get list of stocks with enriched data"""
@@ -51,7 +51,7 @@ async def get_stocks(
 async def get_stock(
     request: Request,
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Get a specific stock entry with enriched data"""
     from modules.inventory.services import get_stock_by_id
@@ -62,7 +62,7 @@ async def get_stock(
 async def create_stock(
     request: Request,
     stock_data: StockCreateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Create a new stock item"""
     db = get_db()
@@ -137,7 +137,7 @@ async def update_stock(
     request: Request,
     stock_id: str,
     stock_data: StockUpdateRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Update stock QC information"""
     db = get_db()
@@ -195,7 +195,7 @@ async def update_stock(
 @router.get("/stock-states")
 async def get_stock_states(
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/stocks")),
     db = Depends(get_db)
 ):
     """Get list of stock states from depo_stocks_states"""
@@ -212,7 +212,7 @@ async def get_stock_states(
 async def get_stock_approval_flow_endpoint(
     request: Request,
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Get approval flow for a stock item"""
     from modules.inventory.services import get_stock_approval_flow
@@ -223,7 +223,7 @@ async def get_stock_approval_flow_endpoint(
 async def create_stock_approval_flow_endpoint(
     request: Request,
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Create approval flow for a stock item"""
     from modules.inventory.services import create_stock_approval_flow
@@ -234,7 +234,7 @@ async def create_stock_approval_flow_endpoint(
 async def sign_stock_qc_endpoint(
     request: Request,
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Sign BA Rompharm for a stock item"""
     from modules.inventory.services import sign_stock_qc
@@ -257,7 +257,7 @@ async def remove_stock_signature_endpoint(
     request: Request,
     stock_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Remove signature from stock QC approval flow"""
     from modules.inventory.services import remove_stock_signature
@@ -268,7 +268,7 @@ async def remove_stock_signature_endpoint(
 async def sign_stock_qa_endpoint(
     request: Request,
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Sign QA Rompharm for a stock item"""
     from modules.inventory.services import sign_stock_qa
@@ -292,7 +292,7 @@ async def remove_stock_qa_signature_endpoint(
     request: Request,
     stock_id: str,
     user_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Remove QA signature from stock"""
     from modules.inventory.services import remove_stock_qa_signature
@@ -303,7 +303,7 @@ async def remove_stock_qa_signature_endpoint(
 async def update_stock_transactionable_endpoint(
     request: Request,
     stock_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("inventory/stocks"))
 ):
     """Update transactionable status for stock in quarantine"""
     from modules.inventory.services import update_stock_transactionable

@@ -8,14 +8,14 @@ from datetime import datetime
 
 from src.backend.utils.db import get_db
 from src.backend.models.user_model import RoleCreate, RoleUpdate
-from src.backend.routes.auth import verify_admin
+from src.backend.utils.sections_permissions import require_section
 
 router = APIRouter(prefix="/api/roles", tags=["roles"])
 
 
 @router.get("/")
 def list_roles(
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("roles"))
 ):
     """List all roles"""
     db = get_db()
@@ -33,26 +33,10 @@ def list_roles(
     return {"results": roles}
 
 
-@router.get("/permissions/items")
-def list_permission_items(
-    current_user: dict = Depends(verify_admin)
-):
-    """List all available permission items from roles_items collection"""
-    db = get_db()
-    roles_items_collection = db['roles_items']
-    
-    items = list(roles_items_collection.find().sort('slug', 1))
-    
-    for item in items:
-        item['_id'] = str(item['_id'])
-    
-    return {"results": items}
-
-
 @router.get("/{role_id}")
 def get_role(
     role_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("roles"))
 ):
     """Get role by ID"""
     db = get_db()
@@ -79,7 +63,7 @@ def get_role(
 @router.post("/")
 def create_role(
     role_data: RoleCreate,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("roles"))
 ):
     """Create new role"""
     db = get_db()
@@ -95,6 +79,8 @@ def create_role(
         'name': role_data.name,
         'slug': role_data.slug,
         'description': role_data.description,
+        'sections': role_data.sections or {},
+        'menu_items': role_data.menu_items or [],
         'created_at': datetime.utcnow(),
         'updated_at': datetime.utcnow()
     }
@@ -111,7 +97,7 @@ def create_role(
 def update_role(
     role_id: str,
     role_data: RoleUpdate,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("roles"))
 ):
     """Update role"""
     db = get_db()
@@ -145,8 +131,10 @@ def update_role(
         update_data['slug'] = role_data.slug
     if role_data.description is not None:
         update_data['description'] = role_data.description
-    if role_data.items is not None:
-        update_data['items'] = role_data.items
+    if role_data.sections is not None:
+        update_data['sections'] = role_data.sections
+    if role_data.menu_items is not None:
+        update_data['menu_items'] = role_data.menu_items
     
     # Update
     roles_collection.update_one(
@@ -162,7 +150,7 @@ def update_role(
 @router.delete("/{role_id}")
 def delete_role(
     role_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("roles"))
 ):
     """Delete role"""
     db = get_db()

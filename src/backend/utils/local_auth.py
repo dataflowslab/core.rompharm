@@ -121,6 +121,8 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
     
     # Get role info
     role_data = None
+    role_sections = {}
+    role_menu_items = []
     if user.get('role'):
         roles_collection = db['roles']
         role = roles_collection.find_one({'_id': ObjectId(user['role'])})
@@ -129,8 +131,11 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
                 '_id': str(role['_id']),
                 'name': role.get('name'),
                 'slug': role.get('slug'),
-                'items': role.get('items', [])  # Permission items
+                'sections': role.get('sections', {}) or {},
+                'menu_items': role.get('menu_items', []) or []
             }
+            role_sections = role_data.get('sections', {}) or {}
+            role_menu_items = role_data.get('menu_items', []) or []
     
     # Return user data
     display_name = user.get('name') or f"{user.get('firstname', '')} {user.get('lastname', '')}".strip()
@@ -146,6 +151,8 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
         'mobile': user.get('mobile', True),  # Default True as requested
         'locations': _normalize_locations(user.get('locations')),
         'role': role_data,
+        'role_sections': role_sections,
+        'role_menu_items': role_menu_items,
         'local_role': user.get('local_role'),
         'quick_actions': user.get('quick_actions') or [],
         'token': token,
@@ -181,6 +188,8 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
     
     # Get role info
     role_data = None
+    role_sections = {}
+    role_menu_items = []
     if user.get('role'):
         roles_collection = db['roles']
         try:
@@ -190,8 +199,11 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                     '_id': str(role['_id']),
                     'name': role.get('name'),
                     'slug': role.get('slug'),
-                    'items': role.get('items', [])  # Permission items
+                    'sections': role.get('sections', {}) or {},
+                    'menu_items': role.get('menu_items', []) or []
                 }
+                role_sections = role_data.get('sections', {}) or {}
+                role_menu_items = role_data.get('menu_items', []) or []
         except:
             pass
     
@@ -204,11 +216,12 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         'lastname': user.get('lastname', ''),
         'name': display_name,
         'email': user.get('email'),
-        'is_staff': user.get('is_staff', False),
         'is_active': user.get('is_active', True),
         'mobile': user.get('mobile', True),  # Default True as requested
         'locations': _normalize_locations(user.get('locations')),
         'role': role_data,
+        'role_sections': role_sections,
+        'role_menu_items': role_menu_items,
         'local_role': user.get('local_role'),
         'quick_actions': user.get('quick_actions') or []
     }
@@ -223,7 +236,6 @@ def create_user(
     role_id: str,
     email: Optional[str] = None,
     phone: Optional[str] = None,
-    is_staff: bool = False,
     is_active: bool = True,
     mobile: bool = True,
     locations: Optional[list[str]] = None
@@ -256,7 +268,6 @@ def create_user(
         'role': ObjectId(role_id),  # Use 'role' not 'role_id'
         'email': email,
         'phone': phone,
-        'is_staff': is_staff,
         'is_active': is_active,
         'mobile': mobile,
         'created_at': datetime.utcnow(),

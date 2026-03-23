@@ -7,6 +7,7 @@ import { IconDeviceFloppy, IconCheck, IconAlertCircle } from '@tabler/icons-reac
 import { DocumentManager } from '../Common/DocumentManager';
 import { SafeSelect } from '../Common/SafeSelect';
 import { useAuth } from '../../context/AuthContext';
+import { hasSectionPermission } from '../../utils/permissions';
 import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 import { formatDateTime } from '../../utils/dateFormat';
@@ -72,13 +73,13 @@ interface DetailsTabProps {
 
 export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUpdate, orderStateId }: DetailsTabProps) {
   const { t } = useTranslation();
-  const { username, isStaff } = useAuth();
+  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
 
   // Check if order is in FINISHED or CANCELLED state (cannot modify signatures)
   const FINISHED_STATE = '6943a4a6451609dd8a618ce3';
   const CANCELLED_STATE = '6943a4a6451609dd8a618ce2';
   const isOrderLocked = orderStateId === FINISHED_STATE || orderStateId === CANCELLED_STATE;
-  const canRemoveSignatures = isStaff && !isOrderLocked;
+  const canRemoveSignatures = hasSectionPermission(roleSections, 'procurement', 'delete') && !isOrderLocked;
   const [saving, setSaving] = useState(false);
   const [documentTemplates, setDocumentTemplates] = useState<Array<{ code: string; name: string; label: string }>>([]);
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
@@ -293,9 +294,23 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
       return false;
     }
 
-    // Check if user is authorized to sign
     const allOfficers = [...flow.required_officers, ...flow.optional_officers];
-    return allOfficers.length > 0;
+    const normalize = (value?: string | null) => (value || '').toString().trim().toLowerCase();
+
+    const matchesOfficer = (officer: any) => {
+      if (officer?.type === 'person') {
+        if (userId && officer.reference === userId) return true;
+        if (username && officer.username && officer.username === username) return true;
+      }
+      if (officer?.type === 'role') {
+        if (localRole && officer.reference === localRole) return true;
+        if (roleSlug && normalize(officer.reference) === normalize(roleSlug)) return true;
+        if (localRole && normalize(officer.reference) === normalize(localRole)) return true;
+      }
+      return false;
+    };
+
+    return allOfficers.some(matchesOfficer);
   };
 
   const getStatusColor = (status: string) => {

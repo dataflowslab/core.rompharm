@@ -44,6 +44,7 @@ class ArticleCreateRequest(BaseModel):
     is_salable: bool = False
     is_active: bool = True
     loss_rate_threshold: Optional[float] = None
+    production_step_id: Optional[str] = None
 
 
 class ArticleUpdateRequest(BaseModel):
@@ -74,6 +75,7 @@ class ArticleUpdateRequest(BaseModel):
     total_delivery_time: Optional[int] = None
     payment_condition: Optional[int] = None
     loss_rate_threshold: Optional[float] = None
+    production_step_id: Optional[str] = None
 
 
 class ArticleSupplierRequest(BaseModel):

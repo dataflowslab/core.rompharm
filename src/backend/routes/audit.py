@@ -7,7 +7,7 @@ from datetime import datetime
 
 from src.backend.utils.db import get_db
 from src.backend.models.audit_log_model import AuditLogModel
-from src.backend.routes.auth import verify_admin
+from src.backend.utils.sections_permissions import require_section
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
@@ -21,7 +21,7 @@ def get_audit_logs(
     search: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    user = Depends(verify_admin)
+    user = Depends(require_section("audit"))
 ) -> Dict[str, Any]:
     """
     Get audit logs with pagination and filtering
@@ -93,7 +93,7 @@ def get_audit_logs(
 
 
 @router.get("/actions")
-def get_available_actions(user = Depends(verify_admin)) -> List[str]:
+def get_available_actions(user = Depends(require_section("audit"))) -> List[str]:
     """
     Get list of all available action types
     Requires administrator access

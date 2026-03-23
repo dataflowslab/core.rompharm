@@ -70,6 +70,9 @@ export const requestsApi = {
   saveBuildOrderProduction: (id: string) => `${API_PREFIX}/build-orders/${id}/production`,
   getBuildOrderProductionFlow: (id: string) => `${API_PREFIX}/build-orders/${id}/production-flow`,
   signBuildOrderSeries: (id: string) => `${API_PREFIX}/build-orders/${id}/production-series-sign`,
+  saveBuildOrderSeries: (id: string) => `${API_PREFIX}/build-orders/${id}/production-series-save`,
+  getBuildOrderProductionRemaining: (id: string) => `${API_PREFIX}/build-orders/${id}/production-remaining`,
+  createBuildOrderReturnOrders: (id: string) => `${API_PREFIX}/build-orders/${id}/production-return`,
   // Transfer
   executeTransfer: (requestId: string) => `${API_PREFIX}/${requestId}/execute-transfer`,
 };

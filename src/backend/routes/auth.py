@@ -9,6 +9,7 @@ from bson import ObjectId
 from src.backend.services.auth_service import AuthService
 # Use absolute imports
 from src.backend.utils.db import get_db
+from src.backend.utils.sections_permissions import get_role_sections, get_role_menu_items
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -19,7 +20,6 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     token: str
     username: str
-    is_staff: bool
     name: Optional[str] = None
     message: str
 
@@ -110,9 +110,6 @@ def verify_admin(authorization: Optional[str] = Header(None)):
     Dependency to verify user is administrator
     """
     user = verify_token(authorization)
-    
-    if user.get('is_staff', False):
-        return user
 
     role_value = user.get('role') or user.get('local_role')
     if role_value:
@@ -137,8 +134,7 @@ def verify(user = Depends(verify_token)):
     return {
         'valid': True,
         'username': user['username'],
-        'name': user.get('name'),
-        'is_staff': user.get('is_staff', False)
+        'name': user.get('name')
     }
 
 
@@ -162,15 +158,17 @@ def get_current_user(user = Depends(verify_token)):
 
     locations = user.get('locations') or []
     default_location = locations[0] if locations else None
+    role_sections = get_role_sections(db, user)
+    role_menu_items = get_role_menu_items(db, user)
 
     return {
         '_id': str(user['_id']),
         'username': user['username'],
         'name': user.get('name'),
-        'is_staff': user.get('is_staff', False),
-        'staff': user.get('is_staff', False),
         'local_role': user.get('local_role'),
         'role_slug': role_slug,
+        'role_sections': role_sections,
+        'role_menu_items': role_menu_items,
         'locations': locations,
         'default_location': default_location,
         'quick_actions': user.get('quick_actions') or []
@@ -180,13 +178,13 @@ def get_current_user(user = Depends(verify_token)):
 @router.post("/refresh-status")
 def refresh_status(user = Depends(verify_token)):
     """
-    Refresh user's staff status
-    For localhost mode, staff status is managed locally in the database
+    Refresh user's role status
+    For localhost mode, role status is managed locally in the database
     """
     return {
         'username': user['username'],
-        'is_staff': user.get('is_staff', False),
-        'message': 'Staff status is managed locally'
+        'role': user.get('role') or user.get('local_role'),
+        'message': 'Role status is managed locally'
     }
 
 

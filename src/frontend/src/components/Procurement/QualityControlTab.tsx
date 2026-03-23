@@ -7,6 +7,8 @@ import api from '../../services/api';
 import { procurementApi } from '../../services/procurement';
 import { notifications } from '@mantine/notifications';
 import { formatDate } from '../../utils/dateFormat';
+import { useAuth } from '../../context/AuthContext';
+import { hasSectionPermission } from '../../utils/permissions';
 
 interface QCRecord {
   _id: string;
@@ -48,6 +50,7 @@ interface QualityControlTabProps {
 
 export function QualityControlTab({ orderId }: QualityControlTabProps) {
   const { t } = useTranslation();
+  const { roleSections } = useAuth();
   const [qcRecords, setQcRecords] = useState<QCRecord[]>([]);
   const [receivedItems, setReceivedItems] = useState<ReceivedItem[]>([]);
   const [qcModalOpened, setQcModalOpened] = useState(false);
@@ -57,7 +60,10 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
   // Order state management
   const [orderState, setOrderState] = useState<string>('Finished');
   const [savingState, setSavingState] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  const canCreateQc = hasSectionPermission(roleSections, 'procurement', 'post');
+  const canUpdateQc = hasSectionPermission(roleSections, 'procurement', 'patch');
+  const canChangeOrderState = canUpdateQc;
 
   // Form state for QC record
   const [qcData, setQcData] = useState({
@@ -79,17 +85,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
   useEffect(() => {
     loadQCRecords();
     loadReceivedItems();
-    loadCurrentUser();
   }, [orderId]);
-  
-  const loadCurrentUser = async () => {
-    try {
-      const response = await api.get('/api/auth/me');
-      setCurrentUser(response.data);
-    } catch (error) {
-      console.error('Failed to load current user:', error);
-    }
-  };
 
   const loadQCRecords = async () => {
     try {
@@ -388,6 +384,14 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
   };
   
   const handleSaveOrderState = async () => {
+    if (!canChangeOrderState) {
+      notifications.show({
+        title: t('Error'),
+        message: t('Access Denied'),
+        color: 'red'
+      });
+      return;
+    }
     setSavingState(true);
     try {
       await api.patch(`/modules/depo_procurement/api/purchase-orders/${orderId}/state`, null, {
@@ -410,15 +414,6 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
       setSavingState(false);
     }
   };
-  
-  // Check if user can change order state (admin or qc role)
-  const canChangeOrderState = () => {
-    if (!currentUser) return false;
-    const isAdmin = currentUser.is_staff || currentUser.is_superuser || false;
-    // Check if user has QC role (you may need to adjust this based on your role structure)
-    const hasQCRole = currentUser.role_name === 'QC' || currentUser.role_slug === 'qc';
-    return isAdmin || hasQCRole;
-  };
 
   return (
     <Paper p="md" withBorder>
@@ -427,7 +422,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
         <Button 
           leftSection={<IconPlus size={16} />}
           onClick={() => setQcModalOpened(true)}
-          disabled={batchCodes.length === 0}
+          disabled={batchCodes.length === 0 || !canCreateQc}
         >
           {t('New QC Record')}
         </Button>
@@ -469,7 +464,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
                 <Table.Td>{getTransactionableBadge(record.transactionable)}</Table.Td>
                 <Table.Td>{record.comment || '-'}</Table.Td>
                 <Table.Td>
-                  {!record.confirmed && (
+                  {!record.confirmed && canUpdateQc && (
                     <ActionIcon
                       variant="subtle"
                       color="blue"
@@ -487,7 +482,7 @@ export function QualityControlTab({ orderId }: QualityControlTabProps) {
       )}
 
       {/* Order State Management - Only for Admin/QC */}
-      {canChangeOrderState() && (
+      {canChangeOrderState && (
         <Paper p="md" withBorder mt="xl">
           <Title order={5} mb="md">{t('Order State Management')}</Title>
           <Text size="sm" c="dimmed" mb="md">

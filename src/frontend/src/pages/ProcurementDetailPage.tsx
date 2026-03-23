@@ -21,6 +21,8 @@ import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import api from '../services/api';
 import { procurementApi } from '../services/procurement';
+import { useAuth } from '../context/AuthContext';
+import { hasSectionPermission } from '../utils/permissions';
 import { 
   DetailsTab, 
   ReceivedStockTab,
@@ -117,8 +119,8 @@ export function ProcurementDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { userId, roleSections } = useAuth();
+  const canEditOrders = hasSectionPermission(roleSections, 'procurement', 'patch');
   
   const [order, setOrder] = useState<PurchaseOrder | null>(null);
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
@@ -127,18 +129,6 @@ export function ProcurementDetailPage() {
   const [approvalFlow, setApprovalFlow] = useState<ApprovalFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string | null>('details');
-
-  useEffect(() => {
-    // Load current user info
-    api.get('/api/auth/me')
-      .then(response => {
-        setCurrentUserId(response.data._id);
-        setIsAdmin(response.data.is_staff || response.data.staff || false);
-      })
-      .catch(error => {
-        console.error('Failed to load user info:', error);
-      });
-  }, []);
 
   useEffect(() => {
     if (id) {
@@ -231,8 +221,8 @@ export function ProcurementDetailPage() {
     }
 
     console.log('[canEdit] Checking permissions:', {
-      isAdmin,
-      currentUserId,
+      canEditOrders,
+      currentUserId: userId,
       orderCreatedBy: order.created_by,
       orderStateId: order.state_id,
       orderStateName: order.state_detail?.name,
@@ -244,7 +234,7 @@ export function ProcurementDetailPage() {
     // PENDING state = can edit, ISSUED/PROCESSING/FINISHED = signed = cannot edit
     if (!order.state_id) {
       console.log('[canEdit] No state_id, assuming can edit');
-      return isAdmin || (!approvalFlow || approvalFlow.signatures.length === 0);
+      return canEditOrders && (!approvalFlow || approvalFlow.signatures.length === 0);
     }
 
     if (order.state_id !== PURCHASE_ORDER_STATES.PENDING) {
@@ -252,16 +242,10 @@ export function ProcurementDetailPage() {
       return false;
     }
 
-    // Admin can edit pending orders
-    if (isAdmin) {
-      console.log('[canEdit] User is admin - CAN EDIT');
-      return true;
-    }
-
     // If no approval flow exists yet, or no signatures, creator can edit
     if (!approvalFlow || approvalFlow.signatures.length === 0) {
       console.log('[canEdit] No signatures - CAN EDIT');
-      return true;
+      return canEditOrders;
     }
 
     console.log('[canEdit] Has signatures - CANNOT EDIT');

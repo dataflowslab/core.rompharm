@@ -28,6 +28,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { hasSectionPermission } from '../utils/permissions';
 import { ConfirmModal } from '../components/Common/ConfirmModal';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
@@ -47,7 +48,7 @@ interface Template {
 export function DataListPage() {
   const { formId } = useParams<{ formId: string }>();
   const navigate = useNavigate();
-  const { isStaff } = useAuth();
+  const { roleSections } = useAuth();
   const { t } = useTranslation();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +75,7 @@ export function DataListPage() {
       if (error.response?.status === 403) {
         notifications.show({
           title: t('Error'),
-          message: t('Administrator access required'),
+          message: t('Access Denied'),
           color: 'red',
         });
       } else {
@@ -89,13 +90,16 @@ export function DataListPage() {
     }
   };
 
+  const canViewSubmissions = hasSectionPermission(roleSections, 'forms', 'get');
+  const canDeleteSubmissions = hasSectionPermission(roleSections, 'forms', 'delete');
+
   useEffect(() => {
-    if (isStaff) {
+    if (canViewSubmissions) {
       loadSubmissions();
     } else {
       setLoading(false);
     }
-  }, [formId, isStaff]);
+  }, [formId, canViewSubmissions]);
 
   const handleViewSubmission = (submission: Submission) => {
     setSelectedSubmission(submission);
@@ -189,11 +193,11 @@ export function DataListPage() {
     );
   }
 
-  if (!isStaff) {
+  if (!canViewSubmissions) {
     return (
       <Container size="md" mt={50}>
         <Alert icon={<IconAlertCircle size={16} />} title={t('Access Denied')} color="red">
-          {t('Administrator access required to view submissions.')}
+          {t('Access Denied')}
         </Alert>
       </Container>
     );
@@ -279,15 +283,17 @@ export function DataListPage() {
                             </ActionIcon>
                           ))}
                           
-                          <ActionIcon
-                            variant="subtle"
-                            color="red"
-                            onClick={() => openDeleteModal(submission.id)}
-                            title={t('Delete submission')}
-                            size={isMobile ? 'lg' : 'md'}
-                          >
-                            <IconTrash size={isMobile ? 20 : 16} />
-                          </ActionIcon>
+                          {canDeleteSubmissions && (
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              onClick={() => openDeleteModal(submission.id)}
+                              title={t('Delete submission')}
+                              size={isMobile ? 'lg' : 'md'}
+                            >
+                              <IconTrash size={isMobile ? 20 : 16} />
+                            </ActionIcon>
+                          )}
                         </Group>
                       </Table.Td>
                     </Table.Tr>

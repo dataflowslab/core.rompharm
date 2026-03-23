@@ -7,11 +7,17 @@ from bson import ObjectId
 from typing import Optional, Any
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_admin, verify_token
-from src.backend.utils.approval_helpers import check_user_can_sign
+from src.backend.utils.sections_permissions import (
+    require_section,
+    get_section_permissions,
+    apply_scope_to_query,
+    is_doc_in_scope
+)
+from src.backend.utils.approval_helpers import check_user_can_sign, normalize_officers
 from src.backend.models.approval_flow_model import ApprovalFlowModel
 
 from .build_orders_helpers import normalize_batch_code
+from .utils import generate_request_reference
 
 
 router = APIRouter(prefix="/build-orders", tags=["build-orders"])
@@ -65,6 +71,111 @@ def _fix_oid(value: Any):
     if isinstance(value, dict):
         return {k: _fix_oid(v) for k, v in value.items()}
     return value
+
+
+def _ensure_build_order_scope(db, current_user: dict, build_order: dict) -> None:
+    perms = get_section_permissions(db, current_user, "build-orders")
+    if not is_doc_in_scope(db, current_user, perms, build_order, created_by_field="created_by"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _get_product_step_id(db, build_order: dict) -> Optional[str]:
+    product_id = build_order.get("product_id")
+    if not product_id:
+        return None
+    try:
+        product_oid = ObjectId(product_id) if isinstance(product_id, str) else product_id
+    except Exception:
+        return None
+    product = db.depo_parts.find_one({"_id": product_oid})
+    if not product:
+        return None
+    step_id = product.get("production_step_id")
+    if not step_id:
+        return None
+    return str(step_id)
+
+
+def _apply_series_defaults(series: list, default_step_id: Optional[str]):
+    for serie in series:
+        if default_step_id:
+            serie["production_step_id"] = default_step_id
+        else:
+            if isinstance(serie.get("production_step_id"), ObjectId):
+                serie["production_step_id"] = str(serie.get("production_step_id"))
+        if "saved_at" in serie and isinstance(serie["saved_at"], datetime):
+            serie["saved_at"] = serie["saved_at"].isoformat()
+    return series
+
+
+def _signature_matches_officer(db, signature: dict, officer: dict) -> bool:
+    if officer.get("type") == "person":
+        return signature.get("user_id") == officer.get("reference")
+    if officer.get("type") != "role":
+        return False
+
+    role_reference = officer.get("reference")
+    role_id = None
+    if isinstance(role_reference, str) and ObjectId.is_valid(role_reference):
+        role_id = str(role_reference)
+    else:
+        role = db.roles.find_one({"slug": role_reference})
+        if role:
+            role_id = str(role.get("_id"))
+    if not role_id:
+        return False
+
+    try:
+        user = db.users.find_one({"_id": ObjectId(signature.get("user_id"))})
+    except Exception:
+        user = None
+    if not user:
+        return False
+    user_role = user.get("role") or user.get("local_role")
+    if not user_role:
+        return False
+    return str(user_role) == role_id
+
+
+def _is_serie_completed(db, flow: dict, signatures: list) -> bool:
+    if not flow:
+        return False
+    must_sign = flow.get("must_sign_officers", []) or []
+    can_sign = flow.get("can_sign_officers", []) or []
+    min_signatures = int(flow.get("min_signatures", 1) or 0)
+    if not can_sign:
+        min_signatures = 0
+
+    from src.backend.utils.approval_helpers import check_approval_completion
+    required_ok, _, _ = check_approval_completion(db, must_sign, signatures)
+
+    optional_count = 0
+    for signature in signatures:
+        if any(_signature_matches_officer(db, signature, officer) for officer in can_sign):
+            optional_count += 1
+    has_min = optional_count >= min_signatures
+
+    return required_ok and has_min
+
+
+def _build_officers_from_template(db, template: dict) -> tuple[list, list]:
+    can_sign_officers = []
+    must_sign_officers = []
+    for officer in template.get("officers", []) or []:
+        entry = {
+            "type": officer.get("type", "person"),
+            "reference": officer.get("reference", ""),
+            "username": officer.get("username", ""),
+            "action": officer.get("action", "can_sign")
+        }
+        action = str(entry.get("action") or "can_sign").strip().lower()
+        if action == "must_sign":
+            must_sign_officers.append(entry)
+        else:
+            can_sign_officers.append(entry)
+    can_sign_officers = normalize_officers(db, can_sign_officers)
+    must_sign_officers = normalize_officers(db, must_sign_officers)
+    return can_sign_officers, must_sign_officers
 
 
 def _match_prefix(batch_codes: list, prefix: str) -> bool:
@@ -129,7 +240,7 @@ def _build_requests_by_prefix(db, prefixes: set[str]):
 
 @router.get("/states")
 async def get_build_states(
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("build-orders"))
 ):
     db = get_db()
     states = list(db.depo_build_states.find().sort('order', 1))
@@ -147,7 +258,7 @@ async def list_build_orders(
     date_to: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("build-orders"))
 ):
     db = get_db()
     build_orders_collection = db["depo_build_orders"]
@@ -159,6 +270,7 @@ async def list_build_orders(
         except Exception:
             query["state_id"] = state_id
 
+    date_query = None
     if date_from or date_to:
         date_query = {}
         if date_from:
@@ -171,8 +283,11 @@ async def list_build_orders(
                 date_query["$lte"] = datetime.fromisoformat(f"{date_to}T23:59:59")
             except Exception:
                 pass
-        if date_query:
-            query["created_at"] = date_query
+    if date_query:
+        query["created_at"] = date_query
+
+    perms = get_section_permissions(db, current_user, "build-orders")
+    query = apply_scope_to_query(db, current_user, perms, query, created_by_field="created_by")
 
     build_orders = list(
         build_orders_collection
@@ -291,7 +406,7 @@ async def list_build_orders(
 @router.get("/{build_order_id}")
 async def get_build_order(
     build_order_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("build-orders"))
 ):
     db = get_db()
     try:
@@ -303,6 +418,16 @@ async def get_build_order(
     if not build_order:
         raise HTTPException(status_code=404, detail="Build order not found")
 
+    _ensure_build_order_scope(db, current_user, build_order)
+
+    _ensure_build_order_scope(db, current_user, build_order)
+
+    _ensure_build_order_scope(db, current_user, build_order)
+
+    _ensure_build_order_scope(db, current_user, build_order)
+
+    _ensure_build_order_scope(db, current_user, build_order)
+
     build_order = _fix_oid(build_order)
 
     if build_order.get("product_id"):
@@ -312,7 +437,8 @@ async def get_build_order(
                 "_id": str(product["_id"]),
                 "name": product.get("name"),
                 "ipn": product.get("ipn"),
-                "description": product.get("description", "")
+                "description": product.get("description", ""),
+                "production_step_id": str(product.get("production_step_id")) if product.get("production_step_id") else None
             }
 
     if build_order.get("location_id"):
@@ -333,6 +459,9 @@ async def get_build_order(
                 "slug": state.get("slug", "")
             }
 
+    group_codes = build_order.get("grup", {}).get("batch_codes") or []
+    build_order["campaign"] = len(group_codes) > 1
+
     return build_order
 
 
@@ -340,7 +469,7 @@ async def get_build_order(
 async def update_build_order(
     build_order_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("build-orders"))
 ):
     db = get_db()
     try:
@@ -397,6 +526,8 @@ def _build_materials_from_requests(db, requests_list: list) -> list:
         req_id = str(req["_id"])
         req_reference = req.get("reference")
         req_issue_date = req.get("issue_date")
+        req_source = req.get("source")
+        req_destination = req.get("destination")
         for index, item in enumerate(req.get("items", []) or []):
             part_id = item.get("part")
             part_name = part_map.get(str(part_id), "")
@@ -409,7 +540,9 @@ def _build_materials_from_requests(db, requests_list: list) -> list:
                 "request_id": req_id,
                 "request_reference": req_reference,
                 "request_issue_date": req_issue_date.isoformat() if isinstance(req_issue_date, datetime) else req_issue_date,
-                "request_item_index": index
+                "request_item_index": index,
+                "source_location_id": str(req_source) if req_source is not None else None,
+                "destination_location_id": str(req_destination) if req_destination is not None else None
             })
     return materials
 
@@ -418,6 +551,105 @@ def _material_key(material: dict) -> str:
     if material.get("request_id") is not None and material.get("request_item_index") is not None:
         return f"{material.get('request_id')}::{material.get('request_item_index')}"
     return f"{material.get('request_id','')}::{material.get('part','')}::{material.get('batch','')}"
+
+
+def _build_remaining_materials(db, series: list) -> list:
+    totals = {}
+    request_ids = set()
+
+    for serie in series or []:
+        state = _get_request_state(db, serie.get("decision_status"))
+        is_canceled = _is_canceled_state(state)
+        for material in serie.get("materials", []) or []:
+            key = _material_key(material)
+            part_id = material.get("part")
+            batch = material.get("batch") or ""
+            request_id = material.get("request_id")
+            request_item_index = material.get("request_item_index")
+
+            entry = totals.setdefault(key, {
+                "key": key,
+                "part_id": str(part_id) if part_id is not None else None,
+                "part_name": material.get("part_name", ""),
+                "batch": batch,
+                "request_id": str(request_id) if request_id is not None else None,
+                "request_reference": material.get("request_reference"),
+                "request_issue_date": material.get("request_issue_date"),
+                "request_item_index": request_item_index,
+                "source_location_id": material.get("source_location_id"),
+                "destination_location_id": material.get("destination_location_id"),
+                "total_received": 0.0,
+                "total_used": 0.0
+            })
+
+            received_qty = float(material.get("received_qty") or 0)
+            if received_qty > entry["total_received"]:
+                entry["total_received"] = received_qty
+
+            if request_id:
+                request_ids.add(str(request_id))
+
+            if not is_canceled:
+                entry["total_used"] += float(material.get("used_qty") or 0)
+
+    request_oids = []
+    for rid in request_ids:
+        try:
+            request_oids.append(ObjectId(rid))
+        except Exception:
+            continue
+
+    request_map = {}
+    if request_oids:
+        for req in db.depo_requests.find({"_id": {"$in": request_oids}}, {"source": 1, "destination": 1, "reference": 1, "issue_date": 1}):
+            request_map[str(req["_id"])] = req
+
+    location_ids = set()
+
+    for entry in totals.values():
+        req = request_map.get(entry.get("request_id") or "")
+        if req:
+            if not entry.get("request_reference"):
+                entry["request_reference"] = req.get("reference")
+            if not entry.get("request_issue_date"):
+                issue_date = req.get("issue_date")
+                entry["request_issue_date"] = issue_date.isoformat() if isinstance(issue_date, datetime) else issue_date
+            if not entry.get("source_location_id"):
+                source = req.get("source")
+                entry["source_location_id"] = str(source) if source is not None else None
+            if not entry.get("destination_location_id"):
+                destination = req.get("destination")
+                entry["destination_location_id"] = str(destination) if destination is not None else None
+
+        if entry.get("source_location_id"):
+            location_ids.add(entry.get("source_location_id"))
+
+        entry["total_used"] = min(entry["total_used"], entry["total_received"])
+
+    location_map = {}
+    if location_ids:
+        location_oids = []
+        for lid in location_ids:
+            try:
+                location_oids.append(ObjectId(lid))
+            except Exception:
+                continue
+        if location_oids:
+            for loc in db.depo_locations.find({"_id": {"$in": location_oids}}, {"code": 1}):
+                location_map[str(loc["_id"])] = loc.get("code") or str(loc["_id"])
+
+    remaining_items = []
+    for entry in totals.values():
+        remaining_qty = max(0.0, entry["total_received"] - entry["total_used"])
+        if remaining_qty <= 0:
+            continue
+        entry["remaining_qty"] = remaining_qty
+        source_id = entry.get("source_location_id")
+        if source_id:
+            entry["source_location_name"] = location_map.get(source_id, source_id)
+        remaining_items.append(entry)
+
+    return remaining_items
 
 
 def _merge_series_materials(series: list, base_materials: list) -> list:
@@ -434,17 +666,19 @@ def _merge_series_materials(series: list, base_materials: list) -> list:
     return series
 
 
-def _build_series(batch_codes: list, base_materials: list) -> list:
+def _build_series(batch_codes: list, base_materials: list, default_step_id: Optional[str] = None) -> list:
     series = []
     for code in batch_codes:
         series.append({
             "batch_code": code,
             "produced_qty": 0,
             "expiry_date": "",
-            "production_step_id": "",
+            "production_step_id": default_step_id or "",
             "decision_status": "",
             "decision_reason": "",
             "signatures": [],
+            "saved_at": None,
+            "saved_by": None,
             "materials": base_materials
         })
     return series
@@ -453,7 +687,7 @@ def _build_series(batch_codes: list, base_materials: list) -> list:
 @router.get("/{build_order_id}/production")
 async def get_build_order_production(
     build_order_id: str,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("build-orders"))
 ):
     db = get_db()
     try:
@@ -465,6 +699,7 @@ async def get_build_order_production(
     if not build_order:
         raise HTTPException(status_code=404, detail="Build order not found")
 
+    default_step_id = _get_product_step_id(db, build_order)
     build_order = _fix_oid(build_order)
     prefix = build_order.get("batch_prefix") or normalize_batch_code(build_order.get("batch_code_text") or build_order.get("batch_code"))[2]
 
@@ -488,19 +723,21 @@ async def get_build_order_production(
                     "batch_code": code,
                     "produced_qty": 0,
                     "expiry_date": "",
-                    "production_step_id": "",
+                    "production_step_id": default_step_id or "",
                     "decision_status": "",
                     "decision_reason": "",
                     "signatures": [],
+                    "saved_at": None,
+                    "saved_by": None,
                     "materials": base_materials
                 })
 
-        production["series"] = series
+        production["series"] = _apply_series_defaults(series, default_step_id)
         return production
 
     production_data = {
         "build_order_id": build_oid,
-        "series": _build_series(batch_codes, base_materials),
+        "series": _build_series(batch_codes, base_materials, default_step_id),
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow()
     }
@@ -509,6 +746,30 @@ async def get_build_order_production(
     production_data["_id"] = str(result.inserted_id)
     production_data["build_order_id"] = str(build_oid)
     return production_data
+
+
+@router.get("/{build_order_id}/production-remaining")
+async def get_build_order_production_remaining(
+    build_order_id: str,
+    current_user: dict = Depends(require_section("build-orders"))
+):
+    db = get_db()
+    try:
+        build_oid = ObjectId(build_order_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid build order ID")
+
+    production = db.depo_build_production.find_one({"build_order_id": build_oid})
+    if not production:
+        raise HTTPException(status_code=404, detail="Production data not found")
+
+    series = production.get("series", []) or []
+    remaining_items = _build_remaining_materials(db, series)
+
+    return {
+        "items": remaining_items,
+        "return_orders": production.get("return_orders") or []
+    }
 
 
 async def _execute_build_order_stock_movements(db, build_order: dict, series: list, current_user: dict, timestamp: datetime):
@@ -675,7 +936,7 @@ async def _execute_build_order_stock_movements(db, build_order: dict, series: li
 async def save_build_order_production(
     build_order_id: str,
     request: Request,
-    current_user: dict = Depends(verify_admin)
+    current_user: dict = Depends(require_section("build-orders"))
 ):
     db = get_db()
     try:
@@ -690,9 +951,28 @@ async def save_build_order_production(
     body = await request.json()
     series = body.get("series", [])
 
+    default_step_id = _get_product_step_id(db, build_order)
+    if default_step_id:
+        for serie in series:
+            if not serie.get("production_step_id"):
+                serie["production_step_id"] = default_step_id
+
     timestamp = datetime.utcnow()
     existing = db.depo_build_production.find_one({"build_order_id": build_oid})
     if existing:
+        existing_series_map = {str(s.get("batch_code")): s for s in existing.get("series", []) or []}
+        merged_series = []
+        for serie in series:
+            key = str(serie.get("batch_code"))
+            existing_serie = existing_series_map.get(key, {})
+            if existing_serie.get("saved_at") and not serie.get("saved_at"):
+                serie["saved_at"] = existing_serie.get("saved_at")
+                serie["saved_by"] = existing_serie.get("saved_by")
+            if existing_serie.get("signatures") and not serie.get("signatures"):
+                serie["signatures"] = existing_serie.get("signatures")
+            merged_series.append(serie)
+        series = merged_series
+
         db.depo_build_production.update_one(
             {"_id": existing["_id"]},
             {"$set": {
@@ -714,11 +994,6 @@ async def save_build_order_production(
         result = db.depo_build_production.insert_one(production_data)
         production_id = str(result.inserted_id)
 
-    try:
-        await _execute_build_order_stock_movements(db, build_order, series, current_user, timestamp)
-    except Exception as e:
-        print(f"[BUILD_ORDERS] Warning: Stock movements failed: {e}")
-
     return {
         "success": True,
         "production_id": production_id,
@@ -729,7 +1004,7 @@ async def save_build_order_production(
 @router.get("/{build_order_id}/production-flow")
 async def get_build_order_production_flow(
     build_order_id: str,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("build-orders"))
 ):
     db = get_db()
     flow = db.approval_flows.find_one({
@@ -737,31 +1012,69 @@ async def get_build_order_production_flow(
         "object_id": build_order_id
     })
 
-    if not flow:
-        try:
-            production_flow_id = ObjectId("694a1ae3297c9dde6d70661a")
-            existing_flow = db.approval_flows.find_one({"_id": production_flow_id})
+    try:
+        production_flow_id = ObjectId("694a1ae3297c9dde6d70661a")
 
-            if existing_flow:
-                flow_data = {
-                    "object_type": "build_order_production",
-                    "object_source": "depo_build_orders",
-                    "object_id": build_order_id,
-                    "flow_type": "production",
-                    "config_slug": existing_flow.get("config_slug", "production"),
-                    "template_id": str(production_flow_id),
-                    "min_signatures": existing_flow.get("min_signatures", 1),
-                    "can_sign_officers": existing_flow.get("can_sign_officers", []),
-                    "must_sign_officers": existing_flow.get("must_sign_officers", []),
-                    "signatures": [],
-                    "status": "pending",
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                }
-                result = db.approval_flows.insert_one(flow_data)
-                flow = db.approval_flows.find_one({"_id": result.inserted_id})
-        except Exception as e:
-            print(f"[BUILD_ORDERS] Failed to auto-create production flow: {e}")
+        template = db.approval_templates.find_one({"_id": production_flow_id})
+        if not template:
+            template = db.approval_flows.find_one({"_id": production_flow_id})
+
+        can_sign_officers = []
+        must_sign_officers = []
+        min_signatures = 1
+        config_slug = "production"
+
+        if template:
+            if template.get("officers"):
+                can_sign_officers, must_sign_officers = _build_officers_from_template(db, template)
+                min_signatures = template.get("min_signatures", 1)
+            else:
+                can_sign_officers = template.get("can_sign_officers", []) or []
+                must_sign_officers = template.get("must_sign_officers", []) or []
+                min_signatures = template.get("min_signatures", 1)
+            config_slug = template.get("config_slug", "production")
+        if not can_sign_officers:
+            min_signatures = 0
+        else:
+            print(f"[BUILD_ORDERS] Warning: Production template {production_flow_id} not found in approval_templates or approval_flows")
+
+        if not flow and template:
+            flow_data = {
+                "object_type": "build_order_production",
+                "object_source": "depo_build_orders",
+                "object_id": build_order_id,
+                "flow_type": "production",
+                "config_slug": config_slug,
+                "template_id": str(production_flow_id),
+                "min_signatures": min_signatures,
+                "can_sign_officers": can_sign_officers,
+                "must_sign_officers": must_sign_officers,
+                "signatures": [],
+                "status": "pending",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            result = db.approval_flows.insert_one(flow_data)
+            flow = db.approval_flows.find_one({"_id": result.inserted_id})
+        elif flow and template:
+            has_officers = bool(flow.get("can_sign_officers") or flow.get("must_sign_officers"))
+            if not has_officers and (can_sign_officers or must_sign_officers):
+                db.approval_flows.update_one(
+                    {"_id": ObjectId(flow["_id"])},
+                    {"$set": {
+                        "can_sign_officers": can_sign_officers,
+                        "must_sign_officers": must_sign_officers,
+                        "min_signatures": min_signatures,
+                        "updated_at": datetime.utcnow(),
+                        "template_id": str(production_flow_id),
+                        "config_slug": config_slug
+                    }}
+                )
+                flow = db.approval_flows.find_one({"_id": ObjectId(flow["_id"])})
+            elif not template and not flow:
+                pass
+    except Exception as e:
+        print(f"[BUILD_ORDERS] Failed to auto-create production flow: {e}")
 
     if not flow:
         return {"flow": None}
@@ -779,11 +1092,12 @@ async def get_build_order_production_flow(
 async def sign_build_order_series(
     build_order_id: str,
     request: Request,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("build-orders"))
 ):
     db = get_db()
     body = await request.json()
     batch_code = body.get("batch_code")
+    serie_payload = body.get("serie") or {}
     if not batch_code:
         raise HTTPException(status_code=400, detail="batch_code is required")
 
@@ -802,7 +1116,30 @@ async def sign_build_order_series(
         raise HTTPException(status_code=404, detail="Production series not found")
 
     serie = series[serie_index]
-    decision_status = serie.get("decision_status")
+    if serie.get("saved_at"):
+        raise HTTPException(status_code=400, detail="Series already saved")
+
+    serie_candidate = serie.copy()
+    allowed_fields = [
+        "produced_qty",
+        "expiry_date",
+        "production_step_id",
+        "decision_status",
+        "decision_reason",
+        "materials"
+    ]
+    for field in allowed_fields:
+        if field in serie_payload:
+            serie_candidate[field] = serie_payload.get(field)
+
+    build_order = db.depo_build_orders.find_one({"_id": build_oid})
+    if build_order:
+        _ensure_build_order_scope(db, current_user, build_order)
+    default_step_id = _get_product_step_id(db, build_order) if build_order else None
+    if not serie_candidate.get("production_step_id") and default_step_id:
+        serie_candidate["production_step_id"] = default_step_id
+
+    decision_status = serie_candidate.get("decision_status")
     if not decision_status:
         raise HTTPException(status_code=400, detail="Decision status is required before signing")
 
@@ -810,15 +1147,15 @@ async def sign_build_order_series(
     is_canceled = _is_canceled_state(state)
     is_failed = _is_failed_state(state)
 
-    if state and state.get("needs_comment") and not str(serie.get("decision_reason") or "").strip():
+    if state and state.get("needs_comment") and not str(serie_candidate.get("decision_reason") or "").strip():
         raise HTTPException(status_code=400, detail="Comment is required for this decision")
 
-    if not (is_canceled or is_failed) and not serie.get("expiry_date"):
+    if not (is_canceled or is_failed) and not serie_candidate.get("expiry_date"):
         raise HTTPException(status_code=400, detail="Expiration date is required")
-    if not is_canceled and not serie.get("production_step_id"):
+    if not is_canceled and not serie_candidate.get("production_step_id"):
         raise HTTPException(status_code=400, detail="Production step is required")
 
-    produced_qty = float(serie.get("produced_qty") or 0)
+    produced_qty = float(serie_candidate.get("produced_qty") or 0)
     if produced_qty <= 0 and not is_canceled:
         raise HTTPException(status_code=400, detail="Produced quantity is required")
 
@@ -867,10 +1204,10 @@ async def sign_build_order_series(
         "user_agent": request.headers.get("user-agent")
     }
 
-    serie_signatures = serie.get("signatures", [])
+    serie_signatures = serie_candidate.get("signatures", []) or []
     serie_signatures.append(signature)
-    serie["signatures"] = serie_signatures
-    series[serie_index] = serie
+    serie_candidate["signatures"] = serie_signatures
+    series[serie_index] = serie_candidate
 
     db.depo_build_production.update_one(
         {"_id": production["_id"]},
@@ -887,6 +1224,269 @@ async def sign_build_order_series(
         print(f"[BUILD_ORDERS] Warning: Failed to update requests open status: {e}")
 
     return {"series": series}
+
+
+@router.post("/{build_order_id}/production-series-save")
+async def save_build_order_series(
+    build_order_id: str,
+    request: Request,
+    current_user: dict = Depends(require_section("build-orders"))
+):
+    db = get_db()
+    body = await request.json()
+    batch_code = body.get("batch_code")
+    serie_payload = body.get("serie") or {}
+    if not batch_code:
+        raise HTTPException(status_code=400, detail="batch_code is required")
+
+    try:
+        build_oid = ObjectId(build_order_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid build order ID")
+
+    build_order = db.depo_build_orders.find_one({"_id": build_oid})
+    if not build_order:
+        raise HTTPException(status_code=404, detail="Build order not found")
+
+    production = db.depo_build_production.find_one({"build_order_id": build_oid})
+    if not production:
+        raise HTTPException(status_code=404, detail="Production data not found")
+
+    series = production.get("series", [])
+    serie_index = next((i for i, s in enumerate(series) if str(s.get("batch_code")) == str(batch_code)), None)
+    if serie_index is None:
+        raise HTTPException(status_code=404, detail="Production series not found")
+
+    serie = series[serie_index]
+    if serie.get("saved_at"):
+        raise HTTPException(status_code=400, detail="Series already saved")
+
+    serie_candidate = serie.copy()
+    allowed_fields = [
+        "produced_qty",
+        "expiry_date",
+        "production_step_id",
+        "decision_status",
+        "decision_reason",
+        "materials"
+    ]
+    for field in allowed_fields:
+        if field in serie_payload:
+            serie_candidate[field] = serie_payload.get(field)
+
+    default_step_id = _get_product_step_id(db, build_order)
+    if not serie_candidate.get("production_step_id") and default_step_id:
+        serie_candidate["production_step_id"] = default_step_id
+
+    decision_status = serie_candidate.get("decision_status")
+    if not decision_status:
+        raise HTTPException(status_code=400, detail="Decision status is required before saving")
+
+    state = _get_request_state(db, decision_status)
+    is_canceled = _is_canceled_state(state)
+    is_failed = _is_failed_state(state)
+
+    if state and state.get("needs_comment") and not str(serie_candidate.get("decision_reason") or "").strip():
+        raise HTTPException(status_code=400, detail="Comment is required for this decision")
+
+    if not (is_canceled or is_failed) and not serie_candidate.get("expiry_date"):
+        raise HTTPException(status_code=400, detail="Expiration date is required")
+    if not is_canceled and not serie_candidate.get("production_step_id"):
+        raise HTTPException(status_code=400, detail="Production step is required")
+
+    produced_qty = float(serie_candidate.get("produced_qty") or 0)
+    if produced_qty <= 0 and not is_canceled:
+        raise HTTPException(status_code=400, detail="Produced quantity is required")
+
+    flow = db.approval_flows.find_one({
+        "object_type": "build_order_production",
+        "object_id": build_order_id
+    })
+    if not flow:
+        raise HTTPException(status_code=404, detail="No production flow found")
+
+    user_id = str(current_user["_id"])
+    user_role_id = current_user.get("role") or current_user.get("local_role")
+    can_sign = check_user_can_sign(
+        db,
+        user_id,
+        user_role_id,
+        flow.get("must_sign_officers", []),
+        flow.get("can_sign_officers", [])
+    )
+    if not can_sign:
+        raise HTTPException(status_code=403, detail="You are not authorized to save this series")
+
+    if not _is_serie_completed(db, flow, serie_candidate.get("signatures", []) or []):
+        raise HTTPException(status_code=400, detail="Series must be fully signed before saving")
+
+    timestamp = datetime.utcnow()
+    serie_candidate["saved_at"] = timestamp
+    serie_candidate["saved_by"] = current_user.get("username")
+
+    series[serie_index] = serie_candidate
+    db.depo_build_production.update_one(
+        {"_id": production["_id"]},
+        {"$set": {
+            "series": series,
+            "updated_at": timestamp,
+            "updated_by": current_user.get("username")
+        }}
+    )
+
+    try:
+        await _execute_build_order_stock_movements(db, build_order, [serie_candidate], current_user, timestamp)
+    except Exception as e:
+        print(f"[BUILD_ORDERS] Warning: Stock movements failed: {e}")
+
+    return {"series": series}
+
+
+@router.post("/{build_order_id}/production-return")
+async def create_build_order_return_orders(
+    build_order_id: str,
+    request: Request,
+    current_user: dict = Depends(require_section("build-orders"))
+):
+    db = get_db()
+    try:
+        build_oid = ObjectId(build_order_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid build order ID")
+
+    build_order = db.depo_build_orders.find_one({"_id": build_oid})
+    if not build_order:
+        raise HTTPException(status_code=404, detail="Build order not found")
+
+    production = db.depo_build_production.find_one({"build_order_id": build_oid})
+    if not production:
+        raise HTTPException(status_code=404, detail="Production data not found")
+
+    if production.get("return_orders"):
+        return {"return_orders": production.get("return_orders")}
+
+    series = production.get("series", []) or []
+    if any(not serie.get("saved_at") for serie in series):
+        raise HTTPException(status_code=400, detail="All series must be saved before creating return orders")
+
+    body = await request.json()
+    items = body.get("items", []) or []
+    if not items:
+        raise HTTPException(status_code=400, detail="Return items are required")
+
+    remaining_items = _build_remaining_materials(db, series)
+    remaining_map = {item["key"]: item for item in remaining_items}
+
+    build_location = build_order.get("location_id")
+    if not build_location:
+        raise HTTPException(status_code=400, detail="Build order missing location")
+    if isinstance(build_location, str) and ObjectId.is_valid(build_location):
+        build_location = ObjectId(build_location)
+
+    batch_code = build_order.get("batch_code_text") or build_order.get("batch_code") or str(build_order_id)
+    date_str = datetime.utcnow().date().isoformat()
+    item_note = f"Rest from build order #{batch_code}/{date_str}"
+
+    items_by_destination: dict[str, list] = {}
+    return_qty_map = {}
+
+    for item in items:
+        return_qty = float(item.get("return_qty") or 0)
+        if return_qty <= 0:
+            continue
+        part_id = item.get("part_id") or item.get("part")
+        material_stub = {
+            "request_id": item.get("request_id"),
+            "request_item_index": item.get("request_item_index"),
+            "part": part_id,
+            "batch": item.get("batch") or item.get("batch_code") or ""
+        }
+        key = item.get("key") or _material_key(material_stub)
+        remaining_entry = remaining_map.get(key)
+        if not remaining_entry:
+            raise HTTPException(status_code=400, detail=f"Unknown material key: {key}")
+
+        if not part_id:
+            part_id = remaining_entry.get("part_id")
+
+        remaining_qty = float(remaining_entry.get("remaining_qty") or 0)
+        return_qty = max(0.0, min(return_qty, remaining_qty))
+        if return_qty <= 0:
+            continue
+
+        destination = remaining_entry.get("source_location_id")
+        if not destination:
+            raise HTTPException(status_code=400, detail="Missing source location for return item")
+
+        return_qty_map[key] = return_qty
+        items_by_destination.setdefault(str(destination), []).append({
+            "part": str(part_id),
+            "quantity": return_qty,
+            "init_q": return_qty,
+            "batch_code": remaining_entry.get("batch") or "",
+            "notes": item_note
+        })
+
+    if not items_by_destination:
+        raise HTTPException(status_code=400, detail="No valid return quantities provided")
+
+    timestamp = datetime.utcnow()
+    created_orders = []
+
+    for destination, payload_items in items_by_destination.items():
+        reference = generate_request_reference(db)
+        return_doc = {
+            "reference": reference,
+            "source": build_location,
+            "destination": ObjectId(destination) if ObjectId.is_valid(destination) else destination,
+            "items": payload_items,
+            "line_items": len(payload_items),
+            "status": "Pending",
+            "notes": item_note,
+            "issue_date": timestamp,
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "created_by": current_user.get("username"),
+            "build_order_id": build_oid,
+            "build_order_batch": batch_code
+        }
+        result = db.depo_requests.insert_one(return_doc)
+        created_orders.append({
+            "request_id": str(result.inserted_id),
+            "reference": reference,
+            "source": str(build_location),
+            "destination": destination
+        })
+
+    unused_materials = []
+    for entry in remaining_items:
+        key = entry.get("key")
+        remaining_qty = float(entry.get("remaining_qty") or 0)
+        return_qty = float(return_qty_map.get(key, 0))
+        lost_qty = max(0.0, remaining_qty - return_qty)
+        unused_materials.append({
+            "key": key,
+            "part": entry.get("part_id"),
+            "batch": entry.get("batch"),
+            "request_id": entry.get("request_id"),
+            "request_item_index": entry.get("request_item_index"),
+            "remaining_qty": remaining_qty,
+            "return_qty": return_qty,
+            "lost_qty": lost_qty,
+            "source_location_id": entry.get("source_location_id")
+        })
+
+    db.depo_build_production.update_one(
+        {"_id": production["_id"]},
+        {"$set": {
+            "unused_materials": unused_materials,
+            "return_orders": created_orders,
+            "updated_at": timestamp,
+            "updated_by": current_user.get("username")
+        }}
+    )
+
+    return {"return_orders": created_orders}
 
 
 def _update_requests_open_status(db, series: list):

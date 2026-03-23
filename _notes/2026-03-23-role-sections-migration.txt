@@ -1,0 +1,20 @@
+Task: migrate roles to sections + menu_items, remove admin/staff gating, update approvals/signing, and frontend permissions.
+
+Backend:
+- Added section-based permissions helpers and public sections (dashboard, notifications).
+- Removed admin overrides in approval helpers + flows; signing now only via officers (person/role).
+- Added scope checks (own/dep) for requests/build-orders/returns/sales/procurement and inventory routes.
+- Updated recipes routes to require section permissions.
+- Added delete-permission checks for removing signatures in procurement/received stock/stock QC.
+
+Frontend:
+- AuthContext now stores role_sections and role_menu_items.
+- New permissions utils for section access checks.
+- Navbar renders menu from role_menu_items.
+- Replaced isAdmin checks with section permissions across audit/forms/users/returns/procurement/requests/operations/reception/build orders.
+
+Tools:
+- Added _tools/migrate_roles_sections.py (admin + section-chief roles, menu_items + sections; dry-run unless --apply).
+
+Notes:
+- Legacy admin/staff compatibility removed from auth flows; permissions now controlled by sections.

@@ -2,6 +2,7 @@
 DEPO Procurement Module - Purchase Orders Services
 """
 from fastapi import HTTPException, UploadFile
+from typing import Optional
 from datetime import datetime
 from bson import ObjectId
 import os
@@ -11,12 +12,12 @@ from src.backend.utils.db import get_db
 from ..utils import serialize_doc
 
 
-async def get_purchase_orders_list(search=None, state_id=None, date_from=None, date_to=None, skip=None, limit=None):
+async def get_purchase_orders_list(search=None, state_id=None, date_from=None, date_to=None, skip=None, limit=None, base_query: Optional[dict] = None):
     """Get list of purchase orders with supplier and state details"""
     db = get_db()
     collection = db['depo_purchase_orders']
     
-    query = {}
+    query = base_query.copy() if isinstance(base_query, dict) else {}
     
     # Search filter
     if search:

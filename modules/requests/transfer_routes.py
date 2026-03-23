@@ -8,7 +8,7 @@ from bson import ObjectId
 from pydantic import BaseModel
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 from modules.inventory.services.stocks_service import transfer_stock
 
 router = APIRouter()
@@ -27,7 +27,7 @@ class ExecuteTransferRequest(BaseModel):
 async def execute_request_transfer(
     request_id: str,
     transfer_data: ExecuteTransferRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(require_section("requests"))
 ):
     """
     Execute actual stock transfers for a request.

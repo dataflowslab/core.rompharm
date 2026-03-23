@@ -65,6 +65,14 @@ interface Article {
   manufacturer_um_id?: string;
   total_delivery_time?: string;
   loss_rate_threshold?: number;
+  production_step_id?: string;
+}
+
+interface ProductionStep {
+  _id: string;
+  name?: string;
+  label?: string;
+  code?: string;
 }
 
 interface DetailsTabProps {
@@ -74,6 +82,7 @@ interface DetailsTabProps {
   manufacturers: Company[];
   categories: Category[];
   systemUMs: UnitOfMeasure[];
+  productionSteps: ProductionStep[];
   editor: Editor | null;
 }
 
@@ -84,6 +93,7 @@ export function DetailsTab({
   manufacturers,
   categories,
   systemUMs,
+  productionSteps,
   editor,
 }: DetailsTabProps) {
   return (
@@ -193,9 +203,10 @@ export function DetailsTab({
 
       {/* Column 2: Stock Info */}
       <Grid.Col span={4}>
-        <Paper p="md" withBorder>
-          <Title order={5} mb="md">Stock</Title>
-          <Stack gap="sm">
+        <Stack gap="md">
+          <Paper p="md" withBorder>
+            <Title order={5} mb="md">Stock</Title>
+            <Stack gap="sm">
             <Select
               label="Default Location"
               placeholder="Select location"
@@ -293,8 +304,27 @@ export function DetailsTab({
               step={0.1}
               decimalScale={2}
             />
-          </Stack>
-        </Paper>
+            </Stack>
+          </Paper>
+
+          <Paper p="md" withBorder>
+            <Title order={5} mb="md">Production</Title>
+            <Stack gap="sm">
+              <Select
+                label="Production step"
+                placeholder="Select production step"
+                data={productionSteps.map((step) => ({
+                  value: step._id,
+                  label: step.name || step.label || step.code || step._id
+                }))}
+                value={article.production_step_id || ''}
+                onChange={(value) => setArticle({ ...article, production_step_id: value || undefined })}
+                searchable
+                clearable
+              />
+            </Stack>
+          </Paper>
+        </Stack>
       </Grid.Col>
 
       {/* Column 3: Other Info */}

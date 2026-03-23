@@ -14,7 +14,8 @@ import os
 
 from src.backend.utils.db import get_db
 from src.backend.models.form_model import FormModel
-from src.backend.routes.auth import verify_token, verify_admin
+from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 from src.backend.utils.audit import log_action
 from src.backend.utils.slug_generator import generate_unique_slug
 
@@ -89,7 +90,7 @@ def get_form_by_slug(slug: str, authorization: Optional[str] = Header(None)):
 
 
 @router.get("/")
-def list_forms(user = Depends(verify_admin)):
+def list_forms(user = Depends(require_section("forms"))):
     """
     List all forms (requires administrator access)
     Only returns non-deleted forms or forms with future deletion date
@@ -110,7 +111,7 @@ def list_forms(user = Depends(verify_admin)):
 
 
 @router.post("/")
-def create_form(form_data: FormCreate, request: Request, user = Depends(verify_admin)):
+def create_form(form_data: FormCreate, request: Request, user = Depends(require_section("forms"))):
     """
     Create a new form (requires administrator access)
     """
@@ -153,7 +154,7 @@ def create_form(form_data: FormCreate, request: Request, user = Depends(verify_a
 
 
 @router.put("/{form_id}")
-def update_form(form_id: str, form_data: FormUpdate, request: Request, user = Depends(verify_admin)):
+def update_form(form_id: str, form_data: FormUpdate, request: Request, user = Depends(require_section("forms"))):
     """
     Update an existing form (requires administrator access)
     """
@@ -221,7 +222,7 @@ def update_form(form_id: str, form_data: FormUpdate, request: Request, user = De
 
 
 @router.delete("/{form_id}")
-def delete_form(form_id: str, request: Request, user = Depends(verify_admin)):
+def delete_form(form_id: str, request: Request, user = Depends(require_section("forms"))):
     """
     Soft delete a form (requires administrator access)
     Sets deleted timestamp instead of removing from database
@@ -316,7 +317,7 @@ def get_form_qr_code(slug: str):
 
 
 @router.get("/mail-templates/list")
-def list_mail_templates(user = Depends(verify_admin)):
+def list_mail_templates(user = Depends(require_section("forms"))):
     """
     List available email notification templates
     """

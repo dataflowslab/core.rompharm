@@ -9,6 +9,7 @@ from bson import ObjectId
 from src.backend.utils.db import get_db
 from src.backend.models.approval_flow_model import ApprovalFlowModel
 from src.backend.utils.approval_helpers import check_approval_completion, check_user_can_sign
+from src.backend.utils.sections_permissions import get_section_permissions, is_action_allowed
 from ..utils import serialize_doc
 
 
@@ -232,12 +233,11 @@ async def remove_received_stock_signature(order_id: str, user_id: str, current_u
     """Remove signature from received stock approval flow"""
     db = get_db()
     
-    # Check if user is admin or the one who signed
-    is_admin = current_user.get('is_staff', False) or current_user.get('is_superuser', False)
     current_user_id = str(current_user["_id"])
-    
-    if not is_admin and current_user_id != user_id:
-        raise HTTPException(status_code=403, detail="You can only remove your own signature or be an admin")
+    perms = get_section_permissions(db, current_user, "procurement")
+    can_delete = is_action_allowed(perms, "delete")
+    if not can_delete and current_user_id != user_id:
+        raise HTTPException(status_code=403, detail="You can only remove your own signature")
     
     # Get approval flow
     flow = db.approval_flows.find_one({

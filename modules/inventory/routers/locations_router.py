@@ -9,7 +9,7 @@ from datetime import datetime
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 
 import sys
 import os
@@ -35,7 +35,7 @@ class LocationUpdateRequest(BaseModel):
 async def get_locations(
     request: Request,
     search: Optional[str] = Query(None),
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/locations")),
     db = Depends(get_db)
 ):
     """Get list of locations from MongoDB with parent details populated"""
@@ -66,7 +66,7 @@ async def get_locations(
 async def create_location(
     request: Request,
     location_data: LocationCreateRequest,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/locations")),
     db = Depends(get_db)
 ):
     """Create a new location"""
@@ -106,7 +106,7 @@ async def update_location(
     request: Request,
     location_id: str,
     location_data: LocationUpdateRequest,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/locations")),
     db = Depends(get_db)
 ):
     """Update an existing location"""
@@ -183,7 +183,7 @@ async def update_location(
 async def delete_location(
     request: Request,
     location_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("inventory/locations")),
     db = Depends(get_db)
 ):
     """Delete a location (only if it has no children and no stocks)"""

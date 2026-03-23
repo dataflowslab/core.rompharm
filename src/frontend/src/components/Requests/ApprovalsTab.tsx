@@ -7,6 +7,7 @@ import api from '../../services/api';
 import { requestsApi } from '../../services/requests';
 import { notifications } from '@mantine/notifications';
 import { useAuth } from '../../context/AuthContext';
+import { hasSectionPermission } from '../../utils/permissions';
 
 interface ApprovalOfficer {
   type: string;
@@ -47,10 +48,11 @@ interface ApprovalsTabProps {
 
 export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
   const { t } = useTranslation();
-  const { username, isStaff } = useAuth();
+  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
+  const canRemoveSignatures = hasSectionPermission(roleSections, 'requests', 'delete');
 
   useEffect(() => {
     loadApprovalFlow();
@@ -168,10 +170,22 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
     const alreadySigned = flow.signatures.some(s => s.username === username);
     if (alreadySigned) return false;
     
-    // Check if user is in can_sign or must_sign by username
-    const canSign = flow.can_sign_officers.some(o => o.username === username);
-    const mustSign = flow.must_sign_officers.some(o => o.username === username);
-    
+    const normalize = (value?: string | null) => (value || '').toString().trim().toLowerCase();
+    const matchesOfficer = (officer: ApprovalOfficer) => {
+      if (officer.type === 'person') {
+        if (userId && officer.reference === userId) return true;
+        if (username && officer.username === username) return true;
+      }
+      if (officer.type === 'role') {
+        if (localRole && officer.reference === localRole) return true;
+        if (roleSlug && normalize(officer.reference) === normalize(roleSlug)) return true;
+        if (localRole && normalize(officer.reference) === normalize(localRole)) return true;
+      }
+      return false;
+    };
+
+    const canSign = flow.can_sign_officers.some(matchesOfficer);
+    const mustSign = flow.must_sign_officers.some(matchesOfficer);
     return canSign || mustSign;
   };
 
@@ -280,7 +294,7 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
                 <Table.Th>{t('User')}</Table.Th>
                 <Table.Th>{t('Date')}</Table.Th>
                 <Table.Th>{t('Signature Hash')}</Table.Th>
-                <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>
+                {canRemoveSignatures && <Table.Th style={{ width: '60px' }}>{t('Actions')}</Table.Th>}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -293,8 +307,8 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
                       {signature.signature_hash.substring(0, 16)}...
                     </Text>
                   </Table.Td>
-                  <Table.Td>
-                    {isStaff && (
+                  {canRemoveSignatures && (
+                    <Table.Td>
                       <ActionIcon
                         color="red"
                         variant="subtle"
@@ -303,8 +317,8 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
                       >
                         <IconTrash size={16} />
                       </ActionIcon>
-                    )}
-                  </Table.Td>
+                    </Table.Td>
+                  )}
                 </Table.Tr>
               ))}
             </Table.Tbody>

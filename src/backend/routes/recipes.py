@@ -8,7 +8,7 @@ from datetime import datetime
 from bson import ObjectId
 
 from src.backend.utils.db import get_db
-from src.backend.routes.auth import verify_token
+from src.backend.utils.sections_permissions import require_section
 from src.backend.models.recipe_model import RecipeModel, RecipeItem, RecipeLogModel
 
 router = APIRouter()
@@ -74,7 +74,7 @@ def log_recipe_change(db, recipe_id: str, action: str, changes: dict, user: str,
 @router.get("/api/recipes")
 def list_recipes(
     search: Optional[str] = None,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """List all recipes with optional search (latest revision only)"""
@@ -148,7 +148,7 @@ def list_recipes(
 @router.get("/api/recipes/parts")
 def search_parts(
     search: Optional[str] = None,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Search parts from depo_parts"""
@@ -182,7 +182,7 @@ def search_parts(
 @router.get("/api/recipes/{recipe_id}")
 def get_recipe(
     recipe_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Get recipe details"""
@@ -275,7 +275,7 @@ def get_recipe(
 def create_recipe(
     data: dict,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Create new recipe"""
@@ -328,7 +328,7 @@ def update_recipe_meta(
     recipe_id: str,
     data: dict,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Update recipe metadata (estimated production quantity and UM)."""
@@ -389,7 +389,7 @@ def add_item(
     recipe_id: str,
     data: dict,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Add item to recipe"""
@@ -456,7 +456,7 @@ def update_item(
     item_index: int,
     data: dict,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Update item in recipe"""
@@ -525,7 +525,7 @@ def remove_item(
     recipe_id: str,
     item_index: int,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Remove item from recipe"""
@@ -577,7 +577,7 @@ def add_alternative(
     item_index: int,
     data: dict,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Add alternative to group (Type 2 item)"""
@@ -652,7 +652,7 @@ def update_alternative(
     alt_index: int,
     data: dict,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Update alternative in group"""
@@ -728,7 +728,7 @@ def remove_alternative(
     item_index: int,
     alt_index: int,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Remove alternative from group"""
@@ -787,7 +787,7 @@ def remove_alternative(
 def increment_version(
     recipe_id: str,
     request: Request,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Increment recipe version (revision)"""
@@ -833,7 +833,7 @@ def increment_version(
 @router.get("/api/recipes/{recipe_id}/revisions")
 def get_recipe_revisions(
     recipe_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Get all revisions for a recipe's product"""
@@ -878,7 +878,7 @@ def get_recipe_revisions(
 @router.get("/api/recipes/{recipe_id}/logs")
 def get_recipe_logs(
     recipe_id: str,
-    current_user: dict = Depends(verify_token),
+    current_user: dict = Depends(require_section("recipes")),
     db = Depends(get_db)
 ):
     """Get recipe change history"""

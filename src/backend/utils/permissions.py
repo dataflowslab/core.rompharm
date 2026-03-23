@@ -98,12 +98,9 @@ def get_user_permissions(user: dict) -> List[str]:
         # Dacă role e dict
         if isinstance(role, dict):
             if role.get('slug') == 'sysadmin':
-                # Sysadmin are toate permisiunile
-                db = get_db()
-                roles_items = db['roles_items']
-                all_items = list(roles_items.find({}, {'slug': 1}))
-                return [item['slug'] for item in all_items]
-            
+                # Sysadmin has full access in legacy permissions
+                return ['*']
+
             return role.get('items', [])
         
         # Dacă role e ObjectId
@@ -114,11 +111,9 @@ def get_user_permissions(user: dict) -> List[str]:
             
             if role_doc:
                 if role_doc.get('slug') == 'sysadmin':
-                    # Sysadmin are toate permisiunile
-                    roles_items = db['roles_items']
-                    all_items = list(roles_items.find({}, {'slug': 1}))
-                    return [item['slug'] for item in all_items]
-                
+                    # Sysadmin has full access in legacy permissions
+                    return ['*']
+
                 return role_doc.get('items', [])
     
     return []

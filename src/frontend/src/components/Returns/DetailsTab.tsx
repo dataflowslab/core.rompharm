@@ -10,6 +10,7 @@ import api from '../../services/api';
 import { returnsApi, ReturnOrder, ApprovalFlow } from '../../services/returns';
 import { useAuth } from '../../context/AuthContext';
 import { formatDateTime } from '../../utils/dateFormat';
+import { hasSectionPermission } from '../../utils/permissions';
 
 interface DetailsTabProps {
   order: ReturnOrder;
@@ -24,7 +25,7 @@ const RETURN_PENDING_STATE_ID = '6943a4a6451609dd8a618ce0';
 
 export function DetailsTab({ order, canEdit, onUpdate, onOrderUpdate, orderStateId, itemsCount }: DetailsTabProps) {
   const { t } = useTranslation();
-  const { username, isStaff } = useAuth();
+  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
   const [saving, setSaving] = useState(false);
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +40,7 @@ export function DetailsTab({ order, canEdit, onUpdate, onOrderUpdate, orderState
 
   const issueDate = order.issue_date ? new Date(order.issue_date) : null;
   const isOrderLocked = orderStateId ? orderStateId !== RETURN_PENDING_STATE_ID : false;
-  const canRemoveSignatures = isStaff && !isOrderLocked;
+  const canRemoveSignatures = hasSectionPermission(roleSections, 'returns', 'delete') && !isOrderLocked;
 
   useEffect(() => {
     loadApprovalFlow();
@@ -183,7 +184,20 @@ export function DetailsTab({ order, canEdit, onUpdate, onOrderUpdate, orderState
     }
 
     const allOfficers = [...(flow.required_officers || []), ...(flow.optional_officers || [])];
-    return allOfficers.length > 0;
+    const normalize = (value?: string | null) => (value || '').toString().trim().toLowerCase();
+    const matchesOfficer = (officer: any) => {
+      if (officer?.type === 'person') {
+        if (userId && officer.reference === userId) return true;
+        if (username && officer.username && officer.username === username) return true;
+      }
+      if (officer?.type === 'role') {
+        if (localRole && officer.reference === localRole) return true;
+        if (roleSlug && normalize(officer.reference) === normalize(roleSlug)) return true;
+        if (localRole && normalize(officer.reference) === normalize(localRole)) return true;
+      }
+      return false;
+    };
+    return allOfficers.some(matchesOfficer);
   };
 
   const getStatusColor = (status: string) => {
