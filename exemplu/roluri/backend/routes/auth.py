@@ -64,7 +64,7 @@ class LoginResponse(BaseModel):
 
 
 def _get_role_info(db, user: dict) -> Tuple[Optional[str], Optional[str]]:
-    role_id = user.get('role') or user.get('local_role')
+    role_id = user.get('role')
     role_name = None
     if role_id:
         role_doc = None
@@ -209,10 +209,10 @@ async def login(request_data: LoginRequest, request: Request):
             update_data['name'] = name
         
         # If user doesn't have a role yet, assign a default role
-        if not existing_user.get('local_role') and not existing_user.get('role'):
+        if not existing_user.get('role'):
             user_role = roles_collection.find_one({'name': 'standard user'})
             if user_role:
-                update_data['local_role'] = str(user_role['_id'])
+                update_data['role'] = str(user_role['_id'])
         
         users_collection.update_one(
             {'username': username},
@@ -220,12 +220,12 @@ async def login(request_data: LoginRequest, request: Request):
         )
     else:
         # Create new user with role assignment
-        local_role = None
+        role_id = None
         user_role = roles_collection.find_one({'name': 'standard user'})
         if user_role:
-            local_role = str(user_role['_id'])
+            role_id = str(user_role['_id'])
         
-        user_doc = UserModel.create(username, '', local_role=local_role)
+        user_doc = UserModel.create(username, '', role=role_id)
         user_doc['domain'] = request_data.domain
         users_collection.insert_one(user_doc)
     
@@ -307,7 +307,7 @@ async def verify_admin(authorization: Optional[str] = Header(None)):
         from ..utils.permission_helpers import is_admin_user
 
     if not is_admin_user(user):
-        print(f"Access denied for user {user['username']}: role={user.get('role') or user.get('local_role')}")
+        print(f"Access denied for user {user['username']}: role={user.get('role')}")
         raise HTTPException(status_code=403, detail="Administrator access required")
     
     return user
@@ -376,8 +376,8 @@ async def get_dashboard_shortcuts(user = Depends(verify_token)):
     
     db = get_db()
     
-    # Get user's role (check both 'role' and 'local_role' for compatibility)
-    user_role = user.get('role') or user.get('local_role')
+    # Get user's role
+    user_role = user.get('role')
     if not user_role:
         return {'forms': []}
     

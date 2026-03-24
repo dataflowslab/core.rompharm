@@ -25,7 +25,7 @@ const RETURN_PENDING_STATE_ID = '6943a4a6451609dd8a618ce0';
 
 export function DetailsTab({ order, canEdit, onUpdate, onOrderUpdate, orderStateId, itemsCount }: DetailsTabProps) {
   const { t } = useTranslation();
-  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
+  const { username, userId, roleSlug, roleId, roleSections } = useAuth();
   const [saving, setSaving] = useState(false);
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -191,9 +191,9 @@ export function DetailsTab({ order, canEdit, onUpdate, onOrderUpdate, orderState
         if (username && officer.username && officer.username === username) return true;
       }
       if (officer?.type === 'role') {
-        if (localRole && officer.reference === localRole) return true;
+        if (roleId && officer.reference === roleId) return true;
         if (roleSlug && normalize(officer.reference) === normalize(roleSlug)) return true;
-        if (localRole && normalize(officer.reference) === normalize(localRole)) return true;
+        if (roleId && normalize(officer.reference) === normalize(roleId)) return true;
       }
       return false;
     };

@@ -432,7 +432,7 @@ def get_pending_approvals(current_user: dict = Depends(verify_token)):
     """Get pending approvals for current user"""
     db = get_db()
     user_id = str(current_user["_id"])
-    user_role = current_user.get("role") or current_user.get("local_role")
+    user_role = current_user.get("role")
     user_role = str(user_role) if user_role is not None else None
 
     def _safe_object_id(value):

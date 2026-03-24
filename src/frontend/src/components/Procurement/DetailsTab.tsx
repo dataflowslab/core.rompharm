@@ -73,7 +73,7 @@ interface DetailsTabProps {
 
 export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUpdate, orderStateId }: DetailsTabProps) {
   const { t } = useTranslation();
-  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
+  const { username, userId, roleSlug, roleId, roleSections } = useAuth();
 
   // Check if order is in FINISHED or CANCELLED state (cannot modify signatures)
   const FINISHED_STATE = '6943a4a6451609dd8a618ce3';
@@ -303,9 +303,9 @@ export function DetailsTab({ order, stockLocations, canEdit, onUpdate, onOrderUp
         if (username && officer.username && officer.username === username) return true;
       }
       if (officer?.type === 'role') {
-        if (localRole && officer.reference === localRole) return true;
+        if (roleId && officer.reference === roleId) return true;
         if (roleSlug && normalize(officer.reference) === normalize(roleSlug)) return true;
-        if (localRole && normalize(officer.reference) === normalize(localRole)) return true;
+        if (roleId && normalize(officer.reference) === normalize(roleId)) return true;
       }
       return false;
     };

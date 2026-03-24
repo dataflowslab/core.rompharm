@@ -74,8 +74,8 @@ def _normalize_user_data(user: dict) -> dict:
         if isinstance(normalized['_id'], ObjectId):
             normalized['_id'] = str(normalized['_id'])
     
-    # Normalize role field (can be 'role' or 'local_role')
-    role_field = normalized.get('role') or normalized.get('local_role')
+    # Normalize role field (role only)
+    role_field = normalized.get('role')
     if role_field:
         if isinstance(role_field, ObjectId):
             normalized['role'] = str(role_field)
@@ -86,10 +86,6 @@ def _normalize_user_data(user: dict) -> dict:
         else:
             normalized['role'] = None
         
-        # Ensure both 'role' and 'local_role' are set for compatibility
-        if 'local_role' not in normalized:
-            normalized['local_role'] = normalized['role']
-
     # Normalize locations list
     if 'locations' in normalized:
         normalized_locations = []
@@ -111,7 +107,7 @@ def verify_admin(authorization: Optional[str] = Header(None)):
     """
     user = verify_token(authorization)
 
-    role_value = user.get('role') or user.get('local_role')
+    role_value = user.get('role')
     if role_value:
         db = get_db()
         try:
@@ -144,7 +140,7 @@ def get_current_user(user = Depends(verify_token)):
     Get current user information
     """
     db = get_db()
-    role_value = user.get('local_role') or user.get('role')
+    role_value = user.get('role')
     role_slug = None
     if role_value:
         try:
@@ -165,7 +161,7 @@ def get_current_user(user = Depends(verify_token)):
         '_id': str(user['_id']),
         'username': user['username'],
         'name': user.get('name'),
-        'local_role': user.get('local_role'),
+        'role_id': user.get('role'),
         'role_slug': role_slug,
         'role_sections': role_sections,
         'role_menu_items': role_menu_items,
@@ -183,7 +179,7 @@ def refresh_status(user = Depends(verify_token)):
     """
     return {
         'username': user['username'],
-        'role': user.get('role') or user.get('local_role'),
+        'role': user.get('role'),
         'message': 'Role status is managed locally'
     }
 
@@ -197,8 +193,8 @@ def get_dashboard_shortcuts(user = Depends(verify_token)):
     
     db = get_db()
     
-    # Get user's role (check both 'role' and 'local_role' for compatibility)
-    user_role = user.get('role') or user.get('local_role')
+    # Get user's role
+    user_role = user.get('role')
     if not user_role:
         return {'forms': []}
     

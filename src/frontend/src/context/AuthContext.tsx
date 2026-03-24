@@ -6,7 +6,7 @@ interface AuthContextType {
   username: string | null;
   name: string | null;
   userId: string | null;
-  localRole: string | null;
+  roleId: string | null;
   roleSlug: string | null;
   locations: string[];
   roleSections: Record<string, string[]>;
@@ -31,8 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(
     localStorage.getItem('auth_user_id')
   );
-  const [localRole, setLocalRole] = useState<string | null>(
-    localStorage.getItem('auth_local_role')
+  const [roleId, setRoleId] = useState<string | null>(
+    localStorage.getItem('auth_role_id')
   );
   const [roleSlug, setRoleSlug] = useState<string | null>(
     localStorage.getItem('auth_role_slug')
@@ -82,9 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUserId(data._id);
             localStorage.setItem('auth_user_id', data._id);
           }
-          if (data.local_role) {
-            setLocalRole(data.local_role);
-            localStorage.setItem('auth_local_role', data.local_role);
+          if (data.role_id || data.role) {
+            const roleValue = data.role_id || data.role;
+            setRoleId(roleValue);
+            localStorage.setItem('auth_role_id', roleValue);
           }
           if (data.role_slug) {
             setRoleSlug(data.role_slug);
@@ -144,9 +145,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUserId(data._id);
         localStorage.setItem('auth_user_id', data._id);
       }
-      if (data.local_role) {
-        setLocalRole(data.local_role);
-        localStorage.setItem('auth_local_role', data.local_role);
+      if (data.role_id || data.role) {
+        const roleValue = data.role_id || data.role;
+        setRoleId(roleValue);
+        localStorage.setItem('auth_role_id', roleValue);
       }
       if (data.role_slug) {
         setRoleSlug(data.role_slug);
@@ -174,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsername(null);
     setName(null);
     setUserId(null);
-    setLocalRole(null);
+    setRoleId(null);
     setRoleSlug(null);
     setLocations([]);
     setRoleSections({});
@@ -183,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('auth_username');
     localStorage.removeItem('auth_name');
     localStorage.removeItem('auth_user_id');
-    localStorage.removeItem('auth_local_role');
+    localStorage.removeItem('auth_role_id');
     localStorage.removeItem('auth_role_slug');
     localStorage.removeItem('auth_locations');
     localStorage.removeItem('auth_role_sections');
@@ -197,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username,
         name,
         userId,
-        localRole,
+        roleId,
         roleSlug,
         locations,
         roleSections,

@@ -118,7 +118,7 @@ def check_approval_completion(
                 for sig in signatures:
                     user = db.users.find_one({"_id": ObjectId(sig["user_id"])})
                     if user:
-                        user_role = user.get("role") or user.get("local_role")
+                        user_role = user.get("role")
                         if user_role is not None and str(user_role) == role_id:
                             has_signed = True
                             break
@@ -132,7 +132,7 @@ def check_approval_completion(
                     for sig in signatures:
                         user = db.users.find_one({"_id": ObjectId(sig["user_id"])})
                         if user:
-                            user_role = user.get("role") or user.get("local_role")
+                            user_role = user.get("role")
                             if user_role is not None and str(user_role) == role_id:
                                 has_signed = True
                                 break
@@ -174,7 +174,7 @@ def check_user_can_sign(
         user_doc = db.users.find_one({"_id": ObjectId(user_id)})
         if user_doc:
             user_username = user_doc.get("username")
-            role_value = user_doc.get("role") or user_doc.get("local_role")
+            role_value = user_doc.get("role")
             if role_value:
                 if _is_object_id(role_value):
                     role_doc = db.roles.find_one({"_id": ObjectId(role_value)})

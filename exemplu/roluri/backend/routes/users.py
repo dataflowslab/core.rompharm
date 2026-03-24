@@ -56,7 +56,6 @@ async def list_users(
         'email': 1,
         'name': 1,
         'role': 1,
-        'local_role': 1,
         'deps': 1,
         'last_login': 1,
         'created_at': 1,
@@ -111,7 +110,7 @@ async def list_users(
         del user_doc['_id']
         
         # Get role name if role ID exists
-        role_id = user_doc.get('role') or user_doc.get('local_role')
+        role_id = user_doc.get('role')
         if role_id:
             try:
                 role = db.roles.find_one({'_id': ObjectId(role_id)})

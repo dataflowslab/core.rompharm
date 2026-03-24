@@ -54,7 +54,7 @@ interface ReceptieTabProps {
 
 export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   const { t } = useTranslation();
-  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
+  const { username, userId, roleSlug, roleId, roleSections } = useAuth();
   const [flow, setFlow] = useState<ReceptionFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
@@ -321,9 +321,9 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
         if (o.username === username) return true;
       }
       if (o.type === 'role') {
-        if (localRole && o.reference === localRole) return true;
+        if (roleId && o.reference === roleId) return true;
         if (roleSlug && normalize(o.reference) === normalize(roleSlug)) return true;
-        if (localRole && normalize(o.reference) === normalize(localRole)) return true;
+        if (roleId && normalize(o.reference) === normalize(roleId)) return true;
       }
       return false;
     };

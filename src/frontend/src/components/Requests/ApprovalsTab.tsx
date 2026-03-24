@@ -48,7 +48,7 @@ interface ApprovalsTabProps {
 
 export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
   const { t } = useTranslation();
-  const { username, userId, roleSlug, localRole, roleSections } = useAuth();
+  const { username, userId, roleSlug, roleId, roleSections } = useAuth();
   const [flow, setFlow] = useState<ApprovalFlow | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
@@ -177,9 +177,9 @@ export function ApprovalsTab({ requestId, onReload }: ApprovalsTabProps) {
         if (username && officer.username === username) return true;
       }
       if (officer.type === 'role') {
-        if (localRole && officer.reference === localRole) return true;
+        if (roleId && officer.reference === roleId) return true;
         if (roleSlug && normalize(officer.reference) === normalize(roleSlug)) return true;
-        if (localRole && normalize(officer.reference) === normalize(localRole)) return true;
+        if (roleId && normalize(officer.reference) === normalize(roleId)) return true;
       }
       return false;
     };

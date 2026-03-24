@@ -27,7 +27,7 @@ def is_admin_user(user: Dict[str, Any]) -> bool:
     Check if user has administrator role.
     Access control is role-based only.
     """
-    role_id = user.get('role') or user.get('local_role')
+    role_id = user.get('role')
     if not role_id:
         return False
 
@@ -68,7 +68,7 @@ def has_permission(user: Dict[str, Any], section: str, permission: str) -> bool:
         return True
     
     # Get user's role
-    role = user.get('role') or user.get('local_role')
+    role = user.get('role')
     if not role:
         return False
     
@@ -108,7 +108,7 @@ def get_user_permissions(user: Dict[str, Any], section: str) -> List[str]:
         return ['VIEW', 'ADD', 'EDIT', 'DELETE', 'OWNDATA', 'DEPDATA']
 
     # Get user's role
-    role = user.get('role') or user.get('local_role')
+    role = user.get('role')
     if not role:
         return []
     

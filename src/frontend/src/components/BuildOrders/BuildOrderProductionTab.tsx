@@ -87,7 +87,7 @@ interface RemainingItem {
 
 export function BuildOrderProductionTab({ buildOrderId }: BuildOrderProductionTabProps) {
   const { t } = useTranslation();
-  const { username, localRole, roleSlug, userId } = useAuth();
+  const { username, roleId, roleSlug, userId } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [series, setSeries] = useState<Serie[]>([]);
@@ -282,14 +282,16 @@ export function BuildOrderProductionTab({ buildOrderId }: BuildOrderProductionTa
     if (!flow) return false;
 
     const normalize = (value?: string | null) => (value || '').toString().trim().toLowerCase();
+    const roleSlugNormalized = normalize(roleSlug);
+    const roleIdNormalized = normalize(roleId);
 
     const matchesOfficer = (o: any) => {
       if (username && o.username && o.username === username) return true;
       if (o.reference && userId && o.reference === userId) return true;
       if (o.type === 'role') {
-        if (roleSlug && normalize(o.reference) === normalize(roleSlug)) return true;
-        if (localRole && o.reference === localRole) return true;
-        if (localRole && normalize(o.reference) === normalize(localRole)) return true;
+        if (roleSlug && normalize(o.reference) === roleSlugNormalized) return true;
+        if (roleId && o.reference === roleId) return true;
+        if (roleId && normalize(o.reference) === roleIdNormalized) return true;
       }
       return false;
     };

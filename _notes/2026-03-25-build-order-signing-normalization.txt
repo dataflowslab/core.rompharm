@@ -1,0 +1,14 @@
+Context: build order production signing blocked for admin role.
+
+Actions:
+- Ran _tools/normalize_approval_officers.py --apply (templates + flows).
+- Ran _tools/normalize_user_roles.py --apply (users.role to OID strings).
+- Added _tools/inspect_build_order_sign.py for DB inspection.
+
+Findings:
+- build_order_production flow has must_sign_officers role=admin (OID).
+- Series fields in DB were empty (decision_status/produced_qty/expiry_date), but product.production_step_id present.
+
+Next checks:
+- User should re-login to refresh role from DB.
+- Reload build order production tab after re-login.

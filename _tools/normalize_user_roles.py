@@ -1,5 +1,5 @@
 """
-Normalize users.role and users.local_role to ObjectId strings.
+Normalize users.role to ObjectId strings.
 """
 import argparse
 import os
@@ -41,7 +41,7 @@ def _normalize_role_field(db, value):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Normalize users.role and users.local_role to ObjectId strings.")
+    parser = argparse.ArgumentParser(description="Normalize users.role to ObjectId strings.")
     parser.add_argument("--apply", action="store_true", help="Apply updates to the database.")
     args = parser.parse_args()
 
@@ -54,13 +54,13 @@ def main():
         user_id = str(user.get("_id"))
         update_data = {}
 
-        for field in ["role", "local_role"]:
-            if field in user:
-                normalized = _normalize_role_field(db, user.get(field))
-                if normalized != user.get(field):
-                    update_data[field] = normalized
-                if isinstance(normalized, str) and not _is_oid(normalized):
-                    unresolved.append(f"user:{user_id}.{field} unresolved: {normalized}")
+        field = "role"
+        if field in user:
+            normalized = _normalize_role_field(db, user.get(field))
+            if normalized != user.get(field):
+                update_data[field] = normalized
+            if isinstance(normalized, str) and not _is_oid(normalized):
+                unresolved.append(f"user:{user_id}.{field} unresolved: {normalized}")
 
         if update_data:
             updated += 1

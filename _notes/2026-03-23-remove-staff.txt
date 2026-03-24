@@ -1,7 +1,7 @@
 Date: 2026-03-23
 Task: Remove staff concept from app
 Summary:
-- Replaced all frontend role gating from isStaff to roleSlug/localRole === "admin".
+- Replaced all frontend role gating from isStaff to roleSlug === "admin".
 - Updated requests/procurement/returns signatures tables to use admin-only remove actions.
 - Removed remaining is_staff/isStaff references across repo.
 Files touched:

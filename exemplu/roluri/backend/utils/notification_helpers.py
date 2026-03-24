@@ -535,14 +535,8 @@ def _resolve_officer_user_ids(db, officers: List[Dict[str, Any]]) -> Set[str]:
                 role_doc = db.roles.find_one({'name': role_ref}, {'_id': 1})
                 if role_doc and role_doc.get('_id'):
                     role_ref = str(role_doc['_id'])
-            # Find users by role or local_role
-            role_query = {
-                '$or': [
-                    {'role': role_ref},
-                    {'local_role': role_ref}
-                ]
-            }
-            users = db.users.find(role_query, {'_id': 1})
+            # Find users by role
+            users = db.users.find({'role': role_ref}, {'_id': 1})
             for user in users:
                 if user.get('_id'):
                     user_ids.add(str(user['_id']))

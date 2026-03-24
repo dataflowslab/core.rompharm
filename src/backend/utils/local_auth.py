@@ -153,7 +153,6 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
         'role': role_data,
         'role_sections': role_sections,
         'role_menu_items': role_menu_items,
-        'local_role': user.get('local_role'),
         'quick_actions': user.get('quick_actions') or [],
         'token': token,
         'access_token': token  # Alias pentru compatibilitate
@@ -222,7 +221,6 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
         'role': role_data,
         'role_sections': role_sections,
         'role_menu_items': role_menu_items,
-        'local_role': user.get('local_role'),
         'quick_actions': user.get('quick_actions') or []
     }
 

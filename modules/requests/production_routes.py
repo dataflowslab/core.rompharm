@@ -680,7 +680,7 @@ async def sign_production(
     
     # Check authorization
     username = current_user["username"]
-    user_role_id = current_user.get("role") or current_user.get("local_role")
+    user_role_id = current_user.get("role")
 
     from src.backend.utils.approval_helpers import check_user_can_sign
     can_sign = check_user_can_sign(
@@ -829,7 +829,7 @@ async def sign_production_series(
 
     # Check authorization (same logic as production flow)
     username = current_user["username"]
-    user_role_id = current_user.get("role") or current_user.get("local_role")
+    user_role_id = current_user.get("role")
 
     from src.backend.utils.approval_helpers import check_user_can_sign
     can_sign = check_user_can_sign(

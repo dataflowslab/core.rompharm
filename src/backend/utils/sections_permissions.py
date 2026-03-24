@@ -39,7 +39,7 @@ def get_role_sections(db, user: dict) -> Dict[str, List[str]]:
     if isinstance(user.get("role_sections"), dict):
         return _normalize_sections(user.get("role_sections"))
 
-    role_value = user.get("role") or user.get("local_role")
+    role_value = user.get("role")
     if isinstance(role_value, dict) and isinstance(role_value.get("sections"), dict):
         return _normalize_sections(role_value.get("sections"))
 
@@ -62,7 +62,7 @@ def get_role_menu_items(db, user: dict) -> list:
     if isinstance(user.get("role_menu_items"), list):
         return user.get("role_menu_items") or []
 
-    role_value = user.get("role") or user.get("local_role")
+    role_value = user.get("role")
     if isinstance(role_value, dict) and isinstance(role_value.get("menu_items"), list):
         return role_value.get("menu_items") or []
 

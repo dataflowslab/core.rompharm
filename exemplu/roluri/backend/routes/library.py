@@ -29,7 +29,7 @@ def _resolve_user_role(db, username: str) -> tuple[str, str]:
         return '', ''
     users_collection = db['users']
     user_doc = users_collection.find_one({'username': username}) or {}
-    role_id = str(user_doc.get('local_role') or user_doc.get('role') or '')
+    role_id = str(user_doc.get('role') or '')
     role_name = ''
     if role_id:
         try:

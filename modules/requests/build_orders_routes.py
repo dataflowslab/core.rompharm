@@ -131,7 +131,7 @@ def _signature_matches_officer(db, signature: dict, officer: dict) -> bool:
         user = None
     if not user:
         return False
-    user_role = user.get("role") or user.get("local_role")
+    user_role = user.get("role")
     if not user_role:
         return False
     return str(user_role) == role_id
@@ -1175,7 +1175,7 @@ async def sign_build_order_series(
     if existing_signature:
         raise HTTPException(status_code=400, detail="You have already signed this series")
 
-    user_role_id = current_user.get("role") or current_user.get("local_role")
+    user_role_id = current_user.get("role")
     can_sign = check_user_can_sign(
         db,
         user_id,
@@ -1306,7 +1306,7 @@ async def save_build_order_series(
         raise HTTPException(status_code=404, detail="No production flow found")
 
     user_id = str(current_user["_id"])
-    user_role_id = current_user.get("role") or current_user.get("local_role")
+    user_role_id = current_user.get("role")
     can_sign = check_user_can_sign(
         db,
         user_id,

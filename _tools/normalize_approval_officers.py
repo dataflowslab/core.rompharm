@@ -25,7 +25,22 @@ def _is_oid(value) -> bool:
 
 def _normalize_officers_list(db, officers, label: str, field: str):
     original = officers or []
-    normalized = normalize_officers(db, original)
+    sanitized = []
+    for officer in original:
+        if not isinstance(officer, dict):
+            sanitized.append(officer)
+            continue
+        updated = officer.copy()
+        officer_type = (updated.get("type") or "").strip().lower()
+        if officer_type == "role":
+            ref = updated.get("reference")
+            if isinstance(ref, str):
+                cleaned = ref.strip().strip(",").strip()
+                if cleaned != ref:
+                    updated["reference"] = cleaned
+        sanitized.append(updated)
+
+    normalized = normalize_officers(db, sanitized)
     changed = normalized != original
 
     issues = []

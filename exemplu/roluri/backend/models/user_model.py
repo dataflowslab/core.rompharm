@@ -13,7 +13,7 @@ class UserModel:
     @staticmethod
     def create(username: str, token: str,
                firstname: Optional[str] = None, lastname: Optional[str] = None,
-               local_role: Optional[str] = None) -> Dict[Any, Any]:
+               role: Optional[str] = None) -> Dict[Any, Any]:
         """
         Create a new user document
         
@@ -22,7 +22,7 @@ class UserModel:
             token: Authentication token (optional)
             firstname: User's first name
             lastname: User's last name
-            local_role: Local role assigned to user
+            role: Role assigned to user
             
         Returns:
             User document
@@ -32,7 +32,7 @@ class UserModel:
             'token': token,
             'firstname': firstname,
             'lastname': lastname,
-            'local_role': local_role,
+            'role': role,
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow(),
             'last_login': datetime.utcnow()

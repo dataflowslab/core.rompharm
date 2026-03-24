@@ -159,7 +159,7 @@ async def get_user_menu(user = Depends(verify_token)) -> Dict[str, Any]:
     
     try:
         # Get user's role
-        user_role_id = user.get('local_role') or user.get('role')
+        user_role_id = user.get('role')
         
         if not user_role_id:
             # No role assigned - return empty menu

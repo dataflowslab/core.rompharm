@@ -29,7 +29,6 @@ class UserUpdate(BaseModel):
     firstname: Optional[str] = None
     lastname: Optional[str] = None
     role_id: Optional[str] = None
-    local_role: Optional[str] = None
     locations: Optional[list[str]] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None

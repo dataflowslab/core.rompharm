@@ -255,12 +255,6 @@ def update_user(
         else:
             update_data['lastname'] = payload.get('lastname')
 
-    if 'local_role' in payload:
-        if _should_unset(payload.get('local_role')):
-            unset_data['local_role'] = ''
-        else:
-            update_data['local_role'] = payload.get('local_role')
-
     if 'role_id' in payload:
         role_id_value = payload.get('role_id')
         if role_id_value:
