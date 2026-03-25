@@ -656,7 +656,26 @@ def _merge_series_materials(series: list, base_materials: list) -> list:
     base_map = {_material_key(m): m for m in base_materials}
     for serie in series:
         existing = serie.get("materials", []) or []
-        existing_map = {_material_key(m): m for m in existing}
+        existing_map = {}
+        for material in existing:
+            key = _material_key(material)
+            base = base_map.get(key)
+            if base:
+                for field in [
+                    "part_name",
+                    "batch",
+                    "received_qty",
+                    "request_reference",
+                    "request_issue_date",
+                    "request_id",
+                    "request_item_index",
+                    "source_location_id",
+                    "destination_location_id",
+                    "part"
+                ]:
+                    if material.get(field) in (None, "") and base.get(field) not in (None, ""):
+                        material[field] = base.get(field)
+            existing_map[key] = material
 
         merged = list(existing_map.values())
         for key, base in base_map.items():
@@ -684,6 +703,136 @@ def _build_series(batch_codes: list, base_materials: list, default_step_id: Opti
     return series
 
 
+def _normalize_batch_code_value(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _get_group_batch_codes(build_order: dict) -> list[str]:
+    raw_codes = build_order.get("grup", {}).get("batch_codes") or [
+        build_order.get("batch_code_text") or build_order.get("batch_code")
+    ]
+    cleaned = []
+    seen = set()
+    for code in raw_codes or []:
+        text = _normalize_batch_code_value(code)
+        if not text or text in seen:
+            continue
+        cleaned.append(text)
+        seen.add(text)
+    return cleaned
+
+
+def _build_group_build_orders(db, batch_codes: list[str]) -> tuple[list[dict], dict[str, str]]:
+    owner_by_code: dict[str, str] = {}
+    if not batch_codes:
+        return [], owner_by_code
+
+    numeric_codes = []
+    for code in batch_codes:
+        if str(code).isdigit():
+            try:
+                numeric_codes.append(int(str(code)))
+            except Exception:
+                continue
+
+    query_or = [{"batch_code_text": {"$in": batch_codes}}]
+    if numeric_codes:
+        query_or.append({"batch_code": {"$in": numeric_codes}})
+
+    build_orders = list(db.depo_build_orders.find(
+        {"$or": query_or},
+        {"_id": 1, "batch_code_text": 1, "batch_code": 1}
+    ))
+
+    for bo in build_orders:
+        code = _normalize_batch_code_value(bo.get("batch_code_text") or bo.get("batch_code"))
+        if not code or code not in batch_codes:
+            continue
+        if code not in owner_by_code:
+            owner_by_code[code] = str(bo["_id"])
+
+    group_build_orders = [
+        {"batch_code": code, "build_order_id": owner_by_code.get(code)}
+        for code in batch_codes
+        if owner_by_code.get(code)
+    ]
+    return group_build_orders, owner_by_code
+
+
+def _as_naive_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+    except Exception:
+        return None
+
+
+def _collect_group_series(
+    db,
+    batch_codes: list[str],
+    owner_by_code: dict[str, str],
+    base_materials: list,
+    default_step_id: Optional[str] = None
+) -> tuple[list, list]:
+    group_ids = []
+    for build_order_id in owner_by_code.values():
+        if isinstance(build_order_id, ObjectId):
+            group_ids.append(build_order_id)
+        elif isinstance(build_order_id, str) and ObjectId.is_valid(build_order_id):
+            group_ids.append(ObjectId(build_order_id))
+
+    productions = []
+    if group_ids:
+        productions = list(db.depo_build_production.find({"build_order_id": {"$in": group_ids}}))
+
+    series_by_code: dict[str, dict] = {}
+    rank_by_code: dict[str, tuple] = {}
+
+    for production in productions:
+        prod_updated = _as_naive_datetime(production.get("updated_at") or production.get("created_at")) or datetime.min
+        prod_build_id = str(production.get("build_order_id"))
+        for serie in production.get("series", []) or []:
+            code = _normalize_batch_code_value(serie.get("batch_code"))
+            if not code or code not in batch_codes:
+                continue
+            owner_match = 1 if owner_by_code.get(code) == prod_build_id else 0
+            saved_at = _as_naive_datetime(serie.get("saved_at"))
+            saved_flag = 1 if saved_at else 0
+            rank = (owner_match, saved_flag, saved_at or datetime.min, prod_updated)
+            if code not in rank_by_code or rank > rank_by_code[code]:
+                series_by_code[code] = serie
+                rank_by_code[code] = rank
+
+    series = []
+    for code in batch_codes:
+        serie = series_by_code.get(code)
+        if not serie:
+            serie = {
+                "batch_code": code,
+                "produced_qty": 0,
+                "expiry_date": "",
+                "production_step_id": default_step_id or "",
+                "decision_status": "",
+                "decision_reason": "",
+                "signatures": [],
+                "saved_at": None,
+                "saved_by": None,
+                "materials": base_materials
+            }
+        series.append(serie)
+
+    series = _merge_series_materials(series, base_materials)
+    series = _apply_series_defaults(series, default_step_id)
+    series = _fix_oid(series)
+    return series, productions
+
+
 @router.get("/{build_order_id}/production")
 async def get_build_order_production(
     build_order_id: str,
@@ -700,52 +849,44 @@ async def get_build_order_production(
         raise HTTPException(status_code=404, detail="Build order not found")
 
     default_step_id = _get_product_step_id(db, build_order)
-    build_order = _fix_oid(build_order)
     prefix = build_order.get("batch_prefix") or normalize_batch_code(build_order.get("batch_code_text") or build_order.get("batch_code"))[2]
 
     open_requests = _get_related_requests(db, prefix, open_only=True)
     base_materials = _build_materials_from_requests(db, open_requests)
 
+    batch_codes = _get_group_batch_codes(build_order)
+    current_batch_code = _normalize_batch_code_value(build_order.get("batch_code_text") or build_order.get("batch_code"))
+    if not current_batch_code and batch_codes:
+        current_batch_code = batch_codes[0]
+
+    group_build_orders, owner_by_code = _build_group_build_orders(db, batch_codes)
+    if current_batch_code:
+        owner_by_code.setdefault(current_batch_code, str(build_oid))
+    group_build_orders = [
+        {"batch_code": code, "build_order_id": owner_by_code.get(code)}
+        for code in batch_codes
+        if owner_by_code.get(code)
+    ]
+
     production = db.depo_build_production.find_one({"build_order_id": build_oid})
+    if not production:
+        init_codes = [current_batch_code] if current_batch_code else batch_codes
+        production_data = {
+            "build_order_id": build_oid,
+            "series": _build_series(init_codes, base_materials, default_step_id),
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        result = db.depo_build_production.insert_one(production_data)
+        production = production_data
+        production["_id"] = result.inserted_id
 
-    batch_codes = build_order.get("grup", {}).get("batch_codes") or [build_order.get("batch_code_text") or build_order.get("batch_code")]
-    batch_codes = [str(c) for c in batch_codes if str(c)]
+    series, _ = _collect_group_series(db, batch_codes, owner_by_code, base_materials, default_step_id)
 
-    if production:
-        production = _fix_oid(production)
-        series = production.get("series", [])
-        series = _merge_series_materials(series, base_materials)
-
-        existing_codes = {str(s.get("batch_code")) for s in series}
-        for code in batch_codes:
-            if str(code) not in existing_codes:
-                series.append({
-                    "batch_code": code,
-                    "produced_qty": 0,
-                    "expiry_date": "",
-                    "production_step_id": default_step_id or "",
-                    "decision_status": "",
-                    "decision_reason": "",
-                    "signatures": [],
-                    "saved_at": None,
-                    "saved_by": None,
-                    "materials": base_materials
-                })
-
-        production["series"] = _apply_series_defaults(series, default_step_id)
-        return production
-
-    production_data = {
-        "build_order_id": build_oid,
-        "series": _build_series(batch_codes, base_materials, default_step_id),
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
-    }
-
-    result = db.depo_build_production.insert_one(production_data)
-    production_data["_id"] = str(result.inserted_id)
-    production_data["build_order_id"] = str(build_oid)
-    return production_data
+    production_payload = _fix_oid(production)
+    production_payload["series"] = series
+    production_payload["group_build_orders"] = group_build_orders
+    return production_payload
 
 
 @router.get("/{build_order_id}/production-remaining")
@@ -759,16 +900,38 @@ async def get_build_order_production_remaining(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid build order ID")
 
+    build_order = db.depo_build_orders.find_one({"_id": build_oid})
+    if not build_order:
+        raise HTTPException(status_code=404, detail="Build order not found")
+    _ensure_build_order_scope(db, current_user, build_order)
+
     production = db.depo_build_production.find_one({"build_order_id": build_oid})
     if not production:
         raise HTTPException(status_code=404, detail="Production data not found")
 
-    series = production.get("series", []) or []
+    default_step_id = _get_product_step_id(db, build_order)
+    prefix = build_order.get("batch_prefix") or normalize_batch_code(build_order.get("batch_code_text") or build_order.get("batch_code"))[2]
+    open_requests = _get_related_requests(db, prefix, open_only=True)
+    base_materials = _build_materials_from_requests(db, open_requests)
+
+    batch_codes = _get_group_batch_codes(build_order)
+    current_batch_code = _normalize_batch_code_value(build_order.get("batch_code_text") or build_order.get("batch_code"))
+    group_build_orders, owner_by_code = _build_group_build_orders(db, batch_codes)
+    if current_batch_code:
+        owner_by_code.setdefault(current_batch_code, str(build_oid))
+
+    series, productions = _collect_group_series(db, batch_codes, owner_by_code, base_materials, default_step_id)
     remaining_items = _build_remaining_materials(db, series)
+
+    return_orders = []
+    for prod in productions:
+        if prod.get("return_orders"):
+            return_orders = prod.get("return_orders") or []
+            break
 
     return {
         "items": remaining_items,
-        "return_orders": production.get("return_orders") or []
+        "return_orders": return_orders
     }
 
 
@@ -950,6 +1113,21 @@ async def save_build_order_production(
 
     body = await request.json()
     series = body.get("series", [])
+    current_batch_code = _normalize_batch_code_value(build_order.get("batch_code_text") or build_order.get("batch_code"))
+    if current_batch_code:
+        series = [s for s in series if _normalize_batch_code_value(s.get("batch_code")) == current_batch_code]
+        conflict = db.depo_build_production.find_one({
+            "build_order_id": {"$ne": build_oid},
+            "series": {"$elemMatch": {
+                "batch_code": current_batch_code,
+                "saved_at": {"$exists": True, "$ne": None}
+            }}
+        })
+        if conflict:
+            raise HTTPException(status_code=400, detail="Series already saved in another build order")
+
+    if not series:
+        raise HTTPException(status_code=400, detail="No valid production series found for this build order")
 
     default_step_id = _get_product_step_id(db, build_order)
     if default_step_id:
@@ -961,7 +1139,6 @@ async def save_build_order_production(
     existing = db.depo_build_production.find_one({"build_order_id": build_oid})
     if existing:
         existing_series_map = {str(s.get("batch_code")): s for s in existing.get("series", []) or []}
-        merged_series = []
         for serie in series:
             key = str(serie.get("batch_code"))
             existing_serie = existing_series_map.get(key, {})
@@ -970,8 +1147,8 @@ async def save_build_order_production(
                 serie["saved_by"] = existing_serie.get("saved_by")
             if existing_serie.get("signatures") and not serie.get("signatures"):
                 serie["signatures"] = existing_serie.get("signatures")
-            merged_series.append(serie)
-        series = merged_series
+            existing_series_map[key] = serie
+        series = list(existing_series_map.values())
 
         db.depo_build_production.update_one(
             {"_id": existing["_id"]},
@@ -1106,6 +1283,25 @@ async def sign_build_order_series(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid build order ID")
 
+    build_order = db.depo_build_orders.find_one({"_id": build_oid})
+    if not build_order:
+        raise HTTPException(status_code=404, detail="Build order not found")
+    _ensure_build_order_scope(db, current_user, build_order)
+
+    current_batch_code = _normalize_batch_code_value(build_order.get("batch_code_text") or build_order.get("batch_code"))
+    if current_batch_code and _normalize_batch_code_value(batch_code) != current_batch_code:
+        raise HTTPException(status_code=400, detail="You can only sign the current build order batch code")
+    if current_batch_code:
+        conflict = db.depo_build_production.find_one({
+            "build_order_id": {"$ne": build_oid},
+            "series": {"$elemMatch": {
+                "batch_code": current_batch_code,
+                "saved_at": {"$exists": True, "$ne": None}
+            }}
+        })
+        if conflict:
+            raise HTTPException(status_code=400, detail="Series already saved in another build order")
+
     production = db.depo_build_production.find_one({"build_order_id": build_oid})
     if not production:
         raise HTTPException(status_code=404, detail="Production data not found")
@@ -1132,9 +1328,6 @@ async def sign_build_order_series(
         if field in serie_payload:
             serie_candidate[field] = serie_payload.get(field)
 
-    build_order = db.depo_build_orders.find_one({"_id": build_oid})
-    if build_order:
-        _ensure_build_order_scope(db, current_user, build_order)
     default_step_id = _get_product_step_id(db, build_order) if build_order else None
     if not serie_candidate.get("production_step_id") and default_step_id:
         serie_candidate["production_step_id"] = default_step_id
@@ -1219,7 +1412,15 @@ async def sign_build_order_series(
     )
 
     try:
-        _update_requests_open_status(db, series)
+        prefix = build_order.get("batch_prefix") or normalize_batch_code(build_order.get("batch_code_text") or build_order.get("batch_code"))[2]
+        open_requests = _get_related_requests(db, prefix, open_only=True)
+        base_materials = _build_materials_from_requests(db, open_requests)
+        batch_codes = _get_group_batch_codes(build_order)
+        _, owner_by_code = _build_group_build_orders(db, batch_codes)
+        if current_batch_code:
+            owner_by_code.setdefault(current_batch_code, str(build_oid))
+        group_series, _ = _collect_group_series(db, batch_codes, owner_by_code, base_materials, default_step_id)
+        _update_requests_open_status(db, group_series)
     except Exception as e:
         print(f"[BUILD_ORDERS] Warning: Failed to update requests open status: {e}")
 
@@ -1358,14 +1559,41 @@ async def create_build_order_return_orders(
     if not build_order:
         raise HTTPException(status_code=404, detail="Build order not found")
 
+    current_batch_code = _normalize_batch_code_value(build_order.get("batch_code_text") or build_order.get("batch_code"))
+    if current_batch_code and _normalize_batch_code_value(batch_code) != current_batch_code:
+        raise HTTPException(status_code=400, detail="You can only save the current build order batch code")
+    if current_batch_code:
+        conflict = db.depo_build_production.find_one({
+            "build_order_id": {"$ne": build_oid},
+            "series": {"$elemMatch": {
+                "batch_code": current_batch_code,
+                "saved_at": {"$exists": True, "$ne": None}
+            }}
+        })
+        if conflict:
+            raise HTTPException(status_code=400, detail="Series already saved in another build order")
+
     production = db.depo_build_production.find_one({"build_order_id": build_oid})
     if not production:
         raise HTTPException(status_code=404, detail="Production data not found")
 
-    if production.get("return_orders"):
-        return {"return_orders": production.get("return_orders")}
+    default_step_id = _get_product_step_id(db, build_order)
+    prefix = build_order.get("batch_prefix") or normalize_batch_code(build_order.get("batch_code_text") or build_order.get("batch_code"))[2]
+    open_requests = _get_related_requests(db, prefix, open_only=True)
+    base_materials = _build_materials_from_requests(db, open_requests)
 
-    series = production.get("series", []) or []
+    batch_codes = _get_group_batch_codes(build_order)
+    current_batch_code = _normalize_batch_code_value(build_order.get("batch_code_text") or build_order.get("batch_code"))
+    _, owner_by_code = _build_group_build_orders(db, batch_codes)
+    if current_batch_code:
+        owner_by_code.setdefault(current_batch_code, str(build_oid))
+
+    series, productions = _collect_group_series(db, batch_codes, owner_by_code, base_materials, default_step_id)
+
+    for prod in productions:
+        if prod.get("return_orders"):
+            return {"return_orders": prod.get("return_orders")}
+
     if any(not serie.get("saved_at") for serie in series):
         raise HTTPException(status_code=400, detail="All series must be saved before creating return orders")
 
@@ -1476,15 +1704,33 @@ async def create_build_order_return_orders(
             "source_location_id": entry.get("source_location_id")
         })
 
-    db.depo_build_production.update_one(
-        {"_id": production["_id"]},
-        {"$set": {
-            "unused_materials": unused_materials,
-            "return_orders": created_orders,
-            "updated_at": timestamp,
-            "updated_by": current_user.get("username")
-        }}
-    )
+    group_ids = []
+    for build_order_id in owner_by_code.values():
+        if isinstance(build_order_id, ObjectId):
+            group_ids.append(build_order_id)
+        elif isinstance(build_order_id, str) and ObjectId.is_valid(build_order_id):
+            group_ids.append(ObjectId(build_order_id))
+
+    if group_ids:
+        db.depo_build_production.update_many(
+            {"build_order_id": {"$in": group_ids}},
+            {"$set": {
+                "unused_materials": unused_materials,
+                "return_orders": created_orders,
+                "updated_at": timestamp,
+                "updated_by": current_user.get("username")
+            }}
+        )
+    else:
+        db.depo_build_production.update_one(
+            {"_id": production["_id"]},
+            {"$set": {
+                "unused_materials": unused_materials,
+                "return_orders": created_orders,
+                "updated_at": timestamp,
+                "updated_by": current_user.get("username")
+            }}
+        )
 
     return {"return_orders": created_orders}
 

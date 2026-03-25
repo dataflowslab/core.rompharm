@@ -15,6 +15,37 @@ from .approval_helpers import check_flow_completion, enrich_flow_with_user_detai
 
 router = APIRouter()
 
+REJECT_TOKENS = [
+    "refused", "reject", "rejected", "refuz", "refuzat",
+    "canceled", "cancelled", "cancel", "anulat", "anulare"
+]
+
+
+def _is_rejected_state(state: dict) -> bool:
+    if not state:
+        return False
+    name = (state.get("name") or "").lower()
+    slug = (state.get("slug") or "").lower()
+    return any(token in name or token in slug for token in REJECT_TOKENS)
+
+
+def _get_location_detail(db, location_id):
+    if not location_id:
+        return None
+    try:
+        loc_oid = ObjectId(location_id) if isinstance(location_id, str) else location_id
+    except Exception:
+        return None
+    loc = db.depo_locations.find_one({"_id": loc_oid})
+    if not loc:
+        return None
+    return {
+        "_id": str(loc["_id"]),
+        "name": loc.get("code", str(loc["_id"])),
+        "code": loc.get("code", ""),
+        "description": loc.get("description", "")
+    }
+
 
 @router.get("/{request_id}/reception-flow")
 async def get_request_reception_flow(
@@ -356,6 +387,33 @@ async def update_reception_status(
             'state_order': state.get('order', 0),
             'updated_at': timestamp
         }
+
+        is_rejected = _is_rejected_state(state)
+        request_doc = requests_collection.find_one({'_id': req_obj_id})
+        if request_doc and is_rejected:
+            source_id = request_doc.get('source')
+            destination_id = request_doc.get('destination')
+
+            if source_id:
+                update_data['destination'] = source_id
+                update_data['reception_return_to_sender'] = True
+
+            if destination_id and not request_doc.get('reception_initial_destination'):
+                update_data['reception_initial_destination'] = destination_id
+
+            update_data['reception_rejected_at'] = timestamp
+            update_data['reception_rejected_by'] = {
+                'user_id': str(current_user.get('_id')),
+                'username': current_user.get('username')
+            }
+            update_data['reception_rejected_state_id'] = state_id
+            update_data['reception_rejected_state_name'] = state.get('name')
+            update_data['reception_rejected_reason'] = reason if reason else None
+
+            status_log_entry['return_to_sender'] = True
+            status_log_entry['initial_destination_id'] = str(destination_id) if destination_id else None
+            status_log_entry['rejected_by_user_id'] = str(current_user.get('_id'))
+            status_log_entry['rejected_by_username'] = current_user.get('username')
         
         requests_collection.update_one(
             {'_id': req_obj_id},
@@ -366,8 +424,7 @@ async def update_reception_status(
         )
         
         # Log to audit logs
-        is_rejected = 'reject' in state.get('slug', '').lower() or 'refuse' in state.get('slug', '').lower()
-        db.logs.insert_one({
+        audit_entry = {
             'collection': 'depo_requests',
             'object_id': request_id,
             'action': 'reception_decision',
@@ -377,7 +434,28 @@ async def update_reception_status(
             'reason': reason if is_rejected else '',
             'user': current_user.get('username'),
             'timestamp': timestamp
-        })
+        }
+        if is_rejected and request_doc:
+            audit_entry['return_to_sender'] = True
+            audit_entry['initial_destination_id'] = str(request_doc.get('destination')) if request_doc.get('destination') else None
+            audit_entry['source_id'] = str(request_doc.get('source')) if request_doc.get('source') else None
+        db.logs.insert_one(audit_entry)
+
+        if is_rejected and request_doc:
+            initial_dest_detail = _get_location_detail(db, request_doc.get('destination'))
+            source_detail = _get_location_detail(db, request_doc.get('source'))
+            db.logs.insert_one({
+                'collection': 'depo_requests',
+                'object_id': request_id,
+                'action': 'reception_return_to_sender',
+                'initial_destination_id': str(request_doc.get('destination')) if request_doc.get('destination') else None,
+                'initial_destination_name': initial_dest_detail.get('name') if initial_dest_detail else None,
+                'source_id': str(request_doc.get('source')) if request_doc.get('source') else None,
+                'source_name': source_detail.get('name') if source_detail else None,
+                'rejected_by': current_user.get('username'),
+                'reason': reason if reason else '',
+                'timestamp': timestamp
+            })
         
         print(f"[REQUESTS] Request {request_id} state_id updated to {state.get('name')} ({status})")
         
@@ -403,6 +481,7 @@ async def update_reception_status(
                     source_id = ObjectId(source_id)
                 if isinstance(destination_id, str):
                     destination_id = ObjectId(destination_id)
+                same_location = source_id == destination_id
                 
                 # Create stock movements for each item
                 stocks_collection = db['depo_stocks']
@@ -439,93 +518,93 @@ async def update_reception_status(
                         print(f"[REQUESTS] Warning: No stock found at source for part {part_id}, batch {batch_code}")
                         continue
                     
-                    # Transfer stock from source to destination
-                    remaining_qty = quantity
-                    first_state_id = None
-                    
-                    for source_stock in source_stocks:
-                        if remaining_qty <= 0:
-                            break
-                        
-                        available_qty = source_stock.get('quantity', 0)
-                        transfer_qty = min(remaining_qty, available_qty)
-                        if first_state_id is None:
-                            first_state_id = source_stock.get('state_id')
-                        
-                        # Reduce quantity at source
-                        stocks_collection.update_one(
-                            {'_id': source_stock['_id']},
-                            {
-                                '$inc': {'quantity': -transfer_qty},
-                                '$set': {'updated_at': timestamp}
-                            }
-                        )
-                        
-                        # Create or update stock at destination
-                        dest_stock_query = {
-                            'part_id': part_id,
-                            'location_id': destination_id,
-                            'batch_code': source_stock.get('batch_code', ''),
-                            'state_id': source_stock.get('state_id')
-                        }
-                        
-                        dest_stock = stocks_collection.find_one(dest_stock_query)
-                        
-                        if dest_stock:
-                            # Update existing stock
+                    first_state_id = source_stocks[0].get('state_id') if source_stocks else None
+                    if not same_location:
+                        # Transfer stock from source to destination
+                        remaining_qty = quantity
+                        for source_stock in source_stocks:
+                            if remaining_qty <= 0:
+                                break
+
+                            available_qty = source_stock.get('quantity', 0)
+                            transfer_qty = min(remaining_qty, available_qty)
+                            if first_state_id is None:
+                                first_state_id = source_stock.get('state_id')
+
+                            # Reduce quantity at source
                             stocks_collection.update_one(
-                                {'_id': dest_stock['_id']},
+                                {'_id': source_stock['_id']},
                                 {
-                                    '$inc': {'quantity': transfer_qty},
+                                    '$inc': {'quantity': -transfer_qty},
                                     '$set': {'updated_at': timestamp}
                                 }
                             )
-                        else:
-                            # Create new stock entry at destination
-                            new_stock = {
+
+                            # Create or update stock at destination
+                            dest_stock_query = {
                                 'part_id': part_id,
                                 'location_id': destination_id,
-                                'quantity': transfer_qty,
                                 'batch_code': source_stock.get('batch_code', ''),
-                                'supplier_batch_code': source_stock.get('supplier_batch_code', ''),
-                                'serial_numbers': source_stock.get('serial_numbers', ''),
-                                'packaging': source_stock.get('packaging', ''),
-                                'state_id': source_stock.get('state_id'),
-                                'notes': f"Transferred from request {request_doc.get('reference', request_id)}",
-                                'supplier_id': source_stock.get('supplier_id'),
-                                'supplier_um_id': source_stock.get('supplier_um_id'),
-                                'manufacturing_date': source_stock.get('manufacturing_date'),
-                                'expiry_date': source_stock.get('expiry_date'),
-                                'reset_date': source_stock.get('reset_date'),
-                                'created_at': timestamp,
-                                'updated_at': timestamp,
-                                'created_by': current_user.get('username'),
-                                'updated_by': current_user.get('username'),
-                                'request_id': req_obj_id,
-                                'request_reference': request_doc.get('reference')
+                                'state_id': source_stock.get('state_id')
                             }
-                            stocks_collection.insert_one(new_stock)
-                        
-                        # Log the movement
-                        db.logs.insert_one({
-                            'collection': 'depo_stocks',
-                            'action': 'stock_transfer',
-                            'request_id': request_id,
-                            'request_reference': request_doc.get('reference'),
-                            'part_id': str(part_id),
-                            'quantity': transfer_qty,
-                            'from_location': str(source_id),
-                            'to_location': str(destination_id),
-                            'batch_code': source_stock.get('batch_code', ''),
-                            'user': current_user.get('username'),
-                            'timestamp': timestamp
-                        })
-                        
-                        remaining_qty -= transfer_qty
-                        movements_created += 1
-                    
-                    if remaining_qty > 0:
-                        print(f"[REQUESTS] Warning: Could not transfer full quantity for part {part_id}. Remaining: {remaining_qty}")
+
+                            dest_stock = stocks_collection.find_one(dest_stock_query)
+
+                            if dest_stock:
+                                # Update existing stock
+                                stocks_collection.update_one(
+                                    {'_id': dest_stock['_id']},
+                                    {
+                                        '$inc': {'quantity': transfer_qty},
+                                        '$set': {'updated_at': timestamp}
+                                    }
+                                )
+                            else:
+                                # Create new stock entry at destination
+                                new_stock = {
+                                    'part_id': part_id,
+                                    'location_id': destination_id,
+                                    'quantity': transfer_qty,
+                                    'batch_code': source_stock.get('batch_code', ''),
+                                    'supplier_batch_code': source_stock.get('supplier_batch_code', ''),
+                                    'serial_numbers': source_stock.get('serial_numbers', ''),
+                                    'packaging': source_stock.get('packaging', ''),
+                                    'state_id': source_stock.get('state_id'),
+                                    'notes': f"Transferred from request {request_doc.get('reference', request_id)}",
+                                    'supplier_id': source_stock.get('supplier_id'),
+                                    'supplier_um_id': source_stock.get('supplier_um_id'),
+                                    'manufacturing_date': source_stock.get('manufacturing_date'),
+                                    'expiry_date': source_stock.get('expiry_date'),
+                                    'reset_date': source_stock.get('reset_date'),
+                                    'created_at': timestamp,
+                                    'updated_at': timestamp,
+                                    'created_by': current_user.get('username'),
+                                    'updated_by': current_user.get('username'),
+                                    'request_id': req_obj_id,
+                                    'request_reference': request_doc.get('reference')
+                                }
+                                stocks_collection.insert_one(new_stock)
+
+                            # Log the movement
+                            db.logs.insert_one({
+                                'collection': 'depo_stocks',
+                                'action': 'stock_transfer',
+                                'request_id': request_id,
+                                'request_reference': request_doc.get('reference'),
+                                'part_id': str(part_id),
+                                'quantity': transfer_qty,
+                                'from_location': str(source_id),
+                                'to_location': str(destination_id),
+                                'batch_code': source_stock.get('batch_code', ''),
+                                'user': current_user.get('username'),
+                                'timestamp': timestamp
+                            })
+
+                            remaining_qty -= transfer_qty
+                            movements_created += 1
+
+                        if remaining_qty > 0:
+                            print(f"[REQUESTS] Warning: Could not transfer full quantity for part {part_id}. Remaining: {remaining_qty}")
 
                     # Track desired movement state
                     if first_state_id == qt_state_id:

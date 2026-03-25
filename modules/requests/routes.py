@@ -531,6 +531,24 @@ async def get_request(
                 }
         except Exception as e:
             print(f"Warning: Failed to get destination location: {e}")
+
+    # Get initial destination details if request was rejected/returned
+    if req.get('reception_initial_destination'):
+        try:
+            init_dest = req.get('reception_initial_destination')
+            init_dest_oid = ObjectId(init_dest) if isinstance(init_dest, str) else init_dest
+            init_dest_loc = locations_collection.find_one({'_id': init_dest_oid})
+            if init_dest_loc:
+                req['reception_initial_destination_detail'] = {
+                    '_id': str(init_dest_loc['_id']),
+                    'name': init_dest_loc.get('code', str(init_dest_loc['_id'])),
+                    'code': init_dest_loc.get('code', ''),
+                    'description': init_dest_loc.get('description', '')
+                }
+                if isinstance(req.get('reception_initial_destination'), ObjectId):
+                    req['reception_initial_destination'] = str(req.get('reception_initial_destination'))
+        except Exception as e:
+            print(f"Warning: Failed to get initial destination: {e}")
     
     # Get part details for each item from MongoDB depo_parts
     if req.get('items'):
@@ -622,6 +640,15 @@ async def get_request(
     # Convert state_id if present
     if 'state_id' in req and isinstance(req['state_id'], ObjectId):
         req['state_id'] = str(req['state_id'])
+
+    if 'reception_initial_destination' in req and isinstance(req['reception_initial_destination'], ObjectId):
+        req['reception_initial_destination'] = str(req['reception_initial_destination'])
+    if 'reception_rejected_state_id' in req and isinstance(req['reception_rejected_state_id'], ObjectId):
+        req['reception_rejected_state_id'] = str(req['reception_rejected_state_id'])
+    if isinstance(req.get('reception_rejected_by'), dict):
+        user_id = req['reception_rejected_by'].get('user_id')
+        if isinstance(user_id, ObjectId):
+            req['reception_rejected_by']['user_id'] = str(user_id)
     
     # Convert recipe ObjectIds if present
     if 'recipe_id' in req and isinstance(req['recipe_id'], ObjectId):

@@ -47,6 +47,26 @@ interface RequestItem {
   received_quantity?: number;
 }
 
+interface LocationDetail {
+  _id: string;
+  name: string;
+  code?: string;
+  description?: string;
+}
+
+interface RequestMeta {
+  source_detail?: LocationDetail;
+  destination_detail?: LocationDetail;
+  reception_initial_destination_detail?: LocationDetail;
+  reception_return_to_sender?: boolean;
+  reception_rejected_by?: {
+    user_id?: string;
+    username?: string;
+  };
+  reception_rejected_state_name?: string;
+  reception_rejected_reason?: string;
+}
+
 interface ReceptieTabProps {
   requestId: string;
   onReload: () => void;
@@ -64,7 +84,24 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
   const [submitting, setSubmitting] = useState(false);
   const [stateOrder, setStateOrder] = useState<number>(0);
   const [availableStates, setAvailableStates] = useState<any[]>([]);
+  const [requestMeta, setRequestMeta] = useState<RequestMeta | null>(null);
   const canRemoveSignatures = hasSectionPermission(roleSections, 'requests', 'delete');
+
+  const REJECT_TOKENS = ['refused', 'reject', 'rejected', 'refuz', 'refuzat', 'canceled', 'cancelled', 'cancel', 'anulat', 'anulare'];
+
+  const isRejectedState = (state?: any) => {
+    if (!state) return false;
+    const name = (state.name || '').toLowerCase();
+    const slug = (state.slug || '').toLowerCase();
+    return REJECT_TOKENS.some(token => name.includes(token) || slug.includes(token));
+  };
+
+  const isCanceledState = (state?: any) => {
+    if (!state) return false;
+    const name = (state.name || '').toLowerCase();
+    const slug = (state.slug || '').toLowerCase();
+    return ['canceled', 'cancelled', 'cancel', 'anulat', 'anulare'].some(token => name.includes(token) || slug.includes(token));
+  };
 
   useEffect(() => {
     loadReceptionFlow();
@@ -116,6 +153,15 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     try {
       const response = await api.get(requestsApi.getRequest(requestId));
       const requestItems = response.data.items || [];
+      setRequestMeta({
+        source_detail: response.data.source_detail,
+        destination_detail: response.data.destination_detail,
+        reception_initial_destination_detail: response.data.reception_initial_destination_detail,
+        reception_return_to_sender: response.data.reception_return_to_sender,
+        reception_rejected_by: response.data.reception_rejected_by,
+        reception_rejected_state_name: response.data.reception_rejected_state_name,
+        reception_rejected_reason: response.data.reception_rejected_reason
+      });
       setStateOrder(response.data.state_order || 0);
       
       // Load last status from status_log for receive_stock scene
@@ -268,17 +314,23 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
       
       await api.patch(requestsApi.updateReceptionStatus(requestId), payload);
 
-      // Auto-sign after saving decision
-      console.log('[ReceptieTab] Auto-signing after save decision...');
-      await api.post(requestsApi.signReception(requestId));
+      const rejectedDecision = isRejectedState(selectedState);
+      if (!rejectedDecision) {
+        // Auto-sign after saving decision
+        console.log('[ReceptieTab] Auto-signing after save decision...');
+        await api.post(requestsApi.signReception(requestId));
+      }
 
       notifications.show({
         title: t('Success'),
-        message: t('Decision saved and signed successfully'),
+        message: rejectedDecision
+          ? t('Decision saved successfully')
+          : t('Decision saved and signed successfully'),
         color: 'green'
       });
       
       await loadReceptionFlow();
+      await loadRequestItems();
       onReload();
     } catch (error: any) {
       console.error('Failed to update status or sign:', error);
@@ -370,7 +422,32 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
     return !!(flow && flow.signatures.length > 0);
   };
 
-  const isFormReadonly = hasAnySignature();
+  const isReturnToSender = requestMeta?.reception_return_to_sender === true;
+
+  const getRejectionMessage = () => {
+    const selectedState = availableStates.find(s => s._id === finalStatus);
+    const rejectedState =
+      isRejectedState(selectedState) ||
+      isRejectedState({ name: requestMeta?.reception_rejected_state_name || '', slug: '' });
+    if (!isReturnToSender || !rejectedState) return null;
+    const stateName = (selectedState?.name || requestMeta?.reception_rejected_state_name || '').toLowerCase();
+    const isCanceled = stateName
+      ? ['canceled', 'cancelled', 'cancel', 'anulat', 'anulare'].some(token => stateName.includes(token))
+      : false;
+    const actionLabel = isCanceled ? t('Canceled by') : t('Refused by');
+    const rejectedBy = requestMeta?.reception_rejected_by?.username || '-';
+    const senderName = requestMeta?.source_detail?.name || t('Expeditor');
+    const initialDest = requestMeta?.reception_initial_destination_detail?.name;
+    return {
+      headline: `${actionLabel} ${rejectedBy}. ${t('Goods are set to return to')} ${senderName}.`,
+      initialDest
+    };
+  };
+
+  const rejectionMessage = getRejectionMessage();
+  const selectedDecisionState = availableStates.find(s => s._id === finalStatus);
+  const isRejectedDecision = isRejectedState(selectedDecisionState);
+  const allowDecisionEditAfterReturn = isReturnToSender && isRejectedDecision;
 
   if (loading) {
     return <Paper p="md"><Text>{t('Loading...')}</Text></Paper>;
@@ -427,8 +504,20 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
           <Grid.Col span={4}>
             <Paper withBorder p="md">
               <Title order={5} mb="md">{t('Decision')}</Title>
-              {/* Only show decision section if user can sign (hasn't signed yet) and flow not completed */}
-              {!hasAnySignature() && canUserSignInitially() && !isFlowCompleted() ? (
+              {rejectionMessage && (
+                <>
+                  <Text size="sm" c="orange" fw={600}>
+                    {rejectionMessage.headline}
+                  </Text>
+                  {rejectionMessage.initialDest && (
+                    <Text size="xs" c="dimmed" mb="md">
+                      {t('Initial destination')}: {rejectionMessage.initialDest}
+                    </Text>
+                  )}
+                </>
+              )}
+              {/* Only show decision section if user can sign */}
+              {(!hasAnySignature() || allowDecisionEditAfterReturn) && canUserSignInitially() && (!isFlowCompleted() || allowDecisionEditAfterReturn) ? (
                 <DecisionSection
                   status={finalStatus}
                   reason={refusalReason}
@@ -441,7 +530,7 @@ export function ReceptieTab({ requestId, onReload }: ReceptieTabProps) {
                 />
               ) : (
                 <Text size="sm" c="dimmed">
-                  {hasAnySignature() ? t('Decision already made') : 
+                  {hasAnySignature() && !allowDecisionEditAfterReturn ? t('Decision already made') : 
                    isFlowCompleted() ? t('Flow completed') : 
                    t('You are not authorized to make a decision')}
                 </Text>

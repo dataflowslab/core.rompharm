@@ -141,7 +141,7 @@ export function BuildOrderDetailPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="production" pt="md">
-          {id && hasSavedProduct ? <BuildOrderProductionTab buildOrderId={id} /> : (
+          {id && hasSavedProduct ? <BuildOrderProductionTab buildOrderId={id} currentBatchCode={String(batchCode || '')} /> : (
             <Paper p="md" withBorder>
               <Text c="dimmed">
                 {t('Select and save a product in Details before using Production.')}

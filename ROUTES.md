@@ -1,5 +1,5 @@
 # API Routes Documentation
-**Last Updated:** 2026-03-25 01:07:27
+**Last Updated:** 2026-03-25 23:15:37
 **Auto-generated** - Do not edit manually. Run `python src/scripts/generate_routes_doc.py` to update.
 ---
 ## 🌐 Global Platform Routes

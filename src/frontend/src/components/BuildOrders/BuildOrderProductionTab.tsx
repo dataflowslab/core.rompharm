@@ -66,6 +66,7 @@ interface RequestState {
 
 interface BuildOrderProductionTabProps {
   buildOrderId: string;
+  currentBatchCode: string;
 }
 
 interface RemainingItem {
@@ -85,7 +86,7 @@ interface RemainingItem {
   return_qty?: number;
 }
 
-export function BuildOrderProductionTab({ buildOrderId }: BuildOrderProductionTabProps) {
+export function BuildOrderProductionTab({ buildOrderId, currentBatchCode }: BuildOrderProductionTabProps) {
   const { t } = useTranslation();
   const { username, roleId, roleSlug, userId } = useAuth();
 
@@ -99,6 +100,7 @@ export function BuildOrderProductionTab({ buildOrderId }: BuildOrderProductionTa
   const [remainingLoading, setRemainingLoading] = useState(false);
   const [returnLoading, setReturnLoading] = useState(false);
   const [returnOrders, setReturnOrders] = useState<any[]>([]);
+  const [groupBuildOrders, setGroupBuildOrders] = useState<Array<{ batch_code: string; build_order_id: string }>>([]);
 
   useEffect(() => {
     loadData();
@@ -122,6 +124,7 @@ export function BuildOrderProductionTab({ buildOrderId }: BuildOrderProductionTa
   const loadProductionData = async () => {
     try {
       const response = await api.get(requestsApi.getBuildOrderProduction(buildOrderId));
+      setGroupBuildOrders(response.data?.group_build_orders || []);
       if (response.data && response.data.series) {
         const normalizeMaterials = (materials: Material[] | undefined) => (materials || []).map(material => ({
           ...material,
@@ -372,6 +375,8 @@ export function BuildOrderProductionTab({ buildOrderId }: BuildOrderProductionTa
           savingSerie={savingSerie}
           isCanceled={false}
           currentUsername={username}
+          editableBatchCode={currentBatchCode}
+          groupBuildOrders={groupBuildOrders}
         />
 
         {allSeriesSaved && (
