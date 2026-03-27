@@ -21,6 +21,7 @@ class RequestCreate(BaseModel):
     destination: str  # Stock location ObjectId from depo_locations
     items: List[RequestItemCreate]
     notes: Optional[str] = None
+    labels: Optional[List[str]] = None
     product_id: Optional[str] = None  # Main product ObjectId if recipe-based
     product_quantity: Optional[float] = None  # Quantity of main product
     recipe_id: Optional[str] = None  # Recipe ObjectId if recipe-based
@@ -31,6 +32,7 @@ class RequestUpdate(BaseModel):
     source: Optional[str] = None
     destination: Optional[str] = None
     notes: Optional[str] = None
+    labels: Optional[List[str]] = None
     batch_codes: Optional[List[str]] = None
     status: Optional[str] = None
     issue_date: Optional[str] = None

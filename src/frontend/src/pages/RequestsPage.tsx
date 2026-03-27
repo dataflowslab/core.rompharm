@@ -70,6 +70,7 @@ interface Request {
   status: string;
   issue_date: string;
   created_at: string;
+  labels?: string[];
   items?: RequestItem[];
   product_detail?: {
     name: string;
@@ -694,6 +695,7 @@ export function RequestsPage() {
                     {renderSortIcon('status')}
                   </Group>
                 </Table.Th>
+                <Table.Th>{t('Labels')}</Table.Th>
                 <Table.Th onClick={() => toggleSort('issue_date')} style={{ cursor: 'pointer' }}>
                   <Group gap={6}>
                     <span>{t('Issue Date')}</span>
@@ -746,6 +748,19 @@ export function RequestsPage() {
                         />
                       )}
                     </Group>
+                  </Table.Td>
+                  <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
+                    {request.labels && request.labels.length > 0 ? (
+                      <Group gap="xs">
+                        {request.labels.map((label) => (
+                          <Badge key={`${request._id}-${label}`} variant="light" color="gray">
+                            {label}
+                          </Badge>
+                        ))}
+                      </Group>
+                    ) : (
+                      <Text size="sm" c="dimmed">-</Text>
+                    )}
                   </Table.Td>
                   <Table.Td onClick={() => navigate(`/requests/${request._id}`)}>
                     {formatDate(request.issue_date)}

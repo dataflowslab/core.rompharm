@@ -793,6 +793,7 @@ async def create_request(
         'items': items_with_init_q,
         'line_items': len(request_data.items),
         'notes': request_data.notes or '',
+        'labels': request_data.labels or [],
         'issue_date': datetime.utcnow(),
         'created_at': datetime.utcnow(),
         'updated_at': datetime.utcnow(),
@@ -936,6 +937,8 @@ async def update_request(
         update_data['destination'] = request_data.destination
     if request_data.notes is not None:
         update_data['notes'] = request_data.notes
+    if request_data.labels is not None:
+        update_data['labels'] = request_data.labels
     if request_data.batch_codes is not None:
         update_data['batch_codes'] = request_data.batch_codes
         if request_data.batch_codes:

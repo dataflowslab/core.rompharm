@@ -1560,8 +1560,6 @@ async def create_build_order_return_orders(
         raise HTTPException(status_code=404, detail="Build order not found")
 
     current_batch_code = _normalize_batch_code_value(build_order.get("batch_code_text") or build_order.get("batch_code"))
-    if current_batch_code and _normalize_batch_code_value(batch_code) != current_batch_code:
-        raise HTTPException(status_code=400, detail="You can only save the current build order batch code")
     if current_batch_code:
         conflict = db.depo_build_production.find_one({
             "build_order_id": {"$ne": build_oid},

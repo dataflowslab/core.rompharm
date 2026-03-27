@@ -11,6 +11,7 @@ from src.backend.models.approval_flow_model import ApprovalFlowModel
 from src.backend.utils.approval_helpers import check_user_can_sign
 
 from .approval_helpers import check_flow_completion, enrich_flow_with_user_details
+from .utils import generate_request_reference
 
 
 router = APIRouter()
@@ -394,13 +395,8 @@ async def update_reception_status(
             source_id = request_doc.get('source')
             destination_id = request_doc.get('destination')
 
-            if source_id:
-                update_data['destination'] = source_id
-                update_data['reception_return_to_sender'] = True
-
-            if destination_id and not request_doc.get('reception_initial_destination'):
-                update_data['reception_initial_destination'] = destination_id
-
+            update_data['reception_return_to_sender'] = True
+            update_data['open'] = False
             update_data['reception_rejected_at'] = timestamp
             update_data['reception_rejected_by'] = {
                 'user_id': str(current_user.get('_id')),
@@ -414,6 +410,99 @@ async def update_reception_status(
             status_log_entry['initial_destination_id'] = str(destination_id) if destination_id else None
             status_log_entry['rejected_by_user_id'] = str(current_user.get('_id'))
             status_log_entry['rejected_by_username'] = current_user.get('username')
+
+            if source_id and destination_id and source_id != destination_id:
+                try:
+                    return_reference = generate_request_reference(db)
+                    origin_ref = request_doc.get('reference') or str(request_doc.get('_id'))
+                    date_str = timestamp.date().isoformat()
+                    return_note = f"Return for refused request #{origin_ref}/{date_str}"
+
+                    items = []
+                    for item in request_doc.get('items', []) or []:
+                        item_copy = dict(item)
+                        if item_copy.get('init_q') is None and item_copy.get('quantity') is not None:
+                            item_copy['init_q'] = item_copy.get('quantity')
+                        items.append(item_copy)
+
+                    return_doc = {
+                        'reference': return_reference,
+                        'source': destination_id,
+                        'destination': source_id,
+                        'items': items,
+                        'line_items': len(items),
+                        'notes': return_note,
+                        'labels': ['return'],
+                        'issue_date': timestamp,
+                        'created_at': timestamp,
+                        'updated_at': timestamp,
+                        'created_by': current_user.get('username')
+                    }
+
+                    if request_doc.get('recipe_id'):
+                        return_doc['recipe_id'] = request_doc.get('recipe_id')
+                    if request_doc.get('recipe_part_id'):
+                        return_doc['recipe_part_id'] = request_doc.get('recipe_part_id')
+                    if request_doc.get('product_id'):
+                        return_doc['product_id'] = request_doc.get('product_id')
+                    if request_doc.get('product_quantity'):
+                        return_doc['product_quantity'] = request_doc.get('product_quantity')
+                    if request_doc.get('batch_codes'):
+                        return_doc['batch_codes'] = request_doc.get('batch_codes')
+
+                    result = requests_collection.insert_one(return_doc)
+                    return_request_id = str(result.inserted_id)
+
+                    try:
+                        config_collection = db['config']
+                        approval_config = config_collection.find_one({'slug': 'requests_operations_flow'})
+
+                        if approval_config and 'items' in approval_config:
+                            flow_config = None
+                            for item in approval_config.get('items', []):
+                                if item.get('slug') == 'operations' and item.get('enabled', True):
+                                    flow_config = item
+                                    break
+
+                            if flow_config:
+                                can_sign_officers = []
+                                for user in flow_config.get('can_sign', []):
+                                    can_sign_officers.append({
+                                        "type": "person",
+                                        "reference": user.get('user_id'),
+                                        "username": user.get('username'),
+                                        "action": "can_sign"
+                                    })
+
+                                must_sign_officers = []
+                                for user in flow_config.get('must_sign', []):
+                                    must_sign_officers.append({
+                                        "type": "person",
+                                        "reference": user.get('user_id'),
+                                        "username": user.get('username'),
+                                        "action": "must_sign"
+                                    })
+
+                                flow_data = {
+                                    "object_type": "stock_request",
+                                    "object_source": "depo_request",
+                                    "object_id": return_request_id,
+                                    "config_slug": flow_config.get('slug'),
+                                    "min_signatures": flow_config.get('min_signatures', 1),
+                                    "can_sign_officers": can_sign_officers,
+                                    "must_sign_officers": must_sign_officers,
+                                    "signatures": [],
+                                    "status": "pending",
+                                    "created_at": datetime.utcnow(),
+                                    "updated_at": datetime.utcnow()
+                                }
+
+                                db.approval_flows.insert_one(flow_data)
+                                print(f"[REQUESTS] Auto-created approval flow for return request {return_request_id}")
+                    except Exception as e:
+                        print(f"[REQUESTS] Warning: Failed to auto-create approval flow for return request: {e}")
+                except Exception as e:
+                    print(f"[REQUESTS] Warning: Failed to create return request: {e}")
         
         requests_collection.update_one(
             {'_id': req_obj_id},
