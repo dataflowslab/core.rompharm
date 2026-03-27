@@ -655,6 +655,8 @@ async def get_request(
         req['recipe_id'] = str(req['recipe_id'])
     if 'recipe_part_id' in req and isinstance(req['recipe_part_id'], ObjectId):
         req['recipe_part_id'] = str(req['recipe_part_id'])
+    if 'build_order_id' in req and isinstance(req['build_order_id'], ObjectId):
+        req['build_order_id'] = str(req['build_order_id'])
     
     # Convert status_log ObjectIds to strings
     if 'status_log' in req and req['status_log']:
